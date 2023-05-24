@@ -21,7 +21,8 @@ outputs:
   yourRandomNumber: "{{randomNumber}}"
 
 tasks:
-  - type: randomInt
+  - name: Generate a random number
+    type: randomInt
     startInclusive: 0
     endInclusive: 10000
     output: randomNumber
