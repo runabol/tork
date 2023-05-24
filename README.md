@@ -14,10 +14,10 @@ A distributed workflow engine.
 # Pipelines (Draft)
 
 ```yaml
-inputs:
+input:
   yourName: string
     
-outputs:
+output:
   yourRandomNumber: "{{randomNumber}}"
 
 tasks:
