@@ -5,11 +5,10 @@ A distributed workflow engine.
 # Goals
 
 1. Simple
-2. Distributed
+2. Embeddable
 3. Horizontally scalable
-4. Embeddable
-5. Pipeline code assist
-6. Pipeline validation
+4. Type-safety support for pipelines
+5. Ability to execute Ad-hoc piplines
 
 # Pipelines (Draft)
 
