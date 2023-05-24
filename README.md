@@ -53,3 +53,15 @@ tasks:
     file: ${item}
     output: fileSizes
 ```
+
+### Parallel
+
+```yaml
+- type: parallel
+  tasks: 
+    - type: time/sleep
+      duration: 5s
+        
+    - type: time/sleep
+      duration: 3s
+```
