@@ -13,7 +13,7 @@ A distributed workflow engine.
 
 # Pipelines (Draft)
 
-```
+```yaml
 inputs:
   yourName: string
     
