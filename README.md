@@ -9,6 +9,8 @@ A pain-less, distributed workflow engine.
 3. Horizontally scalable
 4. Type-safety support for pipelines
 5. Ability to execute Ad-hoc piplines
+6. Easy to extend
+7. No single point of failure
 
 # Pipelines (Draft)
 
