@@ -12,7 +12,7 @@ A pain-less, distributed workflow engine.
 6. Easy to extend
 7. No single point of failure
 
-# Pipelines (Draft)
+# Pipeline Definition (Draft)
 
 ```yaml
 input:
