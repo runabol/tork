@@ -50,7 +50,7 @@ tasks:
   ]
   mapper:
     type: io/filesize         
-    file: ${item}
+    file: "{{item}}"
     output: fileSizes
 ```
 
