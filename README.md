@@ -11,7 +11,7 @@ A distributed workflow engine.
 5. Pipeline code assist
 6. Pipeline validation
 
-# DSL (Draft)
+# Pipelines (Draft)
 
 ```
 inputs:
