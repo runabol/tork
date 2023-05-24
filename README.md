@@ -5,12 +5,13 @@ A pain-less, distributed workflow engine.
 # Goals
 
 1. Simple
-2. Embeddable
-3. Horizontally scalable
-4. Type-safety support for pipelines
-5. Ability to execute Ad-hoc piplines
-6. Easy to extend
-7. No single point of failure
+2. Lightweight
+3. Embeddable
+4. Horizontally scalable
+5. Type-safety support for pipelines
+6. Ability to execute Ad-hoc piplines
+7. Easy to extend
+8. No single point of failure
 
 # Pipeline Definition (Draft)
 
