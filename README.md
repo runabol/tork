@@ -1,4 +1,4 @@
-# tork
+# Tork
 
 A distributed workflow engine.
 
@@ -35,4 +35,21 @@ tasks:
   - label: Print a farewell
     type: io/print
     text: "Goodbye {{yourName}}"
+```
+
+## Special Tasks
+
+### Map
+
+```yaml
+- type: map
+  list: [
+     "/path/to/file1.txt",
+     "/path/to/file2.txt",
+     "/path/to/file3.txt"
+  ]
+  mapper:
+    type: io/filesize         
+    file: ${item}
+    output: fileSizes
 ```
