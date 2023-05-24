@@ -18,7 +18,7 @@ inputs:
   yourName: string
     
 outputs:
-  myMagicNumber: randomNumber
+  myMagicNumber: "{{randomNumber}}"
 
 tasks:
   - type: random/int
@@ -27,12 +27,12 @@ tasks:
     output: randomNumber
     
   - type: io/print             
-    text: Hello {{yourName}}
+    text: "Hello {{yourName}}"
     
   - type: time/sleep
-    millis: {{randomNumber}}
+    millis: "{{randomNumber}}"
     
   - label: Print a farewell
     type: io/print
-    text: Goodbye {{yourName}}
+    text: "Goodbye {{yourName}}"
 ```
