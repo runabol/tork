@@ -32,8 +32,7 @@ tasks:
   - type: sleep
     millis: "{{randomNumber}}"
     
-  - label: Print a farewell
-    type: print
+  - type: print
     text: "Goodbye {{yourName}}"
 ```
 
