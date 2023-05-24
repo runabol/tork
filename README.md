@@ -21,19 +21,19 @@ outputs:
   myMagicNumber: "{{randomNumber}}"
 
 tasks:
-  - type: random/int
+  - type: randomInt
     startInclusive: 0
     endInclusive: 10000
     output: randomNumber
     
-  - type: io/print             
+  - type: print            
     text: "Hello {{yourName}}"
     
-  - type: time/sleep
+  - type: sleep
     millis: "{{randomNumber}}"
     
   - label: Print a farewell
-    type: io/print
+    type: print
     text: "Goodbye {{yourName}}"
 ```
 
@@ -49,7 +49,7 @@ tasks:
      "/path/to/file3.txt"
   ]
   mapper:
-    type: io/filesize         
+    type: fileSize         
     file: "{{item}}"
     output: fileSizes
 ```
@@ -59,9 +59,9 @@ tasks:
 ```yaml
 - type: parallel
   tasks: 
-    - type: time/sleep
+    - type: sleep
       duration: 5s
         
-    - type: time/sleep
+    - type: sleep
       duration: 3s
 ```
