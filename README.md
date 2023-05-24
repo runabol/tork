@@ -18,7 +18,7 @@ inputs:
   yourName: string
     
 outputs:
-  myMagicNumber: "{{randomNumber}}"
+  yourRandomNumber: "{{randomNumber}}"
 
 tasks:
   - type: randomInt
