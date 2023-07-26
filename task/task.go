@@ -39,6 +39,13 @@ type Docker struct {
 	ContainerId string
 }
 
+type DockerResult struct {
+	Error       error
+	Action      string
+	ContainerId string
+	Result      string
+}
+
 type Config struct {
 	Name          string
 	AttachStdin   bool
