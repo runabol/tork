@@ -1,6 +1,6 @@
 # Tork
 
-A pain-less, distributed workflow engine.
+A distributed workflow engine.
 
 # Goals
 
