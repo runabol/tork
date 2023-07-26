@@ -11,7 +11,7 @@ A distributed workflow engine.
 5. Minimum amount of "magic"
 6. Horizontally scalable
 7. Type-safety support for pipelines
-8. Ability to execute Ad-hoc piplines
+8. Ability to execute Ad-hoc piplines / encourage expermintation / iterative development process
 9. No single point of failure
 
 # Pipeline Definition (Draft)
@@ -31,9 +31,18 @@ defaults:
         AWS_SECRET_KEY: env('DEFAULT_AWS_SECRET_KEY')
 
 tasks:
+  - name: echo your name
+    image: ubuntu:scratch
+    cmd: echo {{yourName}}
+
   - name: s3 cp
     image: amazon/aws-cli
     cmd: aws s3 cp s3://my-source-bucket/file s3://my-target-bucket/file
+
+  - var: yourRandomNumber
+    name: generate random number
+    image: ubuntu:scratch
+    cmd: echo $((RANDOM))
 ```
 
 ## Pre/Post Tasks
