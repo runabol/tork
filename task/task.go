@@ -5,6 +5,8 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/google/uuid"
+
+	"github.com/docker/docker/client"
 )
 
 type State int
@@ -29,7 +31,12 @@ type Task struct {
 	RestartPolicy string
 	StartTime     time.Time
 	FinishTime    time.Time
-	Config        Config
+}
+
+type Docker struct {
+	Client      *client.Client
+	Config      Config
+	ContainerId string
 }
 
 type Config struct {
