@@ -19,19 +19,6 @@ type Worker struct {
 	Client    *client.Client
 }
 
-type Config struct {
-	Name          string
-	AttachStdin   bool
-	AttachStdout  bool
-	AttachStderr  bool
-	Cmd           []string
-	Image         string
-	Memory        int64
-	Disk          int64
-	Env           []string
-	RestartPolicy string
-}
-
 func NewWorker() (*Worker, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -52,11 +39,8 @@ func (w *Worker) RunTask() {
 
 func (w *Worker) StartTask(t task.Task) error {
 	t.StartTime = time.Now().UTC()
-	cfg := Config{
-		Image: t.Image,
-	}
 	d := dockerClient{}
-	containerID, err := d.run(cfg)
+	containerID, err := d.run(t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
 		t.State = task.Failed

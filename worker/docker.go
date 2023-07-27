@@ -10,33 +10,34 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/tork/task"
 )
 
 type dockerClient struct {
 	Client *client.Client
 }
 
-func (d *dockerClient) run(cfg Config) (string, error) {
+func (d *dockerClient) run(t task.Task) (string, error) {
 	ctx := context.Background()
 	reader, err := d.Client.ImagePull(
-		ctx, cfg.Image, types.ImagePullOptions{})
+		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
-		log.Printf("Error pulling image %s: %v\n", cfg.Image, err)
+		log.Printf("Error pulling image %s: %v\n", t.Image, err)
 		return "", err
 	}
 	io.Copy(os.Stdout, reader)
 
 	rp := container.RestartPolicy{
-		Name: cfg.RestartPolicy,
+		Name: t.RestartPolicy,
 	}
 
 	r := container.Resources{
-		Memory: cfg.Memory,
+		Memory: t.Memory,
 	}
 
 	cc := container.Config{
-		Image: cfg.Image,
-		Env:   cfg.Env,
+		Image: t.Image,
+		Env:   t.Env,
 	}
 
 	hc := container.HostConfig{
@@ -46,11 +47,11 @@ func (d *dockerClient) run(cfg Config) (string, error) {
 	}
 
 	resp, err := d.Client.ContainerCreate(
-		ctx, &cc, &hc, nil, nil, cfg.Name)
+		ctx, &cc, &hc, nil, nil, t.Name)
 	if err != nil {
 		log.Printf(
 			"Error creating container using image %s: %v\n",
-			cfg.Image, err,
+			t.Image, err,
 		)
 		return "", err
 	}

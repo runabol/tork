@@ -18,16 +18,17 @@ const (
 
 type Task struct {
 	ID            uuid.UUID
-	ContainerID   string
 	Name          string
 	State         State
-	Image         string
-	Memory        int
-	Disk          int
-	PortBindings  map[string]string
-	RestartPolicy string
 	StartTime     time.Time
 	FinishTime    time.Time
+	CMD           []string
+	Image         string
+	Memory        int64
+	Disk          int64
+	Env           []string
+	RestartPolicy string
+	ContainerID   string
 }
 
 type TaskEvent struct {
