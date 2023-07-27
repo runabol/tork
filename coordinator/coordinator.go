@@ -7,7 +7,7 @@ import (
 	"github.com/tork/task"
 )
 
-type Manager struct {
+type Coordinator struct {
 	Pending       queue.Queue
 	TaskDB        map[string][]task.Task
 	EventDB       map[string][]task.TaskEvent
@@ -16,14 +16,14 @@ type Manager struct {
 	TaskWorkerMap map[string]string
 }
 
-func (m *Manager) SelectWorker() {
+func (m *Coordinator) SelectWorker() {
 	fmt.Println("I will select an appropriate worker")
 }
 
-func (m *Manager) UpdateTasks() {
+func (m *Coordinator) UpdateTasks() {
 	fmt.Println("I will update tasks")
 }
 
-func (m *Manager) SendWork() {
+func (m *Coordinator) SendWork() {
 	fmt.Println("I will send work to workers")
 }
