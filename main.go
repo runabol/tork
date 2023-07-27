@@ -19,11 +19,16 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Info().Msg("Starting up")
 
+	// create a broker
 	b := broker.NewInMemoryBroker()
-	w, err := worker.NewWorker(b)
+
+	// create a worker
+	w, err := worker.NewWorker(worker.Config{Broker: b})
 	if err != nil {
 		panic(err)
 	}
+
+	// send a dummy task
 	t := task.Task{
 		ID:    uuid.NewUUID(),
 		State: task.Pending,
@@ -36,16 +41,14 @@ func main() {
 	}
 
 	b.Send(ctx, w.Name, t)
-
 	time.Sleep(2 * time.Second)
 
 	t.State = task.Cancelled
-
 	err = b.Send(ctx, w.Name, t)
 
 	if err != nil {
 		panic(err)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 }

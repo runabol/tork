@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -19,7 +18,11 @@ type Worker struct {
 	runtime runtime.Runtime
 }
 
-func NewWorker(b broker.Broker) (*Worker, error) {
+type Config struct {
+	Broker broker.Broker
+}
+
+func NewWorker(cfg Config) (*Worker, error) {
 	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
 	r, err := runtime.NewDockerRuntime()
 	if err != nil {
@@ -29,7 +32,7 @@ func NewWorker(b broker.Broker) (*Worker, error) {
 		Name:    name,
 		runtime: r,
 	}
-	err = b.Receive(name, w.handleTask)
+	err = cfg.Broker.Receive(name, w.handleTask)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error subscribing for queue: %s", name)
 	}
@@ -66,7 +69,6 @@ func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
 	if err != nil {
 		log.Printf("Error stopping task %s: %v", t.ID, err)
 	}
-	t.EndTime = time.Now().UTC()
 	log.Printf("Stopped and removed task %s", t.ID)
 	return err
 }
