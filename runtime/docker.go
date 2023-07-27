@@ -1,4 +1,4 @@
-package worker
+package runtime
 
 import (
 	"context"
@@ -13,13 +13,21 @@ import (
 	"github.com/tork/task"
 )
 
-type dockerRuntime struct {
-	Client *client.Client
+type DockerRuntime struct {
+	client *client.Client
 }
 
-func (d *dockerRuntime) start(t task.Task) (string, error) {
+func NewDockerRuntime() (*DockerRuntime, error) {
+	dc, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	return &DockerRuntime{client: dc}, nil
+}
+
+func (d *DockerRuntime) Start(t task.Task) (string, error) {
 	ctx := context.Background()
-	reader, err := d.Client.ImagePull(
+	reader, err := d.client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
 		log.Printf("Error pulling image %s: %v\n", t.Image, err)
@@ -46,7 +54,7 @@ func (d *dockerRuntime) start(t task.Task) (string, error) {
 		PublishAllPorts: true,
 	}
 
-	resp, err := d.Client.ContainerCreate(
+	resp, err := d.client.ContainerCreate(
 		ctx, &cc, &hc, nil, nil, t.Name)
 	if err != nil {
 		log.Printf(
@@ -56,14 +64,14 @@ func (d *dockerRuntime) start(t task.Task) (string, error) {
 		return "", err
 	}
 
-	err = d.Client.ContainerStart(
+	err = d.client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Printf("Error starting container %s: %v\n", resp.ID, err)
 		return "", err
 	}
 
-	out, err := d.Client.ContainerLogs(
+	out, err := d.client.ContainerLogs(
 		ctx,
 		resp.ID,
 		types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true},
@@ -78,14 +86,14 @@ func (d *dockerRuntime) start(t task.Task) (string, error) {
 	return resp.ID, nil
 }
 
-func (d *dockerRuntime) stop(id string) error {
+func (d *DockerRuntime) Stop(id string) error {
 	log.Printf("Attempting to stop container %v", id)
 	ctx := context.Background()
-	err := d.Client.ContainerStop(ctx, id, container.StopOptions{})
+	err := d.client.ContainerStop(ctx, id, container.StopOptions{})
 	if err != nil {
 		return err
 	}
-	err = d.Client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
+	err = d.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
 	if err != nil {
 		return err
 	}

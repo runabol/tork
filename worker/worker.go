@@ -5,27 +5,22 @@ import (
 	"log"
 	"time"
 
-	"github.com/docker/docker/client"
+	"github.com/tork/runtime"
 	"github.com/tork/task"
 )
 
 type Worker struct {
 	tasks   map[string]string
-	runtime runtime
-}
-
-type runtime interface {
-	start(t task.Task) (string, error)
-	stop(containerID string) error
+	runtime runtime.Runtime
 }
 
 func NewWorker() (*Worker, error) {
-	dc, err := client.NewClientWithOpts(client.FromEnv)
+	r, err := runtime.NewDockerRuntime()
 	if err != nil {
 		return nil, err
 	}
 	return &Worker{
-		runtime: &dockerRuntime{Client: dc},
+		runtime: r,
 		tasks:   make(map[string]string),
 	}, nil
 }
@@ -39,7 +34,7 @@ func (w *Worker) RunTask() {
 }
 
 func (w *Worker) StartTask(t task.Task) error {
-	containerID, err := w.runtime.start(t)
+	containerID, err := w.runtime.Start(t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
 		return err
@@ -50,10 +45,11 @@ func (w *Worker) StartTask(t task.Task) error {
 
 func (w *Worker) StopTask(t task.Task) error {
 	containerID := w.tasks[t.ID]
-	err := w.runtime.stop(containerID)
+	err := w.runtime.Stop(containerID)
 	if err != nil {
 		log.Printf("Error stopping container %v: %v", containerID, err)
 	}
+	delete(w.tasks, t.ID)
 	t.EndTime = time.Now().UTC()
 	log.Printf("Stopped and removed container %v for task %v", containerID, t.ID)
 	return err
