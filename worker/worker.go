@@ -3,6 +3,9 @@ package worker
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
 
@@ -16,27 +19,23 @@ import (
 type Worker struct {
 	Name    string
 	runtime runtime.Runtime
+	cfg     Config
+	done    chan os.Signal
 }
 
 type Config struct {
 	Broker broker.Broker
 }
 
-func NewWorker(cfg Config) (*Worker, error) {
+func NewWorker(cfg Config) *Worker {
 	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
-	r, err := runtime.NewDockerRuntime()
-	if err != nil {
-		return nil, err
-	}
 	w := &Worker{
-		Name:    name,
-		runtime: r,
+		Name: name,
+		cfg:  cfg,
+		done: make(chan os.Signal),
 	}
-	err = cfg.Broker.Receive(name, w.handleTask)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error subscribing for queue: %s", name)
-	}
-	return w, nil
+	signal.Notify(w.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	return w
 }
 
 func (w *Worker) CollectStats() {
@@ -71,4 +70,19 @@ func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
 	}
 	log.Printf("Stopped and removed task %s", t.ID)
 	return err
+}
+
+func (w *Worker) Start() error {
+	log.Info().Msgf("starting %s", w.Name)
+	r, err := runtime.NewDockerRuntime()
+	if err != nil {
+		return err
+	}
+	w.runtime = r
+	err = w.cfg.Broker.Receive(w.Name, w.handleTask)
+	if err != nil {
+		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
+	}
+	<-w.done
+	return nil
 }

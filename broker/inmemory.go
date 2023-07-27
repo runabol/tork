@@ -24,12 +24,15 @@ func NewInMemoryBroker() *InMemoryBroker {
 }
 
 func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) error {
-	log.Debug().Msgf("sending task %s to %s", t.ID, qname)
+	log.Debug().Msgf("sending task %s (%s) to %s", t.ID, t.State, qname)
 	b.mu.RLock()
-	defer b.mu.RUnlock()
 	q, ok := b.queues[qname]
+	b.mu.RUnlock()
 	if !ok {
-		return ErrUnknownQueue
+		b.mu.Lock()
+		q = make(chan task.Task, 10)
+		b.queues[qname] = q
+		b.mu.Unlock()
 	}
 	q <- t
 	return nil

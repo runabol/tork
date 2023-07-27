@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/tork/broker"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
@@ -17,16 +15,12 @@ func main() {
 
 	// loggging
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Info().Msg("Starting up")
 
 	// create a broker
 	b := broker.NewInMemoryBroker()
 
 	// create a worker
-	w, err := worker.NewWorker(worker.Config{Broker: b})
-	if err != nil {
-		panic(err)
-	}
+	w := worker.NewWorker(worker.Config{Broker: b})
 
 	// send a dummy task
 	t := task.Task{
@@ -39,16 +33,18 @@ func main() {
 			"POSTGRES_PASSWORD=secret",
 		},
 	}
-
 	b.Send(ctx, w.Name, t)
-	time.Sleep(2 * time.Second)
 
+	// cancel the dummy task
 	t.State = task.Cancelled
-	err = b.Send(ctx, w.Name, t)
+	err := b.Send(ctx, w.Name, t)
 
 	if err != nil {
 		panic(err)
 	}
 
-	time.Sleep(5 * time.Second)
+	err = w.Start()
+	if err != nil {
+		panic(err)
+	}
 }
