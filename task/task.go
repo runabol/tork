@@ -2,8 +2,6 @@ package task
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type State int
@@ -17,22 +15,21 @@ const (
 )
 
 type Task struct {
-	ID            uuid.UUID
+	ID            string
 	Name          string
 	State         State
 	StartTime     time.Time
-	FinishTime    time.Time
+	EndTime       time.Time
 	CMD           []string
 	Image         string
 	Memory        int64
 	Disk          int64
 	Env           []string
 	RestartPolicy string
-	ContainerID   string
 }
 
 type TaskEvent struct {
-	ID        uuid.UUID
+	ID        string
 	State     State
 	Timestamp time.Time
 	Task      Task

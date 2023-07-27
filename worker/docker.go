@@ -13,11 +13,11 @@ import (
 	"github.com/tork/task"
 )
 
-type dockerClient struct {
+type dockerRuntime struct {
 	Client *client.Client
 }
 
-func (d *dockerClient) run(t task.Task) (string, error) {
+func (d *dockerRuntime) start(t task.Task) (string, error) {
 	ctx := context.Background()
 	reader, err := d.Client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
@@ -78,7 +78,7 @@ func (d *dockerClient) run(t task.Task) (string, error) {
 	return resp.ID, nil
 }
 
-func (d *dockerClient) stop(id string) error {
+func (d *dockerRuntime) stop(id string) error {
 	log.Printf("Attempting to stop container %v", id)
 	ctx := context.Background()
 	err := d.Client.ContainerStop(ctx, id, container.StopOptions{})

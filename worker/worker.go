@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
-	"github.com/golang-collections/collections/queue"
-	"github.com/google/uuid"
 	"github.com/tork/task"
 )
 
 type Worker struct {
-	Name      string
-	Queue     queue.Queue
-	DB        map[uuid.UUID]task.Task
-	TaskCount int
-	Client    *client.Client
+	tasks   map[string]string
+	runtime runtime
+}
+
+type runtime interface {
+	start(t task.Task) (string, error)
+	stop(containerID string) error
 }
 
 func NewWorker() (*Worker, error) {
@@ -25,7 +25,8 @@ func NewWorker() (*Worker, error) {
 		return nil, err
 	}
 	return &Worker{
-		Client: dc,
+		runtime: &dockerRuntime{Client: dc},
+		tasks:   make(map[string]string),
 	}, nil
 }
 
@@ -38,30 +39,22 @@ func (w *Worker) RunTask() {
 }
 
 func (w *Worker) StartTask(t task.Task) error {
-	t.StartTime = time.Now().UTC()
-	d := dockerClient{}
-	containerID, err := d.run(t)
+	containerID, err := w.runtime.start(t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
-		t.State = task.Failed
-		w.DB[t.ID] = t
 		return err
 	}
-	t.ContainerID = containerID
-	t.State = task.Running
-	w.DB[t.ID] = t
+	w.tasks[t.ID] = containerID
 	return nil
 }
 
 func (w *Worker) StopTask(t task.Task) error {
-	d := dockerClient{}
-	err := d.stop(t.ContainerID)
+	containerID := w.tasks[t.ID]
+	err := w.runtime.stop(containerID)
 	if err != nil {
-		log.Printf("Error stopping container %v: %v", t.ContainerID, err)
+		log.Printf("Error stopping container %v: %v", containerID, err)
 	}
-	t.FinishTime = time.Now().UTC()
-	t.State = task.Completed
-	w.DB[t.ID] = t
-	log.Printf("Stopped and removed container %v for task %v", t.ContainerID, t.ID)
+	t.EndTime = time.Now().UTC()
+	log.Printf("Stopped and removed container %v for task %v", containerID, t.ID)
 	return err
 }

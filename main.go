@@ -1,28 +1,40 @@
 package main
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/tork/task"
 	"github.com/tork/worker"
 )
 
 func main() {
-
 	w, err := worker.NewWorker()
 	if err != nil {
 		panic(err)
 	}
-
 	t := task.Task{
-		ID:     uuid.New(),
-		Name:   "Task-1",
-		State:  task.Pending,
-		Image:  "Image-1",
-		Memory: 1024,
-		Disk:   1,
+		ID:    uuid.New().String(),
+		State: task.Pending,
+		Name:  "test-container-1",
+		Image: "postgres:13",
+		Env: []string{
+			"POSTGRES_USER=cube",
+			"POSTGRES_PASSWORD=secret",
+		},
 	}
 
-	w.StartTask(t)
+	err = w.StartTask(t)
+	if err != nil {
+		panic(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	err = w.StopTask(t)
+	if err != nil {
+		panic(err)
+	}
 
 	// 	te := task.TaskEvent{
 	// 		ID:        uuid.New(),

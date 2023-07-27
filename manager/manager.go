@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/golang-collections/collections/queue"
-	"github.com/google/uuid"
 	"github.com/tork/task"
 )
 
@@ -13,8 +12,8 @@ type Manager struct {
 	TaskDB        map[string][]task.Task
 	EventDB       map[string][]task.TaskEvent
 	Workers       []string
-	WorkerTaskMap map[string][]uuid.UUID
-	TaskWorkerMap map[uuid.UUID]string
+	WorkerTaskMap map[string][]string
+	TaskWorkerMap map[string]string
 }
 
 func (m *Manager) SelectWorker() {
