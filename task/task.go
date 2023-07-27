@@ -31,7 +31,9 @@ type Task struct {
 	RestartPolicy string
 }
 
-type CancelEvent struct {
+// CancelRequest contains the information necessary
+// to cancel a running task
+type CancelRequest struct {
 	ID   string
 	Task Task
 }

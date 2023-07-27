@@ -25,7 +25,7 @@ func main() {
 	// send a dummy task
 	t := task.Task{
 		ID:    uuid.NewUUID(),
-		State: task.Pending,
+		State: task.Scheduled,
 		Name:  "test-container-1",
 		Image: "postgres:13",
 		Env: []string{
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	// cancel the dummy task
-	err = b.Send(ctx, w.Name, task.CancelEvent{ID: uuid.NewUUID(), Task: t})
+	err = b.Send(ctx, w.Name, task.CancelRequest{ID: uuid.NewUUID(), Task: t})
 	if err != nil {
 		panic(err)
 	}

@@ -46,7 +46,7 @@ func (w *Worker) handleMessage(ctx context.Context, msg any) error {
 	switch v := msg.(type) {
 	case task.Task:
 		return w.startTask(ctx, v)
-	case task.CancelEvent:
+	case task.CancelRequest:
 		return w.stopTask(ctx, v.Task)
 	default:
 		return errors.Errorf("unknown message type: %T", msg)
@@ -54,6 +54,9 @@ func (w *Worker) handleMessage(ctx context.Context, msg any) error {
 }
 
 func (w *Worker) startTask(ctx context.Context, t task.Task) error {
+	if t.State != task.Scheduled {
+		return errors.Errorf("can't start a task in %s state", t.State)
+	}
 	err := w.runtime.Start(ctx, t)
 	if err != nil {
 		log.Printf("error running task %v: %v\n", t.ID, err)
