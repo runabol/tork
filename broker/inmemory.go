@@ -40,12 +40,14 @@ func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) er
 
 func (b *InMemoryBroker) Receive(qname string, handler func(ctx context.Context, t task.Task) error) error {
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
 	q, ok := b.queues[qname]
+	b.mu.RUnlock()
 	if !ok {
 		q = make(chan task.Task, 10)
+		b.mu.Lock()
 		b.queues[qname] = q
+		b.mu.Unlock()
 	}
 	go func() {
 		ctx := context.TODO()
