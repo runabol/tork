@@ -2,8 +2,9 @@ package broker
 
 import (
 	"context"
-	"log"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/tork/task"
 )
@@ -20,7 +21,7 @@ func NewInMemoryBroker() *InMemoryBroker {
 }
 
 func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) error {
-	log.Printf("sending task %v to %s", t, qname)
+	log.Debug().Msgf("sending task %s to %s", t.ID, qname)
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	q, ok := b.queues[qname]
@@ -32,7 +33,7 @@ func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) er
 }
 
 func (b *InMemoryBroker) Receive(qname string, handler func(ctx context.Context, t task.Task) error) error {
-	log.Printf("subscribing for tasks on %s", qname)
+	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	q, ok := b.queues[qname]

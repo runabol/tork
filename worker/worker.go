@@ -3,14 +3,15 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+
 	"github.com/pkg/errors"
 	"github.com/tork/broker"
 	"github.com/tork/runtime"
 	"github.com/tork/task"
+	"github.com/tork/uuid"
 )
 
 type Worker struct {
@@ -19,7 +20,7 @@ type Worker struct {
 }
 
 func NewWorker(b broker.Broker) (*Worker, error) {
-	name := fmt.Sprintf("worker-%s", uuid.NewString())
+	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
 	r, err := runtime.NewDockerRuntime()
 	if err != nil {
 		return nil, err
