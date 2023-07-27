@@ -33,16 +33,19 @@ func main() {
 			"POSTGRES_PASSWORD=secret",
 		},
 	}
-	b.Send(ctx, w.Name, t)
-
-	// cancel the dummy task
-	t.State = task.Cancelled
 	err := b.Send(ctx, w.Name, t)
-
 	if err != nil {
 		panic(err)
 	}
 
+	// cancel the dummy task
+	t.State = task.Cancelled
+	err = b.Send(ctx, w.Name, t)
+	if err != nil {
+		panic(err)
+	}
+
+	// start the worker
 	err = w.Start()
 	if err != nil {
 		panic(err)

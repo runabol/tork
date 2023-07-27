@@ -57,7 +57,7 @@ func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
 func (w *Worker) startTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Start(ctx, t)
 	if err != nil {
-		log.Printf("Err running task %v: %v\n", t.ID, err)
+		log.Printf("error running task %v: %v\n", t.ID, err)
 		return err
 	}
 	return nil
@@ -66,9 +66,9 @@ func (w *Worker) startTask(ctx context.Context, t task.Task) error {
 func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Stop(ctx, t)
 	if err != nil {
-		log.Printf("Error stopping task %s: %v", t.ID, err)
+		log.Printf("error stopping task %s: %v", t.ID, err)
 	}
-	log.Printf("Stopped and removed task %s", t.ID)
+	log.Printf("stopped and removed task %s", t.ID)
 	return err
 }
 
