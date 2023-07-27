@@ -31,8 +31,8 @@ type Task struct {
 	RestartPolicy string
 }
 
-// CancelRequest contains the information necessary
-// to cancel a running task
+// CancelRequest is used by the Coordinator to singal a Worker to
+// cancel a running task.
 type CancelRequest struct {
 	ID   string
 	Task Task
