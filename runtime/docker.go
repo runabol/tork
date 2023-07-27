@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/pkg/errors"
 	"github.com/tork/task"
 )
 
@@ -36,7 +37,10 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 		log.Printf("Error pulling image %s: %v\n", t.Image, err)
 		return err
 	}
-	io.Copy(os.Stdout, reader)
+	_, err = io.Copy(os.Stdout, reader)
+	if err != nil {
+		return err
+	}
 
 	rp := container.RestartPolicy{
 		Name: t.RestartPolicy,
@@ -70,8 +74,7 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 	err = d.client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
-		log.Printf("Error starting container %s: %v\n", resp.ID, err)
-		return err
+		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
 	}
 
 	out, err := d.client.ContainerLogs(
@@ -80,11 +83,13 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 		types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true},
 	)
 	if err != nil {
-		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
-		return err
+		return errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
 	}
 
-	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	if err != nil {
+		return errors.Wrapf(err, "error reading the std out")
+	}
 
 	d.tasks[t.ID] = resp.ID
 
