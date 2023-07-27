@@ -15,7 +15,7 @@ import (
 )
 
 type Worker struct {
-	name    string
+	Name    string
 	runtime runtime.Runtime
 }
 
@@ -26,7 +26,7 @@ func NewWorker(b broker.Broker) (*Worker, error) {
 		return nil, err
 	}
 	w := &Worker{
-		name:    name,
+		Name:    name,
 		runtime: r,
 	}
 	err = b.Receive(name, w.HandleTask)
@@ -36,19 +36,23 @@ func NewWorker(b broker.Broker) (*Worker, error) {
 	return w, nil
 }
 
-func (w *Worker) Name() string {
-	return w.name
-}
-
 func (w *Worker) CollectStats() {
 	fmt.Println("I will collect stats")
 }
 
 func (w *Worker) HandleTask(ctx context.Context, t task.Task) error {
-	return w.StartTask(ctx, t)
+	switch t.State {
+	case task.Pending,
+		task.Scheduled:
+		return w.startTask(ctx, t)
+	case task.Cancelled:
+		return w.stopTask(ctx, t)
+	default:
+		return errors.Errorf("invalid task state: %v", t.State)
+	}
 }
 
-func (w *Worker) StartTask(ctx context.Context, t task.Task) error {
+func (w *Worker) startTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Start(ctx, t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
@@ -57,7 +61,7 @@ func (w *Worker) StartTask(ctx context.Context, t task.Task) error {
 	return nil
 }
 
-func (w *Worker) StopTask(ctx context.Context, t task.Task) error {
+func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Stop(ctx, t)
 	if err != nil {
 		log.Printf("Error stopping task %s: %v", t.ID, err)

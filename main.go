@@ -35,12 +35,17 @@ func main() {
 		},
 	}
 
-	b.Send(ctx, w.Name(), t)
+	b.Send(ctx, w.Name, t)
 
 	time.Sleep(2 * time.Second)
 
-	err = w.StopTask(ctx, t)
+	t.State = task.Cancelled
+
+	err = b.Send(ctx, w.Name, t)
+
 	if err != nil {
 		panic(err)
 	}
+
+	time.Sleep(2 * time.Second)
 }
