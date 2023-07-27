@@ -29,7 +29,7 @@ func NewWorker(b broker.Broker) (*Worker, error) {
 		Name:    name,
 		runtime: r,
 	}
-	err = b.Receive(name, w.HandleTask)
+	err = b.Receive(name, w.handleTask)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error subscribing for queue: %s", name)
 	}
@@ -40,7 +40,7 @@ func (w *Worker) CollectStats() {
 	fmt.Println("I will collect stats")
 }
 
-func (w *Worker) HandleTask(ctx context.Context, t task.Task) error {
+func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
 	switch t.State {
 	case task.Pending,
 		task.Scheduled:
