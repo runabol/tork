@@ -24,7 +24,9 @@ func main() {
 		},
 	}
 
-	err = w.StartTask(t)
+	w.EnqueueTask(t)
+
+	err = w.RunTask()
 	if err != nil {
 		panic(err)
 	}

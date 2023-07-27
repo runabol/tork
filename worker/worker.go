@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/golang-collections/collections/queue"
 	"github.com/tork/runtime"
 	"github.com/tork/task"
 )
@@ -12,6 +13,7 @@ import (
 type Worker struct {
 	tasks   map[string]string
 	runtime runtime.Runtime
+	queue   *queue.Queue
 }
 
 func NewWorker() (*Worker, error) {
@@ -21,16 +23,26 @@ func NewWorker() (*Worker, error) {
 	}
 	return &Worker{
 		runtime: r,
+		queue:   queue.New(),
 		tasks:   make(map[string]string),
 	}, nil
+}
+
+func (w *Worker) EnqueueTask(t task.Task) {
+	w.queue.Enqueue(t)
 }
 
 func (w *Worker) CollectStats() {
 	fmt.Println("I will collect stats")
 }
 
-func (w *Worker) RunTask() {
-	fmt.Println("I will start or stop a task")
+func (w *Worker) RunTask() error {
+	dt := w.queue.Dequeue()
+	if dt == nil {
+		return nil
+	}
+	t := dt.(task.Task)
+	return w.StartTask(t)
 }
 
 func (w *Worker) StartTask(t task.Task) error {
