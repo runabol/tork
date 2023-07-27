@@ -6,14 +6,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/golang-collections/collections/queue"
 	"github.com/tork/runtime"
 	"github.com/tork/task"
 )
 
 type Worker struct {
 	runtime runtime.Runtime
-	queue   *queue.Queue
+	queue   chan task.Task
 }
 
 func NewWorker() (*Worker, error) {
@@ -23,12 +22,12 @@ func NewWorker() (*Worker, error) {
 	}
 	return &Worker{
 		runtime: r,
-		queue:   queue.New(),
+		queue:   make(chan task.Task, 10),
 	}, nil
 }
 
 func (w *Worker) EnqueueTask(t task.Task) {
-	w.queue.Enqueue(t)
+	w.queue <- t
 }
 
 func (w *Worker) CollectStats() {
@@ -36,12 +35,8 @@ func (w *Worker) CollectStats() {
 }
 
 func (w *Worker) RunTask() error {
-	dt := w.queue.Dequeue()
-	if dt == nil {
-		return nil
-	}
-	t := dt.(task.Task)
-	return w.StartTask(t)
+	dt := <-w.queue
+	return w.StartTask(dt)
 }
 
 func (w *Worker) StartTask(t task.Task) error {

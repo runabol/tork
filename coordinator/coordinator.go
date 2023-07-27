@@ -3,12 +3,10 @@ package manager
 import (
 	"fmt"
 
-	"github.com/golang-collections/collections/queue"
 	"github.com/tork/task"
 )
 
 type Coordinator struct {
-	Pending       queue.Queue
 	TaskDB        map[string][]task.Task
 	EventDB       map[string][]task.TaskEvent
 	Workers       []string
