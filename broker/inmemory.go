@@ -9,6 +9,9 @@ import (
 	"github.com/tork/task"
 )
 
+// InMemoryBroker a very simple implementation of the Broker interface
+// which uses in-memory channels to exchange messages. Meant for local
+// development, tests etc.
 type InMemoryBroker struct {
 	queues map[string]chan task.Task
 	mu     sync.RWMutex
