@@ -30,3 +30,8 @@ type Task struct {
 	Env           []string
 	RestartPolicy string
 }
+
+type CancelEvent struct {
+	ID   string
+	Task Task
+}

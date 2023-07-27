@@ -39,8 +39,7 @@ func main() {
 	}
 
 	// cancel the dummy task
-	t.State = task.Cancelled
-	err = b.Send(ctx, w.Name, t)
+	err = b.Send(ctx, w.Name, task.CancelEvent{ID: uuid.NewUUID(), Task: t})
 	if err != nil {
 		panic(err)
 	}

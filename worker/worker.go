@@ -42,15 +42,14 @@ func (w *Worker) CollectStats() {
 	fmt.Println("I will collect stats")
 }
 
-func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
-	switch t.State {
-	case task.Pending,
-		task.Scheduled:
-		return w.startTask(ctx, t)
-	case task.Cancelled:
-		return w.stopTask(ctx, t)
+func (w *Worker) handleMessage(ctx context.Context, msg any) error {
+	switch v := msg.(type) {
+	case task.Task:
+		return w.startTask(ctx, v)
+	case task.CancelEvent:
+		return w.stopTask(ctx, v.Task)
 	default:
-		return errors.Errorf("invalid task state: %v", t.State)
+		return errors.Errorf("unknown message type: %T", msg)
 	}
 }
 
@@ -79,7 +78,7 @@ func (w *Worker) Start() error {
 		return err
 	}
 	w.runtime = r
-	err = w.cfg.Broker.Receive(w.Name, w.handleTask)
+	err = w.cfg.Broker.Receive(w.Name, w.handleMessage)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}
