@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -11,7 +12,6 @@ import (
 )
 
 type Worker struct {
-	tasks   map[string]string
 	runtime runtime.Runtime
 	queue   *queue.Queue
 }
@@ -24,7 +24,6 @@ func NewWorker() (*Worker, error) {
 	return &Worker{
 		runtime: r,
 		queue:   queue.New(),
-		tasks:   make(map[string]string),
 	}, nil
 }
 
@@ -46,23 +45,22 @@ func (w *Worker) RunTask() error {
 }
 
 func (w *Worker) StartTask(t task.Task) error {
-	containerID, err := w.runtime.Start(t)
+	ctx := context.Background()
+	err := w.runtime.Start(ctx, t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
 		return err
 	}
-	w.tasks[t.ID] = containerID
 	return nil
 }
 
 func (w *Worker) StopTask(t task.Task) error {
-	containerID := w.tasks[t.ID]
-	err := w.runtime.Stop(containerID)
+	ctx := context.Background()
+	err := w.runtime.Stop(ctx, t)
 	if err != nil {
-		log.Printf("Error stopping container %v: %v", containerID, err)
+		log.Printf("Error stopping task %s: %v", t.ID, err)
 	}
-	delete(w.tasks, t.ID)
 	t.EndTime = time.Now().UTC()
-	log.Printf("Stopped and removed container %v for task %v", containerID, t.ID)
+	log.Printf("Stopped and removed task %s", t.ID)
 	return err
 }

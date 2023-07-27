@@ -1,8 +1,12 @@
 package runtime
 
-import "github.com/tork/task"
+import (
+	"context"
+
+	"github.com/tork/task"
+)
 
 type Runtime interface {
-	Start(t task.Task) (containerID string, err error)
-	Stop(containerID string) error
+	Start(ctx context.Context, t task.Task) error
+	Stop(ctx context.Context, t task.Task) error
 }

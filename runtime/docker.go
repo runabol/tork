@@ -15,6 +15,7 @@ import (
 
 type DockerRuntime struct {
 	client *client.Client
+	tasks  map[string]string
 }
 
 func NewDockerRuntime() (*DockerRuntime, error) {
@@ -22,16 +23,18 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DockerRuntime{client: dc}, nil
+	return &DockerRuntime{
+		client: dc,
+		tasks:  make(map[string]string),
+	}, nil
 }
 
-func (d *DockerRuntime) Start(t task.Task) (string, error) {
-	ctx := context.Background()
+func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 	reader, err := d.client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
 		log.Printf("Error pulling image %s: %v\n", t.Image, err)
-		return "", err
+		return err
 	}
 	io.Copy(os.Stdout, reader)
 
@@ -61,14 +64,14 @@ func (d *DockerRuntime) Start(t task.Task) (string, error) {
 			"Error creating container using image %s: %v\n",
 			t.Image, err,
 		)
-		return "", err
+		return err
 	}
 
 	err = d.client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Printf("Error starting container %s: %v\n", resp.ID, err)
-		return "", err
+		return err
 	}
 
 	out, err := d.client.ContainerLogs(
@@ -78,22 +81,27 @@ func (d *DockerRuntime) Start(t task.Task) (string, error) {
 	)
 	if err != nil {
 		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
-		return "", err
+		return err
 	}
 
 	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 
-	return resp.ID, nil
+	d.tasks[t.ID] = resp.ID
+
+	return nil
 }
 
-func (d *DockerRuntime) Stop(id string) error {
-	log.Printf("Attempting to stop container %v", id)
-	ctx := context.Background()
-	err := d.client.ContainerStop(ctx, id, container.StopOptions{})
+func (d *DockerRuntime) Stop(ctx context.Context, t task.Task) error {
+	containerID, ok := d.tasks[t.ID]
+	if !ok {
+		return nil
+	}
+	log.Printf("Attempting to stop container %v", containerID)
+	err := d.client.ContainerStop(ctx, containerID, container.StopOptions{})
 	if err != nil {
 		return err
 	}
-	err = d.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
+	err = d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
 	if err != nil {
 		return err
 	}
