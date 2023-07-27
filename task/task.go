@@ -19,6 +19,7 @@ const (
 	Failed
 )
 
+// Task is the basic unit of work that a Worker can handle.
 type Task struct {
 	ID            string
 	Name          string
@@ -31,11 +32,4 @@ type Task struct {
 	Disk          int64
 	Env           []string
 	RestartPolicy string
-}
-
-type TaskEvent struct {
-	ID        string
-	State     State
-	Timestamp time.Time
-	Task      Task
 }

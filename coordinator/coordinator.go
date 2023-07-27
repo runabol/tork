@@ -8,7 +8,6 @@ import (
 
 type Coordinator struct {
 	TaskDB        map[string][]task.Task
-	EventDB       map[string][]task.TaskEvent
 	Workers       []string
 	WorkerTaskMap map[string][]string
 	TaskWorkerMap map[string]string

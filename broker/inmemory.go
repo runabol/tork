@@ -20,7 +20,7 @@ func NewInMemoryBroker() *InMemoryBroker {
 }
 
 func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) error {
-	log.Printf("sending %v to %s", t, qname)
+	log.Printf("sending task %v to %s", t, qname)
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	q, ok := b.queues[qname]
@@ -32,7 +32,7 @@ func (b *InMemoryBroker) Send(ctx context.Context, qname string, t task.Task) er
 }
 
 func (b *InMemoryBroker) Receive(qname string, handler func(ctx context.Context, t task.Task) error) error {
-	log.Printf("subscribing for messages on %s", qname)
+	log.Printf("subscribing for tasks on %s", qname)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	q, ok := b.queues[qname]
