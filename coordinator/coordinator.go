@@ -6,6 +6,9 @@ import (
 	"github.com/tork/task"
 )
 
+// Coordinator is the responsible for accepting tasks from
+// clients, scheduling tasks for workers to execute and for
+// exposing the cluster's state to the outside world.
 type Coordinator struct {
 	TaskDB        map[string][]task.Task
 	Workers       []string
