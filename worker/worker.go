@@ -6,41 +6,48 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"github.com/tork/broker"
 	"github.com/tork/runtime"
 	"github.com/tork/task"
 )
 
 type Worker struct {
+	name    string
 	runtime runtime.Runtime
-	queue   chan task.Task
 }
 
-func NewWorker() (*Worker, error) {
+func NewWorker(b broker.Broker) (*Worker, error) {
+	name := fmt.Sprintf("worker-%s", uuid.NewString())
 	r, err := runtime.NewDockerRuntime()
 	if err != nil {
 		return nil, err
 	}
-	return &Worker{
+	w := &Worker{
+		name:    name,
 		runtime: r,
-		queue:   make(chan task.Task, 10),
-	}, nil
+	}
+	err = b.Receive(name, w.RunTask)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error subscribing for queue: %s", name)
+	}
+	return w, nil
 }
 
-func (w *Worker) EnqueueTask(t task.Task) {
-	w.queue <- t
+func (w *Worker) Name() string {
+	return w.name
 }
 
 func (w *Worker) CollectStats() {
 	fmt.Println("I will collect stats")
 }
 
-func (w *Worker) RunTask() error {
-	dt := <-w.queue
-	return w.StartTask(dt)
+func (w *Worker) RunTask(ctx context.Context, t task.Task) error {
+	return w.StartTask(ctx, t)
 }
 
-func (w *Worker) StartTask(t task.Task) error {
-	ctx := context.Background()
+func (w *Worker) StartTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Start(ctx, t)
 	if err != nil {
 		log.Printf("Err running task %v: %v\n", t.ID, err)
@@ -49,8 +56,7 @@ func (w *Worker) StartTask(t task.Task) error {
 	return nil
 }
 
-func (w *Worker) StopTask(t task.Task) error {
-	ctx := context.Background()
+func (w *Worker) StopTask(ctx context.Context, t task.Task) error {
 	err := w.runtime.Stop(ctx, t)
 	if err != nil {
 		log.Printf("Error stopping task %s: %v", t.ID, err)

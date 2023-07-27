@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tork/broker"
 	"github.com/tork/task"
 	"github.com/tork/worker"
 )
 
 func main() {
-	w, err := worker.NewWorker()
+
+	ctx := context.Background()
+
+	b := broker.NewInMemoryBroker()
+	w, err := worker.NewWorker(b)
 	if err != nil {
 		panic(err)
 	}
@@ -24,16 +30,11 @@ func main() {
 		},
 	}
 
-	w.EnqueueTask(t)
-
-	err = w.RunTask()
-	if err != nil {
-		panic(err)
-	}
+	b.Send(ctx, w.Name(), t)
 
 	time.Sleep(2 * time.Second)
 
-	err = w.StopTask(t)
+	err = w.StopTask(ctx, t)
 	if err != nil {
 		panic(err)
 	}
