@@ -50,34 +50,34 @@ func (w *Worker) RunTask() {
 	fmt.Println("I will start or stop a task")
 }
 
-func (w *Worker) StartTask(t task.Task) dockerResult {
+func (w *Worker) StartTask(t task.Task) error {
 	t.StartTime = time.Now().UTC()
 	cfg := Config{
 		Image: t.Image,
 	}
 	d := dockerClient{}
-	result := d.Run(cfg)
-	if result.Error != nil {
-		log.Printf("Err running task %v: %v\n", t.ID, result.Error)
+	containerID, err := d.run(cfg)
+	if err != nil {
+		log.Printf("Err running task %v: %v\n", t.ID, err)
 		t.State = task.Failed
 		w.DB[t.ID] = t
-		return result
+		return err
 	}
-	t.ContainerID = result.ContainerID
+	t.ContainerID = containerID
 	t.State = task.Running
 	w.DB[t.ID] = t
-	return result
+	return nil
 }
 
-func (w *Worker) StopTask(t task.Task) dockerResult {
+func (w *Worker) StopTask(t task.Task) error {
 	d := dockerClient{}
-	result := d.Stop(t.ContainerID)
-	if result.Error != nil {
-		log.Printf("Error stopping container %v: %v", t.ContainerID, result.Error)
+	err := d.stop(t.ContainerID)
+	if err != nil {
+		log.Printf("Error stopping container %v: %v", t.ContainerID, err)
 	}
 	t.FinishTime = time.Now().UTC()
 	t.State = task.Completed
 	w.DB[t.ID] = t
 	log.Printf("Stopped and removed container %v for task %v", t.ContainerID, t.ID)
-	return result
+	return err
 }

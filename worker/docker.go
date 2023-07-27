@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -17,20 +16,13 @@ type dockerClient struct {
 	Client *client.Client
 }
 
-type dockerResult struct {
-	Error       error
-	Action      string
-	ContainerID string
-	Result      string
-}
-
-func (d *dockerClient) Run(cfg Config) dockerResult {
+func (d *dockerClient) run(cfg Config) (string, error) {
 	ctx := context.Background()
 	reader, err := d.Client.ImagePull(
 		ctx, cfg.Image, types.ImagePullOptions{})
 	if err != nil {
 		log.Printf("Error pulling image %s: %v\n", cfg.Image, err)
-		return dockerResult{Error: err}
+		return "", err
 	}
 	io.Copy(os.Stdout, reader)
 
@@ -60,14 +52,14 @@ func (d *dockerClient) Run(cfg Config) dockerResult {
 			"Error creating container using image %s: %v\n",
 			cfg.Image, err,
 		)
-		return dockerResult{Error: err}
+		return "", err
 	}
 
 	err = d.Client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		log.Printf("Error starting container %s: %v\n", resp.ID, err)
-		return dockerResult{Error: err}
+		return "", err
 	}
 
 	out, err := d.Client.ContainerLogs(
@@ -77,31 +69,24 @@ func (d *dockerClient) Run(cfg Config) dockerResult {
 	)
 	if err != nil {
 		log.Printf("Error getting logs for container %s: %v\n", resp.ID, err)
-		return dockerResult{Error: err}
+		return "", err
 	}
 
 	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 
-	return dockerResult{
-		ContainerID: resp.ID,
-		Action:      "start",
-		Result:      "success",
-	}
+	return resp.ID, nil
 }
 
-func (d *dockerClient) Stop(id string) dockerResult {
+func (d *dockerClient) stop(id string) error {
 	log.Printf("Attempting to stop container %v", id)
 	ctx := context.Background()
 	err := d.Client.ContainerStop(ctx, id, container.StopOptions{})
 	if err != nil {
-		fmt.Println(err)
-		panic(err)
+		return err
 	}
-
 	err = d.Client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
 	if err != nil {
-		panic(err)
+		return err
 	}
-
-	return dockerResult{Action: "stop", Result: "success", Error: nil}
+	return nil
 }
