@@ -20,8 +20,8 @@ import (
 type Worker struct {
 	Name    string
 	runtime runtime.Runtime
-	cfg     Config
 	done    chan os.Signal
+	broker  broker.Broker
 }
 
 type Config struct {
@@ -31,16 +31,12 @@ type Config struct {
 func NewWorker(cfg Config) *Worker {
 	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
 	w := &Worker{
-		Name: name,
-		cfg:  cfg,
-		done: make(chan os.Signal),
+		Name:   name,
+		done:   make(chan os.Signal),
+		broker: cfg.Broker,
 	}
 	signal.Notify(w.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	return w
-}
-
-func (w *Worker) CollectStats() {
-	fmt.Println("I will collect stats")
 }
 
 func (w *Worker) handleMessage(ctx context.Context, msg any) error {
@@ -99,7 +95,7 @@ func (w *Worker) Start() error {
 		return err
 	}
 	w.runtime = r
-	err = w.cfg.Broker.Receive(w.Name, w.handleMessage)
+	err = w.broker.Receive(w.Name, w.handleMessage)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}
