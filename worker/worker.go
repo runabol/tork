@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -74,6 +75,23 @@ func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
 	return err
 }
 
+func (w *Worker) collectStats() {
+	for {
+		s, err := getStats()
+		if err != nil {
+			log.Error().Msgf("error collecting stats for %s", w.Name)
+		} else {
+			log.Debug().Msgf("stats for %s: CPU: %f", w.Name, s.CPUPercent)
+		}
+		select {
+		case <-w.done:
+			return
+		default:
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
 	r, err := runtime.NewDockerRuntime()
@@ -85,6 +103,7 @@ func (w *Worker) Start() error {
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}
+	go w.collectStats()
 	<-w.done
 	return nil
 }
