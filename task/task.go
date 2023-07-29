@@ -4,6 +4,8 @@ import (
 	"time"
 )
 
+// State defines the list of states that a
+// task can be in, at any given moment.
 type State string
 
 const (
