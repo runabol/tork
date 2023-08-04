@@ -2,7 +2,9 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -21,6 +23,7 @@ func newAPI(cfg Config) *api {
 	}
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+	r.Use(errorHandler)
 	s := &api{
 		scheduler: cfg.Scheduler,
 		server: &http.Server{
@@ -33,16 +36,25 @@ func newAPI(cfg Config) *api {
 	return s
 }
 
+func errorHandler(c *gin.Context) {
+	c.Next()
+	if len(c.Errors) > 0 {
+		c.JSON(-1, c.Errors[0])
+	}
+}
+
 func (s *api) status(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "OK",
-	})
+	c.JSON(http.StatusOK, gin.H{"status": "OK"})
 }
 
 func (s *api) submitTask(c *gin.Context) {
 	t := task.Task{}
 	if err := c.BindJSON(&t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(t.Image) == "" {
+		c.AbortWithError(http.StatusBadRequest, errors.New("missing required field: image"))
 		return
 	}
 	t.State = task.Pending
