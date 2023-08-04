@@ -1,52 +1,33 @@
 package main
 
 import (
-	"context"
-
 	"github.com/rs/zerolog"
 	"github.com/tork/broker"
-	"github.com/tork/task"
-	"github.com/tork/uuid"
+	"github.com/tork/runtime"
 	"github.com/tork/worker"
 )
 
 func main() {
-	ctx := context.Background()
-
 	// loggging
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	// create a broker
 	b := broker.NewInMemoryBroker()
 
+	// create a Docker-based runtime
+	rt, err := runtime.NewDockerRuntime()
+	if err != nil {
+		panic(err)
+	}
+
 	// create a worker
-	w := worker.NewWorker(worker.Config{Broker: b})
-
-	// send a dummy task
-	t := task.Task{
-		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
-		Name:  "test-container-1",
-		Image: "postgres:13",
-		Env: []string{
-			"POSTGRES_USER=cube",
-			"POSTGRES_PASSWORD=secret",
-		},
-	}
-	err := b.Send(ctx, w.Name, t)
-	if err != nil {
-		panic(err)
-	}
-
-	// cancel the dummy task
-	err = b.Send(ctx, w.Name, task.CancelRequest{ID: uuid.NewUUID(), Task: t})
-	if err != nil {
-		panic(err)
-	}
+	w := worker.NewWorker(worker.Config{
+		Broker:  b,
+		Runtime: rt,
+	})
 
 	// start the worker
-	err = w.Start()
-	if err != nil {
+	if err := w.Start(); err != nil {
 		panic(err)
 	}
 }
