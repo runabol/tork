@@ -58,3 +58,13 @@ func (b *InMemoryBroker) Receive(qname string, handler func(ctx context.Context,
 	}()
 	return nil
 }
+
+func (b *InMemoryBroker) Queues(ctx context.Context) []string {
+	keys := make([]string, len(b.queues))
+	i := 0
+	for k := range b.queues {
+		keys[i] = k
+		i++
+	}
+	return keys
+}

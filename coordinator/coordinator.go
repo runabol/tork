@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/tork/broker"
+	"github.com/tork/scheduler"
 	"github.com/tork/uuid"
 )
 
@@ -18,22 +18,20 @@ import (
 // clients, scheduling tasks for workers to execute and for
 // exposing the cluster's state to the outside world.
 type Coordinator struct {
-	Name   string
-	broker broker.Broker
-	api    *api
+	Name string
+	api  *api
 }
 
 type Config struct {
-	Broker  broker.Broker
-	Address string
+	Scheduler scheduler.Scheduler
+	Address   string
 }
 
 func NewCoordinator(cfg Config) *Coordinator {
 	name := fmt.Sprintf("coordinator-%s", uuid.NewUUID())
 	return &Coordinator{
-		Name:   name,
-		broker: cfg.Broker,
-		api:    newAPI(cfg),
+		Name: name,
+		api:  newAPI(cfg),
 	}
 }
 
