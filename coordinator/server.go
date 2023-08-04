@@ -18,17 +18,20 @@ func newServer(cfg Config) *server {
 	}
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	r.GET("/status", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "OK",
-		})
-	})
-	return &server{
+	s := &server{
 		httpServer: &http.Server{
 			Addr:    cfg.Address,
 			Handler: r,
 		},
 	}
+	r.GET("/status", s.status)
+	return s
+}
+
+func (s *server) status(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status": "OK",
+	})
 }
 
 func (s *server) start() error {
