@@ -20,17 +20,17 @@ const (
 
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {
-	ID            string
-	Name          string
-	State         State
-	StartTime     time.Time
-	EndTime       time.Time
-	CMD           []string
-	Image         string
-	Memory        int64
-	Disk          int64
-	Env           []string
-	RestartPolicy string
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	State          State     `json:"state"`
+	StartTime      time.Time `json:"startTime"`
+	CompletionTime time.Time `json:"completionTime"`
+	CMD            []string  `json:"cmd"`
+	Image          string    `json:"image"`
+	Memory         int64     `json:"memory"`
+	Disk           int64     `json:"disk"`
+	Env            []string  `json:"env"`
+	RestartPolicy  string    `json:"restartPolicy"`
 }
 
 // CancelRequest is used by the Coordinator to singal a Worker to

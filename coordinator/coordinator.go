@@ -20,7 +20,7 @@ import (
 type Coordinator struct {
 	Name   string
 	broker broker.Broker
-	server *server
+	api    *api
 }
 
 type Config struct {
@@ -33,13 +33,13 @@ func NewCoordinator(cfg Config) *Coordinator {
 	return &Coordinator{
 		Name:   name,
 		broker: cfg.Broker,
-		server: newServer(cfg),
+		api:    newAPI(cfg),
 	}
 }
 
 func (c *Coordinator) Start() error {
 	log.Info().Msgf("starting %s", c.Name)
-	if err := c.server.start(); err != nil {
+	if err := c.api.start(); err != nil {
 		return err
 	}
 	quit := make(chan os.Signal, 1)
@@ -48,7 +48,7 @@ func (c *Coordinator) Start() error {
 	log.Debug().Msgf("shutting down %s", c.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := c.server.shutdown(ctx); err != nil {
+	if err := c.api.shutdown(ctx); err != nil {
 		return err
 	}
 	return nil
