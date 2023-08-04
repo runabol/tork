@@ -20,7 +20,6 @@ import (
 type Worker struct {
 	Name    string
 	runtime runtime.Runtime
-	done    chan os.Signal
 	broker  broker.Broker
 }
 
@@ -33,11 +32,9 @@ func NewWorker(cfg Config) *Worker {
 	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
 	w := &Worker{
 		Name:    name,
-		done:    make(chan os.Signal),
 		broker:  cfg.Broker,
 		runtime: cfg.Runtime,
 	}
-	signal.Notify(w.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	return w
 }
 
@@ -81,12 +78,7 @@ func (w *Worker) collectStats() {
 		} else {
 			log.Debug().Float64("cpu-percent", s.CPUPercent).Msgf("collecting stats for %s", w.Name)
 		}
-		select {
-		case <-w.done:
-			return
-		default:
-			time.Sleep(1 * time.Minute)
-		}
+		time.Sleep(1 * time.Minute)
 	}
 }
 
@@ -97,6 +89,9 @@ func (w *Worker) Start() error {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}
 	go w.collectStats()
-	<-w.done
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Debug().Msgf("shutting down %s", w.Name)
 	return nil
 }

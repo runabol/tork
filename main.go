@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/rs/zerolog"
 	"github.com/tork/broker"
+	"github.com/tork/coordinator"
 	"github.com/tork/runtime"
 	"github.com/tork/worker"
 )
@@ -27,7 +28,19 @@ func main() {
 	})
 
 	// start the worker
-	if err := w.Start(); err != nil {
+	go func() {
+		if err := w.Start(); err != nil {
+			panic(err)
+		}
+	}()
+
+	// create a coordinator
+	c := coordinator.NewCoordinator(coordinator.Config{
+		Broker: b,
+	})
+
+	// start the coordinator
+	if err := c.Start(); err != nil {
 		panic(err)
 	}
 }
