@@ -38,17 +38,6 @@ func NewWorker(cfg Config) *Worker {
 	return w
 }
 
-func (w *Worker) handleMessage(ctx context.Context, msg any) error {
-	switch v := msg.(type) {
-	case task.Task:
-		return w.startTask(ctx, v)
-	case task.CancelRequest:
-		return w.stopTask(ctx, v.Task)
-	default:
-		return errors.Errorf("unknown message type: %T", msg)
-	}
-}
-
 func (w *Worker) startTask(ctx context.Context, t task.Task) error {
 	if t.State != task.Scheduled {
 		return errors.Errorf("can't start a task in %s state", t.State)
@@ -84,7 +73,7 @@ func (w *Worker) collectStats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
-	err := w.broker.Receive(w.Name, w.handleMessage)
+	err := w.broker.Subscribe(w.Name, w.startTask)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}

@@ -32,11 +32,5 @@ type Task struct {
 	Disk          int64      `json:"disk,omitempty"`
 	Env           []string   `json:"env,omitempty"`
 	RestartPolicy string     `json:"restartPolicy,omitempty"`
-}
-
-// CancelRequest is used by the Coordinator to singal a Worker to
-// cancel a running task.
-type CancelRequest struct {
-	ID   string
-	Task Task
+	Queue         string     `json:"queue,omitempty"`
 }

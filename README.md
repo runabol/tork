@@ -4,15 +4,22 @@ A distributed workflow engine.
 
 # Goals
 
-1. Simple, lightweight
-2. Easy to integrate with
-3. Task isolation
-4. Composable
-5. Minimum amount of "magic"
-6. Horizontally scalable
-7. Type-safety support for pipelines
-8. Ability to execute Ad-hoc piplines / encourage expermintation / iterative development process
-9. No single point of failure
+1. Simple
+2. Task isolation
+3. Horizontally scalable
+4. IDE support for pipelines (future)
+5. No single point of failure
+6. Automatic concurrency level on the worker side based on avaiable capacity (RAM & CPU)
+7. Support multiple types of message brokers
+
+# Sample task
+
+```
+  - name: echo your name
+    queue: default
+    image: ubuntu:scratch
+    cmd: echo {{yourName}}
+```
 
 # Pipeline Definition (Draft)
 

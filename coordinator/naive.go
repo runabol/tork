@@ -28,5 +28,5 @@ func (s *NaiveScheduler) Schedule(ctx context.Context, t *task.Task) error {
 	n := time.Now()
 	t.ScheduledAt = &n
 	t.State = task.Scheduled
-	return s.broker.Send(ctx, s.qname, *t)
+	return s.broker.Enqueue(ctx, s.qname, *t)
 }
