@@ -59,10 +59,11 @@ func (s *api) submitTask(c *gin.Context) {
 	}
 	t.State = task.Pending
 	log.Info().Any("task", t).Msg("received task")
-	if err := s.scheduler.Schedule(c, t); err != nil {
+	if err := s.scheduler.Schedule(c, &t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
+	c.JSON(http.StatusOK, t)
 }
 
 func (s *api) start() error {

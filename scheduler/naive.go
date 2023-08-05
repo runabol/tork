@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tork/broker"
 	"github.com/tork/task"
+	"github.com/tork/uuid"
 )
 
 type NaiveScheduler struct {
@@ -20,13 +22,19 @@ func NewNaiveScheduler(b broker.Broker) *NaiveScheduler {
 	}
 }
 
-func (s *NaiveScheduler) Schedule(ctx context.Context, t task.Task) error {
+func (s *NaiveScheduler) Schedule(ctx context.Context, t *task.Task) error {
 	log.Info().Any("task", t).Msg("scheduling task")
+
+	t.ID = uuid.NewUUID()
+
+	n := time.Now()
+
+	t.ScheduledAt = &n
 
 	for _, q := range s.broker.Queues(ctx) {
 		if strings.HasPrefix(q, "worker-") {
 			t.State = task.Scheduled
-			return s.broker.Send(ctx, q, t)
+			return s.broker.Send(ctx, q, *t)
 		}
 	}
 

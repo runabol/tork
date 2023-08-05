@@ -53,6 +53,7 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 	cc := container.Config{
 		Image: t.Image,
 		Env:   t.Env,
+		Cmd:   t.CMD,
 	}
 
 	hc := container.HostConfig{
@@ -62,7 +63,7 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 	}
 
 	resp, err := d.client.ContainerCreate(
-		ctx, &cc, &hc, nil, nil, t.Name)
+		ctx, &cc, &hc, nil, nil, t.ID)
 	if err != nil {
 		log.Printf(
 			"Error creating container using image %s: %v\n",
