@@ -10,7 +10,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/tork/scheduler"
 	"github.com/tork/uuid"
 )
 
@@ -23,7 +22,7 @@ type Coordinator struct {
 }
 
 type Config struct {
-	Scheduler scheduler.Scheduler
+	Scheduler Scheduler
 	Address   string
 }
 

@@ -8,13 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/scheduler"
 	"github.com/tork/task"
 )
 
 type api struct {
 	server    *http.Server
-	scheduler scheduler.Scheduler
+	scheduler Scheduler
 }
 
 func newAPI(cfg Config) *api {

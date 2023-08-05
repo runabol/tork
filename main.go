@@ -5,7 +5,6 @@ import (
 	"github.com/tork/broker"
 	"github.com/tork/coordinator"
 	"github.com/tork/runtime"
-	"github.com/tork/scheduler"
 	"github.com/tork/worker"
 )
 
@@ -37,7 +36,7 @@ func main() {
 
 	// create a coordinator
 	c := coordinator.NewCoordinator(coordinator.Config{
-		Scheduler: scheduler.NewNaiveScheduler(w.Name, b),
+		Scheduler: coordinator.NewNaiveScheduler(w.Name, b),
 	})
 
 	// start the coordinator
