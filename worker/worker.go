@@ -39,7 +39,7 @@ func NewWorker(cfg Config) *Worker {
 }
 
 func (w *Worker) startTask(ctx context.Context, t task.Task) error {
-	if t.State != task.Scheduled {
+	if t.State != task.Pending {
 		return errors.Errorf("can't start a task in %s state", t.State)
 	}
 	err := w.runtime.Start(ctx, t)
@@ -48,15 +48,6 @@ func (w *Worker) startTask(ctx context.Context, t task.Task) error {
 		return err
 	}
 	return nil
-}
-
-func (w *Worker) stopTask(ctx context.Context, t task.Task) error {
-	err := w.runtime.Stop(ctx, t)
-	if err != nil {
-		log.Printf("error stopping task %s: %v", t.ID, err)
-	}
-	log.Printf("stopped and removed task %s", t.ID)
-	return err
 }
 
 func (w *Worker) collectStats() {

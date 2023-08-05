@@ -8,12 +8,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"github.com/tork/broker"
 	"github.com/tork/task"
 )
 
 type api struct {
-	server    *http.Server
-	scheduler Scheduler
+	server *http.Server
+	broker broker.Broker
 }
 
 func newAPI(cfg Config) *api {
@@ -24,7 +25,7 @@ func newAPI(cfg Config) *api {
 	r := gin.Default()
 	r.Use(errorHandler)
 	s := &api{
-		scheduler: cfg.Scheduler,
+		broker: cfg.Broker,
 		server: &http.Server{
 			Addr:    cfg.Address,
 			Handler: r,
@@ -58,7 +59,7 @@ func (s *api) submitTask(c *gin.Context) {
 	}
 	t.State = task.Pending
 	log.Info().Any("task", t).Msg("received task")
-	if err := s.scheduler.Schedule(c, &t); err != nil {
+	if err := s.broker.Enqueue(c, broker.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
