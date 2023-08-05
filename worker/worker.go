@@ -38,11 +38,11 @@ func NewWorker(cfg Config) *Worker {
 	return w
 }
 
-func (w *Worker) startTask(ctx context.Context, t task.Task) error {
+func (w *Worker) runTask(ctx context.Context, t task.Task) error {
 	if t.State != task.Pending {
 		return errors.Errorf("can't start a task in %s state", t.State)
 	}
-	err := w.runtime.Start(ctx, t)
+	_, err := w.runtime.Run(ctx, t)
 	if err != nil {
 		log.Printf("error running task %v: %v\n", t.ID, err)
 		return err
@@ -64,7 +64,7 @@ func (w *Worker) collectStats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
-	err := w.broker.Subscribe(w.Name, w.startTask)
+	err := w.broker.Subscribe(w.Name, w.runTask)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}

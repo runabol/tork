@@ -3,20 +3,23 @@ package runtime
 import (
 	"context"
 	"io"
-	"log"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/tork/task"
 )
 
 type DockerRuntime struct {
 	client *client.Client
 	tasks  map[string]string
+	mu     sync.RWMutex
 }
 
 func NewDockerRuntime() (*DockerRuntime, error) {
@@ -27,19 +30,20 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	return &DockerRuntime{
 		client: dc,
 		tasks:  make(map[string]string),
+		mu:     sync.RWMutex{},
 	}, nil
 }
 
-func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
+func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 	reader, err := d.client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
-		log.Printf("Error pulling image %s: %v\n", t.Image, err)
-		return err
+		log.Error().Err(err).Msgf("Error pulling image %s: %v\n", t.Image, err)
+		return "", err
 	}
 	_, err = io.Copy(os.Stdout, reader)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	rp := container.RestartPolicy{
@@ -65,17 +69,21 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 	resp, err := d.client.ContainerCreate(
 		ctx, &cc, &hc, nil, nil, t.ID)
 	if err != nil {
-		log.Printf(
+		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
 			t.Image, err,
 		)
-		return err
+		return "", err
 	}
+
+	d.mu.Lock()
+	d.tasks[t.ID] = resp.ID
+	d.mu.Unlock()
 
 	err = d.client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
+		return "", errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
 	}
 
 	out, err := d.client.ContainerLogs(
@@ -83,31 +91,49 @@ func (d *DockerRuntime) Start(ctx context.Context, t task.Task) error {
 		resp.ID,
 		types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true},
 	)
+	defer func() {
+		if err := out.Close(); err != nil {
+			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
+		}
+	}()
 	if err != nil {
-		return errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
+		return "", errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
+	}
+	// limit the amount of data read from stdout to prevent memory exhaustion
+	lr := &io.LimitedReader{R: out, N: 1024}
+	buf := new(strings.Builder)
+	_, err = stdcopy.StdCopy(buf, buf, lr)
+	if err != nil {
+		return "", errors.Wrapf(err, "error reading the std out")
 	}
 
-	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, out)
-	if err != nil {
-		return errors.Wrapf(err, "error reading the std out")
+	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return "", err
+		}
+	case status := <-statusCh:
+		log.Debug().Msgf("status.StatusCode: %#+v\n", status.StatusCode)
 	}
 
-	d.tasks[t.ID] = resp.ID
-
-	return nil
+	return buf.String(), nil
 }
 
-func (d *DockerRuntime) Stop(ctx context.Context, t task.Task) error {
+func (d *DockerRuntime) Cancel(ctx context.Context, t task.Task) error {
+	d.mu.RLock()
 	containerID, ok := d.tasks[t.ID]
+	d.mu.RUnlock()
 	if !ok {
 		return nil
 	}
-	log.Printf("Attempting to stop container %v", containerID)
-	err := d.client.ContainerStop(ctx, containerID, container.StopOptions{})
-	if err != nil {
-		return err
-	}
-	err = d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{RemoveVolumes: true, RemoveLinks: false, Force: false})
+	log.Printf("Attempting to stop and remove container %v", containerID)
+	err := d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		RemoveLinks:   false,
+		Force:         true,
+	})
 	if err != nil {
 		return err
 	}

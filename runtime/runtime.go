@@ -14,6 +14,6 @@ const (
 
 // Runtime is the actual runtime environment that executes a task.
 type Runtime interface {
-	Start(ctx context.Context, t task.Task) error
-	Stop(ctx context.Context, t task.Task) error
+	Run(ctx context.Context, t task.Task) (string, error)
+	Cancel(ctx context.Context, t task.Task) error
 }
