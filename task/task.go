@@ -33,4 +33,5 @@ type Task struct {
 	Env           []string   `json:"env,omitempty"`
 	RestartPolicy string     `json:"restartPolicy,omitempty"`
 	Queue         string     `json:"queue,omitempty"`
+	Result        string     `json:"result,omitempty"`
 }
