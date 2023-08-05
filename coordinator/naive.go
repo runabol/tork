@@ -10,17 +10,19 @@ import (
 
 type NaiveScheduler struct {
 	broker broker.Broker
-	qname  string
 }
 
-func NewNaiveScheduler(qname string, b broker.Broker) *NaiveScheduler {
+func NewNaiveScheduler(b broker.Broker) *NaiveScheduler {
 	return &NaiveScheduler{
 		broker: b,
-		qname:  qname,
 	}
 }
 
 func (s *NaiveScheduler) Schedule(ctx context.Context, t task.Task) error {
 	log.Info().Any("task", t).Msg("scheduling task")
-	return s.broker.Enqueue(ctx, s.qname, t)
+	qname := t.Queue
+	if qname == "" {
+		qname = broker.QUEUE_DEFAULT
+	}
+	return s.broker.Enqueue(ctx, qname, t)
 }

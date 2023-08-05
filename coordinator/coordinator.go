@@ -52,12 +52,26 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error 
 	return nil
 }
 
+func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) error {
+	log.Debug().Any("task", t).Msg("received task completion")
+	return nil
+}
+
 func (c *Coordinator) Start() error {
 	log.Info().Msgf("starting %s", c.Name)
+	// start the coordinator API
 	if err := c.api.start(); err != nil {
 		return err
 	}
-	c.broker.Subscribe(broker.QUEUE_PENDING, c.handlePendingTask)
+	// subscribe for the pending tasks queue
+	if err := c.broker.Subscribe(broker.QUEUE_PENDING, c.handlePendingTask); err != nil {
+		return err
+	}
+	// subscribe for task completions queue
+	if err := c.broker.Subscribe(broker.QUEUE_COMPLETED, c.handleCompletedTask); err != nil {
+		return err
+	}
+	// listen for termination signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

@@ -69,7 +69,7 @@ func (w *Worker) collectStats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
-	err := w.broker.Subscribe(w.Name, w.handleTask)
+	err := w.broker.Subscribe(broker.QUEUE_DEFAULT, w.handleTask)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}

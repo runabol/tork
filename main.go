@@ -36,7 +36,7 @@ func main() {
 
 	// create a coordinator
 	c := coordinator.NewCoordinator(coordinator.Config{
-		Scheduler: coordinator.NewNaiveScheduler(w.Name, b),
+		Scheduler: coordinator.NewNaiveScheduler(b),
 		Broker:    b,
 	})
 
