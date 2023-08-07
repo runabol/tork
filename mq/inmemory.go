@@ -12,13 +12,13 @@ import (
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	queues map[string]chan *task.Task
+	queues map[string]chan task.Task
 	mu     sync.RWMutex
 }
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		queues: make(map[string]chan *task.Task),
+		queues: make(map[string]chan task.Task),
 	}
 }
 
@@ -29,11 +29,11 @@ func (b *InMemoryBroker) Publish(ctx context.Context, qname string, t *task.Task
 	b.mu.RUnlock()
 	if !ok {
 		b.mu.Lock()
-		q = make(chan *task.Task, 10)
+		q = make(chan task.Task, 10)
 		b.queues[qname] = q
 		b.mu.Unlock()
 	}
-	q <- t
+	q <- *t
 	return nil
 }
 
@@ -43,7 +43,7 @@ func (b *InMemoryBroker) Subscribe(qname string, handler func(ctx context.Contex
 	q, ok := b.queues[qname]
 	b.mu.RUnlock()
 	if !ok {
-		q = make(chan *task.Task, 10)
+		q = make(chan task.Task, 10)
 		b.mu.Lock()
 		b.queues[qname] = q
 		b.mu.Unlock()
@@ -51,7 +51,7 @@ func (b *InMemoryBroker) Subscribe(qname string, handler func(ctx context.Contex
 	go func() {
 		ctx := context.TODO()
 		for t := range q {
-			err := handler(ctx, t)
+			err := handler(ctx, &t)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing task")
 			}

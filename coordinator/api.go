@@ -25,7 +25,7 @@ func newAPI(cfg Config) *api {
 	if cfg.Address == "" {
 		cfg.Address = ":3000"
 	}
-	gin.SetMode(gin.ReleaseMode)
+	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(errorHandler)
 	s := &api{
@@ -37,7 +37,8 @@ func newAPI(cfg Config) *api {
 		ds: cfg.TaskDataStore,
 	}
 	r.GET("/status", s.status)
-	r.POST("/task", s.submitTask)
+	r.POST("/task", s.createTask)
+	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
 	return s
 }
@@ -62,7 +63,7 @@ func (s *api) listQueues(c *gin.Context) {
 	c.JSON(http.StatusOK, qs)
 }
 
-func (s *api) submitTask(c *gin.Context) {
+func (s *api) createTask(c *gin.Context) {
 	t := &task.Task{}
 	if err := c.BindJSON(&t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
@@ -82,6 +83,16 @@ func (s *api) submitTask(c *gin.Context) {
 	log.Info().Any("task", t).Msg("received task")
 	if err := s.broker.Publish(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, t)
+}
+
+func (s *api) getTask(c *gin.Context) {
+	id := c.Param("id")
+	t, err := s.ds.GetByID(c, id)
+	if err != nil {
+		c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
 	c.JSON(http.StatusOK, t)

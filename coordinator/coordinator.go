@@ -24,6 +24,7 @@ type Coordinator struct {
 	broker    mq.Broker
 	scheduler Scheduler
 	api       *api
+	ds        datastore.TaskDatastore
 }
 
 type Config struct {
@@ -40,6 +41,7 @@ func NewCoordinator(cfg Config) *Coordinator {
 		api:       newAPI(cfg),
 		broker:    cfg.Broker,
 		scheduler: cfg.Scheduler,
+		ds:        cfg.TaskDataStore,
 	}
 }
 
@@ -47,14 +49,37 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t *task.Task) error
 	if err := c.scheduler.Schedule(ctx, t); err != nil {
 		return err
 	}
-	return nil
+	return c.ds.Update(ctx, t.ID, func(u *task.Task) {
+		// we don't want to mark the task as SCHEDULED
+		// if an out-of-order task completion/failure
+		// arrived earlier
+		if u.State == task.Pending {
+			u.State = t.State
+			u.ScheduledAt = t.ScheduledAt
+		}
+	})
+}
+
+func (c *Coordinator) handleStartedTask(ctx context.Context, t *task.Task) error {
+	log.Debug().
+		Str("task-id", t.ID).
+		Msg("received task start")
+	return c.ds.Update(ctx, t.ID, func(u *task.Task) {
+		// we don't want to mark the task as RUNNING
+		// if an out-of-order task completion/failure
+		// arrived earlier
+		if u.State == task.Scheduled {
+			u.State = t.State
+			u.StartedAt = t.StartedAt
+		}
+	})
 }
 
 func (c *Coordinator) handleCompletedTask(ctx context.Context, t *task.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task completion")
-	return nil
+	return c.ds.Save(ctx, t)
 }
 
 func (c *Coordinator) handleFailedTask(ctx context.Context, t *task.Task) error {
@@ -62,7 +87,7 @@ func (c *Coordinator) handleFailedTask(ctx context.Context, t *task.Task) error 
 		Str("task-id", t.ID).
 		Str("task-error", t.Error).
 		Msg("received task failure")
-	return nil
+	return c.ds.Save(ctx, t)
 }
 
 func (c *Coordinator) Start() error {
@@ -79,7 +104,12 @@ func (c *Coordinator) Start() error {
 	if err := c.broker.Subscribe(mq.QUEUE_COMPLETED, c.handleCompletedTask); err != nil {
 		return err
 	}
+	// subscribe for failed tasks notifications
 	if err := c.broker.Subscribe(mq.QUEUE_ERROR, c.handleFailedTask); err != nil {
+		return err
+	}
+	// subscribe for starting tasks notifications
+	if err := c.broker.Subscribe(mq.QUEUE_STARTED, c.handleStartedTask); err != nil {
 		return err
 	}
 	// listen for termination signal

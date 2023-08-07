@@ -42,19 +42,27 @@ func (w *Worker) handleTask(ctx context.Context, t *task.Task) error {
 	if t.State != task.Scheduled {
 		return errors.Errorf("can't start a task in %s state", t.State)
 	}
+	started := time.Now()
+	t.StartedAt = &started
+	t.State = task.Running
+	if err := w.broker.Publish(ctx, mq.QUEUE_STARTED, t); err != nil {
+		return err
+	}
 	result, err := w.runtime.Run(ctx, t)
+	finished := time.Now()
 	if err != nil {
 		t.State = task.Failed
 		t.Error = err.Error()
-		w.broker.Publish(ctx, mq.QUEUE_ERROR, t)
+		t.FailedAt = &finished
+		if err := w.broker.Publish(ctx, mq.QUEUE_ERROR, t); err != nil {
+			return err
+		}
 		return nil
 	}
-	now := time.Now()
 	t.Result = result
-	t.CompletedAt = &now
+	t.CompletedAt = &finished
 	t.State = task.Completed
-	w.broker.Publish(ctx, mq.QUEUE_COMPLETED, t)
-	return nil
+	return w.broker.Publish(ctx, mq.QUEUE_COMPLETED, t)
 }
 
 func (w *Worker) collectStats() {

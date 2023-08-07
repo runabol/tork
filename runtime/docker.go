@@ -119,7 +119,10 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 			return "", err
 		}
 	case status := <-statusCh:
-		log.Debug().Msgf("status.StatusCode: %#+v\n", status.StatusCode)
+		log.Debug().
+			Int64("status-code", status.StatusCode).
+			Str("task-id", t.ID).
+			Msg("task completed")
 	}
 	// remove the container
 	if err := d.Stop(ctx, t); err != nil {
