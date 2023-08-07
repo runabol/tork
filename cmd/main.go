@@ -37,7 +37,7 @@ func main() {
 
 	// create a coordinator
 	c := coordinator.NewCoordinator(coordinator.Config{
-		Scheduler:     coordinator.NewNaiveScheduler(b),
+		Scheduler:     coordinator.NewSimpleScheduler(b),
 		Broker:        b,
 		TaskDataStore: datastore.NewInMemoryDatastore(),
 	})

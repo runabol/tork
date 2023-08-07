@@ -9,18 +9,18 @@ import (
 	"github.com/tork/task"
 )
 
-type NaiveScheduler struct {
+type SimpleScheduler struct {
 	broker mq.Broker
 }
 
-func NewNaiveScheduler(b mq.Broker) *NaiveScheduler {
-	return &NaiveScheduler{
+func NewSimpleScheduler(b mq.Broker) *SimpleScheduler {
+	return &SimpleScheduler{
 		broker: b,
 	}
 }
 
-func (s *NaiveScheduler) Schedule(ctx context.Context, t *task.Task) error {
-	log.Info().Any("task", t).Msg("scheduling task")
+func (s *SimpleScheduler) Schedule(ctx context.Context, t *task.Task) error {
+	log.Info().Str("task-id", t.ID).Msg("scheduling task")
 	qname := t.Queue
 	if qname == "" {
 		qname = mq.QUEUE_DEFAULT
