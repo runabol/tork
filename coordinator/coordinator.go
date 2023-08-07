@@ -20,15 +20,13 @@ import (
 // clients, scheduling tasks for workers to execute and for
 // exposing the cluster's state to the outside world.
 type Coordinator struct {
-	Name      string
-	broker    mq.Broker
-	scheduler Scheduler
-	api       *api
-	ds        datastore.TaskDatastore
+	Name   string
+	broker mq.Broker
+	api    *api
+	ds     datastore.TaskDatastore
 }
 
 type Config struct {
-	Scheduler     Scheduler
 	Broker        mq.Broker
 	TaskDataStore datastore.TaskDatastore
 	Address       string
@@ -37,16 +35,24 @@ type Config struct {
 func NewCoordinator(cfg Config) *Coordinator {
 	name := fmt.Sprintf("coordinator-%s", uuid.NewUUID())
 	return &Coordinator{
-		Name:      name,
-		api:       newAPI(cfg),
-		broker:    cfg.Broker,
-		scheduler: cfg.Scheduler,
-		ds:        cfg.TaskDataStore,
+		Name:   name,
+		api:    newAPI(cfg),
+		broker: cfg.Broker,
+		ds:     cfg.TaskDataStore,
 	}
 }
 
 func (c *Coordinator) handlePendingTask(ctx context.Context, t *task.Task) error {
-	if err := c.scheduler.Schedule(ctx, t); err != nil {
+	log.Info().Str("task-id", t.ID).Msg("routing task")
+	qname := t.Queue
+	if qname == "" {
+		qname = mq.QUEUE_DEFAULT
+	}
+	t.State = task.Scheduled
+	n := time.Now()
+	t.ScheduledAt = &n
+	t.State = task.Scheduled
+	if err := c.broker.Publish(ctx, qname, t); err != nil {
 		return err
 	}
 	return c.ds.Update(ctx, t.ID, func(u *task.Task) {
