@@ -7,6 +7,7 @@ A distributed workflow engine.
 # Features:
 
 - REST API
+- Submit individual tasks or workflows for execution.
 - Horizontally scalable
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource limits
 - Automatic recovery of tasks in the event of a worker crash
