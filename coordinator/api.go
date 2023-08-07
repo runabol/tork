@@ -8,13 +8,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/broker"
+	"github.com/tork/mq"
 	"github.com/tork/task"
 )
 
 type api struct {
 	server *http.Server
-	broker broker.Broker
+	broker mq.Broker
 }
 
 func newAPI(cfg Config) *api {
@@ -59,7 +59,7 @@ func (s *api) submitTask(c *gin.Context) {
 	}
 	t.State = task.Pending
 	log.Info().Any("task", t).Msg("received task")
-	if err := s.broker.Enqueue(c, broker.QUEUE_PENDING, t); err != nil {
+	if err := s.broker.Enqueue(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}

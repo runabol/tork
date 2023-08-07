@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/pkg/errors"
-	"github.com/tork/broker"
+	"github.com/tork/mq"
 	"github.com/tork/runtime"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
@@ -20,11 +20,11 @@ import (
 type Worker struct {
 	Name    string
 	runtime runtime.Runtime
-	broker  broker.Broker
+	broker  mq.Broker
 }
 
 type Config struct {
-	Broker  broker.Broker
+	Broker  mq.Broker
 	Runtime runtime.Runtime
 }
 
@@ -51,7 +51,7 @@ func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
 	t.Result = result
 	t.CompletedAt = &now
 	t.State = task.Completed
-	w.broker.Enqueue(ctx, broker.QUEUE_COMPLETED, t)
+	w.broker.Enqueue(ctx, mq.QUEUE_COMPLETED, t)
 	return nil
 }
 
@@ -69,7 +69,7 @@ func (w *Worker) collectStats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
-	err := w.broker.Subscribe(broker.QUEUE_DEFAULT, w.handleTask)
+	err := w.broker.Subscribe(mq.QUEUE_DEFAULT, w.handleTask)
 	if err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}

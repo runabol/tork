@@ -1,4 +1,4 @@
-package broker
+package mq
 
 import (
 	"context"

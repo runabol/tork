@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/tork/broker"
 	"github.com/tork/coordinator"
+	"github.com/tork/mq"
 	"github.com/tork/runtime"
 	"github.com/tork/worker"
 )
@@ -13,7 +13,7 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	// create a broker
-	b := broker.NewInMemoryBroker()
+	b := mq.NewInMemoryBroker()
 
 	// create a Docker-based runtime
 	rt, err := runtime.NewDockerRuntime()

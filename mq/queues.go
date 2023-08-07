@@ -1,4 +1,4 @@
-package broker
+package mq
 
 const (
 	QUEUE_PENDING   = "pending"

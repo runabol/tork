@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/tork/broker"
+	"github.com/tork/mq"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
 )
@@ -20,14 +20,14 @@ import (
 // exposing the cluster's state to the outside world.
 type Coordinator struct {
 	Name      string
-	broker    broker.Broker
+	broker    mq.Broker
 	scheduler Scheduler
 	api       *api
 }
 
 type Config struct {
 	Scheduler Scheduler
-	Broker    broker.Broker
+	Broker    mq.Broker
 	Address   string
 }
 
@@ -64,11 +64,11 @@ func (c *Coordinator) Start() error {
 		return err
 	}
 	// subscribe for the pending tasks queue
-	if err := c.broker.Subscribe(broker.QUEUE_PENDING, c.handlePendingTask); err != nil {
+	if err := c.broker.Subscribe(mq.QUEUE_PENDING, c.handlePendingTask); err != nil {
 		return err
 	}
 	// subscribe for task completions queue
-	if err := c.broker.Subscribe(broker.QUEUE_COMPLETED, c.handleCompletedTask); err != nil {
+	if err := c.broker.Subscribe(mq.QUEUE_COMPLETED, c.handleCompletedTask); err != nil {
 		return err
 	}
 	// listen for termination signal
