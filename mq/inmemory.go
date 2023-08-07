@@ -23,7 +23,7 @@ func NewInMemoryBroker() *InMemoryBroker {
 }
 
 func (b *InMemoryBroker) Publish(ctx context.Context, qname string, t *task.Task) error {
-	log.Debug().Msgf("sending task %v to %s", t, qname)
+	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	b.mu.RLock()
 	q, ok := b.queues[qname]
 	b.mu.RUnlock()
