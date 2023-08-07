@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/rs/zerolog"
 	"github.com/tork/coordinator"
+	"github.com/tork/datastore"
 	"github.com/tork/mq"
 	"github.com/tork/runtime"
 	"github.com/tork/worker"
@@ -36,8 +37,9 @@ func main() {
 
 	// create a coordinator
 	c := coordinator.NewCoordinator(coordinator.Config{
-		Scheduler: coordinator.NewNaiveScheduler(b),
-		Broker:    b,
+		Scheduler:     coordinator.NewNaiveScheduler(b),
+		Broker:        b,
+		TaskDataStore: datastore.NewInMemoryDatastore(),
 	})
 
 	// start the coordinator

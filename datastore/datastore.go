@@ -1,4 +1,4 @@
-package taskstore
+package datastore
 
 import (
 	"context"

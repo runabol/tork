@@ -112,9 +112,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "error reading the std out")
 	}
-
 	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -123,25 +121,28 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	case status := <-statusCh:
 		log.Debug().Msgf("status.StatusCode: %#+v\n", status.StatusCode)
 	}
+	// remove the container
+	if err := d.Stop(ctx, t); err != nil {
+		log.Error().Err(err).Str("container-id", resp.ID).Msg("error removing container upon completion")
+	}
 
 	return buf.String(), nil
 }
 
-func (d *DockerRuntime) Cancel(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
 	d.mu.RLock()
 	containerID, ok := d.tasks[t.ID]
 	d.mu.RUnlock()
 	if !ok {
 		return nil
 	}
+	d.mu.Lock()
+	delete(d.tasks, t.ID)
+	d.mu.Unlock()
 	log.Printf("Attempting to stop and remove container %v", containerID)
-	err := d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+	return d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
 		RemoveLinks:   false,
 		Force:         true,
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }

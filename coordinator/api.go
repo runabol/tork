@@ -5,16 +5,20 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"github.com/tork/datastore"
 	"github.com/tork/mq"
 	"github.com/tork/task"
+	"github.com/tork/uuid"
 )
 
 type api struct {
 	server *http.Server
 	broker mq.Broker
+	ds     datastore.TaskDatastore
 }
 
 func newAPI(cfg Config) *api {
@@ -30,6 +34,7 @@ func newAPI(cfg Config) *api {
 			Addr:    cfg.Address,
 			Handler: r,
 		},
+		ds: cfg.TaskDataStore,
 	}
 	r.GET("/status", s.status)
 	r.POST("/task", s.submitTask)
@@ -67,7 +72,13 @@ func (s *api) submitTask(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, errors.New("missing required field: image"))
 		return
 	}
+	t.ID = uuid.NewUUID()
 	t.State = task.Pending
+	t.CreatedAt = time.Now()
+	if err := s.ds.Save(c, t); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 	log.Info().Any("task", t).Msg("received task")
 	if err := s.broker.Publish(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)

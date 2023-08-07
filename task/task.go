@@ -23,6 +23,7 @@ type Task struct {
 	ID            string            `json:"id"`
 	Name          string            `json:"name,omitempty"`
 	State         State             `json:"state"`
+	CreatedAt     time.Time         `json:"createdAt"`
 	ScheduledAt   *time.Time        `json:"scheduledAt,omitempty"`
 	StartedAt     *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt   *time.Time        `json:"completedAt,omitempty"`

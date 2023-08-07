@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/tork/datastore"
 	"github.com/tork/mq"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
@@ -26,9 +27,10 @@ type Coordinator struct {
 }
 
 type Config struct {
-	Scheduler Scheduler
-	Broker    mq.Broker
-	Address   string
+	Scheduler     Scheduler
+	Broker        mq.Broker
+	TaskDataStore datastore.TaskDatastore
+	Address       string
 }
 
 func NewCoordinator(cfg Config) *Coordinator {
@@ -42,7 +44,6 @@ func NewCoordinator(cfg Config) *Coordinator {
 }
 
 func (c *Coordinator) handlePendingTask(ctx context.Context, t *task.Task) error {
-	t.ID = uuid.NewUUID()
 	if err := c.scheduler.Schedule(ctx, t); err != nil {
 		return err
 	}
