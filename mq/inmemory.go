@@ -53,19 +53,21 @@ func (b *InMemoryBroker) Subscribe(qname string, handler func(ctx context.Contex
 		for t := range q {
 			err := handler(ctx, t)
 			if err != nil {
-				panic(err)
+				log.Error().Err(err).Msg("unexpcted error occured while processing task")
 			}
 		}
 	}()
 	return nil
 }
 
-func (b *InMemoryBroker) Queues(ctx context.Context) []string {
-	keys := make([]string, len(b.queues))
+func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	keys := make([]QueueInfo, len(b.queues))
 	i := 0
 	for k := range b.queues {
-		keys[i] = k
+		keys[i] = QueueInfo{Name: k, Size: len(b.queues[k])}
 		i++
 	}
-	return keys
+	return keys, nil
 }

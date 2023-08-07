@@ -44,8 +44,10 @@ func (w *Worker) handleTask(ctx context.Context, t *task.Task) error {
 	}
 	result, err := w.runtime.Run(ctx, t)
 	if err != nil {
-		log.Printf("error running task %v: %v\n", t.ID, err)
-		return err
+		t.State = task.Failed
+		t.Error = err.Error()
+		w.broker.Publish(ctx, mq.QUEUE_ERROR, t)
+		return nil
 	}
 	now := time.Now()
 	t.Result = result

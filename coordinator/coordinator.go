@@ -50,7 +50,17 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t *task.Task) error
 }
 
 func (c *Coordinator) handleCompletedTask(ctx context.Context, t *task.Task) error {
-	log.Debug().Any("task", t).Msg("received task completion")
+	log.Debug().
+		Str("task-id", t.ID).
+		Msg("received task completion")
+	return nil
+}
+
+func (c *Coordinator) handleFailedTask(ctx context.Context, t *task.Task) error {
+	log.Error().
+		Str("task-id", t.ID).
+		Str("task-error", t.Error).
+		Msg("received task failure")
 	return nil
 }
 
@@ -66,6 +76,9 @@ func (c *Coordinator) Start() error {
 	}
 	// subscribe for task completions queue
 	if err := c.broker.Subscribe(mq.QUEUE_COMPLETED, c.handleCompletedTask); err != nil {
+		return err
+	}
+	if err := c.broker.Subscribe(mq.QUEUE_ERROR, c.handleFailedTask); err != nil {
 		return err
 	}
 	// listen for termination signal

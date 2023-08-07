@@ -20,18 +20,19 @@ const (
 
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name,omitempty"`
-	State         State      `json:"state"`
-	ScheduledAt   *time.Time `json:"scheduledAt,omitempty"`
-	StartedAt     *time.Time `json:"startedAt,omitempty"`
-	CompletedAt   *time.Time `json:"completedAt,omitempty"`
-	CMD           []string   `json:"cmd,omitempty"`
-	Image         string     `json:"image"`
-	Memory        int64      `json:"memory,omitempty"`
-	Disk          int64      `json:"disk,omitempty"`
-	Env           []string   `json:"env,omitempty"`
-	RestartPolicy string     `json:"restartPolicy,omitempty"`
-	Queue         string     `json:"queue,omitempty"`
-	Result        string     `json:"result,omitempty"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name,omitempty"`
+	State         State             `json:"state"`
+	ScheduledAt   *time.Time        `json:"scheduledAt,omitempty"`
+	StartedAt     *time.Time        `json:"startedAt,omitempty"`
+	CompletedAt   *time.Time        `json:"completedAt,omitempty"`
+	CMD           []string          `json:"cmd,omitempty"`
+	Image         string            `json:"image,omitempty"`
+	Memory        int64             `json:"memory,omitempty"`
+	Disk          int64             `json:"disk,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+	RestartPolicy string            `json:"restartPolicy,omitempty"`
+	Queue         string            `json:"queue,omitempty"`
+	Result        string            `json:"result,omitempty"`
+	Error         string            `json:"error,omitempty"`
 }

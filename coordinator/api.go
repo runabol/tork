@@ -33,6 +33,7 @@ func newAPI(cfg Config) *api {
 	}
 	r.GET("/status", s.status)
 	r.POST("/task", s.submitTask)
+	r.GET("/queue", s.listQueues)
 	return s
 }
 
@@ -45,6 +46,15 @@ func errorHandler(c *gin.Context) {
 
 func (s *api) status(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "OK"})
+}
+
+func (s *api) listQueues(c *gin.Context) {
+	qs, err := s.broker.Queues(c)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, qs)
 }
 
 func (s *api) submitTask(c *gin.Context) {

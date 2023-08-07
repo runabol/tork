@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -54,9 +55,14 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		Memory: t.Memory,
 	}
 
+	env := []string{}
+	for name, value := range t.Env {
+		env = append(env, fmt.Sprintf("%s=%s", name, value))
+	}
+
 	cc := container.Config{
 		Image: t.Image,
-		Env:   t.Env,
+		Env:   env,
 		Cmd:   t.CMD,
 	}
 
