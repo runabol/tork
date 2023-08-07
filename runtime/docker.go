@@ -34,7 +34,7 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	}, nil
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
+func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	reader, err := d.client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
@@ -121,7 +121,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 	return buf.String(), nil
 }
 
-func (d *DockerRuntime) Cancel(ctx context.Context, t task.Task) error {
+func (d *DockerRuntime) Cancel(ctx context.Context, t *task.Task) error {
 	d.mu.RLock()
 	containerID, ok := d.tasks[t.ID]
 	d.mu.RUnlock()

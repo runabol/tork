@@ -38,8 +38,8 @@ func NewWorker(cfg Config) *Worker {
 	return w
 }
 
-func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
-	if t.State != task.Pending {
+func (w *Worker) handleTask(ctx context.Context, t *task.Task) error {
+	if t.State != task.Scheduled {
 		return errors.Errorf("can't start a task in %s state", t.State)
 	}
 	result, err := w.runtime.Run(ctx, t)
@@ -51,7 +51,7 @@ func (w *Worker) handleTask(ctx context.Context, t task.Task) error {
 	t.Result = result
 	t.CompletedAt = &now
 	t.State = task.Completed
-	w.broker.Enqueue(ctx, mq.QUEUE_COMPLETED, t)
+	w.broker.Publish(ctx, mq.QUEUE_COMPLETED, t)
 	return nil
 }
 

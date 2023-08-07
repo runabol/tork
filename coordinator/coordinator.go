@@ -41,18 +41,15 @@ func NewCoordinator(cfg Config) *Coordinator {
 	}
 }
 
-func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handlePendingTask(ctx context.Context, t *task.Task) error {
 	t.ID = uuid.NewUUID()
 	if err := c.scheduler.Schedule(ctx, t); err != nil {
 		return err
 	}
-	n := time.Now()
-	t.ScheduledAt = &n
-	t.State = task.Scheduled
 	return nil
 }
 
-func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handleCompletedTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Any("task", t).Msg("received task completion")
 	return nil
 }

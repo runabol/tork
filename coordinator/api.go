@@ -48,7 +48,7 @@ func (s *api) status(c *gin.Context) {
 }
 
 func (s *api) submitTask(c *gin.Context) {
-	t := task.Task{}
+	t := &task.Task{}
 	if err := c.BindJSON(&t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
@@ -59,7 +59,7 @@ func (s *api) submitTask(c *gin.Context) {
 	}
 	t.State = task.Pending
 	log.Info().Any("task", t).Msg("received task")
-	if err := s.broker.Enqueue(c, mq.QUEUE_PENDING, t); err != nil {
+	if err := s.broker.Publish(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}

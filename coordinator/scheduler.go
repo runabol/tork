@@ -7,5 +7,5 @@ import (
 )
 
 type Scheduler interface {
-	Schedule(ctx context.Context, t task.Task) error
+	Schedule(ctx context.Context, t *task.Task) error
 }

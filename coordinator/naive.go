@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tork/mq"
@@ -18,11 +19,15 @@ func NewNaiveScheduler(b mq.Broker) *NaiveScheduler {
 	}
 }
 
-func (s *NaiveScheduler) Schedule(ctx context.Context, t task.Task) error {
+func (s *NaiveScheduler) Schedule(ctx context.Context, t *task.Task) error {
 	log.Info().Any("task", t).Msg("scheduling task")
 	qname := t.Queue
 	if qname == "" {
 		qname = mq.QUEUE_DEFAULT
 	}
-	return s.broker.Enqueue(ctx, qname, t)
+	t.State = task.Scheduled
+	n := time.Now()
+	t.ScheduledAt = &n
+	t.State = task.Scheduled
+	return s.broker.Publish(ctx, qname, t)
 }
