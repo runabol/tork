@@ -25,7 +25,7 @@ func newAPI(cfg Config) *api {
 	if cfg.Address == "" {
 		cfg.Address = ":3000"
 	}
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(errorHandler)
 	s := &api{
