@@ -16,7 +16,7 @@ import (
 	"github.com/tork/uuid"
 )
 
-// Coordinator is the responsible for accepting tasks from
+// Coordinator is responsible for accepting tasks from
 // clients, scheduling tasks for workers to execute and for
 // exposing the cluster's state to the outside world.
 type Coordinator struct {
