@@ -54,18 +54,8 @@ Query for the status of the task:
 # curl -s http://localhost:3000/task/$TASK_ID | jq .
 
 {
-  "id": "5d16ce6055ed4e0b8084ccb55b3d7840",
+  ...
   "state": "COMPLETED",
-  "createdAt": "2023-08-07T18:11:00.122843-04:00",
-  "scheduledAt": "2023-08-07T18:11:00.122935-04:00",
-  "startedAt": "2023-08-07T18:11:00.122951-04:00",
-  "completedAt": "2023-08-07T18:11:01.808909-04:00",
-  "cmd": [
-    "echo",
-    "-n",
-    "hello world"
-  ],
-  "image": "ubuntu:mantic",
   "result": "hello world"
 }
 ```
