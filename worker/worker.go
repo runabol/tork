@@ -3,9 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -21,6 +18,7 @@ type Worker struct {
 	Name    string
 	runtime runtime.Runtime
 	broker  mq.Broker
+	stop    bool
 }
 
 type Config struct {
@@ -66,7 +64,7 @@ func (w *Worker) handleTask(ctx context.Context, t *task.Task) error {
 }
 
 func (w *Worker) collectStats() {
-	for {
+	for !w.stop {
 		s, err := getStats()
 		if err != nil {
 			log.Error().Msgf("error collecting stats for %s", w.Name)
@@ -84,9 +82,11 @@ func (w *Worker) Start() error {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
 	}
 	go w.collectStats()
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	return nil
+}
+
+func (w *Worker) Stop() error {
 	log.Debug().Msgf("shutting down %s", w.Name)
+	w.stop = true
 	return nil
 }

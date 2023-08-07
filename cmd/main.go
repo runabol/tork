@@ -1,16 +1,28 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/tork/coordinator"
 	"github.com/tork/datastore"
 	"github.com/tork/mq"
 	"github.com/tork/runtime"
 	"github.com/tork/worker"
 	"github.com/urfave/cli/v2"
+)
+
+type mode string
+
+const (
+	MODE_STANDALONE  mode = "standalone"
+	MODE_COORDINATOR mode = "coordinator"
+	MODE_WORKER      mode = "worker"
 )
 
 func main() {
@@ -20,7 +32,6 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "mode",
-				Value:    "standalone",
 				Usage:    "standalone|worker|coordinator",
 				Required: true,
 			},
@@ -29,43 +40,62 @@ func main() {
 			// loggging
 			zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-			// create a broker
-			b := mq.NewInMemoryBroker()
-
-			// create a Docker-based runtime
-			rt, err := runtime.NewDockerRuntime()
-			if err != nil {
-				return err
+			m := mode(ctx.String("mode"))
+			if m != MODE_STANDALONE && m != MODE_WORKER && m != MODE_COORDINATOR {
+				return errors.Errorf("invalid mode: %s", m)
 			}
 
-			// create a worker
-			w := worker.NewWorker(worker.Config{
-				Broker:  b,
-				Runtime: rt,
-			})
+			b := mq.NewInMemoryBroker()
 
 			// start the worker
-			go func() {
-				if err := w.Start(); err != nil {
-					panic(err)
+			var w *worker.Worker
+			if m == MODE_WORKER || m == MODE_STANDALONE {
+				rt, err := runtime.NewDockerRuntime()
+				if err != nil {
+					return err
 				}
-			}()
 
-			// create a coordinator
-			c := coordinator.NewCoordinator(coordinator.Config{
-				Broker:        b,
-				TaskDataStore: datastore.NewInMemoryDatastore(),
-			})
+				w = worker.NewWorker(worker.Config{
+					Broker:  b,
+					Runtime: rt,
+				})
 
-			// start the coordinator
-			if err := c.Start(); err != nil {
-				return err
+				if err := w.Start(); err != nil {
+					return err
+				}
+			}
+
+			var c *coordinator.Coordinator
+			if m == MODE_COORDINATOR || m == MODE_STANDALONE {
+				// create a coordinator
+				c = coordinator.NewCoordinator(coordinator.Config{
+					Broker:        b,
+					TaskDataStore: datastore.NewInMemoryDatastore(),
+				})
+				// start the coordinator
+				if err := c.Start(); err != nil {
+					return err
+				}
+			}
+
+			// wait for the termination signal
+			// so we can do a clean shutdown
+			quit := make(chan os.Signal, 1)
+			signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+			<-quit
+			log.Debug().Msg("shutting down")
+			if w != nil {
+				w.Stop()
+			}
+			if c != nil {
+				c.Stop()
 			}
 
 			return nil
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

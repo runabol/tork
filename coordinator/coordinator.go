@@ -3,9 +3,6 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -118,10 +115,10 @@ func (c *Coordinator) Start() error {
 	if err := c.broker.Subscribe(mq.QUEUE_STARTED, c.handleStartedTask); err != nil {
 		return err
 	}
-	// listen for termination signal
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	return nil
+}
+
+func (c *Coordinator) Stop() error {
 	log.Debug().Msgf("shutting down %s", c.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
