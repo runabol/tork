@@ -60,6 +60,18 @@ cmd:
   - output.mp4
 ```
 
+## Special queues
+
+There are 4 special-purpose queues that are used by the Coordinator:
+
+- `pending` - incoming tasks land in this queue prior to being scheduled for processing by the Coordinator.
+
+- `started` - when the worker starts working on a task it inserts the task to this queue to notify the Coordinator.
+
+- `completed` - when a worker completes the processing of a task successfully it inserts it -- along with its output -- to this queue to notify the Coordinator.
+
+- `error` - when a worker encounters an error while processing a task it inserts the task to this queue to notify the Coordinator.
+
 # Running in a distributed mode
 
 To run in distributed mode we need to use an external message broker.
