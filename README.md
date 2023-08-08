@@ -30,6 +30,36 @@ A distributed workflow engine.
 
 **Runtime**: the platform used by workers to execute tasks. Currently only Docker is supported.
 
+# Queues
+
+By default all tasks are routed to the `default` queue.
+
+All workers subscribe to the `default` queue unless they make use of the `-queue` flag.
+
+It is often desirable to route tasks to different queues in order to create specialized pools of workers.
+
+For example, one pool of workers, specially configured to handle video transcoding can listen to video processing related tasks:
+
+```
+  go run cmd/main.go -mode standalone -queue transcoding:3 -queue default:10
+```
+
+In this example the worker would handle up to 3 transcoding-related tasks and up to 10 "regular" tasks concurrently.
+
+This could make sense because transcoding tends to be very resource intensive so a single worker might not want to handle more than 3 concurrent tasks.
+
+To route a task to a special queue use the `queue` property:
+
+```
+name: transcode a video
+queue: transcoding
+image: jrottenberg/ffmpeg:3.4-scratch
+cmd:
+  - -i
+  - https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
+  - output.mp4
+```
+
 # Getting started
 
 ## Hello World
