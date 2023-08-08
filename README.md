@@ -14,6 +14,7 @@ A distributed workflow engine.
 - Supports both stand-alone and distributed setup
 - Retry failed tasks
 - Pre/Post tasks
+- Expression Language
 
 # Architecture
 
@@ -58,4 +59,14 @@ Query for the status of the task:
   "state": "COMPLETED",
   "result": "hello world"
 }
+```
+
+# A more interesting example
+
+```
+TASK_ID=$(curl -s -X POST -H "content-type:application/json" -d '{ "name": "convert the first 5 seconds of a video", "image": "jrottenberg/ffmpeg:3.4-scratch", "volumes": [ "/tmp" ], "pre": [{ "name": "download the remote file", "image": "alpine:3.18.3", "cmd": [ "wget", "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv", "-o", "/tmp/input.ogv" ] }, { "image": "alpine:3.18.3", "cmd": [ "ls", "/tmp" ] } ], "post": [{ "name": "upload the remote file", "image": "alpine:3.18.3", "cmd": [ "wget", "--post-file=/tmp/output.mp4", "https://devnull-as-a-service.com/dev/null" ] }], "cmd": [ "-i", "/tmp/input.ogv", "-t", "5", "/tmp/output.mp4" ] }' http://localhost:3000/task | jq -r .id)
+```
+
+```
+curl -s http://localhost:3000/task/$TASK_ID | jq .
 ```

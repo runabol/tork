@@ -73,9 +73,10 @@ func (s *api) createTask(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, errors.New("missing required field: image"))
 		return
 	}
+	n := time.Now()
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
-	t.CreatedAt = time.Now()
+	t.CreatedAt = &n
 	if err := s.ds.Save(c, t); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
