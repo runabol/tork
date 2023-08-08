@@ -65,14 +65,13 @@ func main() {
 				}
 			}
 
+			// start the coordinator
 			var c *coordinator.Coordinator
 			if m == MODE_COORDINATOR || m == MODE_STANDALONE {
-				// create a coordinator
 				c = coordinator.NewCoordinator(coordinator.Config{
 					Broker:        b,
 					TaskDataStore: datastore.NewInMemoryDatastore(),
 				})
-				// start the coordinator
 				if err := c.Start(); err != nil {
 					return err
 				}

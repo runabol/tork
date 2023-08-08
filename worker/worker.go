@@ -19,19 +19,25 @@ type Worker struct {
 	runtime runtime.Runtime
 	broker  mq.Broker
 	stop    bool
+	queues  map[string]int
 }
 
 type Config struct {
 	Broker  mq.Broker
 	Runtime runtime.Runtime
+	Queues  map[string]int
 }
 
 func NewWorker(cfg Config) *Worker {
 	name := fmt.Sprintf("worker-%s", uuid.NewUUID())
+	if len(cfg.Queues) == 0 {
+		cfg.Queues = map[string]int{mq.QUEUE_DEFAULT: 1}
+	}
 	w := &Worker{
 		Name:    name,
 		broker:  cfg.Broker,
 		runtime: cfg.Runtime,
+		queues:  cfg.Queues,
 	}
 	return w
 }
@@ -129,9 +135,14 @@ func (w *Worker) collectStats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
-	err := w.broker.Subscribe(mq.QUEUE_DEFAULT, w.handleTask)
-	if err != nil {
-		return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
+	// subscribe to work queues
+	for qname, concurrency := range w.queues {
+		for i := 0; i < concurrency; i++ {
+			err := w.broker.Subscribe(qname, w.handleTask)
+			if err != nil {
+				return errors.Wrapf(err, "error subscribing for queue: %s", w.Name)
+			}
+		}
 	}
 	go w.collectStats()
 	return nil
