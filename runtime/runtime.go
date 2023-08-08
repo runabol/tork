@@ -15,5 +15,7 @@ const (
 // Runtime is the actual runtime environment that executes a task.
 type Runtime interface {
 	Run(ctx context.Context, t *task.Task) (string, error)
+	CreateVolume(ctx context.Context, name string) error
+	DeleteVolume(ctx context.Context, name string) error
 	Stop(ctx context.Context, t *task.Task) error
 }
