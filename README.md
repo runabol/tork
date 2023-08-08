@@ -34,20 +34,31 @@ A distributed workflow engine.
 
 ## Hello World
 
-Start in `standalone` mode:
+1. Start in `standalone` mode:
 
 ```
 go run cmd/main.go -mode standalone
 ```
 
-Submit task in another terminal:
+2. Submit task in another terminal:
+
+```yaml
+# hello.yaml
+---
+image: ubuntu:mantic
+cmd:
+  - echo
+  - -n
+  - hello world
+```
 
 ```
 TASK_ID=$(curl \
   -s \
   -X POST \
-  -H "content-type:application/json" \
-  -d '{"image":"ubuntu:mantic","cmd":["echo","-n","hello world"]}' \
+  --data-binary @/tmp/task.yaml \
+  -H "Content-type: text/yaml" \
+  @hello.yaml \
   http://localhost:3000/task | jq -r .id)
 ```
 
@@ -67,47 +78,46 @@ Query for the status of the task:
 
 1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
 2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
-3. Upload the converted video to a destination.
+3. Upload the converted video to a destination using a `post` task.
 
-```
-
-// convert.json
-
-{
-  "name": "convert the first 5 seconds of a video",
-  "image": "jrottenberg/ffmpeg:3.4-scratch",
-  "cmd": [
-    "-i",
-    "/tmp/input.ogv",
-    "-t",
-    "5",
-    "/tmp/output.mp4"
-  ],
-  "volumes": ["/tmp"],
-  "pre": [{
-    "name": "download the remote file",
-    "image": "alpine:3.18.3",
-    "cmd": [
-      "wget",
-      "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv",
-      "-O",
-      "/tmp/input.ogv"
-    ]
-  }],
-  "post": [{
-    "name": "upload the converted file",
-    "image": "alpine:3.18.3",
-    "cmd": [
-      "wget",
-      "--post-file=/tmp/output.mp4",
-      "https://devnull-as-a-service.com/dev/null"
-    ]
-  }]
-}
+```yaml
+# convert.yaml
+---
+name: convert the first 5 seconds of a video
+image: jrottenberg/ffmpeg:3.4-scratch
+cmd:
+  - -i
+  - /tmp/input.ogv
+  - -t
+  - "5"
+  - /tmp/output.mp4
+volumes:
+  - /tmp
+pre:
+  - name: download the remote file
+    image: alpine:3.18.3
+    cmd:
+      - wget
+      - https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
+      - -O
+      - /tmp/input.ogv
+post:
+  - name: upload the converted file
+    image: alpine:3.18.3
+    cmd:
+      - wget
+      - --post-file=/tmp/output.mp4
+      - https://devnull-as-a-service.com/dev/null
 ```
 
 Submit the task:
 
 ```
-TASK_ID=$(curl -s -X POST -d @convert.json http://localhost:3000/task | jq -r .id)
+TASK_ID=$(curl \
+  -s \
+  -X POST \
+  --data-binary @/tmp/task.yaml \
+  -H "Content-type: text/yaml" \
+  @convert.yaml \
+  http://localhost:3000/task | jq -r .id)
 ```
