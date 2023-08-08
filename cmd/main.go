@@ -89,6 +89,7 @@ func main() {
 				c = coordinator.NewCoordinator(coordinator.Config{
 					Broker:        b,
 					TaskDataStore: datastore.NewInMemoryDatastore(),
+					Queues:        queues,
 				})
 				if err := c.Start(); err != nil {
 					return err

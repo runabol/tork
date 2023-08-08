@@ -15,12 +15,16 @@ type QueueInfo struct {
 	Size int
 }
 
-func IsWorkQueue(qname string) bool {
-	specialQueues := []string{
+func IsCoordinatorQueue(qname string) bool {
+	return !IsWorkerQueue(qname)
+}
+
+func IsWorkerQueue(qname string) bool {
+	coordQueues := []string{
 		QUEUE_PENDING,
 		QUEUE_STARTED,
 		QUEUE_COMPLETED,
 		QUEUE_ERROR,
 	}
-	return !slices.Contains(specialQueues, qname)
+	return !slices.Contains(coordQueues, qname)
 }

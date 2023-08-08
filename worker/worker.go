@@ -145,7 +145,7 @@ func (w *Worker) Start() error {
 	log.Info().Msgf("starting %s", w.Name)
 	// subscribe to work queues
 	for qname, concurrency := range w.queues {
-		if !mq.IsWorkQueue(qname) {
+		if !mq.IsWorkerQueue(qname) {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
