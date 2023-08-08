@@ -45,6 +45,7 @@ go run cmd/main.go -mode standalone
 ```yaml
 # hello.yaml
 ---
+name: say hello
 image: ubuntu:mantic
 cmd:
   - echo
