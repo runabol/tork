@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -35,6 +37,10 @@ func main() {
 				Usage:    "standalone|worker|coordinator",
 				Required: true,
 			},
+			&cli.StringSliceFlag{
+				Name:  "queue",
+				Usage: "<queuename>:<concurrency>",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			// loggging
@@ -47,6 +53,19 @@ func main() {
 
 			b := mq.NewInMemoryBroker()
 
+			// parse queue definitions
+			qs := ctx.StringSlice("queue")
+			queues := make(map[string]int)
+			for _, q := range qs {
+				def := strings.Split(q, ":")
+				qname := def[0]
+				conc, err := strconv.Atoi(def[1])
+				if err != nil {
+					return errors.Errorf("invalid queue definition: %s", q)
+				}
+				queues[qname] = conc
+			}
+
 			// start the worker
 			var w *worker.Worker
 			if m == MODE_WORKER || m == MODE_STANDALONE {
@@ -54,12 +73,11 @@ func main() {
 				if err != nil {
 					return err
 				}
-
 				w = worker.NewWorker(worker.Config{
 					Broker:  b,
 					Runtime: rt,
+					Queues:  queues,
 				})
-
 				if err := w.Start(); err != nil {
 					return err
 				}
