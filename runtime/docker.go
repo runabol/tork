@@ -48,7 +48,9 @@ func (r filteredReader) Read(p []byte) (int, error) {
 	}
 	j := 0
 	for i := 0; i < n; i++ {
-		if p[i] != 0 {
+		if p[i] != 0 && // null
+			p[i] != 1 && // start of heading
+			p[i] != 11 { // tab
 			p[j] = p[i]
 			j++
 		}

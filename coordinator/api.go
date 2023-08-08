@@ -2,12 +2,13 @@ package coordinator
 
 import (
 	"context"
-	"errors"
+
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/tork/datastore"
 	"github.com/tork/mq"
@@ -65,8 +66,19 @@ func (s *api) listQueues(c *gin.Context) {
 
 func (s *api) createTask(c *gin.Context) {
 	t := &task.Task{}
-	if err := c.BindJSON(&t); err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+	switch c.ContentType() {
+	case "application/json":
+		if err := c.BindJSON(&t); err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+	case "text/yaml":
+		if err := c.BindYAML(&t); err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+	default:
+		c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
 		return
 	}
 	if strings.TrimSpace(t.Image) == "" {
