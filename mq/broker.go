@@ -6,6 +6,11 @@ import (
 	"github.com/tork/task"
 )
 
+const (
+	BROKER_INMEMORY = "inmemory"
+	BROKER_RABBITMQ = "rabbitmq"
+)
+
 // Broker is the message-queue, pub/sub mechanism used for delivering tasks.
 type Broker interface {
 	Queues(ctx context.Context) ([]QueueInfo, error)

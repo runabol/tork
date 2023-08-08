@@ -6,8 +6,13 @@ import (
 	"github.com/tork/task"
 )
 
-type TaskDatastore interface {
-	Save(ctx context.Context, t *task.Task) error
-	Update(ctx context.Context, id string, modifier func(u *task.Task)) error
-	GetByID(ctx context.Context, id string) (*task.Task, error)
+const (
+	DATASTORE_INMEMORY = "inmemory"
+	DATASTORE_POSTGRES = "postgres"
+)
+
+type Datastore interface {
+	SaveTask(ctx context.Context, t *task.Task) error
+	UpdateTask(ctx context.Context, id string, modify func(u *task.Task)) error
+	GetTaskByID(ctx context.Context, id string) (*task.Task, error)
 }

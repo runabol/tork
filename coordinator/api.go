@@ -19,7 +19,7 @@ import (
 type api struct {
 	server *http.Server
 	broker mq.Broker
-	ds     datastore.TaskDatastore
+	ds     datastore.Datastore
 }
 
 func newAPI(cfg Config) *api {
@@ -35,7 +35,7 @@ func newAPI(cfg Config) *api {
 			Addr:    cfg.Address,
 			Handler: r,
 		},
-		ds: cfg.TaskDataStore,
+		ds: cfg.DataStore,
 	}
 	r.GET("/status", s.status)
 	r.POST("/task", s.createTask)
@@ -93,7 +93,7 @@ func (s *api) createTask(c *gin.Context) {
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
 	t.CreatedAt = &n
-	if err := s.ds.Save(c, t); err != nil {
+	if err := s.ds.SaveTask(c, t); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -107,7 +107,7 @@ func (s *api) createTask(c *gin.Context) {
 
 func (s *api) getTask(c *gin.Context) {
 	id := c.Param("id")
-	t, err := s.ds.GetByID(c, id)
+	t, err := s.ds.GetTaskByID(c, id)
 	if err != nil {
 		c.AbortWithError(http.StatusNotFound, err)
 		return

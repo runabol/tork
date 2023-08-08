@@ -21,14 +21,14 @@ func NewInMemoryDatastore() *InMemoryDatastore {
 	}
 }
 
-func (ds *InMemoryDatastore) Save(ctx context.Context, t *task.Task) error {
+func (ds *InMemoryDatastore) SaveTask(ctx context.Context, t *task.Task) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	ds.data[t.ID] = *t
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetByID(ctx context.Context, id string) (*task.Task, error) {
+func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
 	t, ok := ds.data[id]
@@ -38,7 +38,7 @@ func (ds *InMemoryDatastore) GetByID(ctx context.Context, id string) (*task.Task
 	return &t, nil
 }
 
-func (ds *InMemoryDatastore) Update(ctx context.Context, id string, modifier func(t *task.Task)) error {
+func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modifier func(t *task.Task)) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	t, ok := ds.data[id]

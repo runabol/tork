@@ -20,15 +20,15 @@ type Coordinator struct {
 	Name   string
 	broker mq.Broker
 	api    *api
-	ds     datastore.TaskDatastore
+	ds     datastore.Datastore
 	queues map[string]int
 }
 
 type Config struct {
-	Broker        mq.Broker
-	TaskDataStore datastore.TaskDatastore
-	Address       string
-	Queues        map[string]int
+	Broker    mq.Broker
+	DataStore datastore.Datastore
+	Address   string
+	Queues    map[string]int
 }
 
 func NewCoordinator(cfg Config) *Coordinator {
@@ -52,7 +52,7 @@ func NewCoordinator(cfg Config) *Coordinator {
 		Name:   name,
 		api:    newAPI(cfg),
 		broker: cfg.Broker,
-		ds:     cfg.TaskDataStore,
+		ds:     cfg.DataStore,
 		queues: cfg.Queues,
 	}
 }
@@ -74,7 +74,7 @@ func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context
 		if err := c.broker.Publish(ctx, qname, t); err != nil {
 			return err
 		}
-		return c.ds.Update(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
 			// we don't want to mark the task as SCHEDULED
 			// if an out-of-order task completion/failure
 			// arrived earlier
@@ -92,7 +92,7 @@ func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context
 			Str("task-id", t.ID).
 			Str("thread", thread).
 			Msg("received task start")
-		return c.ds.Update(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
 			// we don't want to mark the task as RUNNING
 			// if an out-of-order task completion/failure
 			// arrived earlier
@@ -110,7 +110,11 @@ func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Conte
 			Str("task-id", t.ID).
 			Str("thread", thread).
 			Msg("received task completion")
-		return c.ds.Save(ctx, t)
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+			u.State = task.Completed
+			u.CompletedAt = t.CompletedAt
+			u.Result = t.Result
+		})
 	}
 }
 
@@ -121,7 +125,10 @@ func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context,
 			Str("task-error", t.Error).
 			Str("thread", thread).
 			Msg("received task failure")
-		return c.ds.Save(ctx, t)
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+			u.State = task.Failed
+			u.FailedAt = t.FailedAt
+		})
 	}
 }
 

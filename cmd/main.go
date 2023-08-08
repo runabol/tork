@@ -19,124 +19,265 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-type mode string
-
 const (
-	MODE_STANDALONE  mode = "standalone"
-	MODE_COORDINATOR mode = "coordinator"
-	MODE_WORKER      mode = "worker"
+	// runs as both a coordinator and workers
+	MODE_STANDALONE = "standalone"
+	// runs as a coordinator
+	MODE_COORDINATOR = "coordinator"
+	// runs as a worker
+	MODE_WORKER = "worker"
+	// executes the database migration script
+	// for the string datastore
+	MODE_MIGRATION = "migration"
 )
+
+func modeFlag() cli.Flag {
+	allModes := []string{
+		MODE_STANDALONE,
+		MODE_COORDINATOR,
+		MODE_WORKER,
+		MODE_MIGRATION,
+	}
+	return &cli.StringFlag{
+		Name:     "mode",
+		Usage:    strings.Join(allModes, "|"),
+		Required: true,
+	}
+}
+
+func queueFlag() cli.Flag {
+	return &cli.StringSliceFlag{
+		Name:  "queue",
+		Usage: "<queuename>:<concurrency>",
+	}
+}
+
+func brokerFlag() cli.Flag {
+	allBrokerTypes := []string{
+		mq.BROKER_INMEMORY,
+		mq.BROKER_RABBITMQ,
+	}
+	return &cli.StringFlag{
+		Name:  "broker",
+		Usage: strings.Join(allBrokerTypes, "|"),
+		Value: mq.BROKER_INMEMORY,
+	}
+}
+
+func rabbitmqURLFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "rabbitmq-url",
+		Usage: "amqp://<username>:<password>@<hostname>:<port>/",
+		Value: "amqp://guest:guest@localhost:5672/",
+	}
+}
+
+func datastoreFlag() cli.Flag {
+	allDSTypes := []string{
+		datastore.DATASTORE_INMEMORY,
+		datastore.DATASTORE_POSTGRES,
+	}
+	return &cli.StringFlag{
+		Name:  "datastore",
+		Usage: strings.Join(allDSTypes, "|"),
+		Value: datastore.DATASTORE_INMEMORY,
+	}
+}
+
+func postgresDSNFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "postgres-dsn",
+		Usage: "host=<hostname> user=<username> password=<username> dbname=<username> port=<port> sslmode=<disable|enable>",
+		Value: "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
+	}
+}
 
 func main() {
 	app := &cli.App{
 		Name:        "tork",
 		Description: "a distributed workflow engine",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "mode",
-				Usage:    "standalone|worker|coordinator",
-				Required: true,
-			},
-			&cli.StringSliceFlag{
-				Name:  "queue",
-				Usage: "<queuename>:<concurrency>",
-			},
-			&cli.StringFlag{
-				Name:  "broker",
-				Usage: "inmemory|rabbitmq",
-				Value: "inmemory",
-			},
-			&cli.StringFlag{
-				Name:  "rabbitmq-url",
-				Usage: "amqp://<username>:<password>@<hostname>:<port>/",
-				Value: "amqp://guest:guest@localhost:5672/",
-			},
+			modeFlag(),
+			queueFlag(),
+			brokerFlag(),
+			rabbitmqURLFlag(),
+			datastoreFlag(),
+			postgresDSNFlag(),
 		},
-		Action: func(ctx *cli.Context) error {
-			// loggging
-			zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-
-			md := mode(ctx.String("mode"))
-			if md != MODE_STANDALONE && md != MODE_WORKER && md != MODE_COORDINATOR {
-				return errors.Errorf("invalid mode: %s", md)
-			}
-
-			bk := ctx.String("broker")
-			var b mq.Broker
-			switch bk {
-			case "inmemory":
-				b = mq.NewInMemoryBroker()
-			case "rabbitmq":
-				rb, err := mq.NewRabbitMQBroker(ctx.String("rabbitmq-url"))
-				if err != nil {
-					return errors.Wrapf(err, "unable to connect to RabbitMQ")
-				}
-				b = rb
-			default:
-				return errors.Errorf("invalid broker type: %s", bk)
-			}
-
-			// parse queue definitions
-			qs := ctx.StringSlice("queue")
-			queues := make(map[string]int)
-			for _, q := range qs {
-				def := strings.Split(q, ":")
-				qname := def[0]
-				conc, err := strconv.Atoi(def[1])
-				if err != nil {
-					return errors.Errorf("invalid queue definition: %s", q)
-				}
-				queues[qname] = conc
-			}
-
-			// start the worker
-			var w *worker.Worker
-			if md == MODE_WORKER || md == MODE_STANDALONE {
-				rt, err := runtime.NewDockerRuntime()
-				if err != nil {
-					return err
-				}
-				w = worker.NewWorker(worker.Config{
-					Broker:  b,
-					Runtime: rt,
-					Queues:  queues,
-				})
-				if err := w.Start(); err != nil {
-					return err
-				}
-			}
-
-			// start the coordinator
-			var c *coordinator.Coordinator
-			if md == MODE_COORDINATOR || md == MODE_STANDALONE {
-				c = coordinator.NewCoordinator(coordinator.Config{
-					Broker:        b,
-					TaskDataStore: datastore.NewInMemoryDatastore(),
-					Queues:        queues,
-				})
-				if err := c.Start(); err != nil {
-					return err
-				}
-			}
-
-			// wait for the termination signal
-			// so we can do a clean shutdown
-			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-			<-quit
-			log.Debug().Msg("shutting down")
-			if w != nil {
-				w.Stop()
-			}
-			if c != nil {
-				c.Stop()
-			}
-
-			return nil
-		},
+		Action: execute,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func execute(ctx *cli.Context) error {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+
+	mode := ctx.String("mode")
+	if !isValidMode(mode) {
+		return errors.Errorf("invalid mode: %s", mode)
+	}
+
+	var broker mq.Broker
+	var ds datastore.Datastore
+	var w *worker.Worker
+	var c *coordinator.Coordinator
+	var err error
+
+	broker, err = createBroker(ctx)
+	if err != nil {
+		return err
+	}
+
+	ds, err = createDatastore(ctx)
+	if err != nil {
+		return err
+	}
+
+	queues, err := getQueueConfig(ctx)
+	if err != nil {
+		return err
+	}
+
+	switch mode {
+	case MODE_STANDALONE:
+		w, err = createWorker(broker, queues)
+		if err != nil {
+			return err
+		}
+		c, err = createCoordinator(broker, ds, queues)
+		if err != nil {
+			return err
+		}
+	case MODE_COORDINATOR:
+		c, err = createCoordinator(broker, ds, queues)
+		if err != nil {
+			return err
+		}
+	case MODE_WORKER:
+		w, err = createWorker(broker, queues)
+		if err != nil {
+			return err
+		}
+	case MODE_MIGRATION:
+		dstype := ctx.String("datastore")
+		switch dstype {
+		case datastore.DATASTORE_POSTGRES:
+			if err := ds.(*datastore.PostgresDatastore).CreateSchema(); err != nil {
+				return errors.Wrapf(err, "error when trying to create db schema")
+			}
+		default:
+			return errors.Errorf("can't perform db migration on: %s", dstype)
+		}
+		log.Info().Msg("migration completed!")
+	}
+
+	if mode != MODE_MIGRATION {
+		// wait for the termination signal
+		// so we can do a clean shutdown
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		log.Debug().Msg("shutting down")
+		if w != nil {
+			w.Stop()
+		}
+		if c != nil {
+			c.Stop()
+		}
+	}
+
+	return nil
+}
+
+func createDatastore(ctx *cli.Context) (datastore.Datastore, error) {
+	dsname := ctx.String("datastore")
+	var ds datastore.Datastore
+	switch dsname {
+	case datastore.DATASTORE_INMEMORY:
+		ds = datastore.NewInMemoryDatastore()
+	case datastore.DATASTORE_POSTGRES:
+		pg, err := datastore.NewPostgresDataStore(ctx.String("postgres-dsn"))
+		if err != nil {
+			return nil, err
+		}
+		ds = pg
+	default:
+		return nil, errors.Errorf("unknown datastore type: %s", dsname)
+	}
+	return ds, nil
+}
+
+func createBroker(ctx *cli.Context) (mq.Broker, error) {
+	var b mq.Broker
+	bt := ctx.String("broker")
+	switch bt {
+	case "inmemory":
+		b = mq.NewInMemoryBroker()
+	case "rabbitmq":
+		rb, err := mq.NewRabbitMQBroker(ctx.String("rabbitmq-url"))
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
+		}
+		b = rb
+	default:
+		return nil, errors.Errorf("invalid broker type: %s", bt)
+	}
+	return b, nil
+}
+
+func createCoordinator(broker mq.Broker, ds datastore.Datastore, queues map[string]int) (*coordinator.Coordinator, error) {
+	c := coordinator.NewCoordinator(coordinator.Config{
+		Broker:    broker,
+		DataStore: ds,
+		Queues:    queues,
+	})
+	if err := c.Start(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func createWorker(b mq.Broker, queues map[string]int) (*worker.Worker, error) {
+	rt, err := runtime.NewDockerRuntime()
+	if err != nil {
+		return nil, err
+	}
+	w := worker.NewWorker(worker.Config{
+		Broker:  b,
+		Runtime: rt,
+		Queues:  queues,
+	})
+	if err := w.Start(); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+func getQueueConfig(ctx *cli.Context) (map[string]int, error) {
+	qs := ctx.StringSlice("queue")
+	queues := make(map[string]int)
+	for _, q := range qs {
+		def := strings.Split(q, ":")
+		qname := def[0]
+		conc, err := strconv.Atoi(def[1])
+		if err != nil {
+			return nil, errors.Errorf("invalid queue definition: %s", q)
+		}
+		queues[qname] = conc
+	}
+	return queues, nil
+}
+
+func isValidMode(m string) bool {
+	switch m {
+	case MODE_STANDALONE,
+		MODE_COORDINATOR,
+		MODE_WORKER,
+		MODE_MIGRATION:
+		return true
+	}
+	return false
 }

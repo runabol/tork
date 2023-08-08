@@ -41,7 +41,7 @@ It is often desirable to route tasks to different queues in order to create spec
 For example, one pool of workers, specially configured to handle video transcoding can listen to video processing related tasks:
 
 ```
-  go run cmd/main.go -mode standalone -queue transcoding:3 -queue default:10
+go run cmd/main.go -mode standalone -queue transcoding:3 -queue default:10
 ```
 
 In this example the worker would handle up to 3 transcoding-related tasks and up to 10 "regular" tasks concurrently.
@@ -72,6 +72,50 @@ There are 4 special-purpose queues that are used by the Coordinator:
 
 - `error` - when a worker encounters an error while processing a task it inserts the task to this queue to notify the Coordinator.
 
+# Datastore
+
+The `Datastore` is responsible for holding job and task metadata.
+
+You can specify which type of datastore to use using the `-datastore` flag.
+
+**In Memory**:
+
+The default implementation. Typically isn't suitable for production because all state will be lost upon restart.
+
+**Postgres**:
+
+Uses a [Postgres](https://www.postgresql.org) database as the underlying implementation.
+
+1. Start Postgres DB:
+
+```
+docker run \
+  --name postgres \
+  -e POSTGRES_PASSWORD=tork \
+  -e POSTGRES_USER=tork \
+  -e POSTGRES_DB=tork \
+  -p 5432:5432 \
+  -d postgres:15.3
+```
+
+2. Run a migration to create the database schema
+
+```
+go run cmd/main.go \
+  -mode migration \
+  -datastore postgres \
+  -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+```
+
+3. Start Tork
+
+```
+go run cmd/main.go \
+  -mode standalone \
+  -datastore postgres \
+  -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+```
+
 # Running in a distributed mode
 
 To run in distributed mode we need to use an external message broker.
@@ -79,30 +123,36 @@ To run in distributed mode we need to use an external message broker.
 1. Start RabbitMQ:
 
 ```
+
 docker run \
-  -d \
-  --name rabbitmq \
-  -p 5672:5672 \
-  -p 15672:15672 \
-  rabbitmq:3-management
+ -d \
+ --name rabbitmq \
+ -p 5672:5672 \
+ -p 15672:15672 \
+ rabbitmq:3-management
+
 ```
 
 2. Start the Coordinator:
 
 ```
+
 go run cmd/main.go \
-  -mode coordinator \
-  -broker rabbitmq \
-  -rabbitmq-url amqp://guest:guest@localhost:5672
+ -mode coordinator \
+ -broker rabbitmq \
+ -rabbitmq-url amqp://guest:guest@localhost:5672
+
 ```
 
 3. Start the worker(s):
 
 ```
+
 go run cmd/main.go \
-  -mode worker \
-  -broker rabbitmq \
-  -rabbitmq-url amqp://guest:guest@localhost:5672
+ -mode worker \
+ -broker rabbitmq \
+ -rabbitmq-url amqp://guest:guest@localhost:5672
+
 ```
 
 # Getting started
@@ -112,7 +162,9 @@ go run cmd/main.go \
 1. Start in `standalone` mode:
 
 ```
+
 go run cmd/main.go -mode standalone
+
 ```
 
 2. Submit task in another terminal:
