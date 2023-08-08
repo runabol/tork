@@ -43,7 +43,7 @@ func (b *InMemoryBroker) Subscribe(qname string, handler func(ctx context.Contex
 	q, ok := b.queues[qname]
 	b.mu.RUnlock()
 	if !ok {
-		q = make(chan task.Task, 10)
+		q = make(chan task.Task, 100)
 		b.mu.Lock()
 		b.queues[qname] = q
 		b.mu.Unlock()
