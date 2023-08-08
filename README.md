@@ -30,7 +30,9 @@ A distributed workflow engine.
 
 **Runtime**: the platform used by workers to execute tasks. Currently only Docker is supported.
 
-# Hello World
+# Getting started
+
+## Hello World
 
 Start in `standalone` mode:
 
@@ -61,7 +63,7 @@ Query for the status of the task:
 }
 ```
 
-# A more interesting example
+## A more interesting example
 
 1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
 2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
