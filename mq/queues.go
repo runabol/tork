@@ -1,5 +1,7 @@
 package mq
 
+import "golang.org/x/exp/slices"
+
 const (
 	QUEUE_PENDING   = "pending"
 	QUEUE_STARTED   = "started"
@@ -11,4 +13,14 @@ const (
 type QueueInfo struct {
 	Name string
 	Size int
+}
+
+func IsWorkQueue(qname string) bool {
+	specialQueues := []string{
+		QUEUE_PENDING,
+		QUEUE_STARTED,
+		QUEUE_COMPLETED,
+		QUEUE_ERROR,
+	}
+	return !slices.Contains(specialQueues, qname)
 }
