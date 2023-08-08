@@ -95,7 +95,7 @@ Query for the status of the task:
     ]
   }],
   "post": [{
-    "name": "upload the remote file",
+    "name": "upload the converted file",
     "image": "alpine:3.18.3",
     "cmd": [
       "wget",
