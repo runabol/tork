@@ -63,10 +63,49 @@ Query for the status of the task:
 
 # A more interesting example
 
-```
-TASK_ID=$(curl -s -X POST -H "content-type:application/json" -d '{ "name": "convert the first 5 seconds of a video", "image": "jrottenberg/ffmpeg:3.4-scratch", "volumes": [ "/tmp" ], "pre": [{ "name": "download the remote file", "image": "alpine:3.18.3", "cmd": [ "wget", "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv", "-o", "/tmp/input.ogv" ] }, { "image": "alpine:3.18.3", "cmd": [ "ls", "/tmp" ] } ], "post": [{ "name": "upload the remote file", "image": "alpine:3.18.3", "cmd": [ "wget", "--post-file=/tmp/output.mp4", "https://devnull-as-a-service.com/dev/null" ] }], "cmd": [ "-i", "/tmp/input.ogv", "-t", "5", "/tmp/output.mp4" ] }' http://localhost:3000/task | jq -r .id)
-```
+1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
+2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
+3. Upload the converted video to a destination.
 
 ```
-curl -s http://localhost:3000/task/$TASK_ID | jq .
+
+// convert.json
+
+{
+  "name": "convert the first 5 seconds of a video",
+  "image": "jrottenberg/ffmpeg:3.4-scratch",
+  "cmd": [
+    "-i",
+    "/tmp/input.ogv",
+    "-t",
+    "5",
+    "/tmp/output.mp4"
+  ],
+  "volumes": ["/tmp"],
+  "pre": [{
+    "name": "download the remote file",
+    "image": "alpine:3.18.3",
+    "cmd": [
+      "wget",
+      "https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv",
+      "-O",
+      "/tmp/input.ogv"
+    ]
+  }],
+  "post": [{
+    "name": "upload the remote file",
+    "image": "alpine:3.18.3",
+    "cmd": [
+      "wget",
+      "--post-file=/tmp/output.mp4",
+      "https://devnull-as-a-service.com/dev/null"
+    ]
+  }]
+}
+```
+
+Submit the task:
+
+```
+TASK_ID=$(curl -s -X POST -d @convert.json http://localhost:3000/task | jq -r .id)
 ```
