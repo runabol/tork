@@ -85,6 +85,10 @@ func (s *api) createTask(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, errors.New("missing required field: image"))
 		return
 	}
+	if mq.IsCoordinatorQueue(t.Queue) {
+		c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't route to special queue: %s", t.Queue))
+		return
+	}
 	n := time.Now()
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
