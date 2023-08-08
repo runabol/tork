@@ -41,17 +41,40 @@ func main() {
 				Name:  "queue",
 				Usage: "<queuename>:<concurrency>",
 			},
+			&cli.StringFlag{
+				Name:  "broker",
+				Usage: "inmemory|rabbitmq",
+				Value: "inmemory",
+			},
+			&cli.StringFlag{
+				Name:  "rabbitmq-url",
+				Usage: "amqp://<username>:<password>@<hostname>:<port>/",
+				Value: "amqp://guest:guest@localhost:5672/",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			// loggging
 			zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
-			m := mode(ctx.String("mode"))
-			if m != MODE_STANDALONE && m != MODE_WORKER && m != MODE_COORDINATOR {
-				return errors.Errorf("invalid mode: %s", m)
+			md := mode(ctx.String("mode"))
+			if md != MODE_STANDALONE && md != MODE_WORKER && md != MODE_COORDINATOR {
+				return errors.Errorf("invalid mode: %s", md)
 			}
 
-			b := mq.NewInMemoryBroker()
+			bk := ctx.String("broker")
+			var b mq.Broker
+			switch bk {
+			case "inmemory":
+				b = mq.NewInMemoryBroker()
+			case "rabbitmq":
+				rb, err := mq.NewRabbitMQBroker(ctx.String("rabbitmq-url"))
+				if err != nil {
+					return errors.Wrapf(err, "unable to connect to RabbitMQ")
+				}
+				b = rb
+			default:
+				return errors.Errorf("invalid broker type: %s", bk)
+			}
 
 			// parse queue definitions
 			qs := ctx.StringSlice("queue")
@@ -68,7 +91,7 @@ func main() {
 
 			// start the worker
 			var w *worker.Worker
-			if m == MODE_WORKER || m == MODE_STANDALONE {
+			if md == MODE_WORKER || md == MODE_STANDALONE {
 				rt, err := runtime.NewDockerRuntime()
 				if err != nil {
 					return err
@@ -85,7 +108,7 @@ func main() {
 
 			// start the coordinator
 			var c *coordinator.Coordinator
-			if m == MODE_COORDINATOR || m == MODE_STANDALONE {
+			if md == MODE_COORDINATOR || md == MODE_STANDALONE {
 				c = coordinator.NewCoordinator(coordinator.Config{
 					Broker:        b,
 					TaskDataStore: datastore.NewInMemoryDatastore(),

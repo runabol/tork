@@ -60,6 +60,39 @@ cmd:
   - output.mp4
 ```
 
+# Running in a distributed mode
+
+To run in distributed mode we need to use an external message broker.
+
+1. Start RabbitMQ:
+
+```
+docker run \
+  -d \
+  --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:3-management
+```
+
+2. Start the Coordinator:
+
+```
+go run cmd/main.go \
+  -mode coordinator \
+  -broker rabbitmq \
+  -rabbitmq-url amqp://guest:guest@localhost:5672
+```
+
+3. Start the worker(s):
+
+```
+go run cmd/main.go \
+  -mode worker \
+  -broker rabbitmq \
+  -rabbitmq-url amqp://guest:guest@localhost:5672
+```
+
 # Getting started
 
 ## Hello World
@@ -105,7 +138,7 @@ Query for the status of the task:
 }
 ```
 
-## A more interesting example
+## A slightly more interesting example
 
 1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
 2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
