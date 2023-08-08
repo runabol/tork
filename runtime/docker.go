@@ -119,7 +119,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		Msg("executing")
 
 	resp, err := d.client.ContainerCreate(
-		ctx, &cc, &hc, nil, nil, t.ID)
+		ctx, &cc, &hc, nil, nil, "")
 	if err != nil {
 		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
