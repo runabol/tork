@@ -1,6 +1,8 @@
 CREATE TABLE tasks (
     id            varchar(64) not null primary key,
     created_at    timestamp   not null,
+    started_at    timestamp,
+    completed_at  timestamp,
     state         varchar(10) not null,
     serialized    jsonb       not null
 );
