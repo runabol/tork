@@ -30,6 +30,90 @@ A distributed workflow engine.
 
 **Runtime**: the platform used by workers to execute tasks. Currently only Docker is supported.
 
+# Getting started
+
+## Hello World
+
+Start in `standalone` mode:
+
+```
+go run cmd/main.go -mode standalone
+```
+
+Submit task in another terminal:
+
+```yaml
+# hello.yaml
+---
+name: say hello
+image: ubuntu:mantic
+run: |
+  echo -n hello world
+```
+
+```bash
+TASK_ID=$(curl \
+  -s \
+  -X POST \
+  --data-binary @hello.yaml \
+  -H "Content-type: text/yaml" \
+  http://localhost:3000/task | jq -r .id)
+```
+
+Query for the status of the task:
+
+```bash
+# curl -s http://localhost:3000/task/$TASK_ID | jq .
+
+{
+  ...
+  "state": "COMPLETED",
+  "result": "hello world"
+}
+```
+
+## A slightly more interesting example
+
+1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
+2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
+3. Upload the converted video to a destination using a `post` task.
+
+```yaml
+# convert.yaml
+---
+name: convert the first 5 seconds of a video
+image: jrottenberg/ffmpeg:3.4-alpine
+run: |
+  ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
+volumes:
+  - /tmp
+pre:
+  - name: download the remote file
+    image: alpine:3.18.3
+    run: |
+      wget \
+      https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
+      -O /tmp/input.ogv
+post:
+  - name: upload the converted file
+    image: alpine:3.18.3
+    run: |
+      wget \
+      --post-file=/tmp/output.mp4 \
+      https://devnull-as-a-service.com/dev/null
+```
+
+Submit the task:
+
+```bash
+TASK_ID=$(curl \
+  -s \
+  -X POST \
+  --data-binary @convert.yaml \
+  -H "Content-type: text/yaml" \
+  http://localhost:3000/task | jq -r .id)
+```
+
 # Queues
 
 By default all tasks are routed to the `default` queue.
@@ -131,86 +215,6 @@ go run cmd/main.go \
  -rabbitmq-url amqp://guest:guest@localhost:5672
 ```
 
-# Getting started
+# License
 
-## Hello World
-
-Start in `standalone` mode:
-
-```
-go run cmd/main.go -mode standalone
-```
-
-Submit task in another terminal:
-
-```yaml
-# hello.yaml
----
-name: say hello
-image: ubuntu:mantic
-run: |
-  echo -n hello world
-```
-
-```bash
-TASK_ID=$(curl \
-  -s \
-  -X POST \
-  --data-binary @hello.yaml \
-  -H "Content-type: text/yaml" \
-  http://localhost:3000/task | jq -r .id)
-```
-
-Query for the status of the task:
-
-```bash
-# curl -s http://localhost:3000/task/$TASK_ID | jq .
-
-{
-  ...
-  "state": "COMPLETED",
-  "result": "hello world"
-}
-```
-
-## A slightly more interesting example
-
-1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
-2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
-3. Upload the converted video to a destination using a `post` task.
-
-```yaml
-# convert.yaml
----
-name: convert the first 5 seconds of a video
-image: jrottenberg/ffmpeg:3.4-alpine
-run: |
-  ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
-volumes:
-  - /tmp
-pre:
-  - name: download the remote file
-    image: alpine:3.18.3
-    run: |
-      wget \
-      https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
-      -O /tmp/input.ogv
-post:
-  - name: upload the converted file
-    image: alpine:3.18.3
-    run: |
-      wget \
-      --post-file=/tmp/output.mp4 \
-      https://devnull-as-a-service.com/dev/null
-```
-
-Submit the task:
-
-```bash
-TASK_ID=$(curl \
-  -s \
-  -X POST \
-  --data-binary @convert.yaml \
-  -H "Content-type: text/yaml" \
-  http://localhost:3000/task | jq -r .id)
-```
+Copyright (c) 2023-present Arik Cohen. Tork is free and open-source software licensed under the MIT License.
