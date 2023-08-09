@@ -12,18 +12,24 @@ import (
 )
 
 type RabbitMQBroker struct {
-	conn   *amqp.Connection
+	pconn  *amqp.Connection
+	sconn  *amqp.Connection
 	queues map[string]string
 	qmu    sync.RWMutex
 }
 
 func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
-	conn, err := amqp.Dial(url)
+	pconn, err := amqp.Dial(url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
+	}
+	sconn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
 	}
 	return &RabbitMQBroker{
-		conn:   conn,
+		pconn:  pconn,
+		sconn:  sconn,
 		queues: make(map[string]string),
 	}, nil
 }
@@ -33,7 +39,7 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 }
 func (b *RabbitMQBroker) Publish(ctx context.Context, qname string, t *task.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
-	ch, err := b.conn.Channel()
+	ch, err := b.pconn.Channel()
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
@@ -62,7 +68,7 @@ func (b *RabbitMQBroker) Publish(ctx context.Context, qname string, t *task.Task
 
 func (b *RabbitMQBroker) Subscribe(qname string, handler func(ctx context.Context, t *task.Task) error) error {
 	log.Debug().Msgf("Subscribing for queue: %s", qname)
-	ch, err := b.conn.Channel()
+	ch, err := b.sconn.Channel()
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
