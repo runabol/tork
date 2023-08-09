@@ -74,9 +74,13 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
 	}
-	t, err := ds.GetTaskByID(ctx, id)
-	if err != nil {
-		return err
+	tr := taskRecord{}
+	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
+		return errors.Wrapf(err, "error fetching task from db")
+	}
+	t := &task.Task{}
+	if err := json.Unmarshal(tr.Serialized, t); err != nil {
+		return errors.Wrapf(err, "error desiralizing task")
 	}
 	modify(t)
 	bytez, err := json.Marshal(t)
