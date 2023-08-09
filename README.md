@@ -152,13 +152,13 @@ go run cmd/main.go \
 
 ## Hello World
 
-1. Start in `standalone` mode:
+Start in `standalone` mode:
 
 ```
 go run cmd/main.go -mode standalone
 ```
 
-2. Submit task in another terminal:
+Submit task in another terminal:
 
 ```yaml
 # hello.yaml
