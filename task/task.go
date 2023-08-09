@@ -29,6 +29,8 @@ type Task struct {
 	CompletedAt   *time.Time        `json:"completedAt,omitempty"`
 	FailedAt      *time.Time        `json:"failedAt,omitempty"`
 	CMD           []string          `json:"cmd,omitempty"`
+	Entrypoint    []string          `json:"entrypoint,omitempty"`
+	Run           string            `json:"run,omitempty"`
 	Image         string            `json:"image,omitempty"`
 	Memory        int64             `json:"memory,omitempty"`
 	Disk          int64             `json:"disk,omitempty"`
