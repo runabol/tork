@@ -18,10 +18,12 @@ type PostgresDatastore struct {
 }
 
 type taskRecord struct {
-	ID         string    `db:"id"`
-	CreatedAt  time.Time `db:"created_at"`
-	State      string    `db:"state"`
-	Serialized []byte    `db:"serialized"`
+	ID          string     `db:"id"`
+	CreatedAt   time.Time  `db:"created_at"`
+	StartedAt   *time.Time `db:"started_at"`
+	CompletedAt *time.Time `db:"completed_at"`
+	State       string     `db:"state"`
+	Serialized  []byte     `db:"serialized"`
 }
 
 func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
@@ -89,9 +91,11 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	}
 	q := `update tasks set 
 	        state = $1,
-			serialized = $2
-		  where id = $3`
-	_, err = ds.db.Exec(q, t.State, (bytez), t.ID)
+			serialized = $2,
+			started_at = $3,
+			completed_at = $4
+		  where id = $5`
+	_, err = ds.db.Exec(q, t.State, (bytez), t.StartedAt, t.CompletedAt, t.ID)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")

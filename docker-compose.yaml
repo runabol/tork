@@ -1,0 +1,26 @@
+version: "3.1"
+services:
+  postgres:
+    image: postgres:15.3
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: tork
+      POSTGRES_USER: tork
+      POSTGRES_DB: tork
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+  migration:
+    image: golang:1.18
+    working_dir: /code
+    command: |
+      go run cmd/main.go -mode migration -datastore postgres -postgres-dsn "host=postgres user=tork password=tork dbname=tork port=5432 sslmode=disable"
+    volumes:
+      - .:/code
+    depends_on:
+      - postgres

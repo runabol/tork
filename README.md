@@ -85,22 +85,13 @@ You can specify which type of datastore to use using the `-datastore` flag.
 Start Postgres DB:
 
 ```bash
-docker run \
-  --name postgres \
-  -e POSTGRES_PASSWORD=tork \
-  -e POSTGRES_USER=tork \
-  -e POSTGRES_DB=tork \
-  -p 5432:5432 \
-  -d postgres:15.3
+docker compose up postgres -d
 ```
 
 Run a migration to create the database schema
 
 ```bash
-go run cmd/main.go \
-  -mode migration \
-  -datastore postgres \
-  -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+docker compose up migration
 ```
 
 Start Tork
@@ -119,12 +110,7 @@ To run in distributed mode we need to use an external message broker.
 Start RabbitMQ:
 
 ```bash
-docker run \
- -d \
- --name rabbitmq \
- -p 5672:5672 \
- -p 15672:15672 \
- rabbitmq:3-management
+docker compose up rabbitmq -d
 ```
 
 Start the Coordinator:
