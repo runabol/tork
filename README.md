@@ -82,7 +82,7 @@ You can specify which type of datastore to use using the `-datastore` flag.
 
 1. Start Postgres DB:
 
-```
+```bash
 docker run \
   --name postgres \
   -e POSTGRES_PASSWORD=tork \
@@ -94,7 +94,7 @@ docker run \
 
 2. Run a migration to create the database schema
 
-```
+```bash
 go run cmd/main.go \
   -mode migration \
   -datastore postgres \
@@ -103,7 +103,7 @@ go run cmd/main.go \
 
 3. Start Tork
 
-```
+```bash
 go run cmd/main.go \
   -mode standalone \
   -datastore postgres \
@@ -116,8 +116,7 @@ To run in distributed mode we need to use an external message broker.
 
 1. Start RabbitMQ:
 
-```
-
+```bash
 docker run \
  -d \
  --name rabbitmq \
@@ -129,8 +128,7 @@ docker run \
 
 2. Start the Coordinator:
 
-```
-
+```bash
 go run cmd/main.go \
  -mode coordinator \
  -broker rabbitmq \
@@ -140,8 +138,7 @@ go run cmd/main.go \
 
 3. Start the worker(s):
 
-```
-
+```bash
 go run cmd/main.go \
  -mode worker \
  -broker rabbitmq \
@@ -172,7 +169,7 @@ run: |
   echo -n hello world
 ```
 
-```
+```bash
 TASK_ID=$(curl \
   -s \
   -X POST \
@@ -184,7 +181,7 @@ TASK_ID=$(curl \
 
 Query for the status of the task:
 
-```
+```bash
 # curl -s http://localhost:3000/task/$TASK_ID | jq .
 
 {
@@ -223,7 +220,7 @@ post:
 
 Submit the task:
 
-```
+```bash
 TASK_ID=$(curl \
   -s \
   -X POST \
