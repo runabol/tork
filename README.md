@@ -50,14 +50,12 @@ This could make sense because transcoding tends to be very resource intensive so
 
 To route a task to a special queue use the `queue` property:
 
-```
+```yaml
 name: transcode a video
 queue: transcoding
-image: jrottenberg/ffmpeg:3.4-scratch
-cmd:
-  - -i
-  - https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
-  - output.mp4
+image: jrottenberg/ffmpeg:3.4-alpine
+run: |
+  ffmpeg -i https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv output.mp4
 ```
 
 ## Special queues
@@ -170,17 +168,15 @@ go run cmd/main.go -mode standalone
 ---
 name: say hello
 image: ubuntu:mantic
-cmd:
-  - echo
-  - -n
-  - hello world
+run: |
+  echo -n hello world
 ```
 
 ```
 TASK_ID=$(curl \
   -s \
   -X POST \
-  --data-binary @/tmp/task.yaml \
+  --data-binary @hello.yaml \
   -H "Content-type: text/yaml" \
   @hello.yaml \
   http://localhost:3000/task | jq -r .id)
@@ -208,30 +204,21 @@ Query for the status of the task:
 # convert.yaml
 ---
 name: convert the first 5 seconds of a video
-image: jrottenberg/ffmpeg:3.4-scratch
-cmd:
-  - -i
-  - /tmp/input.ogv
-  - -t
-  - "5"
-  - /tmp/output.mp4
+image: jrottenberg/ffmpeg:3.4-alpine
+run: |
+  ffmpeg -i /tmp/input.ogv -t "5" /tmp/output.mp4
 volumes:
   - /tmp
 pre:
   - name: download the remote file
     image: alpine:3.18.3
-    cmd:
-      - wget
-      - https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
-      - -O
-      - /tmp/input.ogv
+    run: |
+      wget https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv -O /tmp/input.ogv
 post:
   - name: upload the converted file
     image: alpine:3.18.3
-    cmd:
-      - wget
-      - --post-file=/tmp/output.mp4
-      - https://devnull-as-a-service.com/dev/null
+    run: |
+      wget --post-file=/tmp/output.mp4 https://devnull-as-a-service.com/dev/null
 ```
 
 Submit the task:
@@ -240,7 +227,7 @@ Submit the task:
 TASK_ID=$(curl \
   -s \
   -X POST \
-  --data-binary @/tmp/task.yaml \
+  --data-binary @convert.yaml \
   -H "Content-type: text/yaml" \
   @convert.yaml \
   http://localhost:3000/task | jq -r .id)

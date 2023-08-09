@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
@@ -22,6 +23,7 @@ import (
 type DockerRuntime struct {
 	client *client.Client
 	tasks  map[string]string
+	images map[string]bool
 	mu     sync.RWMutex
 }
 
@@ -33,6 +35,7 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	return &DockerRuntime{
 		client: dc,
 		tasks:  make(map[string]string),
+		images: make(map[string]bool),
 		mu:     sync.RWMutex{},
 	}, nil
 }
@@ -61,18 +64,54 @@ func (r filteredReader) Read(p []byte) (int, error) {
 	return j, nil
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
+func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
+	d.mu.RLock()
+	_, ok := d.images[t.Image]
+	d.mu.RUnlock()
+	if ok {
+		return nil
+	}
+	// let's check if we have the image
+	// locally already
+	images, err := d.client.ImageList(
+		ctx,
+		types.ImageListOptions{All: true},
+	)
+	if err != nil {
+		return err
+	}
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == t.Image {
+				d.mu.Lock()
+				d.images[tag] = true
+				d.mu.Unlock()
+				return nil
+			}
+		}
+	}
+	// this is intended. we don't want to pull
+	// more than one image at a time to prevent
+	// from saturating the nw inteface and to play
+	// nice with the docker registry.
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	reader, err := d.client.ImagePull(
 		ctx, t.Image, types.ImagePullOptions{})
 	if err != nil {
-		log.Error().Err(err).Msgf("Error pulling image %s: %v\n", t.Image, err)
-		return "", err
+		return err
 	}
 	_, err = io.Copy(os.Stdout, reader)
 	if err != nil {
-		return "", err
+		return err
 	}
+	return nil
+}
 
+func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
+	if err := d.imagePull(ctx, t); err != nil {
+		return "", errors.Wrapf(err, "error pulling image")
+	}
 	rp := container.RestartPolicy{
 		Name: t.RestartPolicy,
 	}
@@ -84,12 +123,6 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	env := []string{}
 	for name, value := range t.Env {
 		env = append(env, fmt.Sprintf("%s=%s", name, value))
-	}
-
-	cc := container.Config{
-		Image: t.Image,
-		Env:   env,
-		Cmd:   t.CMD,
 	}
 
 	var mounts []mount.Mount
@@ -107,16 +140,42 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		mounts = append(mounts, mount)
 	}
 
+	// create a temporary mount point
+	// we can use to write the run script to
+	dir, err := os.MkdirTemp("", "tork-")
+	if err != nil {
+		return "", errors.Wrapf(err, "error creating temp dir")
+	}
+	defer os.RemoveAll(dir)
+
+	if err := os.WriteFile(path.Join(dir, "run"), []byte(t.Run), os.ModePerm); err != nil {
+		return "", err
+	}
+	mounts = append(mounts, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: dir,
+		Target: "/tork",
+	})
 	hc := container.HostConfig{
 		RestartPolicy:   rp,
 		Resources:       r,
 		PublishAllPorts: true,
 		Mounts:          mounts,
 	}
-
-	log.Debug().
-		Str("cmd", strings.Join(t.CMD, " ")).
-		Msg("executing")
+	cmd := t.CMD
+	if len(cmd) == 0 {
+		cmd = []string{"/tork/run"}
+	}
+	entrypoint := t.Entrypoint
+	if len(entrypoint) == 0 && t.Run != "" {
+		entrypoint = []string{"sh", "-c"}
+	}
+	cc := container.Config{
+		Image:      t.Image,
+		Env:        env,
+		Cmd:        cmd,
+		Entrypoint: entrypoint,
+	}
 
 	resp, err := d.client.ContainerCreate(
 		ctx, &cc, &hc, nil, nil, "")
@@ -167,7 +226,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		}
 	}()
 	// limit the amount of data read from stdout to prevent memory exhaustion
-	lr := &io.LimitedReader{R: stdout, N: 4096}
+	lr := &io.LimitedReader{R: stdout, N: 1024}
 	bufout := new(strings.Builder)
 	tee := io.TeeReader(lr, bufout)
 	_, err = io.Copy(os.Stdout, tee)
