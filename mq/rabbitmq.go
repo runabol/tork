@@ -75,6 +75,9 @@ func (b *RabbitMQBroker) Subscribe(qname string, handler func(ctx context.Contex
 	if err := b.declareQueue(qname, ch); err != nil {
 		return errors.Wrapf(err, "error (re)declaring queue")
 	}
+	if err := ch.Qos(1, 0, false); err != nil {
+		return errors.Wrapf(err, "error setting qos on channel")
+	}
 	msgs, err := ch.Consume(
 		qname, // queue
 		"",    // consumer name
