@@ -128,6 +128,7 @@ func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context,
 		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
 			u.State = task.Failed
 			u.FailedAt = t.FailedAt
+			u.Error = t.Error
 		})
 	}
 }

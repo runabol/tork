@@ -41,7 +41,7 @@ It is often desirable to route tasks to different queues in order to create spec
 For example, one pool of workers, specially configured to handle video transcoding can listen to video processing related tasks:
 
 ```
-go run cmd/main.go -mode standalone -queue transcoding:3 -queue default:10
+go run cmd/main.go -mode worker -queue transcoding:3 -queue default:10
 ```
 
 In this example the worker would handle up to 3 transcoding-related tasks and up to 10 "regular" tasks concurrently.
