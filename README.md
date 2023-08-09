@@ -78,13 +78,9 @@ The `Datastore` is responsible for holding job and task metadata.
 
 You can specify which type of datastore to use using the `-datastore` flag.
 
-**In Memory**:
+`inmemory`: the default implementation. Typically isn't suitable for production because all state will be lost upon restart.
 
-The default implementation. Typically isn't suitable for production because all state will be lost upon restart.
-
-**Postgres**:
-
-Uses a [Postgres](https://www.postgresql.org) database as the underlying implementation.
+`postgres`: uses a [Postgres](https://www.postgresql.org) database as the underlying implementation. Example:
 
 1. Start Postgres DB:
 
