@@ -156,6 +156,21 @@ There are 4 special-purpose queues that are used by the Coordinator:
 
 - `error` - when a worker encounters an error while processing a task it inserts the task to this queue to notify the Coordinator.
 
+# Environment Variables
+
+You can set custom environment variables for a given task by using the `env` property:
+
+```yaml
+name: print a message
+image: ubuntu:mantic
+env:
+  INTRO: hello world
+  OUTRO: bye world
+run: |
+  echo $INTRO
+  echo $OUTRO
+```
+
 # Datastore
 
 The `Datastore` is responsible for holding job and task metadata.
