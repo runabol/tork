@@ -112,13 +112,6 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	if err := d.imagePull(ctx, t); err != nil {
 		return "", errors.Wrapf(err, "error pulling image")
 	}
-	rp := container.RestartPolicy{
-		Name: t.RestartPolicy,
-	}
-
-	r := container.Resources{
-		Memory: t.Memory,
-	}
 
 	env := []string{}
 	for name, value := range t.Env {
@@ -157,8 +150,6 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		Target: "/tork",
 	})
 	hc := container.HostConfig{
-		RestartPolicy:   rp,
-		Resources:       r,
 		PublishAllPorts: true,
 		Mounts:          mounts,
 	}
