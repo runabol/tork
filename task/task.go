@@ -39,4 +39,5 @@ type Task struct {
 	Pre         []Task            `json:"pre,omitempty"`
 	Post        []Task            `json:"post,omitempty"`
 	Volumes     []string          `json:"volumes,omitempty"`
+	Node        string            `json:"node,omitempty"`
 }

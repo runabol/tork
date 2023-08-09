@@ -3,49 +3,99 @@ package datastore
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
+	"time"
 
+	"github.com/tork/node"
 	"github.com/tork/task"
 )
 
 var ErrTaskNotFound = errors.New("task not found")
+var ErrNodeNotFound = errors.New("node not found")
 
 type InMemoryDatastore struct {
-	data map[string]task.Task
-	mu   sync.RWMutex
+	tasks map[string]task.Task
+	nodes map[string]node.Node
+	mu    sync.RWMutex
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
 	return &InMemoryDatastore{
-		data: make(map[string]task.Task),
+		tasks: make(map[string]task.Task),
+		nodes: make(map[string]node.Node),
 	}
 }
 
-func (ds *InMemoryDatastore) SaveTask(ctx context.Context, t *task.Task) error {
+func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
-	ds.data[t.ID] = *t
+	ds.tasks[t.ID] = *t
 	return nil
 }
 
 func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
-	t, ok := ds.data[id]
+	t, ok := ds.tasks[id]
 	if !ok {
 		return nil, ErrTaskNotFound
 	}
 	return &t, nil
 }
 
-func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modifier func(t *task.Task)) error {
+func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task)) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
-	t, ok := ds.data[id]
+	t, ok := ds.tasks[id]
 	if !ok {
 		return ErrTaskNotFound
 	}
-	modifier(&t)
-	ds.data[t.ID] = t
+	modify(&t)
+	ds.tasks[t.ID] = t
 	return nil
+}
+
+func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *node.Node) error {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.nodes[n.ID] = *n
+	return nil
+}
+
+func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node)) error {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	n, ok := ds.nodes[id]
+	if !ok {
+		return ErrNodeNotFound
+	}
+	modify(&n)
+	ds.nodes[n.ID] = n
+	return nil
+}
+
+func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (*node.Node, error) {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	n, ok := ds.nodes[id]
+	if !ok {
+		return nil, ErrNodeNotFound
+	}
+	return &n, nil
+}
+
+func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]*node.Node, error) {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	nodes := make([]*node.Node, 0)
+	for _, n := range ds.nodes {
+		if n.LastHeartbeatAt.After(lastHeartbeatAfter) {
+			nodes = append(nodes, &n)
+		}
+	}
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].LastHeartbeatAt.After(nodes[j].LastHeartbeatAt)
+	})
+	return nodes, nil
 }

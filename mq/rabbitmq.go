@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
+	"github.com/tork/node"
 	"github.com/tork/task"
 )
 
@@ -37,7 +38,7 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return make([]QueueInfo, 0), nil
 }
-func (b *RabbitMQBroker) Publish(ctx context.Context, qname string, t *task.Task) error {
+func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	ch, err := b.pconn.Channel()
 	if err != nil {
@@ -66,7 +67,7 @@ func (b *RabbitMQBroker) Publish(ctx context.Context, qname string, t *task.Task
 	return nil
 }
 
-func (b *RabbitMQBroker) Subscribe(qname string, handler func(ctx context.Context, t *task.Task) error) error {
+func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t *task.Task) error) error {
 	log.Debug().Msgf("Subscribing for queue: %s", qname)
 	ch, err := b.sconn.Channel()
 	if err != nil {
@@ -145,4 +146,11 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 	}
 	b.queues[qname] = qname
 	return nil
+}
+
+func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *node.Node) error {
+	return errors.New("not implemented")
+}
+func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n *node.Node) error) error {
+	return errors.New("not implemented")
 }

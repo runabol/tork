@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
+	"github.com/tork/node"
 	"github.com/tork/task"
 )
 
@@ -24,6 +25,22 @@ type taskRecord struct {
 	CompletedAt *time.Time `db:"completed_at"`
 	State       string     `db:"state"`
 	Serialized  []byte     `db:"serialized"`
+}
+
+type nodeRecord struct {
+	ID              string    `db:"id"`
+	StartedAt       time.Time `db:"started_at"`
+	LastHeartbeatAt time.Time `db:"last_heartbeat_at"`
+	CPUPercent      float64   `db:"cpu_percent"`
+}
+
+func (r nodeRecord) toNode() *node.Node {
+	return &node.Node{
+		ID:              r.ID,
+		StartedAt:       r.StartedAt,
+		CPUPercent:      r.CPUPercent,
+		LastHeartbeatAt: r.LastHeartbeatAt,
+	}
 }
 
 func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
@@ -43,7 +60,7 @@ func (ds *PostgresDatastore) CreateSchema() error {
 	return err
 }
 
-func (ds *PostgresDatastore) SaveTask(ctx context.Context, t *task.Task) error {
+func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error {
 	bytez, err := json.Marshal(t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize task")
@@ -62,6 +79,9 @@ func (ds *PostgresDatastore) SaveTask(ctx context.Context, t *task.Task) error {
 func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	tr := taskRecord{}
 	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1`, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNodeNotFound
+		}
 		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
 	t := &task.Task{}
@@ -106,4 +126,71 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		return errors.Wrapf(err, "error commiting tx")
 	}
 	return nil
+}
+
+func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *node.Node) error {
+	q := `insert into nodes 
+	       (id,started_at,last_heartbeat_at,cpu_percent) 
+	      values
+	       ($1,$2,$3,$4)`
+	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting node to the db")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node)) error {
+	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "unable to begin tx")
+	}
+	nr := nodeRecord{}
+	if err := ds.db.Get(&nr, `SELECT * FROM nodes where id = $1 for update`, id); err != nil {
+		return errors.Wrapf(err, "error fetching node from db")
+	}
+	n := nr.toNode()
+	modify(n)
+	q := `update nodes set 
+	        last_heartbeat_at = $1,
+			cpu_percent = $2
+		  where id = $3`
+	_, err = ds.db.Exec(q, n.LastHeartbeatAt, n.CPUPercent, id)
+	if err != nil {
+		if err := tx.Rollback(); err != nil {
+			return errors.Wrapf(err, "error rolling-back tx")
+		}
+		return errors.Wrapf(err, "error update task in db")
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrapf(err, "error commiting tx")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (*node.Node, error) {
+	nr := nodeRecord{}
+	if err := ds.db.Get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNodeNotFound
+		}
+		return nil, errors.Wrapf(err, "error fetching task from db")
+	}
+	return nr.toNode(), nil
+}
+
+func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]*node.Node, error) {
+	nrs := []nodeRecord{}
+	q := `SELECT * 
+	      FROM nodes 
+		  where last_heartbeat_at > $1 
+		  ORDER BY last_heartbeat_at DESC`
+	if err := ds.db.Select(&nrs, q, lastHeartbeatAfter); err != nil {
+		return nil, errors.Wrapf(err, "error getting active nodes from db")
+	}
+	ns := make([]*node.Node, len(nrs))
+	for i, n := range nrs {
+		ns[i] = n.toNode()
+	}
+	return ns, nil
 }

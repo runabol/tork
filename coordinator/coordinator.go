@@ -9,6 +9,7 @@ import (
 
 	"github.com/tork/datastore"
 	"github.com/tork/mq"
+	"github.com/tork/node"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
 )
@@ -48,6 +49,9 @@ func NewCoordinator(cfg Config) *Coordinator {
 	if cfg.Queues[mq.QUEUE_STARTED] < 1 {
 		cfg.Queues[mq.QUEUE_STARTED] = 1
 	}
+	if cfg.Queues[mq.QUEUE_HEARBEAT] < 1 {
+		cfg.Queues[mq.QUEUE_HEARBEAT] = 1
+	}
 	return &Coordinator{
 		Name:   name,
 		api:    newAPI(cfg),
@@ -71,7 +75,7 @@ func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context
 		n := time.Now()
 		t.ScheduledAt = &n
 		t.State = task.Scheduled
-		if err := c.broker.Publish(ctx, qname, t); err != nil {
+		if err := c.broker.PublishTask(ctx, qname, t); err != nil {
 			return err
 		}
 		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
@@ -133,6 +137,26 @@ func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context,
 	}
 }
 
+func (c *Coordinator) handleHeartbeats(ctx context.Context, n *node.Node) error {
+	n.LastHeartbeatAt = time.Now()
+	_, err := c.ds.GetNodeByID(ctx, n.ID)
+	if err == datastore.ErrNodeNotFound {
+		log.Info().
+			Str("node-id", n.ID).
+			Msg("received first heartbeat")
+		return c.ds.CreateNode(ctx, n)
+	}
+	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) {
+		log.Info().
+			Str("node-id", n.ID).
+			Float64("cpu-percent", n.CPUPercent).
+			Msg("received heartbeat")
+		u.LastHeartbeatAt = n.LastHeartbeatAt
+		u.CPUPercent = n.CPUPercent
+	})
+
+}
+
 func (c *Coordinator) Start() error {
 	log.Info().Msgf("starting %s", c.Name)
 	// start the coordinator API
@@ -145,19 +169,21 @@ func (c *Coordinator) Start() error {
 			continue
 		}
 		for i := 0; i < conc; i++ {
-			var handler func(ctx context.Context, t *task.Task) error
 			threadName := fmt.Sprintf("%s-%d", qname, i)
+			var err error
 			switch qname {
 			case mq.QUEUE_PENDING:
-				handler = c.taskPendingHandler(threadName)
+				err = c.broker.SubscribeForTasks(qname, c.taskPendingHandler(threadName))
 			case mq.QUEUE_COMPLETED:
-				handler = c.taskCompletedHandler(threadName)
+				err = c.broker.SubscribeForTasks(qname, c.taskCompletedHandler(threadName))
 			case mq.QUEUE_STARTED:
-				handler = c.taskStartedHandler(threadName)
+				err = c.broker.SubscribeForTasks(qname, c.taskStartedHandler(threadName))
 			case mq.QUEUE_ERROR:
-				handler = c.taskFailedHandler(threadName)
+				err = c.broker.SubscribeForTasks(qname, c.taskFailedHandler(threadName))
+			case mq.QUEUE_HEARBEAT:
+				err = c.broker.SubscribeForHeartbeats(c.handleHeartbeats)
 			}
-			if err := c.broker.Subscribe(qname, handler); err != nil {
+			if err != nil {
 				return err
 			}
 		}
