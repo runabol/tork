@@ -155,9 +155,7 @@ go run cmd/main.go \
 1. Start in `standalone` mode:
 
 ```
-
 go run cmd/main.go -mode standalone
-
 ```
 
 2. Submit task in another terminal:
