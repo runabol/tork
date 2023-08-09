@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/tork/datastore"
 	"github.com/tork/mq"
+	"github.com/tork/node"
 	"github.com/tork/task"
 	"github.com/tork/uuid"
 )
@@ -41,6 +42,7 @@ func newAPI(cfg Config) *api {
 	r.POST("/task", s.createTask)
 	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
+	r.GET("/node", s.listActiveNodes)
 	return s
 }
 
@@ -62,6 +64,15 @@ func (s *api) listQueues(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, qs)
+}
+
+func (s *api) listActiveNodes(c *gin.Context) {
+	nodes, err := s.ds.GetActiveNodes(c, time.Now().Add(-node.LAST_HEARTBEAT_TIMEOUT))
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, nodes)
 }
 
 func (s *api) createTask(c *gin.Context) {
@@ -93,12 +104,12 @@ func (s *api) createTask(c *gin.Context) {
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
 	t.CreatedAt = &n
-	if err := s.ds.SaveTask(c, t); err != nil {
+	if err := s.ds.CreateTask(c, t); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	log.Info().Any("task", t).Msg("received task")
-	if err := s.broker.Publish(c, mq.QUEUE_PENDING, t); err != nil {
+	if err := s.broker.PublishTask(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
