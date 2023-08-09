@@ -82,7 +82,7 @@ You can specify which type of datastore to use using the `-datastore` flag.
 
 `postgres`: uses a [Postgres](https://www.postgresql.org) database as the underlying implementation. Example:
 
-1. Start Postgres DB:
+Start Postgres DB:
 
 ```bash
 docker run \
@@ -94,7 +94,7 @@ docker run \
   -d postgres:15.3
 ```
 
-2. Run a migration to create the database schema
+Run a migration to create the database schema
 
 ```bash
 go run cmd/main.go \
@@ -103,7 +103,7 @@ go run cmd/main.go \
   -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 ```
 
-3. Start Tork
+Start Tork
 
 ```bash
 go run cmd/main.go \
@@ -116,7 +116,7 @@ go run cmd/main.go \
 
 To run in distributed mode we need to use an external message broker.
 
-1. Start RabbitMQ:
+Start RabbitMQ:
 
 ```bash
 docker run \
@@ -125,27 +125,24 @@ docker run \
  -p 5672:5672 \
  -p 15672:15672 \
  rabbitmq:3-management
-
 ```
 
-2. Start the Coordinator:
+Start the Coordinator:
 
 ```bash
 go run cmd/main.go \
  -mode coordinator \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
-
 ```
 
-3. Start the worker(s):
+Start the worker(s):
 
 ```bash
 go run cmd/main.go \
  -mode worker \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
-
 ```
 
 # Getting started
