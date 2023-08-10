@@ -39,35 +39,23 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return make([]QueueInfo, 0), nil
 }
 func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
-	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
-	ch, err := b.pconn.Channel()
-	if err != nil {
-		return errors.Wrapf(err, "error creating channel")
-	}
-	defer ch.Close()
-	if err := b.declareQueue(qname, ch); err != nil {
-		return errors.Wrapf(err, "error (re)declaring queue")
-	}
-	body, err := json.Marshal(t)
-	if err != nil {
-		return errors.Wrapf(err, "unable to serialize the task")
-	}
-	err = ch.PublishWithContext(ctx,
-		"",    // exchange
-		qname, // routing key
-		false, // mandatory
-		false, // immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        []byte(body),
-		})
-	if err != nil {
-		return errors.Wrapf(err, "unable to publish task")
-	}
-	return nil
+	return b.publish(ctx, qname, t)
 }
 
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t *task.Task) error) error {
+	return b.subscribe(qname, func(ctx context.Context, body []byte) error {
+		t := task.Task{}
+		if err := json.Unmarshal(body, &t); err != nil {
+			log.Error().
+				Err(err).
+				Str("body", string(body)).
+				Msg("unable to deserialize task")
+		}
+		return handler(ctx, &t)
+	})
+}
+
+func (b *RabbitMQBroker) subscribe(qname string, handler func(ctx context.Context, body []byte) error) error {
 	log.Debug().Msgf("Subscribing for queue: %s", qname)
 	ch, err := b.sconn.Channel()
 	if err != nil {
@@ -93,15 +81,8 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx contex
 	}
 	go func() {
 		for d := range msgs {
-			t := task.Task{}
-			if err := json.Unmarshal(d.Body, &t); err != nil {
-				log.Error().
-					Err(err).
-					Str("body", string(d.Body)).
-					Msg("unable to deserialize task")
-			}
 			ctx := context.TODO()
-			if err := handler(ctx, &t); err != nil {
+			if err := handler(ctx, d.Body); err != nil {
 				log.Error().
 					Err(err).
 					Str("queue", qname).
@@ -132,7 +113,6 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 	}
 	b.qmu.Lock()
 	defer b.qmu.Unlock()
-	log.Debug().Msgf("attempting to (re)delcare queue: %s", qname)
 	_, err := ch.QueueDeclare(
 		qname,
 		false, // durable
@@ -149,8 +129,46 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 }
 
 func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *node.Node) error {
-	return errors.New("not implemented")
+	return b.publish(ctx, QUEUE_HEARBEAT, n)
 }
+
+func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) error {
+	ch, err := b.pconn.Channel()
+	if err != nil {
+		return errors.Wrapf(err, "error creating channel")
+	}
+	defer ch.Close()
+	if err := b.declareQueue(qname, ch); err != nil {
+		return errors.Wrapf(err, "error (re)declaring queue")
+	}
+	body, err := json.Marshal(msg)
+	if err != nil {
+		return errors.Wrapf(err, "unable to serialize the message")
+	}
+	err = ch.PublishWithContext(ctx,
+		"",    // exchange
+		qname, // routing key
+		false, // mandatory
+		false, // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        []byte(body),
+		})
+	if err != nil {
+		return errors.Wrapf(err, "unable to publish message")
+	}
+	return nil
+}
+
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n *node.Node) error) error {
-	return errors.New("not implemented")
+	return b.subscribe(QUEUE_HEARBEAT, func(ctx context.Context, body []byte) error {
+		n := node.Node{}
+		if err := json.Unmarshal(body, &n); err != nil {
+			log.Error().
+				Err(err).
+				Str("body", string(body)).
+				Msg("unable to deserialize node")
+		}
+		return handler(ctx, &n)
+	})
 }
