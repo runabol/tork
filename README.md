@@ -146,8 +146,6 @@ run: |
 
 ## Special queues
 
-There are 4 special-purpose queues that are used by the Coordinator:
-
 - `pending` - incoming tasks land in this queue prior to being scheduled for processing by the Coordinator.
 
 - `started` - when the worker starts working on a task it inserts the task to this queue to notify the Coordinator.
@@ -157,6 +155,8 @@ There are 4 special-purpose queues that are used by the Coordinator:
 - `error` - when a worker encounters an error while processing a task it inserts the task to this queue to notify the Coordinator.
 
 - `hearbeat` - the queue used by workers to periodically notify the Coordinator about their "aliveness".
+
+- `x-<worker id>` - each worker subscribes to an exclusive queue which can be used by the coordinator to cancel tasks started by a particular worker.
 
 # Environment Variables
 
