@@ -14,7 +14,6 @@ A Golang based high performance, scalable and distributed workflow and task exec
 - Supports both stand-alone and distributed setup
 - Retry failed tasks
 - Pre/Post tasks
-- Expression Language
 - No single point of failure.
 
 # Architecture
