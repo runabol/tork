@@ -40,4 +40,21 @@ type Task struct {
 	Post        []Task            `json:"post,omitempty"`
 	Volumes     []string          `json:"volumes,omitempty"`
 	Node        string            `json:"node,omitempty"`
+	Retry       *Retry            `json:"retry,omitempty"`
+}
+
+const (
+	RETRY_DEFAULT_INITIAL_DELAY  = "1s"
+	RETRY_DEFAULT_SCALING_FACTOR = 2
+)
+
+// Retry allows to specify a retry policy for a given
+// task using the exponential backoff formula:
+//
+// initalDelay*scalingFactor^attempt
+type Retry struct {
+	Limit         int    `json:"limit,omitempty"`
+	InitialDelay  string `json:"initialDelay,omitempty"`
+	ScalingFactor int    `json:"scalingFactor,omitempty"`
+	Attempts      int    `json:"attempts,omitempty"`
 }

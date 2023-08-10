@@ -282,6 +282,13 @@ Content-Type:text/yaml
 - `pre` - the list of tasks to execute prior to executing the actual task.
 - `post` - the list of tasks to execute post execution of the actual task.
 - `volumes` - a list of temporary volumes, created for the duration of the execution of the task. Useful for sharing state between the task and its `pre` and `post` tasks.
+- `retry` - the retry configuration to execute in case of a failure. Example:
+  ```yaml
+  retry:
+    limit: 5 # will retry up to 5 times
+    initialDelay: 5s # optional: default 1s (max: 5m)
+    scalingFactor: # optional: default 2 (max: 10)
+  ```
 
 **Examples:**
 

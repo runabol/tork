@@ -3,8 +3,10 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/tork/datastore"
@@ -140,9 +142,33 @@ func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context,
 				Str("task-error", t.Error).
 				Str("thread", thread).
 				Msg("received task failure")
-			u.State = task.Failed
-			u.FailedAt = t.FailedAt
-			u.Error = t.Error
+			// check if the task has a retry policy and if it hadn't been exhausted
+			if u.Retry != nil && u.Retry.Attempts < u.Retry.Limit {
+				u.Retry.Attempts = u.Retry.Attempts + 1
+				t.Retry = u.Retry
+				t.State = task.Scheduled
+				t.Error = ""
+				qname := t.Queue
+				if qname == "" {
+					qname = mq.QUEUE_DEFAULT
+				}
+				dur, err := time.ParseDuration(t.Retry.InitialDelay)
+				if err != nil {
+					return errors.Wrapf(err, "invalid retry.initialDelay: %s", t.Retry.InitialDelay)
+				}
+				go func() {
+					delay := dur * time.Duration(math.Pow(float64(t.Retry.ScalingFactor), float64(u.Retry.Attempts-1)))
+					log.Debug().Msgf("delaying retry %s", delay)
+					time.Sleep(delay)
+					if err := c.broker.PublishTask(ctx, qname, t); err != nil {
+						log.Error().Err(err).Msg("error publishing retry task")
+					}
+				}()
+			} else {
+				u.State = task.Failed
+				u.FailedAt = t.FailedAt
+				u.Error = t.Error
+			}
 			return nil
 		})
 	}
