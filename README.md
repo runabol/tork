@@ -291,6 +291,8 @@ Content-Type:text/yaml
 
 **Examples:**
 
+JSON:
+
 ```bash
 curl -X POST "http://localhost:3000/task" \
      -H "Content-Type: application/json" \
@@ -300,6 +302,8 @@ curl -X POST "http://localhost:3000/task" \
        "run": "echo hello world"
      }'
 ```
+
+YAML:
 
 ```bash
 curl -X POST "http://localhost:3000/task" \
