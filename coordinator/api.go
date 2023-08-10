@@ -101,6 +101,40 @@ func (s *api) createTask(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't route to special queue: %s", t.Queue))
 		return
 	}
+	if t.Retry != nil {
+		if t.Retry.Attempts != 0 {
+			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.attempts"))
+			return
+		}
+		if t.Retry.Limit > 10 {
+			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.limit > 10"))
+			return
+		}
+		if t.Retry.ScalingFactor > 5 {
+			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify a retry.scalingFactor > 5"))
+			return
+		}
+		if t.Retry.ScalingFactor < 2 {
+			t.Retry.ScalingFactor = 2
+		}
+		if t.Retry.Limit < 0 {
+			t.Retry.Limit = 0
+		}
+		if t.Retry.InitialDelay == "" {
+			t.Retry.InitialDelay = "1s"
+		}
+		delay, err := time.ParseDuration(t.Retry.InitialDelay)
+		if err != nil {
+			c.AbortWithError(http.StatusBadRequest, errors.Errorf("invalid initial delay duration: %s", t.Retry.InitialDelay))
+			return
+		}
+		if delay > (time.Minute * 5) {
+			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.initialDelay greater than 5 minutes"))
+			return
+		}
+
+	}
+
 	n := time.Now()
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
