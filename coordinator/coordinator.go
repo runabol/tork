@@ -78,7 +78,7 @@ func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context
 		if err := c.broker.PublishTask(ctx, qname, t); err != nil {
 			return err
 		}
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			// we don't want to mark the task as SCHEDULED
 			// if an out-of-order task completion/failure
 			// arrived earlier
@@ -86,6 +86,7 @@ func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context
 				u.State = t.State
 				u.ScheduledAt = t.ScheduledAt
 			}
+			return nil
 		})
 	}
 }
@@ -96,14 +97,16 @@ func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context
 			Str("task-id", t.ID).
 			Str("thread", thread).
 			Msg("received task start")
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			// we don't want to mark the task as RUNNING
 			// if an out-of-order task completion/failure
 			// arrived earlier
 			if u.State == task.Scheduled {
 				u.State = t.State
 				u.StartedAt = t.StartedAt
+				u.Node = t.Node
 			}
+			return nil
 		})
 	}
 }
@@ -114,25 +117,33 @@ func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Conte
 			Str("task-id", t.ID).
 			Str("thread", thread).
 			Msg("received task completion")
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			u.State = task.Completed
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
+			return nil
 		})
 	}
 }
 
 func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context, t *task.Task) error {
 	return func(ctx context.Context, t *task.Task) error {
-		log.Error().
-			Str("task-id", t.ID).
-			Str("task-error", t.Error).
-			Str("thread", thread).
-			Msg("received task failure")
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) {
+		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+			if u.State == task.Cancelled {
+				log.Debug().
+					Str("thread", thread).
+					Msgf("task %s was previously cancelled. ignoring error.", t.ID)
+				return nil
+			}
+			log.Error().
+				Str("task-id", t.ID).
+				Str("task-error", t.Error).
+				Str("thread", thread).
+				Msg("received task failure")
 			u.State = task.Failed
 			u.FailedAt = t.FailedAt
 			u.Error = t.Error
+			return nil
 		})
 	}
 }
@@ -146,13 +157,14 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n *node.Node) error 
 			Msg("received first heartbeat")
 		return c.ds.CreateNode(ctx, n)
 	}
-	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) {
+	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) error {
 		log.Info().
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
 			Msg("received heartbeat")
 		u.LastHeartbeatAt = n.LastHeartbeatAt
 		u.CPUPercent = n.CPUPercent
+		return nil
 	})
 
 }

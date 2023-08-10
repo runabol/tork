@@ -32,6 +32,7 @@ type nodeRecord struct {
 	StartedAt       time.Time `db:"started_at"`
 	LastHeartbeatAt time.Time `db:"last_heartbeat_at"`
 	CPUPercent      float64   `db:"cpu_percent"`
+	Queue           string    `db:"queue"`
 }
 
 func (r nodeRecord) toNode() *node.Node {
@@ -40,6 +41,7 @@ func (r nodeRecord) toNode() *node.Node {
 		StartedAt:       r.StartedAt,
 		CPUPercent:      r.CPUPercent,
 		LastHeartbeatAt: r.LastHeartbeatAt,
+		Queue:           r.Queue,
 	}
 }
 
@@ -91,7 +93,7 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 	return t, nil
 }
 
-func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task)) error {
+func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task) error) error {
 	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
@@ -104,7 +106,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err := json.Unmarshal(tr.Serialized, t); err != nil {
 		return errors.Wrapf(err, "error desiralizing task")
 	}
-	modify(t)
+	if err := modify(t); err != nil {
+		return err
+	}
 	bytez, err := json.Marshal(t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize task")
@@ -130,17 +134,17 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *node.Node) error {
 	q := `insert into nodes 
-	       (id,started_at,last_heartbeat_at,cpu_percent) 
+	       (id,started_at,last_heartbeat_at,cpu_percent,queue) 
 	      values
-	       ($1,$2,$3,$4)`
-	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent)
+	       ($1,$2,$3,$4,$5)`
+	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}
 	return nil
 }
 
-func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node)) error {
+func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
 	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
@@ -150,7 +154,9 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 		return errors.Wrapf(err, "error fetching node from db")
 	}
 	n := nr.toNode()
-	modify(n)
+	if err := modify(n); err != nil {
+		return err
+	}
 	q := `update nodes set 
 	        last_heartbeat_at = $1,
 			cpu_percent = $2

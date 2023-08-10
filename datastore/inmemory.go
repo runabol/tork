@@ -44,14 +44,16 @@ func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 	return &t, nil
 }
 
-func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task)) error {
+func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *task.Task) error) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	t, ok := ds.tasks[id]
 	if !ok {
 		return ErrTaskNotFound
 	}
-	modify(&t)
+	if err := modify(&t); err != nil {
+		return err
+	}
 	ds.tasks[t.ID] = t
 	return nil
 }
@@ -63,14 +65,16 @@ func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *node.Node) error
 	return nil
 }
 
-func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node)) error {
+func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	n, ok := ds.nodes[id]
 	if !ok {
 		return ErrNodeNotFound
 	}
-	modify(&n)
+	if err := modify(&n); err != nil {
+		return err
+	}
 	ds.nodes[n.ID] = n
 	return nil
 }

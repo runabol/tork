@@ -40,6 +40,7 @@ func newAPI(cfg Config) *api {
 	}
 	r.GET("/status", s.status)
 	r.POST("/task", s.createTask)
+	r.PUT("/task/:id/cancel", s.cancelTask)
 	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
 	r.GET("/node", s.listActiveNodes)
@@ -124,6 +125,31 @@ func (s *api) getTask(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, t)
+}
+
+func (s *api) cancelTask(c *gin.Context) {
+	id := c.Param("id")
+	err := s.ds.UpdateTask(c, id, func(u *task.Task) error {
+		if u.State != task.Running {
+			return errors.New("task in not running")
+		}
+		u.State = task.Cancelled
+		if u.Node != "" {
+			node, err := s.ds.GetNodeByID(c, u.Node)
+			if err != nil {
+				return err
+			}
+			if err := s.broker.PublishTask(c, node.Queue, u); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "OK"})
 }
 
 func (s *api) start() error {

@@ -13,6 +13,7 @@ CREATE INDEX idx_tasks_serialized ON tasks USING GIN (serialized);
 
 CREATE TABLE nodes (
     id                 varchar(64) not null primary key,
+    queue              varchar(64) not null,
     started_at         timestamp   not null,
     last_heartbeat_at  timestamp   not null,
     cpu_percent        float       not null
