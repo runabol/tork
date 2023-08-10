@@ -9,4 +9,5 @@ type Node struct {
 	StartedAt       time.Time `json:"startedAt,omitempty"`
 	CPUPercent      float64   `json:"cpuPercent,omitempty"`
 	LastHeartbeatAt time.Time `json:"lastHeartbeatAt,omitempty"`
+	Queue           string    `json:"queue,omitempty"`
 }
