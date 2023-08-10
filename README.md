@@ -6,7 +6,7 @@ A distributed workflow engine.
 
 # Features:
 
-- REST API
+- [REST API](#rest-api)
 - Submit individual tasks or workflows for execution.
 - Horizontally scalable
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource limits
@@ -230,6 +230,111 @@ go run cmd/main.go \
  -mode worker \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
+```
+
+# REST API
+
+## Submit a task
+
+Submit a new task to be scheduled for execution
+
+**Path:**
+
+```
+POST /task
+```
+
+**Headers:**
+
+JSON Input:
+
+```
+Content-Type:application/json
+```
+
+YAML Input:
+
+```
+Content-Type:text/yaml
+```
+
+**Request body:**
+
+- `name` - a human-readable name for the task
+- `image` (required) - the docker image to use to execute the task
+- `run` - the script to run on the container
+- `env` - a key-value map of environment variables
+- `queue` - the name of the queue that the task should be routed to. See [queues](#queues).
+- `pre` - the list of tasks to execute prior to executing the actual task.
+- `post` - the list of tasks to execute post execution of the actual task.
+- `volumes` - a list of temporary volumes, created for the duration of the execution of the task. Useful for sharing state between the task and its `pre` and `post` tasks.
+
+**Examples:**
+
+```bash
+curl -X POST "http://localhost:3000/task" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "sample task",
+       "image": "ubuntu:mantic",
+       "run": "echo hello world"
+     }'
+```
+
+```bash
+curl -X POST "http://localhost:3000/task" \
+     -H "Content-Type: text/yaml" \
+     -d \
+'
+name: sample task
+image: ubuntu:mantic,
+run: echo hello world
+'
+```
+
+**Response:**
+
+```json
+HTTP 200
+
+{
+  "id": "bb9920c6d9d34e2b8501e4eda2e755bd",
+  "name": "sample task",
+  "state": "PENDING",
+  "createdAt": "2023-08-10T14:54:33.035182-04:00",
+  "run": "echo hello world",
+  "image": "ubuntu:mantic"
+}
+```
+
+## Cancel a running task
+
+**Path:**
+
+```
+PUT /task/{task id}/cancel
+```
+
+**Response:**
+
+Success:
+
+```json
+HTTP 200
+
+{
+  "status": "OK"
+}
+```
+
+Failure:
+
+```json
+400 Bad Request
+
+{
+  "error": "task in not running"
+}
 ```
 
 # License
