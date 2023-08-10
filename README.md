@@ -294,7 +294,7 @@ run: echo hello world
 
 **Response:**
 
-```json
+```
 HTTP 200
 
 {
@@ -319,7 +319,7 @@ PUT /task/{task id}/cancel
 
 Success:
 
-```json
+```
 HTTP 200
 
 {
@@ -329,7 +329,7 @@ HTTP 200
 
 Failure:
 
-```json
+```
 400 Bad Request
 
 {
