@@ -181,6 +181,12 @@ run: |
   echo $OUTRO
 ```
 
+## Secrets
+
+By convention, any environment variables which contain the keywords `SECRET`, `PASSWORD` or `ACCESS_KEY` in their names will have their values automatically redacted from logs as well as from API responses.
+
+**Warning**: Tork automatically redacts secrets printed to the log, but you should avoid printing secrets to the log intentionally.
+
 # Datastore
 
 The `Datastore` is responsible for holding job and task metadata.

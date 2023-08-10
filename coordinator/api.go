@@ -109,12 +109,12 @@ func (s *api) createTask(c *gin.Context) {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	log.Info().Any("task", t).Msg("received task")
+	log.Info().Str("task-id", t.ID).Msg("received task")
 	if err := s.broker.PublishTask(c, mq.QUEUE_PENDING, t); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusOK, t)
+	c.JSON(http.StatusOK, redact(*t))
 }
 
 func (s *api) getTask(c *gin.Context) {
@@ -124,7 +124,7 @@ func (s *api) getTask(c *gin.Context) {
 		c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	c.JSON(http.StatusOK, t)
+	c.JSON(http.StatusOK, redact(*t))
 }
 
 func (s *api) cancelTask(c *gin.Context) {
