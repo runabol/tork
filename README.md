@@ -32,6 +32,13 @@ A distributed workflow engine.
 
 # Getting started
 
+## Prerequisites
+
+Before running the examples, ensure you have the following software installed:
+
+- [Go](https://golang.org/doc/install) 1.18 or later
+- [Docker](https://docs.docker.com/get-docker/)
+
 ## Hello World
 
 Start in `standalone` mode:
