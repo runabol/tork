@@ -3,6 +3,7 @@ package mq
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -117,7 +118,7 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 		qname,
 		false, // durable
 		false, // delete when unused
-		false, // exclusive
+		strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
 		false, // no-wait
 		nil,   // arguments
 	)

@@ -19,6 +19,9 @@ const (
 	// The queue used by workers to periodically
 	// notify the coordinator about their aliveness
 	QUEUE_HEARBEAT = "hearbeat"
+	// The prefix used for queues that
+	// are exclusive
+	QUEUE_EXCLUSIVE_PREFIX = "x-"
 )
 
 type QueueInfo struct {

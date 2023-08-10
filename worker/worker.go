@@ -35,7 +35,7 @@ func NewWorker(cfg Config) *Worker {
 		cfg.Queues = map[string]int{mq.QUEUE_DEFAULT: 1}
 	}
 	w := &Worker{
-		id:        uuid.NewUUID(),
+		id:        uuid.NewUUIDBase64(),
 		startTime: time.Now(),
 		broker:    cfg.Broker,
 		runtime:   cfg.Runtime,
@@ -165,11 +165,11 @@ func (w *Worker) sendHeartbeats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting worker %s", w.id)
-	// subscribe to a control queue
-	if err := w.broker.SubscribeForTasks(w.id, w.taskHandler("main")); err != nil {
+	// subscribe for a private queue for the node
+	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.taskHandler("main")); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
-	// subscribe to work queues
+	// subscribe to shared work queues
 	for qname, concurrency := range w.queues {
 		if !mq.IsWorkerQueue(qname) {
 			continue
