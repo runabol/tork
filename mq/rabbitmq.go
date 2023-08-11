@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
+	"github.com/tork/job"
 	"github.com/tork/node"
 	"github.com/tork/task"
 )
@@ -171,5 +172,21 @@ func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context
 				Msg("unable to deserialize node")
 		}
 		return handler(ctx, n)
+	})
+}
+
+func (b *RabbitMQBroker) PublishJob(ctx context.Context, j job.Job) error {
+	return b.publish(ctx, QUEUE_JOBS, j)
+}
+func (b *RabbitMQBroker) SubscribeForJobs(handler func(ctx context.Context, j job.Job) error) error {
+	return b.subscribe(QUEUE_JOBS, func(ctx context.Context, body []byte) error {
+		j := job.Job{}
+		if err := json.Unmarshal(body, &j); err != nil {
+			log.Error().
+				Err(err).
+				Str("body", string(body)).
+				Msg("unable to deserialize job")
+		}
+		return handler(ctx, j)
 	})
 }

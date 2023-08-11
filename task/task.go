@@ -21,6 +21,8 @@ const (
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {
 	ID          string            `json:"id,omitempty"`
+	JobID       string            `json:"jobId,omitempty"`
+	Position    int               `json:"position,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
@@ -41,7 +43,7 @@ type Task struct {
 	Volumes     []string          `json:"volumes,omitempty"`
 	Node        string            `json:"node,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty"`
-	Limits      Limits            `json:"limits,omitempty"`
+	Limits      *Limits           `json:"limits,omitempty"`
 }
 
 const (

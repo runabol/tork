@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/tork/datastore"
+	"github.com/tork/job"
 	"github.com/tork/mq"
 	"github.com/tork/node"
 	"github.com/tork/task"
@@ -39,11 +40,12 @@ func newAPI(cfg Config) *api {
 		ds: cfg.DataStore,
 	}
 	r.GET("/status", s.status)
-	r.POST("/task", s.createTask)
 	r.PUT("/task/:id/cancel", s.cancelTask)
 	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
 	r.GET("/node", s.listActiveNodes)
+	r.POST("/job", s.createJob)
+	r.GET("/job/:id", s.getJob)
 	return s
 }
 
@@ -76,43 +78,22 @@ func (s *api) listActiveNodes(c *gin.Context) {
 	c.JSON(http.StatusOK, nodes)
 }
 
-func (s *api) createTask(c *gin.Context) {
-	t := task.Task{}
-	switch c.ContentType() {
-	case "application/json":
-		if err := c.BindJSON(&t); err != nil {
-			c.AbortWithError(http.StatusBadRequest, err)
-			return
-		}
-	case "text/yaml":
-		if err := c.BindYAML(&t); err != nil {
-			c.AbortWithError(http.StatusBadRequest, err)
-			return
-		}
-	default:
-		c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
-		return
-	}
+func validateTask(t task.Task) error {
 	if strings.TrimSpace(t.Image) == "" {
-		c.AbortWithError(http.StatusBadRequest, errors.New("missing required field: image"))
-		return
+		return errors.New("missing required field: image")
 	}
 	if mq.IsCoordinatorQueue(t.Queue) || strings.HasPrefix(t.Queue, mq.QUEUE_EXCLUSIVE_PREFIX) {
-		c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't route to special queue: %s", t.Queue))
-		return
+		return errors.Errorf("can't route to special queue: %s", t.Queue)
 	}
 	if t.Retry != nil {
 		if t.Retry.Attempts != 0 {
-			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.attempts"))
-			return
+			return errors.Errorf("can't specify retry.attempts")
 		}
 		if t.Retry.Limit > 10 {
-			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.limit > 10"))
-			return
+			return errors.Errorf("can't specify retry.limit > 10")
 		}
 		if t.Retry.ScalingFactor > 5 {
-			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify a retry.scalingFactor > 5"))
-			return
+			return errors.Errorf("can't specify a retry.scalingFactor > 5")
 		}
 		if t.Retry.ScalingFactor < 2 {
 			t.Retry.ScalingFactor = 2
@@ -125,30 +106,66 @@ func (s *api) createTask(c *gin.Context) {
 		}
 		delay, err := time.ParseDuration(t.Retry.InitialDelay)
 		if err != nil {
-			c.AbortWithError(http.StatusBadRequest, errors.Errorf("invalid initial delay duration: %s", t.Retry.InitialDelay))
-			return
+			return errors.Errorf("invalid initial delay duration: %s", t.Retry.InitialDelay)
 		}
 		if delay > (time.Minute * 5) {
-			c.AbortWithError(http.StatusBadRequest, errors.Errorf("can't specify retry.initialDelay greater than 5 minutes"))
+			return errors.Errorf("can't specify retry.initialDelay greater than 5 minutes")
+		}
+	}
+	return nil
+}
+
+func (s *api) createJob(c *gin.Context) {
+	j := job.Job{}
+	switch c.ContentType() {
+	case "application/json":
+		if err := c.BindJSON(&j); err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
-
+	case "text/yaml":
+		if err := c.BindYAML(&j); err != nil {
+			c.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+	default:
+		c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
+		return
 	}
-
+	if len(j.Tasks) == 0 {
+		c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks"))
+		return
+	}
+	for ix, t := range j.Tasks {
+		if err := validateTask(t); err != nil {
+			c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix))
+			return
+		}
+	}
 	n := time.Now()
-	t.ID = uuid.NewUUID()
-	t.State = task.Pending
-	t.CreatedAt = &n
-	if err := s.ds.CreateTask(c, t); err != nil {
+	j.ID = uuid.NewUUID()
+	j.State = job.Pending
+	j.CreatedAt = n
+	if err := s.ds.CreateJob(c, j); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	log.Info().Str("task-id", t.ID).Msg("received task")
-	if err := s.broker.PublishTask(c, mq.QUEUE_PENDING, t); err != nil {
+	log.Info().Str("task-id", j.ID).Msg("created job")
+	if err := s.broker.PublishJob(c, j); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusOK, redact(t))
+	c.JSON(http.StatusOK, redactJob(j))
+}
+
+func (s *api) getJob(c *gin.Context) {
+	id := c.Param("id")
+	j, err := s.ds.GetJobByID(c, id)
+	if err != nil {
+		c.AbortWithError(http.StatusNotFound, err)
+		return
+	}
+	c.JSON(http.StatusOK, redactJob(j))
 }
 
 func (s *api) getTask(c *gin.Context) {
@@ -158,7 +175,7 @@ func (s *api) getTask(c *gin.Context) {
 		c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	c.JSON(http.StatusOK, redact(t))
+	c.JSON(http.StatusOK, redactTask(t))
 }
 
 func (s *api) cancelTask(c *gin.Context) {

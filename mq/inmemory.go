@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
+	"github.com/tork/job"
 	"github.com/tork/node"
 	"github.com/tork/task"
 )
@@ -13,15 +14,17 @@ import (
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	tasks         map[string]chan task.Task
-	registrations chan node.Node
-	mu            sync.RWMutex
+	tasks     map[string]chan task.Task
+	hearbeats chan node.Node
+	jobs      chan job.Job
+	mu        sync.RWMutex
 }
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		tasks:         make(map[string]chan task.Task),
-		registrations: make(chan node.Node, 10),
+		tasks:     make(map[string]chan task.Task),
+		hearbeats: make(chan node.Node, 10),
+		jobs:      make(chan job.Job, 10),
 	}
 }
 
@@ -76,17 +79,34 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 }
 
 func (b *InMemoryBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {
-	b.registrations <- n
+	b.hearbeats <- n
 	return nil
 }
 
 func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n node.Node) error) error {
 	go func() {
 		ctx := context.TODO()
-		for n := range b.registrations {
+		for n := range b.hearbeats {
 			err := handler(ctx, n)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing registration")
+			}
+		}
+	}()
+	return nil
+}
+
+func (b *InMemoryBroker) PublishJob(ctx context.Context, j job.Job) error {
+	b.jobs <- j
+	return nil
+}
+func (b *InMemoryBroker) SubscribeForJobs(handler func(ctx context.Context, j job.Job) error) error {
+	go func() {
+		ctx := context.TODO()
+		for j := range b.jobs {
+			err := handler(ctx, j)
+			if err != nil {
+				log.Error().Err(err).Msg("unexpcted error occured while processing job")
 			}
 		}
 	}()
