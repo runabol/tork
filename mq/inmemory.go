@@ -25,7 +25,7 @@ func NewInMemoryBroker() *InMemoryBroker {
 	}
 }
 
-func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
+func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t task.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	b.mu.RLock()
 	q, ok := b.tasks[qname]
@@ -36,11 +36,11 @@ func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *task.
 		b.tasks[qname] = q
 		b.mu.Unlock()
 	}
-	q <- *t
+	q <- t
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t *task.Task) error) error {
+func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t task.Task) error) error {
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	b.mu.RLock()
 	q, ok := b.tasks[qname]
@@ -54,7 +54,7 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx contex
 	go func() {
 		ctx := context.TODO()
 		for t := range q {
-			err := handler(ctx, &t)
+			err := handler(ctx, t)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing task")
 			}
@@ -75,16 +75,16 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return keys, nil
 }
 
-func (b *InMemoryBroker) PublishHeartbeat(ctx context.Context, n *node.Node) error {
-	b.registrations <- *n
+func (b *InMemoryBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {
+	b.registrations <- n
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n *node.Node) error) error {
+func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n node.Node) error) error {
 	go func() {
 		ctx := context.TODO()
 		for n := range b.registrations {
-			err := handler(ctx, &n)
+			err := handler(ctx, n)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing registration")
 			}

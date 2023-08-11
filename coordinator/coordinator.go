@@ -63,8 +63,8 @@ func NewCoordinator(cfg Config) *Coordinator {
 	}
 }
 
-func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context, t *task.Task) error {
-	return func(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context, t task.Task) error {
+	return func(ctx context.Context, t task.Task) error {
 		log.Info().
 			Str("task-id", t.ID).
 			Str("thread", thread).
@@ -93,8 +93,8 @@ func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context
 	}
 }
 
-func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context, t *task.Task) error {
-	return func(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context, t task.Task) error {
+	return func(ctx context.Context, t task.Task) error {
 		log.Debug().
 			Str("task-id", t.ID).
 			Str("thread", thread).
@@ -113,8 +113,8 @@ func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context
 	}
 }
 
-func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Context, t *task.Task) error {
-	return func(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Context, t task.Task) error {
+	return func(ctx context.Context, t task.Task) error {
 		log.Debug().
 			Str("task-id", t.ID).
 			Str("thread", thread).
@@ -128,8 +128,8 @@ func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Conte
 	}
 }
 
-func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context, t *task.Task) error {
-	return func(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context, t task.Task) error {
+	return func(ctx context.Context, t task.Task) error {
 		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			if u.State == task.Cancelled {
 				log.Debug().
@@ -174,14 +174,14 @@ func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context,
 	}
 }
 
-func (c *Coordinator) handleHeartbeats(ctx context.Context, n *node.Node) error {
+func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 	n.LastHeartbeatAt = time.Now()
 	_, err := c.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
 			Str("node-id", n.ID).
 			Msg("received first heartbeat")
-		return c.ds.CreateNode(ctx, n)
+		return c.ds.CreateNode(ctx, &n)
 	}
 	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) error {
 		log.Info().
