@@ -202,7 +202,7 @@ func (w *Worker) doRunTask(ctx context.Context, t task.Task) (string, error) {
 		return "", err
 	}
 	t.Volumes = append(t.Volumes, fmt.Sprintf("%s:%s", rundir, "/tork"))
-	return w.runtime.Run(ctx, &t)
+	return w.runtime.Run(ctx, t)
 }
 
 func deleteTempDir(dirname string) {
