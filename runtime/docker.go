@@ -132,12 +132,12 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 		mounts = append(mounts, mount)
 	}
 
-	cpus, err := parseCPUs(t.Limits.CPUs)
+	cpus, err := parseCPUs(t.Limits)
 	if err != nil {
 		return "", errors.Wrapf(err, "invalid CPUs value")
 	}
 
-	mem, err := parseMemory(t.Limits.Memory)
+	mem, err := parseMemory(t.Limits)
 	if err != nil {
 		return "", errors.Wrapf(err, "invalid memory value")
 	}
@@ -259,13 +259,13 @@ func (d *DockerRuntime) Stop(ctx context.Context, t task.Task) error {
 }
 
 // take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403
-func parseCPUs(value string) (int64, error) {
-	if value == "" {
+func parseCPUs(limits *task.Limits) (int64, error) {
+	if limits == nil || limits.CPUs == "" {
 		return 0, nil
 	}
-	cpu, ok := new(big.Rat).SetString(value)
+	cpu, ok := new(big.Rat).SetString(limits.CPUs)
 	if !ok {
-		return 0, fmt.Errorf("failed to parse %v as a rational number", value)
+		return 0, fmt.Errorf("failed to parse %v as a rational number", limits.CPUs)
 	}
 	nano := cpu.Mul(cpu, big.NewRat(1e9, 1))
 	if !nano.IsInt() {
@@ -274,9 +274,9 @@ func parseCPUs(value string) (int64, error) {
 	return nano.Num().Int64(), nil
 }
 
-func parseMemory(value string) (int64, error) {
-	if value == "" {
+func parseMemory(limits *task.Limits) (int64, error) {
+	if limits == nil || limits.Memory == "" {
 		return 0, nil
 	}
-	return units.RAMInBytes(value)
+	return units.RAMInBytes(limits.Memory)
 }

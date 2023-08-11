@@ -19,6 +19,8 @@ const (
 	// The queue used by workers to periodically
 	// notify the coordinator about their aliveness
 	QUEUE_HEARBEAT = "hearbeat"
+	// The queue used by the API to insert new jobs into
+	QUEUE_JOBS = "jobs"
 	// The prefix used for queues that
 	// are exclusive
 	QUEUE_EXCLUSIVE_PREFIX = "x-"
@@ -36,6 +38,7 @@ func IsCoordinatorQueue(qname string) bool {
 		QUEUE_COMPLETED,
 		QUEUE_ERROR,
 		QUEUE_HEARBEAT,
+		QUEUE_JOBS,
 	}
 	return slices.Contains(coordQueues, qname)
 }

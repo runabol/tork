@@ -115,10 +115,13 @@ func (w *Worker) runTask(c context.Context, t task.Task) error {
 		return err
 	}
 	// prepare limits
-	if t.Limits.CPUs == "" {
+	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
+		t.Limits = &task.Limits{}
+	}
+	if t.Limits != nil && t.Limits.CPUs == "" {
 		t.Limits.CPUs = w.limits.DefaultCPUsLimit
 	}
-	if t.Limits.Memory == "" {
+	if t.Limits != nil && t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
 	// prepare shared volumes

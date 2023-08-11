@@ -1,11 +1,10 @@
 # Tork
 
-A Golang based high performance, scalable and distributed workflow and task execution engine.
+A Golang based high-performance, scalable and distributed job execution engine.
 
 # Features:
 
 - [REST API](#rest-api)
-- Submit individual tasks or workflows for execution.
 - Horizontally scalable
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](#limits)
 - Automatic recovery of tasks in the event of a worker crash
@@ -45,78 +44,80 @@ Start in `standalone` mode:
 go run cmd/main.go -mode standalone
 ```
 
-Submit task in another terminal:
+Submit a job in another terminal:
 
 ```yaml
 # hello.yaml
 ---
-name: say hello
-image: ubuntu:mantic
-run: |
-  echo -n hello world
+name: hello job
+tasks:
+  - name: say hello
+    image: ubuntu:mantic
+    run: |
+      echo -n hello world
 ```
 
 ```bash
-TASK_ID=$(curl \
+JOB_ID=$(curl \
   -s \
   -X POST \
   --data-binary @hello.yaml \
   -H "Content-type: text/yaml" \
-  http://localhost:3000/task | jq -r .id)
+  http://localhost:3000/job | jq -r .id)
 ```
 
 Query for the status of the task:
 
 ```bash
-# curl -s http://localhost:3000/task/$TASK_ID | jq .
+curl -s http://localhost:3000/job/$JOB_ID | jq .
 
 {
-  ...
+  "id": "ed0dba93d262492b8cf26e6c1c4f1c98",
   "state": "COMPLETED",
-  "result": "hello world"
+  ...
+  "execution": [
+    {
+      ...
+      "state": "COMPLETED",
+      "result": "hello world",
+    }
+  ],
 }
 ```
 
 ## A slightly more interesting example
 
-1. Download a remote video file using a `pre` task to a shared `/tmp` volume.
-2. Convert the first 5 seconds of the downloaded video using `ffmpeg`.
-3. Upload the converted video to a destination using a `post` task.
+The following job:
+
+1. Downloads a remote video file using a `pre` task to a shared `/tmp` volume.
+2. Converts the first 5 seconds of the downloaded video using `ffmpeg`.
+3. Uploads the converted video to a destination using a `post` task.
 
 ```yaml
 # convert.yaml
 ---
-name: convert the first 5 seconds of a video
-image: jrottenberg/ffmpeg:3.4-alpine
-run: |
-  ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
-volumes:
-  - /tmp
-pre:
-  - name: download the remote file
-    image: alpine:3.18.3
+name: convert a video
+tasks:
+  - name: convert the first 5 seconds of a video
+    image: jrottenberg/ffmpeg:3.4-alpine
     run: |
-      wget \
-      https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
-      -O /tmp/input.ogv
-post:
-  - name: upload the converted file
-    image: alpine:3.18.3
-    run: |
-      wget \
-      --post-file=/tmp/output.mp4 \
-      https://devnull-as-a-service.com/dev/null
-```
-
-Submit the task:
-
-```bash
-TASK_ID=$(curl \
-  -s \
-  -X POST \
-  --data-binary @convert.yaml \
-  -H "Content-type: text/yaml" \
-  http://localhost:3000/task | jq -r .id)
+      ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
+    volumes:
+      - /tmp
+    pre:
+      - name: download the remote file
+        image: alpine:3.18.3
+        run: |
+          wget \
+          https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
+          -O /tmp/input.ogv
+    post:
+      - name: upload the converted file
+        image: alpine:3.18.3
+        run: |
+          wget \
+          --post-file=/tmp/output.mp4 \
+          https://devnull-as-a-service.com/dev/null
 ```
 
 # Queues
@@ -150,6 +151,8 @@ run: |
 ```
 
 ## Special queues
+
+- `jobs` - incoming jobs land in this queue prior to being scheduled for processing by the Coordinator.
 
 - `pending` - incoming tasks land in this queue prior to being scheduled for processing by the Coordinator.
 
@@ -270,14 +273,14 @@ limits:
 
 # REST API
 
-## Submit a task
+## Submit a job
 
-Submit a new task to be scheduled for execution
+Submit a new job to be scheduled for execution
 
 **Path:**
 
 ```
-POST /task
+POST /job
 ```
 
 **Headers:**
@@ -295,6 +298,11 @@ Content-Type:text/yaml
 ```
 
 **Request body:**
+
+- `name` - a human-readable name for the job
+- `tasks` - the list of task to execute
+
+task properties:
 
 - `name` - a human-readable name for the task
 - `image` (required) - the docker image to use to execute the task
@@ -324,25 +332,27 @@ Content-Type:text/yaml
 JSON:
 
 ```bash
-curl -X POST "http://localhost:3000/task" \
+curl -X POST "http://localhost:3000/job" \
      -H "Content-Type: application/json" \
-     -d '{
+     -d '{"name":"sample job","tasks":[{
        "name": "sample task",
        "image": "ubuntu:mantic",
        "run": "echo hello world"
-     }'
+     }]}'
 ```
 
 YAML:
 
 ```bash
-curl -X POST "http://localhost:3000/task" \
+curl -X POST "http://localhost:3000/job" \
      -H "Content-Type: text/yaml" \
      -d \
 '
-name: sample task
-image: ubuntu:mantic,
-run: echo hello world
+name: sample job
+tasks:
+  - name: sample task
+    image: ubuntu:mantic,
+    run: echo hello world
 '
 ```
 
@@ -352,12 +362,15 @@ run: echo hello world
 HTTP 200
 
 {
-  "id": "bb9920c6d9d34e2b8501e4eda2e755bd",
-  "name": "sample task",
-  "state": "PENDING",
-  "createdAt": "2023-08-10T14:54:33.035182-04:00",
-  "run": "echo hello world",
-  "image": "ubuntu:mantic"
+	"id": "68c602bed6d34d7f9130bfa13786e422",
+	"name": "sample job",
+	"state": "PENDING",
+	"createdAt": "2023-08-12T15:55:12.143998-04:00",
+	"tasks": [{
+		"name": "sample task",
+		"run": "echo hello world",
+		"image": "ubuntu:mantic,"
+	}]
 }
 ```
 

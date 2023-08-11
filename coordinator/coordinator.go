@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/tork/datastore"
+	"github.com/tork/job"
 	"github.com/tork/mq"
 	"github.com/tork/node"
 	"github.com/tork/task"
@@ -54,6 +55,9 @@ func NewCoordinator(cfg Config) *Coordinator {
 	if cfg.Queues[mq.QUEUE_HEARBEAT] < 1 {
 		cfg.Queues[mq.QUEUE_HEARBEAT] = 1
 	}
+	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
+		cfg.Queues[mq.QUEUE_JOBS] = 1
+	}
 	return &Coordinator{
 		Name:   name,
 		api:    newAPI(cfg),
@@ -63,115 +67,140 @@ func NewCoordinator(cfg Config) *Coordinator {
 	}
 }
 
-func (c *Coordinator) taskPendingHandler(thread string) func(ctx context.Context, t task.Task) error {
-	return func(ctx context.Context, t task.Task) error {
-		log.Info().
-			Str("task-id", t.ID).
-			Str("thread", thread).
-			Msg("routing task")
-		qname := t.Queue
-		if qname == "" {
-			qname = mq.QUEUE_DEFAULT
+func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error {
+	log.Info().
+		Str("task-id", t.ID).
+		Msg("routing task")
+	qname := t.Queue
+	if qname == "" {
+		qname = mq.QUEUE_DEFAULT
+	}
+	t.State = task.Scheduled
+	n := time.Now()
+	t.ScheduledAt = &n
+	t.State = task.Scheduled
+
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		// we don't want to mark the task as SCHEDULED
+		// if an out-of-order task completion/failure
+		// arrived earlier
+		if u.State == task.Pending {
+			u.State = t.State
+			u.ScheduledAt = t.ScheduledAt
 		}
-		t.State = task.Scheduled
-		n := time.Now()
-		t.ScheduledAt = &n
-		t.State = task.Scheduled
-		if err := c.broker.PublishTask(ctx, qname, t); err != nil {
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+
+	return c.broker.PublishTask(ctx, qname, t)
+}
+
+func (c *Coordinator) handleStartedTask(ctx context.Context, t task.Task) error {
+	log.Debug().
+		Str("task-id", t.ID).
+		Msg("received task start")
+	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		// we don't want to mark the task as RUNNING
+		// if an out-of-order task completion/failure
+		// arrived earlier
+		if u.State == task.Scheduled {
+			u.State = t.State
+			u.StartedAt = t.StartedAt
+			u.Node = t.Node
+		}
+		return nil
+	})
+}
+
+func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) error {
+	log.Debug().Str("task-id", t.ID).Msg("received task completion")
+	// update task in DB
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = task.Completed
+		u.CompletedAt = t.CompletedAt
+		u.Result = t.Result
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	// update job in DB
+	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+		u.Position = t.Position + 1
+		if u.Position > len(u.Tasks) {
+			now := time.Now()
+			u.State = job.Completed
+			u.CompletedAt = &now
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating job in datastore")
+	}
+	// fire the next task (if the job isn't completed)
+	j, err := c.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting job from datatstore")
+	}
+	if j.State == job.Running {
+		now := time.Now()
+		next := j.Tasks[j.Position-1]
+		next.ID = uuid.NewUUID()
+		next.JobID = j.ID
+		next.State = task.Pending
+		next.Position = j.Position
+		next.CreatedAt = &now
+		if err := c.ds.CreateTask(ctx, next); err != nil {
 			return err
 		}
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			// we don't want to mark the task as SCHEDULED
-			// if an out-of-order task completion/failure
-			// arrived earlier
-			if u.State == task.Pending {
-				u.State = t.State
-				u.ScheduledAt = t.ScheduledAt
-			}
-			return nil
-		})
+		return c.handlePendingTask(ctx, next)
 	}
+	return nil
 }
 
-func (c *Coordinator) taskStartedHandler(thread string) func(ctx context.Context, t task.Task) error {
-	return func(ctx context.Context, t task.Task) error {
-		log.Debug().
-			Str("task-id", t.ID).
-			Str("thread", thread).
-			Msg("received task start")
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			// we don't want to mark the task as RUNNING
-			// if an out-of-order task completion/failure
-			// arrived earlier
-			if u.State == task.Scheduled {
-				u.State = t.State
-				u.StartedAt = t.StartedAt
-				u.Node = t.Node
+func (c *Coordinator) handleFailedTask(ctx context.Context, t task.Task) error {
+	log.Error().
+		Str("task-id", t.ID).
+		Str("task-error", t.Error).
+		Msg("received task failure")
+	if t.Retry != nil && t.Retry.Attempts < t.Retry.Limit {
+		// create a new retry task
+		rt := t
+		rt.ID = uuid.NewUUID()
+		rt.Retry.Attempts = rt.Retry.Attempts + 1
+		rt.State = task.Pending
+		rt.Error = ""
+		if err := c.ds.CreateTask(ctx, rt); err != nil {
+			return errors.Wrapf(err, "error creating a retry task")
+		}
+		dur, err := time.ParseDuration(rt.Retry.InitialDelay)
+		if err != nil {
+			return errors.Wrapf(err, "invalid retry.initialDelay: %s", rt.Retry.InitialDelay)
+		}
+		go func() {
+			delay := dur * time.Duration(math.Pow(float64(rt.Retry.ScalingFactor), float64(rt.Retry.Attempts-1)))
+			log.Debug().Msgf("delaying retry %s", delay)
+			time.Sleep(delay)
+			if err := c.broker.PublishTask(ctx, mq.QUEUE_PENDING, rt); err != nil {
+				log.Error().Err(err).Msg("error publishing retry task")
 			}
+		}()
+	} else {
+		// mark the job as FAILED
+		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+			u.State = job.Failed
+			u.FailedAt = t.FailedAt
 			return nil
-		})
+		}); err != nil {
+			return errors.Wrapf(err, "error marking the job as failed in the datastore")
+		}
 	}
-}
-
-func (c *Coordinator) taskCompletedHandler(thread string) func(ctx context.Context, t task.Task) error {
-	return func(ctx context.Context, t task.Task) error {
-		log.Debug().
-			Str("task-id", t.ID).
-			Str("thread", thread).
-			Msg("received task completion")
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			u.State = task.Completed
-			u.CompletedAt = t.CompletedAt
-			u.Result = t.Result
-			return nil
-		})
-	}
-}
-
-func (c *Coordinator) taskFailedHandler(thread string) func(ctx context.Context, t task.Task) error {
-	return func(ctx context.Context, t task.Task) error {
-		return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			if u.State == task.Cancelled {
-				log.Debug().
-					Str("thread", thread).
-					Msgf("task %s was previously cancelled. ignoring error.", t.ID)
-				return nil
-			}
-			log.Error().
-				Str("task-id", t.ID).
-				Str("task-error", t.Error).
-				Str("thread", thread).
-				Msg("received task failure")
-			// check if the task has a retry policy and if it hadn't been exhausted
-			if u.Retry != nil && u.Retry.Attempts < u.Retry.Limit {
-				u.Retry.Attempts = u.Retry.Attempts + 1
-				t.Retry = u.Retry
-				t.State = task.Scheduled
-				t.Error = ""
-				qname := t.Queue
-				if qname == "" {
-					qname = mq.QUEUE_DEFAULT
-				}
-				dur, err := time.ParseDuration(t.Retry.InitialDelay)
-				if err != nil {
-					return errors.Wrapf(err, "invalid retry.initialDelay: %s", t.Retry.InitialDelay)
-				}
-				go func() {
-					delay := dur * time.Duration(math.Pow(float64(t.Retry.ScalingFactor), float64(u.Retry.Attempts-1)))
-					log.Debug().Msgf("delaying retry %s", delay)
-					time.Sleep(delay)
-					if err := c.broker.PublishTask(ctx, qname, t); err != nil {
-						log.Error().Err(err).Msg("error publishing retry task")
-					}
-				}()
-			} else {
-				u.State = task.Failed
-				u.FailedAt = t.FailedAt
-				u.Error = t.Error
-			}
-			return nil
-		})
-	}
+	// mark the task as FAILED
+	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = task.Failed
+		u.FailedAt = t.FailedAt
+		u.Error = t.Error
+		return nil
+	})
 }
 
 func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
@@ -195,6 +224,29 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 
 }
 
+func (c *Coordinator) handleJobs(ctx context.Context, j job.Job) error {
+	log.Debug().Msgf("starting job %s", j.ID)
+	now := time.Now()
+	t := j.Tasks[0]
+	t.ID = uuid.NewUUID()
+	t.JobID = j.ID
+	t.State = task.Pending
+	t.Position = 1
+	t.CreatedAt = &now
+	if err := c.ds.CreateTask(ctx, t); err != nil {
+		return err
+	}
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
+		n := time.Now()
+		u.State = job.Running
+		u.StartedAt = &n
+		return nil
+	}); err != nil {
+		return err
+	}
+	return c.handlePendingTask(ctx, t)
+}
+
 func (c *Coordinator) Start() error {
 	log.Info().Msgf("starting %s", c.Name)
 	// start the coordinator API
@@ -207,19 +259,20 @@ func (c *Coordinator) Start() error {
 			continue
 		}
 		for i := 0; i < conc; i++ {
-			threadName := fmt.Sprintf("%s-%d", qname, i)
 			var err error
 			switch qname {
 			case mq.QUEUE_PENDING:
-				err = c.broker.SubscribeForTasks(qname, c.taskPendingHandler(threadName))
+				err = c.broker.SubscribeForTasks(qname, c.handlePendingTask)
 			case mq.QUEUE_COMPLETED:
-				err = c.broker.SubscribeForTasks(qname, c.taskCompletedHandler(threadName))
+				err = c.broker.SubscribeForTasks(qname, c.handleCompletedTask)
 			case mq.QUEUE_STARTED:
-				err = c.broker.SubscribeForTasks(qname, c.taskStartedHandler(threadName))
+				err = c.broker.SubscribeForTasks(qname, c.handleStartedTask)
 			case mq.QUEUE_ERROR:
-				err = c.broker.SubscribeForTasks(qname, c.taskFailedHandler(threadName))
+				err = c.broker.SubscribeForTasks(qname, c.handleFailedTask)
 			case mq.QUEUE_HEARBEAT:
 				err = c.broker.SubscribeForHeartbeats(c.handleHeartbeats)
+			case mq.QUEUE_JOBS:
+				err = c.broker.SubscribeForJobs(c.handleJobs)
 			}
 			if err != nil {
 				return err
