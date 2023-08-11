@@ -63,7 +63,7 @@ func (r filteredReader) Read(p []byte) (int, error) {
 	return j, nil
 }
 
-func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) imagePull(ctx context.Context, t task.Task) error {
 	d.mu.RLock()
 	_, ok := d.images[t.Image]
 	d.mu.RUnlock()
@@ -107,7 +107,7 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
 	return nil
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
+func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 	if err := d.imagePull(ctx, t); err != nil {
 		return "", errors.Wrapf(err, "error pulling image")
 	}
@@ -240,7 +240,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 	return bufout.String(), nil
 }
 
-func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) Stop(ctx context.Context, t task.Task) error {
 	d.mu.RLock()
 	containerID, ok := d.tasks[t.ID]
 	d.mu.RUnlock()
