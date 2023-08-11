@@ -39,11 +39,11 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return make([]QueueInfo, 0), nil
 }
-func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
+func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t task.Task) error {
 	return b.publish(ctx, qname, t)
 }
 
-func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t *task.Task) error) error {
+func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t task.Task) error) error {
 	return b.subscribe(qname, func(ctx context.Context, body []byte) error {
 		t := task.Task{}
 		if err := json.Unmarshal(body, &t); err != nil {
@@ -52,7 +52,7 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx contex
 				Str("body", string(body)).
 				Msg("unable to deserialize task")
 		}
-		return handler(ctx, &t)
+		return handler(ctx, t)
 	})
 }
 
@@ -129,7 +129,7 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 	return nil
 }
 
-func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *node.Node) error {
+func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {
 	return b.publish(ctx, QUEUE_HEARBEAT, n)
 }
 
@@ -161,7 +161,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n *node.Node) error) error {
+func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n node.Node) error) error {
 	return b.subscribe(QUEUE_HEARBEAT, func(ctx context.Context, body []byte) error {
 		n := node.Node{}
 		if err := json.Unmarshal(body, &n); err != nil {
@@ -170,6 +170,6 @@ func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context
 				Str("body", string(body)).
 				Msg("unable to deserialize node")
 		}
-		return handler(ctx, &n)
+		return handler(ctx, n)
 	})
 }

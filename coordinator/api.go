@@ -77,7 +77,7 @@ func (s *api) listActiveNodes(c *gin.Context) {
 }
 
 func (s *api) createTask(c *gin.Context) {
-	t := &task.Task{}
+	t := task.Task{}
 	switch c.ContentType() {
 	case "application/json":
 		if err := c.BindJSON(&t); err != nil {
@@ -139,7 +139,7 @@ func (s *api) createTask(c *gin.Context) {
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
 	t.CreatedAt = &n
-	if err := s.ds.CreateTask(c, t); err != nil {
+	if err := s.ds.CreateTask(c, &t); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -148,7 +148,7 @@ func (s *api) createTask(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusOK, redact(*t))
+	c.JSON(http.StatusOK, redact(t))
 }
 
 func (s *api) getTask(c *gin.Context) {
@@ -173,7 +173,7 @@ func (s *api) cancelTask(c *gin.Context) {
 			if err != nil {
 				return err
 			}
-			if err := s.broker.PublishTask(c, node.Queue, u); err != nil {
+			if err := s.broker.PublishTask(c, node.Queue, *u); err != nil {
 				return err
 			}
 		}

@@ -25,7 +25,7 @@ type Worker struct {
 	broker    mq.Broker
 	stop      bool
 	queues    map[string]int
-	tasks     map[string]*runningTask
+	tasks     map[string]runningTask
 	mu        sync.RWMutex
 	limits    Limits
 	tempdir   string
@@ -45,7 +45,6 @@ type Config struct {
 }
 
 type runningTask struct {
-	task   *task.Task
 	cancel context.CancelFunc
 }
 
@@ -59,15 +58,15 @@ func NewWorker(cfg Config) *Worker {
 		broker:    cfg.Broker,
 		runtime:   cfg.Runtime,
 		queues:    cfg.Queues,
-		tasks:     make(map[string]*runningTask),
+		tasks:     make(map[string]runningTask),
 		limits:    cfg.Limits,
 		tempdir:   cfg.TempDir,
 	}
 	return w
 }
 
-func (w *Worker) handleTask(threadname string) func(ctx context.Context, t *task.Task) error {
-	return func(ctx context.Context, t *task.Task) error {
+func (w *Worker) handleTask(threadname string) func(ctx context.Context, t task.Task) error {
+	return func(ctx context.Context, t task.Task) error {
 		log.Debug().
 			Str("thread", threadname).
 			Str("task-id", t.ID).
@@ -83,7 +82,7 @@ func (w *Worker) handleTask(threadname string) func(ctx context.Context, t *task
 	}
 }
 
-func (w *Worker) cancelTask(ctx context.Context, t *task.Task) error {
+func (w *Worker) cancelTask(ctx context.Context, t task.Task) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	rt, ok := w.tasks[t.ID]
@@ -96,11 +95,10 @@ func (w *Worker) cancelTask(ctx context.Context, t *task.Task) error {
 	return nil
 }
 
-func (w *Worker) runTask(c context.Context, t *task.Task) error {
+func (w *Worker) runTask(c context.Context, t task.Task) error {
 	ctx, cancel := context.WithCancel(c)
 	w.mu.Lock()
-	w.tasks[t.ID] = &runningTask{
-		task:   t,
+	w.tasks[t.ID] = runningTask{
 		cancel: cancel,
 	}
 	w.mu.Unlock()
@@ -155,7 +153,7 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 		pre.Result = result
 	}
 	// run the actual task
-	result, err := w.doRunTask(ctx, *t)
+	result, err := w.doRunTask(ctx, t)
 	finished := time.Now()
 	if err != nil {
 		t.State = task.Failed
@@ -225,7 +223,7 @@ func (w *Worker) sendHeartbeats() {
 		}
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
-			&node.Node{
+			node.Node{
 				ID:         w.id,
 				StartedAt:  w.startTime,
 				CPUPercent: s.CPUPercent,
