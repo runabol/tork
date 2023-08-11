@@ -3,7 +3,7 @@ module github.com/tork
 go 1.18
 
 require (
-	github.com/docker/docker v23.0.6+incompatible
+	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.3.0
