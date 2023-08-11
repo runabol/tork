@@ -41,6 +41,7 @@ type Task struct {
 	Volumes     []string          `json:"volumes,omitempty"`
 	Node        string            `json:"node,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty"`
+	Limits      Limits            `json:"limits,omitempty"`
 }
 
 const (
@@ -57,4 +58,9 @@ type Retry struct {
 	InitialDelay  string `json:"initialDelay,omitempty"`
 	ScalingFactor int    `json:"scalingFactor,omitempty"`
 	Attempts      int    `json:"attempts,omitempty"`
+}
+
+type Limits struct {
+	CPUs   string `json:"cpus,omitempty"`
+	Memory string `json:"memory,omitempty"`
 }

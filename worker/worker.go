@@ -25,12 +25,19 @@ type Worker struct {
 	queues    map[string]int
 	tasks     map[string]*runningTask
 	mu        sync.RWMutex
+	limits    Limits
+}
+
+type Limits struct {
+	DefaultCPUsLimit   string
+	DefaultMemoryLimit string
 }
 
 type Config struct {
 	Broker  mq.Broker
 	Runtime runtime.Runtime
 	Queues  map[string]int
+	Limits  Limits
 }
 
 type runningTask struct {
@@ -49,6 +56,7 @@ func NewWorker(cfg Config) *Worker {
 		runtime:   cfg.Runtime,
 		queues:    cfg.Queues,
 		tasks:     make(map[string]*runningTask),
+		limits:    cfg.Limits,
 	}
 	return w
 }
@@ -103,6 +111,13 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
 	}
+	// prepare limits
+	if t.Limits.CPUs == "" {
+		t.Limits.CPUs = w.limits.DefaultCPUsLimit
+	}
+	if t.Limits.Memory == "" {
+		t.Limits.Memory = w.limits.DefaultMemoryLimit
+	}
 	// prepare volumes
 	vols := []string{}
 	for _, v := range t.Volumes {
@@ -123,6 +138,7 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
+		pre.Limits = t.Limits
 		result, err := w.runtime.Run(ctx, &pre)
 		finished := time.Now()
 		if err != nil {
@@ -152,6 +168,7 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	// execute post tasks
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
+		post.Limits = t.Limits
 		result, err := w.runtime.Run(ctx, &post)
 		finished := time.Now()
 		if err != nil {
