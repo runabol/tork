@@ -279,7 +279,7 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
 }
 
 func (d *DockerRuntime) CreateVolume(ctx context.Context, name string) error {
-	v, err := d.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
+	v, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Name: name})
 	if err != nil {
 		return err
 	}
