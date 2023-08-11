@@ -139,7 +139,7 @@ func (s *api) createTask(c *gin.Context) {
 	t.ID = uuid.NewUUID()
 	t.State = task.Pending
 	t.CreatedAt = &n
-	if err := s.ds.CreateTask(c, &t); err != nil {
+	if err := s.ds.CreateTask(c, t); err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -158,7 +158,7 @@ func (s *api) getTask(c *gin.Context) {
 		c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	c.JSON(http.StatusOK, redact(*t))
+	c.JSON(http.StatusOK, redact(t))
 }
 
 func (s *api) cancelTask(c *gin.Context) {

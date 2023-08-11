@@ -181,7 +181,7 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 		log.Info().
 			Str("node-id", n.ID).
 			Msg("received first heartbeat")
-		return c.ds.CreateNode(ctx, &n)
+		return c.ds.CreateNode(ctx, n)
 	}
 	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) error {
 		log.Info().

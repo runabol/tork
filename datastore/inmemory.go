@@ -27,21 +27,21 @@ func NewInMemoryDatastore() *InMemoryDatastore {
 	}
 }
 
-func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error {
+func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t task.Task) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
-	ds.tasks[t.ID] = *t
+	ds.tasks[t.ID] = t
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
+func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (task.Task, error) {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
 	t, ok := ds.tasks[id]
 	if !ok {
-		return nil, ErrTaskNotFound
+		return task.Task{}, ErrTaskNotFound
 	}
-	return &t, nil
+	return t, nil
 }
 
 func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *task.Task) error) error {
@@ -58,10 +58,10 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *node.Node) error {
+func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
-	ds.nodes[n.ID] = *n
+	ds.nodes[n.ID] = n
 	return nil
 }
 
@@ -79,23 +79,23 @@ func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (*node.Node, error) {
+func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.Node, error) {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
 	n, ok := ds.nodes[id]
 	if !ok {
-		return nil, ErrNodeNotFound
+		return node.Node{}, ErrNodeNotFound
 	}
-	return &n, nil
+	return n, nil
 }
 
-func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]*node.Node, error) {
+func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]node.Node, error) {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
-	nodes := make([]*node.Node, 0)
+	nodes := make([]node.Node, 0)
 	for _, n := range ds.nodes {
 		if n.LastHeartbeatAt.After(lastHeartbeatAfter) {
-			nodes = append(nodes, &n)
+			nodes = append(nodes, n)
 		}
 	}
 	sort.Slice(nodes, func(i, j int) bool {
