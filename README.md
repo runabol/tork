@@ -2,8 +2,6 @@
 
 A Golang based high performance, scalable and distributed workflow and task execution engine.
 
-**Note: This project is currently a work in progress (WIP) and is not recommended for production use.**
-
 # Features:
 
 - [REST API](#rest-api)
