@@ -6,15 +6,12 @@ import (
 	"io"
 	"math/big"
 	"os"
-	"path"
 	"strings"
 	"sync"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
@@ -128,29 +125,12 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 			return "", errors.Errorf("invalid volume name: %s", v)
 		}
 		mount := mount.Mount{
-			Type:   mount.TypeVolume,
+			Type:   mount.TypeBind,
 			Source: vol[0],
 			Target: vol[1],
 		}
 		mounts = append(mounts, mount)
 	}
-
-	// create a temporary mount point
-	// we can use to write the run script to
-	dir, err := os.MkdirTemp("", "tork-")
-	if err != nil {
-		return "", errors.Wrapf(err, "error creating temp dir")
-	}
-	defer os.RemoveAll(dir)
-
-	if err := os.WriteFile(path.Join(dir, "run"), []byte(t.Run), os.ModePerm); err != nil {
-		return "", err
-	}
-	mounts = append(mounts, mount.Mount{
-		Type:   mount.TypeBind,
-		Source: dir,
-		Target: "/tork",
-	})
 
 	cpus, err := parseCPUs(t.Limits.CPUs)
 	if err != nil {
@@ -276,31 +256,6 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
 		RemoveLinks:   false,
 		Force:         true,
 	})
-}
-
-func (d *DockerRuntime) CreateVolume(ctx context.Context, name string) error {
-	v, err := d.client.VolumeCreate(ctx, volume.VolumeCreateBody{Name: name})
-	if err != nil {
-		return err
-	}
-	log.Debug().
-		Str("mount-point", v.Mountpoint).Msgf("created volume %s", v.Name)
-	return nil
-}
-
-func (d *DockerRuntime) DeleteVolume(ctx context.Context, name string) error {
-	ls, err := d.client.VolumeList(ctx, filters.NewArgs(filters.Arg("name", name)))
-	if err != nil {
-		return err
-	}
-	if len(ls.Volumes) == 0 {
-		return errors.Errorf("unknown volume: %s", name)
-	}
-	if err := d.client.VolumeRemove(ctx, name, true); err != nil {
-		return err
-	}
-	log.Debug().Msgf("removed volume %s", name)
-	return nil
 }
 
 // take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403

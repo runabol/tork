@@ -108,6 +108,13 @@ func postgresDSNFlag() cli.Flag {
 	}
 }
 
+func tempDir() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "temp-dir",
+		Usage: "/tmp",
+	}
+}
+
 func main() {
 	app := &cli.App{
 		Name:        "tork",
@@ -121,6 +128,7 @@ func main() {
 			postgresDSNFlag(),
 			defaultCPUsLimit(),
 			defaultMemoryLimit(),
+			tempDir(),
 		},
 		Action: execute,
 	}
@@ -274,6 +282,7 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 			DefaultCPUsLimit:   ctx.String("default-cpus-limit"),
 			DefaultMemoryLimit: ctx.String("default-memory-limit"),
 		},
+		TempDir: ctx.String("temp-dir"),
 	})
 	if err := w.Start(); err != nil {
 		return nil, err
