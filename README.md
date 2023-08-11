@@ -9,7 +9,7 @@ A Golang based high performance, scalable and distributed workflow and task exec
 - [REST API](#rest-api)
 - Submit individual tasks or workflows for execution.
 - Horizontally scalable
-- Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource limits
+- Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](#limits)
 - Automatic recovery of tasks in the event of a worker crash
 - Supports both stand-alone and distributed setup
 - Retry failed tasks
