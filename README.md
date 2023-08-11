@@ -245,6 +245,31 @@ go run cmd/main.go \
  -rabbitmq-url amqp://guest:guest@localhost:5672
 ```
 
+# Limits
+
+By default, a task has no resource constraints and can use as much of a given resource as the host’s kernel scheduler allows.
+
+Tork provides several ways to control how much CPU and Memory a task can use:
+
+**Setting global defaults at the worker level**
+
+`--default-cpus-limit` - the default maximum number of CPUs that a task is allowed to use when executing on as given worker. For instance, if the host machine has two CPUs and you set `--default-cpus-limit="1.5"`, a task is guaranteed at most one and a half of the CPUs.
+
+`--default-memory-limit` - the default maximum amount of memory that a task is allowed to use when executing on a given worker. Units are specified as a positive integer, followed by a suffix of `b`, `k`, `m`, `g`, to indicate bytes, kilobytes, megabytes, or gigabytes.
+
+**Setting limits on the task itself**
+
+For more fine-grained control, default limits can be overridden at an individual task level:
+
+```yaml
+name: some task
+image: ubuntu:mantic
+run: sleep 10
+limits:
+  cpus: .5
+  memory: 10m
+```
+
 # REST API
 
 ## Submit a task

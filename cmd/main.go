@@ -72,6 +72,22 @@ func rabbitmqURLFlag() cli.Flag {
 	}
 }
 
+func defaultCPUsLimit() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "default-cpus-limit",
+		Usage: "1",
+		Value: "",
+	}
+}
+
+func defaultMemoryLimit() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "default-memory-limit",
+		Usage: "6MB",
+		Value: "",
+	}
+}
+
 func datastoreFlag() cli.Flag {
 	allDSTypes := []string{
 		datastore.DATASTORE_INMEMORY,
@@ -103,6 +119,8 @@ func main() {
 			rabbitmqURLFlag(),
 			datastoreFlag(),
 			postgresDSNFlag(),
+			defaultCPUsLimit(),
+			defaultMemoryLimit(),
 		},
 		Action: execute,
 	}
@@ -136,28 +154,23 @@ func execute(ctx *cli.Context) error {
 		return err
 	}
 
-	queues, err := getQueueConfig(ctx)
-	if err != nil {
-		return err
-	}
-
 	switch mode {
 	case MODE_STANDALONE:
-		w, err = createWorker(broker, queues)
+		w, err = createWorker(broker, ctx)
 		if err != nil {
 			return err
 		}
-		c, err = createCoordinator(broker, ds, queues)
+		c, err = createCoordinator(broker, ds, ctx)
 		if err != nil {
 			return err
 		}
 	case MODE_COORDINATOR:
-		c, err = createCoordinator(broker, ds, queues)
+		c, err = createCoordinator(broker, ds, ctx)
 		if err != nil {
 			return err
 		}
 	case MODE_WORKER:
-		w, err = createWorker(broker, queues)
+		w, err = createWorker(broker, ctx)
 		if err != nil {
 			return err
 		}
@@ -228,7 +241,11 @@ func createBroker(ctx *cli.Context) (mq.Broker, error) {
 	return b, nil
 }
 
-func createCoordinator(broker mq.Broker, ds datastore.Datastore, queues map[string]int) (*coordinator.Coordinator, error) {
+func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Context) (*coordinator.Coordinator, error) {
+	queues, err := parseQueueConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
 	c := coordinator.NewCoordinator(coordinator.Config{
 		Broker:    broker,
 		DataStore: ds,
@@ -240,7 +257,11 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, queues map[stri
 	return c, nil
 }
 
-func createWorker(b mq.Broker, queues map[string]int) (*worker.Worker, error) {
+func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
+	queues, err := parseQueueConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
 	rt, err := runtime.NewDockerRuntime()
 	if err != nil {
 		return nil, err
@@ -249,6 +270,10 @@ func createWorker(b mq.Broker, queues map[string]int) (*worker.Worker, error) {
 		Broker:  b,
 		Runtime: rt,
 		Queues:  queues,
+		Limits: worker.Limits{
+			DefaultCPUsLimit:   ctx.String("default-cpus-limit"),
+			DefaultMemoryLimit: ctx.String("default-memory-limit"),
+		},
 	})
 	if err := w.Start(); err != nil {
 		return nil, err
@@ -256,7 +281,7 @@ func createWorker(b mq.Broker, queues map[string]int) (*worker.Worker, error) {
 	return w, nil
 }
 
-func getQueueConfig(ctx *cli.Context) (map[string]int, error) {
+func parseQueueConfig(ctx *cli.Context) (map[string]int, error) {
 	qs := ctx.StringSlice("queue")
 	queues := make(map[string]int)
 	for _, q := range qs {

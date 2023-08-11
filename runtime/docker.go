@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/tork/task"
@@ -149,9 +151,24 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) (string, error) {
 		Source: dir,
 		Target: "/tork",
 	})
+
+	cpus, err := parseCPUs(t.Limits.CPUs)
+	if err != nil {
+		return "", errors.Wrapf(err, "invalid CPUs value")
+	}
+
+	mem, err := parseMemory(t.Limits.Memory)
+	if err != nil {
+		return "", errors.Wrapf(err, "invalid memory value")
+	}
+
 	hc := container.HostConfig{
 		PublishAllPorts: true,
 		Mounts:          mounts,
+		Resources: container.Resources{
+			NanoCPUs: cpus,
+			Memory:   mem,
+		},
 	}
 	cmd := t.CMD
 	if len(cmd) == 0 {
@@ -284,4 +301,27 @@ func (d *DockerRuntime) DeleteVolume(ctx context.Context, name string) error {
 	}
 	log.Debug().Msgf("removed volume %s", name)
 	return nil
+}
+
+// take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403
+func parseCPUs(value string) (int64, error) {
+	if value == "" {
+		return 0, nil
+	}
+	cpu, ok := new(big.Rat).SetString(value)
+	if !ok {
+		return 0, fmt.Errorf("failed to parse %v as a rational number", value)
+	}
+	nano := cpu.Mul(cpu, big.NewRat(1e9, 1))
+	if !nano.IsInt() {
+		return 0, fmt.Errorf("value is too precise")
+	}
+	return nano.Num().Int64(), nil
+}
+
+func parseMemory(value string) (int64, error) {
+	if value == "" {
+		return 0, nil
+	}
+	return units.RAMInBytes(value)
 }
