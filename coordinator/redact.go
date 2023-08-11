@@ -20,7 +20,7 @@ func contains(substr string) func(s string) bool {
 	}
 }
 
-func redact(t task.Task) *task.Task {
+func redact(t task.Task) task.Task {
 	redacted := make(map[string]string)
 	for k, v := range t.Env {
 		for _, m := range matchers {
@@ -31,5 +31,5 @@ func redact(t task.Task) *task.Task {
 		redacted[k] = v
 	}
 	t.Env = redacted
-	return &t
+	return t
 }

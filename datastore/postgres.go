@@ -35,8 +35,8 @@ type nodeRecord struct {
 	Queue           string    `db:"queue"`
 }
 
-func (r nodeRecord) toNode() *node.Node {
-	return &node.Node{
+func (r nodeRecord) toNode() node.Node {
+	return node.Node{
 		ID:              r.ID,
 		StartedAt:       r.StartedAt,
 		CPUPercent:      r.CPUPercent,
@@ -62,7 +62,7 @@ func (ds *PostgresDatastore) CreateSchema() error {
 	return err
 }
 
-func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error {
+func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error {
 	bytez, err := json.Marshal(t)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize task")
@@ -78,17 +78,17 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 	return nil
 }
 
-func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
+func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (task.Task, error) {
 	tr := taskRecord{}
 	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrNodeNotFound
+			return task.Task{}, ErrNodeNotFound
 		}
-		return nil, errors.Wrapf(err, "error fetching task from db")
+		return task.Task{}, errors.Wrapf(err, "error fetching task from db")
 	}
-	t := &task.Task{}
-	if err := json.Unmarshal(tr.Serialized, t); err != nil {
-		return nil, errors.Wrapf(err, "error desiralizing task")
+	t := task.Task{}
+	if err := json.Unmarshal(tr.Serialized, &t); err != nil {
+		return task.Task{}, errors.Wrapf(err, "error desiralizing task")
 	}
 	return t, nil
 }
@@ -132,7 +132,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *node.Node) error {
+func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	q := `insert into nodes 
 	       (id,started_at,last_heartbeat_at,cpu_percent,queue) 
 	      values
@@ -154,7 +154,7 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 		return errors.Wrapf(err, "error fetching node from db")
 	}
 	n := nr.toNode()
-	if err := modify(n); err != nil {
+	if err := modify(&n); err != nil {
 		return err
 	}
 	q := `update nodes set 
@@ -174,18 +174,18 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (*node.Node, error) {
+func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (node.Node, error) {
 	nr := nodeRecord{}
 	if err := ds.db.Get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrNodeNotFound
+			return node.Node{}, ErrNodeNotFound
 		}
-		return nil, errors.Wrapf(err, "error fetching task from db")
+		return node.Node{}, errors.Wrapf(err, "error fetching task from db")
 	}
 	return nr.toNode(), nil
 }
 
-func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]*node.Node, error) {
+func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]node.Node, error) {
 	nrs := []nodeRecord{}
 	q := `SELECT * 
 	      FROM nodes 
@@ -194,7 +194,7 @@ func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAf
 	if err := ds.db.Select(&nrs, q, lastHeartbeatAfter); err != nil {
 		return nil, errors.Wrapf(err, "error getting active nodes from db")
 	}
-	ns := make([]*node.Node, len(nrs))
+	ns := make([]node.Node, len(nrs))
 	for i, n := range nrs {
 		ns[i] = n.toNode()
 	}
