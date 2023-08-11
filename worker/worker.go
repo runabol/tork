@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -26,6 +28,7 @@ type Worker struct {
 	tasks     map[string]*runningTask
 	mu        sync.RWMutex
 	limits    Limits
+	tempdir   string
 }
 
 type Limits struct {
@@ -38,6 +41,7 @@ type Config struct {
 	Runtime runtime.Runtime
 	Queues  map[string]int
 	Limits  Limits
+	TempDir string
 }
 
 type runningTask struct {
@@ -57,6 +61,7 @@ func NewWorker(cfg Config) *Worker {
 		queues:    cfg.Queues,
 		tasks:     make(map[string]*runningTask),
 		limits:    cfg.Limits,
+		tempdir:   cfg.TempDir,
 	}
 	return w
 }
@@ -118,28 +123,23 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	if t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
-	// prepare volumes
+	// prepare shared volumes
 	vols := []string{}
 	for _, v := range t.Volumes {
-		volName := uuid.NewUUID()
-		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
-			return err
+		tempvol, err := os.MkdirTemp(w.tempdir, "vol-")
+		if err != nil {
+			return errors.Wrapf(err, "error creating temp dir")
 		}
-		defer func() {
-			if err := w.runtime.DeleteVolume(ctx, volName); err != nil {
-				log.Error().
-					Err(err).
-					Msgf("error deleting volume: %s", volName)
-			}
-		}()
-		vols = append(vols, fmt.Sprintf("%s:%s", volName, v))
+		defer deleteTempDir(tempvol)
+		vols = append(vols, fmt.Sprintf("%s:%s", tempvol, v))
 	}
+
 	t.Volumes = vols
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
 		pre.Limits = t.Limits
-		result, err := w.runtime.Run(ctx, &pre)
+		result, err := w.doRunTask(ctx, pre)
 		finished := time.Now()
 		if err != nil {
 			// we also want to mark the
@@ -154,7 +154,8 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 		}
 		pre.Result = result
 	}
-	result, err := w.runtime.Run(ctx, t)
+	// run the actual task
+	result, err := w.doRunTask(ctx, *t)
 	finished := time.Now()
 	if err != nil {
 		t.State = task.Failed
@@ -169,7 +170,7 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
 		post.Limits = t.Limits
-		result, err := w.runtime.Run(ctx, &post)
+		result, err := w.doRunTask(ctx, post)
 		finished := time.Now()
 		if err != nil {
 			// we also want to mark the
@@ -189,6 +190,29 @@ func (w *Worker) runTask(c context.Context, t *task.Task) error {
 	t.CompletedAt = &finished
 	t.State = task.Completed
 	return w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
+}
+
+func (w *Worker) doRunTask(ctx context.Context, t task.Task) (string, error) {
+	// create a temporary mount point
+	// we can use to write the run script to
+	rundir, err := os.MkdirTemp(w.tempdir, "tork-")
+	if err != nil {
+		return "", errors.Wrapf(err, "error creating temp dir")
+	}
+	defer deleteTempDir(rundir)
+	if err := os.WriteFile(path.Join(rundir, "run"), []byte(t.Run), os.ModePerm); err != nil {
+		return "", err
+	}
+	t.Volumes = append(t.Volumes, fmt.Sprintf("%s:%s", rundir, "/tork"))
+	return w.runtime.Run(ctx, &t)
+}
+
+func deleteTempDir(dirname string) {
+	if err := os.RemoveAll(dirname); err != nil {
+		log.Error().
+			Err(err).
+			Msgf("error deleting volume: %s", dirname)
+	}
 }
 
 func (w *Worker) sendHeartbeats() {

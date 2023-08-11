@@ -303,7 +303,14 @@ Content-Type:text/yaml
 - `queue` - the name of the queue that the task should be routed to. See [queues](#queues).
 - `pre` - the list of tasks to execute prior to executing the actual task.
 - `post` - the list of tasks to execute post execution of the actual task.
-- `volumes` - a list of temporary volumes, created for the duration of the execution of the task. Useful for sharing state between the task and its `pre` and `post` tasks.
+- `volumes` - a list of temporary volumes, created for the duration of the execution of the task. Useful for sharing state between the task
+  and its `pre` and `post` tasks.
+  ```yaml
+  volumes:
+    - /data1
+    - /data2
+  ```
+  **note**: if you get an `invalid mount config for type "bind": bind source path does not exist` error it's most likely due to the fact that the Docker daemon isn't allowed to mount volumes from your default `$TMPDIR`. Try using the `--temp-dir` flag to explictly set it to another directory.
 - `retry` - the retry configuration to execute in case of a failure. Example:
   ```yaml
   retry:
