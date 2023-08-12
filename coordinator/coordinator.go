@@ -79,20 +79,13 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error 
 	n := time.Now()
 	t.ScheduledAt = &n
 	t.State = task.Scheduled
-
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		// we don't want to mark the task as SCHEDULED
-		// if an out-of-order task completion/failure
-		// arrived earlier
-		if u.State == task.Pending {
-			u.State = t.State
-			u.ScheduledAt = t.ScheduledAt
-		}
+		u.State = t.State
+		u.ScheduledAt = t.ScheduledAt
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
-
 	return c.broker.PublishTask(ctx, qname, t)
 }
 
