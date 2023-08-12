@@ -22,13 +22,29 @@ CREATE TABLE jobs (
 
 CREATE TABLE tasks (
     id            varchar(32) not null primary key,
-    created_at    timestamp   not null,
-    started_at    timestamp,
-    completed_at  timestamp,
     job_id        varchar(32) not null references jobs(id),
     position      int         not null,
+    name          varchar(256),
     state         varchar(10) not null,
-    serialized    jsonb       not null
+    created_at    timestamp   not null,
+    scheduled_at  timestamp,
+    started_at    timestamp,
+    completed_at  timestamp,
+    failed_at     timestamp,
+    cmd           text[],
+    entrypoint    text[],
+    run_script    text,
+    image         varchar(256),
+    Env           jsonb,
+    queue         varchar(256),
+    result        text,
+    error_msg     text,
+    pre_tasks     jsonb,
+    post_tasks    jsonb,
+    volumes       text[],
+    node_id       varchar(32),
+    retry         jsonb,
+    limits        jsonb
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
