@@ -3,12 +3,13 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/tork/job"
 	"github.com/tork/node"
@@ -20,14 +21,30 @@ type PostgresDatastore struct {
 }
 
 type taskRecord struct {
-	ID          string     `db:"id"`
-	CreatedAt   time.Time  `db:"created_at"`
-	StartedAt   *time.Time `db:"started_at"`
-	CompletedAt *time.Time `db:"completed_at"`
-	State       string     `db:"state"`
-	Serialized  []byte     `db:"serialized"`
-	JobID       string     `db:"job_id"`
-	Position    int        `db:"position"`
+	ID          string         `db:"id"`
+	JobID       string         `db:"job_id"`
+	Position    int            `db:"position"`
+	Name        string         `db:"name"`
+	State       string         `db:"state"`
+	CreatedAt   time.Time      `db:"created_at"`
+	ScheduledAt *time.Time     `db:"scheduled_at"`
+	StartedAt   *time.Time     `db:"started_at"`
+	CompletedAt *time.Time     `db:"completed_at"`
+	FailedAt    *time.Time     `db:"failed_at"`
+	CMD         pq.StringArray `db:"cmd"`
+	Entrypoint  pq.StringArray `db:"entrypoint"`
+	Run         string         `db:"run_script"`
+	Image       string         `db:"image"`
+	Env         []byte         `db:"env"`
+	Queue       string         `db:"queue"`
+	Result      string         `db:"result"`
+	Error       string         `db:"error_msg"`
+	Pre         []byte         `db:"pre_tasks"`
+	Post        []byte         `db:"post_tasks"`
+	Volumes     pq.StringArray `db:"volumes"`
+	Node        string         `db:"node_id"`
+	Retry       []byte         `db:"retry"`
+	Limits      []byte         `db:"limits"`
 }
 
 type jobRecord struct {
@@ -48,6 +65,75 @@ type nodeRecord struct {
 	LastHeartbeatAt time.Time `db:"last_heartbeat_at"`
 	CPUPercent      float64   `db:"cpu_percent"`
 	Queue           string    `db:"queue"`
+}
+
+func (r taskRecord) toTask() (task.Task, error) {
+	var env map[string]string
+	if r.Env != nil {
+		if err := json.Unmarshal(r.Env, &env); err != nil {
+			return task.Task{}, errors.Wrapf(err, "error deserializing task.env")
+		}
+	}
+	var pre []task.Task
+	if r.Pre != nil {
+		if err := json.Unmarshal(r.Pre, &pre); err != nil {
+			return task.Task{}, errors.Wrapf(err, "error deserializing task.pre")
+		}
+	}
+	var post []task.Task
+	if r.Post != nil {
+		if err := json.Unmarshal(r.Post, &post); err != nil {
+			return task.Task{}, errors.Wrapf(err, "error deserializing task.post")
+		}
+	}
+	var retry *task.Retry
+	if r.Retry != nil {
+		retry = &task.Retry{}
+		if err := json.Unmarshal(r.Retry, retry); err != nil {
+			return task.Task{}, errors.Wrapf(err, "error deserializing task.retry")
+		}
+	}
+	var limits *task.Limits
+	if r.Limits != nil {
+		limits = &task.Limits{}
+		if err := json.Unmarshal(r.Limits, limits); err != nil {
+			return task.Task{}, errors.Wrapf(err, "error deserializing task.limits")
+		}
+	}
+	var result []byte
+	var err error
+	if r.Result != "" {
+		result, err = base64.StdEncoding.DecodeString(r.Result)
+		if err != nil {
+			return task.Task{}, errors.Wrapf(err, "error base64 decoding task.result")
+		}
+	}
+	return task.Task{
+		ID:          r.ID,
+		JobID:       r.JobID,
+		Position:    r.Position,
+		Name:        r.Name,
+		State:       task.State(r.State),
+		CreatedAt:   &r.CreatedAt,
+		ScheduledAt: r.ScheduledAt,
+		StartedAt:   r.StartedAt,
+		CompletedAt: r.CompletedAt,
+		FailedAt:    r.FailedAt,
+		CMD:         r.CMD,
+		Entrypoint:  r.Entrypoint,
+		Run:         r.Run,
+		Image:       r.Image,
+		Env:         env,
+		Queue:       r.Queue,
+		Result:      string(result),
+		Error:       r.Error,
+		Pre:         pre,
+		Post:        post,
+		Volumes:     r.Volumes,
+		Node:        r.Node,
+		Retry:       retry,
+		Limits:      limits,
+	}, nil
 }
 
 func (r nodeRecord) toNode() node.Node {
@@ -93,15 +179,96 @@ func (ds *PostgresDatastore) CreateSchema() error {
 }
 
 func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error {
-	bytez, err := json.Marshal(t)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize task")
+	var env *string
+	if t.Env != nil {
+		b, err := json.Marshal(t.Env)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.env")
+		}
+		s := string(b)
+		env = &s
 	}
-	q := `insert into tasks 
-	       (id,created_at,state,serialized,job_id,position) 
-	      values
-	       ($1,$2,$3,$4,$5,$6)`
-	_, err = ds.db.Exec(q, t.ID, t.CreatedAt, t.State, (bytez), t.JobID, t.Position)
+	pre, err := json.Marshal(t.Pre)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize task.pre")
+	}
+	post, err := json.Marshal(t.Post)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize task.post")
+	}
+	var retry *string
+	if t.Retry != nil {
+		b, err := json.Marshal(t.Retry)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.retry")
+		}
+		s := string(b)
+		retry = &s
+	}
+	var limits *string
+	if t.Limits != nil {
+		b, err := json.Marshal(t.Limits)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.limits")
+		}
+		s := string(b)
+		limits = &s
+	}
+	q := `insert into tasks (
+		    id, -- $1
+			job_id, -- $2
+			position, -- $3
+			name, -- $4
+			state, -- $5
+			created_at, -- $6
+			scheduled_at, -- $7
+			started_at, -- $8
+			completed_at, -- $9
+			failed_at, -- $10
+			cmd, -- $11
+			entrypoint, -- $12
+			run_script, -- $13
+			image, -- $14
+			env, -- $15
+			queue, -- $16
+			result, -- $17
+			error_msg, -- $18
+			pre_tasks, -- $19
+			post_tasks, -- $20
+			volumes, -- $21
+			node_id, -- $22
+			retry, -- $23
+			limits -- $24
+		  ) 
+	      values (
+			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+			$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`
+	_, err = ds.db.Exec(q,
+		t.ID,                         // $1
+		t.JobID,                      // $2
+		t.Position,                   // $3
+		t.Name,                       // $4
+		t.State,                      // $5
+		t.CreatedAt,                  // $6
+		t.ScheduledAt,                // $7
+		t.StartedAt,                  // $8
+		t.CompletedAt,                // $9
+		t.FailedAt,                   // $10
+		pq.StringArray(t.CMD),        // $11
+		pq.StringArray(t.Entrypoint), // $12
+		t.Run,                        // $13
+		t.Image,                      // $14
+		env,                          // $15
+		t.Queue,                      // $16
+		t.Result,                     // $17
+		t.Error,                      // $18
+		pre,                          // $19
+		post,                         // $20
+		pq.StringArray(t.Volumes),    // $21
+		t.Node,                       // $22
+		retry,                        // $23
+		limits,                       // $24
+	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
 	}
@@ -109,18 +276,14 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 }
 
 func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (task.Task, error) {
-	tr := taskRecord{}
-	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1`, id); err != nil {
+	r := taskRecord{}
+	if err := ds.db.Get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
 			return task.Task{}, ErrNodeNotFound
 		}
 		return task.Task{}, errors.Wrapf(err, "error fetching task from db")
 	}
-	t := task.Task{}
-	if err := json.Unmarshal(tr.Serialized, &t); err != nil {
-		return task.Task{}, errors.Wrapf(err, "error desiralizing task")
-	}
-	return t, nil
+	return r.toTask()
 }
 
 func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task) error) error {
@@ -132,24 +295,37 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
 		return errors.Wrapf(err, "error fetching task from db")
 	}
-	t := &task.Task{}
-	if err := json.Unmarshal(tr.Serialized, t); err != nil {
-		return errors.Wrapf(err, "error desiralizing task")
-	}
-	if err := modify(t); err != nil {
+	t, err := tr.toTask()
+	if err != nil {
 		return err
 	}
-	bytez, err := json.Marshal(t)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize task")
+	if err := modify(&t); err != nil {
+		return err
 	}
+	result := base64.StdEncoding.EncodeToString([]byte(t.Result))
 	q := `update tasks set 
-	        state = $1,
-			serialized = $2,
-			started_at = $3,
-			completed_at = $4
-		  where id = $5`
-	_, err = ds.db.Exec(q, t.State, (bytez), t.StartedAt, t.CompletedAt, t.ID)
+	        position = $1,
+	        state = $2,
+			scheduled_at = $3,
+			started_at = $4,
+			completed_at = $5,
+			failed_at = $6,
+			result = $7,
+			error_msg = $8,
+			node_id = $9			
+		  where id = $10`
+	_, err = ds.db.Exec(q,
+		t.Position,    // $1
+		t.State,       // $2
+		t.ScheduledAt, // $3
+		t.StartedAt,   // $4
+		t.CompletedAt, // $5
+		t.FailedAt,    // $6
+		result,        // $7
+		t.Error,       // $8
+		t.Node,        // $9
+		t.ID,          // $10
+	)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")
@@ -309,9 +485,9 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 	}
 	exec := make([]task.Task, len(rs))
 	for i, r := range rs {
-		t := task.Task{}
-		if err := json.Unmarshal(r.Serialized, &t); err != nil {
-			return job.Job{}, errors.Wrapf(err, "error desiralizing job execution task")
+		t, err := r.toTask()
+		if err != nil {
+			return job.Job{}, err
 		}
 		exec[i] = t
 	}
