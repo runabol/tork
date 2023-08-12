@@ -35,7 +35,7 @@ CREATE TABLE tasks (
     entrypoint    text[],
     run_script    text,
     image         varchar(256),
-    Env           jsonb,
+    env           jsonb,
     queue         varchar(256),
     result        text,
     error_msg     text,
