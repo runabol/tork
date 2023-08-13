@@ -20,7 +20,7 @@ func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 	assert.NoError(t, err)
 	processed := 0
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	b.SubscribeForTasks(qname, func(ctx context.Context, t task.Task) error {
+	b.SubscribeForTasks(qname, func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -54,7 +54,7 @@ func TestRabbitMQPublishAndSubsribeForHeartbeat(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := 0
-	b.SubscribeForHeartbeats(func(ctx context.Context, n node.Node) error {
+	b.SubscribeForHeartbeats(func(n node.Node) error {
 		processed = processed + 1
 		return nil
 	})
@@ -70,7 +70,7 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := 0
-	b.SubscribeForJobs(func(ctx context.Context, j job.Job) error {
+	b.SubscribeForJobs(func(j job.Job) error {
 		processed = processed + 1
 		return nil
 	})

@@ -45,6 +45,7 @@ type taskRecord struct {
 	Node        string         `db:"node_id"`
 	Retry       []byte         `db:"retry"`
 	Limits      []byte         `db:"limits"`
+	Timeout     string         `db:"timeout"`
 }
 
 type jobRecord struct {
@@ -133,6 +134,7 @@ func (r taskRecord) toTask() (task.Task, error) {
 		Node:        r.Node,
 		Retry:       retry,
 		Limits:      limits,
+		Timeout:     r.Timeout,
 	}, nil
 }
 
@@ -238,11 +240,12 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 			volumes, -- $21
 			node_id, -- $22
 			retry, -- $23
-			limits -- $24
+			limits, -- $24
+			timeout -- $25
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-			$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`
+			$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -268,6 +271,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 		t.Node,                       // $22
 		retry,                        // $23
 		limits,                       // $24
+		t.Timeout,                    // $25
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")

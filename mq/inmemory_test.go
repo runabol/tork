@@ -16,7 +16,7 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForTasks("test-queue", func(ctx context.Context, t task.Task) error {
+	b.SubscribeForTasks("test-queue", func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -51,7 +51,7 @@ func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForHeartbeats(func(ctx context.Context, n node.Node) error {
+	b.SubscribeForHeartbeats(func(n node.Node) error {
 		processed = processed + 1
 		return nil
 	})
@@ -66,7 +66,7 @@ func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForJobs(func(ctx context.Context, j job.Job) error {
+	b.SubscribeForJobs(func(j job.Job) error {
 		processed = processed + 1
 		return nil
 	})

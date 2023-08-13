@@ -65,24 +65,24 @@ func NewWorker(cfg Config) *Worker {
 	return w
 }
 
-func (w *Worker) handleTask(threadname string) func(ctx context.Context, t task.Task) error {
-	return func(ctx context.Context, t task.Task) error {
+func (w *Worker) handleTask(threadname string) func(t task.Task) error {
+	return func(t task.Task) error {
 		log.Debug().
 			Str("thread", threadname).
 			Str("task-id", t.ID).
 			Msg("received task")
 		switch t.State {
 		case task.Scheduled:
-			return w.runTask(ctx, t)
+			return w.runTask(t)
 		case task.Cancelled:
-			return w.cancelTask(ctx, t)
+			return w.cancelTask(t)
 		default:
 			return errors.Errorf("can't start a task in %s state", t.State)
 		}
 	}
 }
 
-func (w *Worker) cancelTask(ctx context.Context, t task.Task) error {
+func (w *Worker) cancelTask(t task.Task) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	rt, ok := w.tasks[t.ID]
@@ -95,8 +95,8 @@ func (w *Worker) cancelTask(ctx context.Context, t task.Task) error {
 	return nil
 }
 
-func (w *Worker) runTask(c context.Context, t task.Task) error {
-	ctx, cancel := context.WithCancel(c)
+func (w *Worker) runTask(t task.Task) error {
+	ctx, cancel := context.WithCancel(context.Background())
 	w.mu.Lock()
 	w.tasks[t.ID] = runningTask{
 		cancel: cancel,
@@ -205,7 +205,18 @@ func (w *Worker) doRunTask(ctx context.Context, t task.Task) (string, error) {
 		return "", err
 	}
 	t.Volumes = append(t.Volumes, fmt.Sprintf("%s:%s", rundir, "/tork"))
-	return w.runtime.Run(ctx, t)
+	// create timeout context -- if timeout is defined
+	rctx := ctx
+	if t.Timeout != "" {
+		dur, err := time.ParseDuration(t.Timeout)
+		if err != nil {
+			return "", errors.Wrapf(err, "invalid timeout duration: %s", t.Timeout)
+		}
+		tctx, cancel := context.WithTimeout(ctx, dur)
+		defer cancel()
+		rctx = tctx
+	}
+	return w.runtime.Run(rctx, t)
 }
 
 func deleteTempDir(dirname string) {

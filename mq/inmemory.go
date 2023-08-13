@@ -47,7 +47,7 @@ func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t task.T
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t task.Task) error) error {
+func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t task.Task) error) error {
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	b.mu.RLock()
 	q, ok := b.tasks[qname]
@@ -59,9 +59,8 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx contex
 		b.mu.Unlock()
 	}
 	go func() {
-		ctx := context.TODO()
 		for t := range q {
-			err := handler(ctx, t)
+			err := handler(t)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing task")
 			}
@@ -100,16 +99,15 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qi, nil
 }
 
-func (b *InMemoryBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {
+func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n node.Node) error {
 	b.hearbeats <- n
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n node.Node) error) error {
+func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error) error {
 	go func() {
-		ctx := context.TODO()
 		for n := range b.hearbeats {
-			err := handler(ctx, n)
+			err := handler(n)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing registration")
 			}
@@ -122,11 +120,10 @@ func (b *InMemoryBroker) PublishJob(ctx context.Context, j job.Job) error {
 	b.jobs <- j
 	return nil
 }
-func (b *InMemoryBroker) SubscribeForJobs(handler func(ctx context.Context, j job.Job) error) error {
+func (b *InMemoryBroker) SubscribeForJobs(handler func(j job.Job) error) error {
 	go func() {
-		ctx := context.TODO()
 		for j := range b.jobs {
-			err := handler(ctx, j)
+			err := handler(j)
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing job")
 			}

@@ -73,7 +73,8 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}, nil
 }
 
-func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handlePendingTask(t task.Task) error {
+	ctx := context.Background()
 	log.Info().
 		Str("task-id", t.ID).
 		Msg("routing task")
@@ -95,7 +96,8 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error 
 	return c.broker.PublishTask(ctx, qname, t)
 }
 
-func (c *Coordinator) handleStartedTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handleStartedTask(t task.Task) error {
+	ctx := context.Background()
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task start")
@@ -112,7 +114,8 @@ func (c *Coordinator) handleStartedTask(ctx context.Context, t task.Task) error 
 	})
 }
 
-func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handleCompletedTask(t task.Task) error {
+	ctx := context.Background()
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -151,12 +154,13 @@ func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) erro
 		if err := c.ds.CreateTask(ctx, next); err != nil {
 			return err
 		}
-		return c.handlePendingTask(ctx, next)
+		return c.handlePendingTask(next)
 	}
 	return nil
 }
 
-func (c *Coordinator) handleFailedTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) handleFailedTask(t task.Task) error {
+	ctx := context.Background()
 	log.Error().
 		Str("task-id", t.ID).
 		Str("task-error", t.Error).
@@ -202,7 +206,8 @@ func (c *Coordinator) handleFailedTask(ctx context.Context, t task.Task) error {
 	})
 }
 
-func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
+func (c *Coordinator) handleHeartbeats(n node.Node) error {
+	ctx := context.Background()
 	n.LastHeartbeatAt = time.Now().UTC()
 	_, err := c.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
@@ -223,7 +228,8 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 
 }
 
-func (c *Coordinator) handleJobs(ctx context.Context, j job.Job) error {
+func (c *Coordinator) handleJobs(j job.Job) error {
+	ctx := context.Background()
 	log.Debug().Msgf("starting job %s", j.ID)
 	now := time.Now().UTC()
 	t := j.Tasks[0]
@@ -243,7 +249,7 @@ func (c *Coordinator) handleJobs(ctx context.Context, j job.Job) error {
 	}); err != nil {
 		return err
 	}
-	return c.handlePendingTask(ctx, t)
+	return c.handlePendingTask(t)
 }
 
 func (c *Coordinator) Start() error {

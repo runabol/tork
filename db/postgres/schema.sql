@@ -44,7 +44,8 @@ CREATE TABLE tasks (
     volumes       text[],
     node_id       varchar(32),
     retry         jsonb,
-    limits        jsonb
+    limits        jsonb,
+    timeout       varchar(8)
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
