@@ -2,11 +2,12 @@ package datastore
 
 import (
 	"context"
-	"errors"
+
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/tork/job"
 	"github.com/tork/node"
 	"github.com/tork/task"
@@ -67,6 +68,10 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	ds.nmu.Lock()
 	defer ds.nmu.Unlock()
+	_, ok := ds.nodes[n.ID]
+	if ok {
+		return errors.Errorf("node %s already exists", n.ID)
+	}
 	ds.nodes[n.ID] = n
 	return nil
 }
