@@ -10,7 +10,7 @@ A Golang based high-performance, scalable and distributed job execution engine.
 - Automatic recovery of tasks in the event of a worker crash
 - Supports both stand-alone and [distributed](#running-in-a-distributed-mode) setup
 - Retry failed tasks
-- Pre/Post tasks
+- [Pre/Post tasks](#a-slightly-more-interesting-example)
 - No single point of failure.
 
 # Architecture
