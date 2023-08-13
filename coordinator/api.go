@@ -70,7 +70,7 @@ func (s *api) listQueues(c *gin.Context) {
 }
 
 func (s *api) listActiveNodes(c *gin.Context) {
-	nodes, err := s.ds.GetActiveNodes(c, time.Now().Add(-node.LAST_HEARTBEAT_TIMEOUT))
+	nodes, err := s.ds.GetActiveNodes(c, time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return

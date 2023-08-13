@@ -54,7 +54,7 @@ func NewWorker(cfg Config) *Worker {
 	}
 	w := &Worker{
 		id:        uuid.NewUUID(),
-		startTime: time.Now(),
+		startTime: time.Now().UTC(),
 		broker:    cfg.Broker,
 		runtime:   cfg.Runtime,
 		queues:    cfg.Queues,
@@ -107,7 +107,7 @@ func (w *Worker) runTask(c context.Context, t task.Task) error {
 		defer w.mu.Unlock()
 		delete(w.tasks, t.ID)
 	}()
-	started := time.Now()
+	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.State = task.Running
 	t.Node = w.id
@@ -141,7 +141,7 @@ func (w *Worker) runTask(c context.Context, t task.Task) error {
 		pre.Volumes = t.Volumes
 		pre.Limits = t.Limits
 		result, err := w.doRunTask(ctx, pre)
-		finished := time.Now()
+		finished := time.Now().UTC()
 		if err != nil {
 			// we also want to mark the
 			// actual task as FAILED
@@ -157,7 +157,7 @@ func (w *Worker) runTask(c context.Context, t task.Task) error {
 	}
 	// run the actual task
 	result, err := w.doRunTask(ctx, t)
-	finished := time.Now()
+	finished := time.Now().UTC()
 	if err != nil {
 		t.State = task.Failed
 		t.Error = err.Error()
@@ -172,7 +172,7 @@ func (w *Worker) runTask(c context.Context, t task.Task) error {
 		post.Volumes = t.Volumes
 		post.Limits = t.Limits
 		result, err := w.doRunTask(ctx, post)
-		finished := time.Now()
+		finished := time.Now().UTC()
 		if err != nil {
 			// we also want to mark the
 			// actual task as FAILED

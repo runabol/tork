@@ -49,11 +49,11 @@ func Test_getActiveNodes(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	active := node.Node{
 		ID:              "1234",
-		LastHeartbeatAt: time.Now(),
+		LastHeartbeatAt: time.Now().UTC(),
 	}
 	inactive := node.Node{
 		ID:              "2345",
-		LastHeartbeatAt: time.Now().Add(-time.Hour),
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Hour),
 	}
 	err := ds.CreateNode(context.Background(), active)
 	assert.NoError(t, err)
