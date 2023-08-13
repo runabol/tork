@@ -20,7 +20,7 @@ import (
 
 func Test_getQueues(t *testing.T) {
 	b := mq.NewInMemoryBroker()
-	err := b.SubscribeForTasks("some-queue", func(ctx context.Context, t task.Task) error {
+	err := b.SubscribeForTasks("some-queue", func(t task.Task) error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -214,6 +214,16 @@ func Test_validateTaskRetry(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
+	err = validateTask(task.Task{
+		Image:   "some:image",
+		Timeout: "-10s",
+	})
+	assert.Error(t, err)
+	err = validateTask(task.Task{
+		Image:   "some:image",
+		Timeout: "10s",
+	})
+	assert.NoError(t, err)
 }
 
 func Test_validateTaskBasic(t *testing.T) {

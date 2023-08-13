@@ -112,6 +112,15 @@ func validateTask(t task.Task) error {
 			return errors.Errorf("can't specify retry.initialDelay greater than 5 minutes")
 		}
 	}
+	if t.Timeout != "" {
+		timeout, err := time.ParseDuration(t.Timeout)
+		if err != nil {
+			return errors.Errorf("invalid timeout duration: %s", t.Timeout)
+		}
+		if timeout < 0 {
+			return errors.Errorf("invalid timeout duration: %s", t.Timeout)
+		}
+	}
 	return nil
 }
 

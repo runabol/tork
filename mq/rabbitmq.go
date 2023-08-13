@@ -86,8 +86,8 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t task.T
 	return b.publish(ctx, qname, t)
 }
 
-func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx context.Context, t task.Task) error) error {
-	return b.subscribe(qname, func(ctx context.Context, body []byte) error {
+func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t task.Task) error) error {
+	return b.subscribe(qname, func(body []byte) error {
 		t := task.Task{}
 		if err := json.Unmarshal(body, &t); err != nil {
 			log.Error().
@@ -95,11 +95,11 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(ctx contex
 				Str("body", string(body)).
 				Msg("unable to deserialize task")
 		}
-		return handler(ctx, t)
+		return handler(t)
 	})
 }
 
-func (b *RabbitMQBroker) subscribe(qname string, handler func(ctx context.Context, body []byte) error) error {
+func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
 	log.Debug().Msgf("Subscribing for queue: %s", qname)
 	ch, err := b.sconn.Channel()
 	if err != nil {
@@ -125,8 +125,7 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(ctx context.Contex
 	}
 	go func() {
 		for d := range msgs {
-			ctx := context.TODO()
-			if err := handler(ctx, d.Body); err != nil {
+			if err := handler(d.Body); err != nil {
 				log.Error().
 					Err(err).
 					Str("queue", qname).
@@ -204,8 +203,8 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context, n node.Node) error) error {
-	return b.subscribe(QUEUE_HEARBEAT, func(ctx context.Context, body []byte) error {
+func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n node.Node) error) error {
+	return b.subscribe(QUEUE_HEARBEAT, func(body []byte) error {
 		n := node.Node{}
 		if err := json.Unmarshal(body, &n); err != nil {
 			log.Error().
@@ -213,15 +212,15 @@ func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(ctx context.Context
 				Str("body", string(body)).
 				Msg("unable to deserialize node")
 		}
-		return handler(ctx, n)
+		return handler(n)
 	})
 }
 
 func (b *RabbitMQBroker) PublishJob(ctx context.Context, j job.Job) error {
 	return b.publish(ctx, QUEUE_JOBS, j)
 }
-func (b *RabbitMQBroker) SubscribeForJobs(handler func(ctx context.Context, j job.Job) error) error {
-	return b.subscribe(QUEUE_JOBS, func(ctx context.Context, body []byte) error {
+func (b *RabbitMQBroker) SubscribeForJobs(handler func(j job.Job) error) error {
+	return b.subscribe(QUEUE_JOBS, func(body []byte) error {
 		j := job.Job{}
 		if err := json.Unmarshal(body, &j); err != nil {
 			log.Error().
@@ -229,6 +228,6 @@ func (b *RabbitMQBroker) SubscribeForJobs(handler func(ctx context.Context, j jo
 				Str("body", string(body)).
 				Msg("unable to deserialize job")
 		}
-		return handler(ctx, j)
+		return handler(j)
 	})
 }

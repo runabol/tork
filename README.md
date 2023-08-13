@@ -12,6 +12,7 @@ A Golang based high-performance, scalable and distributed job execution engine.
 - Retry failed tasks
 - [Pre/Post tasks](#a-slightly-more-interesting-example)
 - No single point of failure.
+- Task timeout
 
 # Architecture
 
@@ -326,6 +327,7 @@ task properties:
     initialDelay: 5s # optional: default 1s (max: 5m)
     scalingFactor: # optional: default 2 (max: 10)
   ```
+- `timeout` - the amount of time (specified as `300ms` or `1h` or `45m` etc.) that a task may execute before it is cancelled.
 
 **Examples:**
 
@@ -362,15 +364,15 @@ tasks:
 HTTP 200
 
 {
-	"id": "68c602bed6d34d7f9130bfa13786e422",
-	"name": "sample job",
-	"state": "PENDING",
-	"createdAt": "2023-08-12T15:55:12.143998-04:00",
-	"tasks": [{
-		"name": "sample task",
-		"run": "echo hello world",
-		"image": "ubuntu:mantic,"
-	}]
+  "id": "68c602bed6d34d7f9130bfa13786e422",
+  "name": "sample job",
+  "state": "PENDING",
+  "createdAt": "2023-08-12T15:55:12.143998-04:00",
+  "tasks": [{
+    "name": "sample task",
+    "run": "echo hello world",
+    "image": "ubuntu:mantic,"
+  }]
 }
 ```
 

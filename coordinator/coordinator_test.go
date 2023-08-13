@@ -46,7 +46,7 @@ func Test_handlePendingTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks("test-queue", func(ctx context.Context, t task.Task) error {
+	err := b.SubscribeForTasks("test-queue", func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -68,7 +68,7 @@ func Test_handlePendingTask(t *testing.T) {
 	err = ds.CreateTask(ctx, tk)
 	assert.NoError(t, err)
 
-	err = c.handlePendingTask(ctx, tk)
+	err = c.handlePendingTask(tk)
 	assert.NoError(t, err)
 
 	// wait for the task to get processed
@@ -105,7 +105,7 @@ func Test_handleStartedTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = c.handleStartedTask(ctx, t1)
+	err = c.handleStartedTask(t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -158,7 +158,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = c.handleCompletedTask(ctx, t1)
+	err = c.handleCompletedTask(t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -217,7 +217,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = c.handleCompletedTask(ctx, t1)
+	err = c.handleCompletedTask(t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -273,7 +273,7 @@ func Test_handleFailedTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = c.handleFailedTask(ctx, t1)
+	err = c.handleFailedTask(t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -294,7 +294,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(ctx context.Context, t task.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -341,7 +341,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = c.handleFailedTask(ctx, t1)
+	err = c.handleFailedTask(t1)
 	assert.NoError(t, err)
 
 	// wait for the retry delay
@@ -379,7 +379,7 @@ func Test_handleHeartbeat(t *testing.T) {
 		CPUPercent:      75,
 	}
 
-	err = c.handleHeartbeats(ctx, n1)
+	err = c.handleHeartbeats(n1)
 	assert.NoError(t, err)
 
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
@@ -413,7 +413,7 @@ func Test_handleJobs(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = c.handleJobs(ctx, j1)
+	err = c.handleJobs(j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)

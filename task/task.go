@@ -44,6 +44,7 @@ type Task struct {
 	Node        string            `json:"node,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty"`
 	Limits      *Limits           `json:"limits,omitempty"`
+	Timeout     string            `json:"timeout,omitempty"`
 }
 
 const (
