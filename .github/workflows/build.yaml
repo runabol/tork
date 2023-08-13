@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres
+        image: postgres:15.3
         env:
           POSTGRES_DB: tork        
           POSTGRES_PASSWORD: tork
@@ -21,6 +21,11 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3

@@ -3,6 +3,9 @@ package mq
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -19,6 +22,7 @@ type RabbitMQBroker struct {
 	sconn  *amqp.Connection
 	queues map[string]string
 	qmu    sync.RWMutex
+	url    string
 }
 
 func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
@@ -34,12 +38,50 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 		pconn:  pconn,
 		sconn:  sconn,
 		queues: make(map[string]string),
+		url:    url,
 	}, nil
 }
 
 func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
-	return make([]QueueInfo, 0), nil
+	u, err := url.Parse(b.url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to parse url: %s", b.url)
+	}
+	manager := fmt.Sprintf("http://%s:15672/api/queues/", u.Hostname())
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", manager, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to build get queues request")
+	}
+	pw, _ := u.User.Password()
+	req.SetBasicAuth(u.User.Username(), pw)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting rabbitmq queues from the API")
+	}
+
+	type rabbitq struct {
+		Name     string `json:"name"`
+		Messages int    `json:"messages"`
+	}
+
+	rqs := make([]rabbitq, 0)
+	err = json.NewDecoder(resp.Body).Decode(&rqs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error unmarshalling API response")
+	}
+
+	qis := make([]QueueInfo, len(rqs))
+	for i, rq := range rqs {
+		qis[i] = QueueInfo{
+			Name: rq.Name,
+			Size: rq.Messages,
+		}
+	}
+
+	return qis, nil
 }
+
 func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t task.Task) error {
 	return b.publish(ctx, qname, t)
 }
