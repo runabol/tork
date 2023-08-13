@@ -56,6 +56,10 @@ tasks:
     image: ubuntu:mantic
     run: |
       echo -n hello world
+  - name: say goodbye
+    image: ubuntu:mantic
+    run: |
+      echo -n bye world
 ```
 
 ```bash
