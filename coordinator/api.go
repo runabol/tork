@@ -40,7 +40,7 @@ func newAPI(cfg Config) *api {
 		ds: cfg.DataStore,
 	}
 	r.GET("/status", s.status)
-	r.PUT("/task/:id/cancel", s.cancelTask)
+	r.PUT("/task/:id/cancel", s.cancelTask) // TODO: replace with /job/:id/cancel
 	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
 	r.GET("/node", s.listActiveNodes)
