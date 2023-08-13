@@ -276,7 +276,7 @@ limits:
 
 Each task can define a set of tasks that will be executed prior to its execution (`pre`), and after its execution (`post`).
 
-`pre`/`post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
+The `pre` and `post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
 
 Additionally, any `volumes` defined are also accessible to the `pre` and `post` tasks.
 
