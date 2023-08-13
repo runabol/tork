@@ -82,7 +82,7 @@ func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error 
 		qname = mq.QUEUE_DEFAULT
 	}
 	t.State = task.Scheduled
-	n := time.Now()
+	n := time.Now().UTC()
 	t.ScheduledAt = &n
 	t.State = task.Scheduled
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -127,7 +127,7 @@ func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) erro
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
 		u.Position = t.Position + 1
 		if u.Position > len(u.Tasks) {
-			now := time.Now()
+			now := time.Now().UTC()
 			u.State = job.Completed
 			u.CompletedAt = &now
 		}
@@ -141,7 +141,7 @@ func (c *Coordinator) handleCompletedTask(ctx context.Context, t task.Task) erro
 		return errors.Wrapf(err, "error getting job from datatstore")
 	}
 	if j.State == job.Running {
-		now := time.Now()
+		now := time.Now().UTC()
 		next := j.Tasks[j.Position-1]
 		next.ID = uuid.NewUUID()
 		next.JobID = j.ID
@@ -203,7 +203,7 @@ func (c *Coordinator) handleFailedTask(ctx context.Context, t task.Task) error {
 }
 
 func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
-	n.LastHeartbeatAt = time.Now()
+	n.LastHeartbeatAt = time.Now().UTC()
 	_, err := c.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
@@ -216,7 +216,7 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
 			Msg("received heartbeat")
-		u.LastHeartbeatAt = time.Now()
+		u.LastHeartbeatAt = time.Now().UTC()
 		u.CPUPercent = n.CPUPercent
 		return nil
 	})
@@ -225,7 +225,7 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 
 func (c *Coordinator) handleJobs(ctx context.Context, j job.Job) error {
 	log.Debug().Msgf("starting job %s", j.ID)
-	now := time.Now()
+	now := time.Now().UTC()
 	t := j.Tasks[0]
 	t.ID = uuid.NewUUID()
 	t.JobID = j.ID
@@ -236,7 +236,7 @@ func (c *Coordinator) handleJobs(ctx context.Context, j job.Job) error {
 		return err
 	}
 	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
-		n := time.Now()
+		n := time.Now().UTC()
 		u.State = job.Running
 		u.StartedAt = &n
 		return nil

@@ -5,16 +5,36 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_DB: tork        
+          POSTGRES_PASSWORD: tork
+          POSTGRES_USER: tork
+          POSTGRES_PORT: 5432
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
-    - uses: actions/checkout@v3
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.20'
+      - name: Build Tork
+        run: go build -v ./...
 
-    - name: Build
-      run: go build -v ./...
+      - name: Run DB migration
+        run: go run cmd/main.go -mode migration -datastore postgres -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 
-    - name: Test
-      run: go test -v ./...
+      - name: Run tests
+        run: go test -v ./...

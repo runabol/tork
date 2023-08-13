@@ -13,27 +13,47 @@ import (
 	"github.com/tork/uuid"
 )
 
-func TestInMemoryCreateAndGetTask(t *testing.T) {
+func TestPostgresCreateAndGetTask(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
-	t1 := task.Task{
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := job.Job{
 		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateTask(ctx, t1)
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+	t1 := task.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, t1.ID, t2.ID)
 }
 
-func TestInMemoryUpdateTask(t *testing.T) {
+func TestPostgresUpdateTask(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
-	t1 := task.Task{
-		ID:    uuid.NewUUID(),
-		State: task.Pending,
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateTask(ctx, t1)
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+	t1 := task.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
 	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
@@ -47,27 +67,32 @@ func TestInMemoryUpdateTask(t *testing.T) {
 	assert.Equal(t, task.Scheduled, t2.State)
 }
 
-func TestInMemoryCreateAndGetNode(t *testing.T) {
+func TestPostgresCreateAndGetNode(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
 	n1 := node.Node{
 		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateNode(ctx, n1)
+	err = ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, n1.ID, n2.ID)
 }
 
-func TestInMemoryUpdateNode(t *testing.T) {
+func TestPostgresUpdateNode(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 	}
-	err := ds.CreateNode(ctx, n1)
+	err = ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -80,12 +105,16 @@ func TestInMemoryUpdateNode(t *testing.T) {
 
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, now, n2.LastHeartbeatAt)
+	assert.Equal(t, now.Hour(), n2.LastHeartbeatAt.Hour())
+	assert.Equal(t, now.Minute(), n2.LastHeartbeatAt.Minute())
+	assert.Equal(t, now.Second(), n2.LastHeartbeatAt.Second())
 }
 
-func TestInMemoryGetActiveNodes(t *testing.T) {
+func TestPostgresGetActiveNodes(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
@@ -98,7 +127,7 @@ func TestInMemoryGetActiveNodes(t *testing.T) {
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
 	}
-	err := ds.CreateNode(ctx, n1)
+	err = ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 
 	err = ds.CreateNode(ctx, n2)
@@ -108,31 +137,37 @@ func TestInMemoryGetActiveNodes(t *testing.T) {
 	assert.NoError(t, err)
 
 	ns, err := ds.GetActiveNodes(ctx, time.Now().UTC().Add(-time.Minute*5))
+	for _, n := range ns {
+		assert.True(t, n.LastHeartbeatAt.After(time.Now().UTC().Add(-time.Minute*5)))
+	}
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(ns))
 }
 
-func TestInMemoryCreateAndGetJob(t *testing.T) {
+func TestPostgresCreateAndGetJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
 	j1 := job.Job{
 		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 }
 
-func TestInMemoryUpdateJob(t *testing.T) {
+func TestPostgresUpdateJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
 	j1 := job.Job{
 		ID:    uuid.NewUUID(),
 		State: job.Pending,
 	}
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {

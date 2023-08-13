@@ -93,7 +93,7 @@ func Test_handleStartedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	t1 := task.Task{
 		ID:        uuid.NewUUID(),
@@ -127,7 +127,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	j1 := job.Job{
 		ID:       uuid.NewUUID(),
@@ -186,7 +186,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	j1 := job.Job{
 		ID:       uuid.NewUUID(),
@@ -245,7 +245,7 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	j1 := job.Job{
 		ID:       uuid.NewUUID(),
@@ -308,7 +308,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	j1 := job.Job{
 		ID:       uuid.NewUUID(),
@@ -375,7 +375,7 @@ func Test_handleHeartbeat(t *testing.T) {
 
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
-		LastHeartbeatAt: time.Now().Add(-time.Minute),
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 		CPUPercent:      75,
 	}
 
