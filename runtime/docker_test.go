@@ -1,10 +1,13 @@
 package runtime
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tork/task"
+	"github.com/tork/uuid"
 )
 
 func TestParseCPUs(t *testing.T) {
@@ -37,4 +40,54 @@ func TestParseMemory(t *testing.T) {
 	parsed, err = parseMemory(&task.Limits{Memory: "1B"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), parsed)
+}
+
+func TestNewDockerRuntime(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+}
+
+func TestRunTask(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	output, err := rt.Run(context.Background(), task.Task{
+		Image: "ubuntu:mantic",
+		CMD:   []string{"ls"},
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, output)
+}
+
+func TestRunTaskWithTimeout(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = rt.Run(ctx, task.Task{
+		Image: "ubuntu:mantic",
+		CMD:   []string{"sleep", "10"},
+	})
+	assert.Error(t, err)
+}
+
+func TestRunAndStopTask(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	t1 := task.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		CMD:   []string{"sleep", "10"},
+	}
+	go func() {
+		_, err = rt.Run(context.Background(), t1)
+		assert.Error(t, err)
+	}()
+	// give the task a chance to get started
+	time.Sleep(time.Second)
+	err = rt.Stop(context.Background(), t1)
+	assert.NoError(t, err)
 }
