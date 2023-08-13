@@ -124,6 +124,7 @@ func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j job.Job) error {
 	ds.jobs[j.ID] = j
 	return nil
 }
+
 func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error {
 	ds.jmu.Lock()
 	defer ds.jmu.Unlock()
@@ -137,6 +138,7 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	ds.jobs[j.ID] = j
 	return nil
 }
+
 func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (job.Job, error) {
 	ds.jmu.RLock()
 	defer ds.jmu.RUnlock()
