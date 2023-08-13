@@ -34,9 +34,14 @@ func Test_getQueues(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	qs := []mq.QueueInfo{}
+	err = json.Unmarshal(body, &qs)
+	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `[{"Name":"some-queue","Size":0}]`, string(body))
+	assert.Equal(t, 3, len(qs))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 

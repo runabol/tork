@@ -2,13 +2,17 @@ package mq
 
 import (
 	"context"
+
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/tork/job"
 	"github.com/tork/node"
 	"github.com/tork/task"
 )
+
+const defaultQueueSize = 10
 
 // InMemoryBroker a very simple implementation of the Broker interface
 // which uses in-memory channels to exchange messages. Meant for local
@@ -23,8 +27,8 @@ type InMemoryBroker struct {
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
 		tasks:     make(map[string]chan task.Task),
-		hearbeats: make(chan node.Node, 10),
-		jobs:      make(chan job.Job, 10),
+		hearbeats: make(chan node.Node, defaultQueueSize),
+		jobs:      make(chan job.Job, defaultQueueSize),
 	}
 }
 
@@ -35,7 +39,7 @@ func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t task.T
 	b.mu.RUnlock()
 	if !ok {
 		b.mu.Lock()
-		q = make(chan task.Task, 10)
+		q = make(chan task.Task, defaultQueueSize)
 		b.tasks[qname] = q
 		b.mu.Unlock()
 	}
@@ -66,16 +70,34 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(ctx contex
 	return nil
 }
 
+func (b *InMemoryBroker) Queue(ctx context.Context, qname string) (QueueInfo, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	switch qname {
+	case QUEUE_JOBS:
+		return QueueInfo{Name: QUEUE_JOBS, Size: len(b.jobs)}, nil
+	case QUEUE_HEARBEAT:
+		return QueueInfo{Name: QUEUE_HEARBEAT, Size: len(b.hearbeats)}, nil
+	default:
+		q, ok := b.tasks[qname]
+		if !ok {
+			return QueueInfo{}, errors.Errorf("unknown queue: %s", qname)
+		}
+		return QueueInfo{Name: qname, Size: len(q)}, nil
+	}
+}
+
 func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	keys := make([]QueueInfo, len(b.tasks))
-	i := 0
+	qi := make([]QueueInfo, 0)
 	for k := range b.tasks {
-		keys[i] = QueueInfo{Name: k, Size: len(b.tasks[k])}
-		i++
+		qi = append(qi, QueueInfo{Name: k, Size: len(b.tasks[k])})
+
 	}
-	return keys, nil
+	qi = append(qi, QueueInfo{Name: QUEUE_JOBS, Size: len(b.jobs)})
+	qi = append(qi, QueueInfo{Name: QUEUE_HEARBEAT, Size: len(b.hearbeats)})
+	return qi, nil
 }
 
 func (b *InMemoryBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {

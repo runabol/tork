@@ -35,7 +35,13 @@ type Config struct {
 	Queues    map[string]int
 }
 
-func NewCoordinator(cfg Config) *Coordinator {
+func NewCoordinator(cfg Config) (*Coordinator, error) {
+	if cfg.Broker == nil {
+		return nil, errors.New("most provide a broker")
+	}
+	if cfg.DataStore == nil {
+		return nil, errors.New("most provide a datastore")
+	}
 	name := fmt.Sprintf("coordinator-%s", uuid.NewUUID())
 	if len(cfg.Queues) == 0 {
 		cfg.Queues = make(map[string]int)
@@ -64,7 +70,7 @@ func NewCoordinator(cfg Config) *Coordinator {
 		broker: cfg.Broker,
 		ds:     cfg.DataStore,
 		queues: cfg.Queues,
-	}
+	}, nil
 }
 
 func (c *Coordinator) handlePendingTask(ctx context.Context, t task.Task) error {
@@ -98,7 +104,7 @@ func (c *Coordinator) handleStartedTask(ctx context.Context, t task.Task) error 
 		// if an out-of-order task completion/failure
 		// arrived earlier
 		if u.State == task.Scheduled {
-			u.State = t.State
+			u.State = task.Running
 			u.StartedAt = t.StartedAt
 			u.Node = t.Node
 		}
@@ -169,7 +175,7 @@ func (c *Coordinator) handleFailedTask(ctx context.Context, t task.Task) error {
 		if err != nil {
 			return errors.Wrapf(err, "invalid retry.initialDelay: %s", rt.Retry.InitialDelay)
 		}
-		go func() {
+		go func() { // TODO: push the delay implementation to the broker
 			delay := dur * time.Duration(math.Pow(float64(rt.Retry.ScalingFactor), float64(rt.Retry.Attempts-1)))
 			log.Debug().Msgf("delaying retry %s", delay)
 			time.Sleep(delay)
@@ -210,7 +216,7 @@ func (c *Coordinator) handleHeartbeats(ctx context.Context, n node.Node) error {
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
 			Msg("received heartbeat")
-		u.LastHeartbeatAt = n.LastHeartbeatAt
+		u.LastHeartbeatAt = time.Now()
 		u.CPUPercent = n.CPUPercent
 		return nil
 	})
