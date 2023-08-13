@@ -254,11 +254,14 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Contex
 	if err != nil {
 		return nil, err
 	}
-	c := coordinator.NewCoordinator(coordinator.Config{
+	c, err := coordinator.NewCoordinator(coordinator.Config{
 		Broker:    broker,
 		DataStore: ds,
 		Queues:    queues,
 	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating the coordinator")
+	}
 	if err := c.Start(); err != nil {
 		return nil, err
 	}

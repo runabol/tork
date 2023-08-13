@@ -35,6 +35,9 @@ func NewInMemoryDatastore() *InMemoryDatastore {
 }
 
 func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t task.Task) error {
+	if t.ID == "" {
+		return errors.New("must provide ID")
+	}
 	ds.tmu.Lock()
 	defer ds.tmu.Unlock()
 	ds.tasks[t.ID] = t
