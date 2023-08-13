@@ -1,0 +1,78 @@
+package mq_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/tork/job"
+	"github.com/tork/mq"
+	"github.com/tork/node"
+	"github.com/tork/task"
+)
+
+func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := 0
+	b.SubscribeForTasks("test-queue", func(ctx context.Context, t task.Task) error {
+		processed = processed + 1
+		return nil
+	})
+	err := b.PublishTask(ctx, "test-queue", task.Task{})
+	// wait for task to be processed
+	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, processed)
+}
+
+func TestInMemoryGetQueue(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	err := b.PublishTask(ctx, "test-queue", task.Task{})
+	assert.NoError(t, err)
+	qi, err := b.Queue(ctx, "test-queue")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, qi.Size)
+}
+
+func TestInMemoryGetQueues(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	err := b.PublishTask(ctx, "test-queue", task.Task{})
+	assert.NoError(t, err)
+	qis, err := b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(qis))
+}
+
+func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := 0
+	b.SubscribeForHeartbeats(func(ctx context.Context, n node.Node) error {
+		processed = processed + 1
+		return nil
+	})
+	err := b.PublishHeartbeat(ctx, node.Node{})
+	// wait for heartbeat to be processed
+	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, processed)
+}
+
+func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := 0
+	b.SubscribeForJobs(func(ctx context.Context, j job.Job) error {
+		processed = processed + 1
+		return nil
+	})
+	err := b.PublishJob(ctx, job.Job{})
+	// wait for heartbeat to be processed
+	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, processed)
+}
