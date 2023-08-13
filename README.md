@@ -272,6 +272,36 @@ limits:
   memory: 10m
 ```
 
+Pre/Post
+Each task can define a set of tasks that will be executed prior to its execution (`pre`), and after its execution (`post`).
+
+`pre`/`post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
+
+Additionally, any `volumes` defined are also accessible to the `pre` and `post` tasks.
+
+```yaml
+- name: convert the first 5 seconds of a video
+  image: jrottenberg/ffmpeg:3.4-alpine
+  run: |
+    ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
+  volumes:
+    - /tmp
+  pre:
+    - name: download the remote file
+      image: alpine:3.18.3
+      run: |
+        wget \
+         https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
+         -O /tmp/input.ogv
+  post:
+    - name: upload the converted file
+      image: alpine:3.18.3
+      run: |
+        wget \
+        --post-file=/tmp/output.mp4 \
+        https://devnull-as-a-service.com/dev/null
+```
+
 # REST API
 
 ## Submit a job
