@@ -10,7 +10,7 @@ A Golang based high-performance, scalable and distributed job execution engine.
 - Automatic recovery of tasks in the event of a worker crash
 - Supports both stand-alone and [distributed](#running-in-a-distributed-mode) setup
 - Retry failed tasks
-- [Pre/Post tasks](#a-slightly-more-interesting-example)
+- [Pre/Post tasks](#prepost-tasks)
 - No single point of failure.
 - Task timeout
 
@@ -272,7 +272,8 @@ limits:
   memory: 10m
 ```
 
-Pre/Post
+# Pre/Post Tasks
+
 Each task can define a set of tasks that will be executed prior to its execution (`pre`), and after its execution (`post`).
 
 `pre`/`post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
