@@ -16,6 +16,7 @@ import (
 var ErrTaskNotFound = errors.New("task not found")
 var ErrNodeNotFound = errors.New("node not found")
 var ErrJobNotFound = errors.New("job not found")
+var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
 	tasks map[string]task.Task

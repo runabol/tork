@@ -413,7 +413,7 @@ func Test_handleJobs(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = c.handleJobs(j1)
+	err = c.handleJob(j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)

@@ -58,6 +58,8 @@ type jobRecord struct {
 	FailedAt    *time.Time `db:"failed_at"`
 	Tasks       []byte     `db:"tasks"`
 	Position    int        `db:"position"`
+	Inputs      []byte     `db:"inputs"`
+	Context     []byte     `db:"context"`
 }
 
 type nodeRecord struct {
@@ -148,7 +150,15 @@ func (r nodeRecord) toNode() node.Node {
 	}
 }
 
-func (r jobRecord) toJob(tasks, execution []task.Task) job.Job {
+func (r jobRecord) toJob(tasks, execution []task.Task) (job.Job, error) {
+	var c map[string]any
+	if err := json.Unmarshal(r.Context, &c); err != nil {
+		return job.Job{}, errors.Wrapf(err, "error deserializing task.context")
+	}
+	var inputs map[string]string
+	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
+		return job.Job{}, errors.Wrapf(err, "error deserializing task.inputs")
+	}
 	return job.Job{
 		ID:          r.ID,
 		Name:        r.Name,
@@ -160,7 +170,9 @@ func (r jobRecord) toJob(tasks, execution []task.Task) job.Job {
 		Tasks:       tasks,
 		Execution:   execution,
 		Position:    r.Position,
-	}
+		Context:     c,
+		Inputs:      inputs,
+	}, nil
 }
 
 func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
@@ -419,11 +431,19 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j job.Job) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize job.tasks")
 	}
+	c, err := json.Marshal(j.Context)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize job.context")
+	}
+	inputs, err := json.Marshal(j.Inputs)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize job.inputs")
+	}
 	q := `insert into jobs 
-	       (id,name,state,created_at,started_at,tasks,position) 
+	       (id,name,state,created_at,started_at,tasks,position,inputs,context) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
+	_, err = ds.db.Exec(q, j.ID, j.Name, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
@@ -442,18 +462,26 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
 		return errors.Wrapf(err, "error desiralizing job.tasks")
 	}
-	j := r.toJob(tasks, []task.Task{})
+	j, err := r.toJob(tasks, []task.Task{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to convert jobRecord")
+	}
 	if err := modify(&j); err != nil {
 		return err
+	}
+	c, err := json.Marshal(j.Context)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize job.context")
 	}
 	q := `update jobs set 
 	        state = $1,
 			started_at = $2,
 			completed_at = $3,
 			failed_at = $4,
-			position = $5
-		  where id = $6`
-	_, err = ds.db.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, j.ID)
+			position = $5,
+			context = $6
+		  where id = $7`
+	_, err = ds.db.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.ID)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")
@@ -478,7 +506,6 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
 		return job.Job{}, errors.Wrapf(err, "error desiralizing job.tasks")
 	}
-
 	rs := make([]taskRecord, 0)
 	q := `SELECT * 
 	      FROM tasks 
@@ -496,5 +523,5 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 		exec[i] = t
 	}
 
-	return r.toJob(tasks, exec), nil
+	return r.toJob(tasks, exec)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/tork/datastore"
+	"github.com/tork/eval"
 	"github.com/tork/job"
 	"github.com/tork/mq"
 	"github.com/tork/node"
@@ -151,6 +152,9 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 		next.State = task.Pending
 		next.Position = j.Position
 		next.CreatedAt = &now
+		if err := eval.Evaluate(&next, j.Context); err != nil {
+			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
+		}
 		if err := c.ds.CreateTask(ctx, next); err != nil {
 			return err
 		}
@@ -228,7 +232,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 
 }
 
-func (c *Coordinator) handleJobs(j job.Job) error {
+func (c *Coordinator) handleJob(j job.Job) error {
 	ctx := context.Background()
 	log.Debug().Msgf("starting job %s", j.ID)
 	now := time.Now().UTC()
@@ -238,6 +242,9 @@ func (c *Coordinator) handleJobs(j job.Job) error {
 	t.State = task.Pending
 	t.Position = 1
 	t.CreatedAt = &now
+	if err := eval.Evaluate(&t, j.Context); err != nil {
+		return errors.Wrapf(err, "error evaluating task")
+	}
 	if err := c.ds.CreateTask(ctx, t); err != nil {
 		return err
 	}
@@ -277,7 +284,7 @@ func (c *Coordinator) Start() error {
 			case mq.QUEUE_HEARBEAT:
 				err = c.broker.SubscribeForHeartbeats(c.handleHeartbeats)
 			case mq.QUEUE_JOBS:
-				err = c.broker.SubscribeForJobs(c.handleJobs)
+				err = c.broker.SubscribeForJobs(c.handleJob)
 			}
 			if err != nil {
 				return err

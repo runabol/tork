@@ -17,7 +17,9 @@ CREATE TABLE jobs (
     completed_at  timestamp,
     failed_at     timestamp,
     tasks         jsonb       not null,
-    position      int         not null
+    position      int         not null,
+    inputs        jsonb       not null,
+    context       jsonb       not null
 );
 
 CREATE TABLE tasks (
