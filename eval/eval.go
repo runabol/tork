@@ -27,12 +27,6 @@ func Evaluate(t *task.Task, c map[string]any) error {
 		return err
 	}
 	t.Queue = q
-	// evaluate the run script
-	run, err := evaluateTemplate(t.Run, c)
-	if err != nil {
-		return err
-	}
-	t.Run = run
 	// evaluate the env vars
 	env := t.Env
 	for k, v := range env {

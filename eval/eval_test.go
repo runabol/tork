@@ -72,7 +72,7 @@ func TestEvalQueue(t *testing.T) {
 	assert.Equal(t, "default", t1.Queue)
 }
 
-func TestEvalRun(t *testing.T) {
+func TestDontEvalRun(t *testing.T) {
 	t1 := &task.Task{
 		Run: "Hello {{ .NAME }}",
 	}
@@ -80,7 +80,7 @@ func TestEvalRun(t *testing.T) {
 		"NAME": "world",
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "Hello world", t1.Run)
+	assert.Equal(t, "Hello {{ .NAME }}", t1.Run)
 }
 
 func TestEvalVarInMap(t *testing.T) {

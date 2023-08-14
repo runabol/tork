@@ -60,12 +60,16 @@ inputs:
 tasks:
   - name: say hello
     image: ubuntu:mantic
+    env:
+      NAME: "{{ .inputs.name }}"
     run: |
-      echo -n hello {{ .inputs.name }}
+      echo -n hello $NAME
   - name: say goodbye
     image: ubuntu:mantic
+    env:
+      NAME: "{{ .inputs.name }}"
     run: |
-      echo -n bye {{ .inputs.name }}
+      echo -n bye $NAME
 ```
 
 ```bash
