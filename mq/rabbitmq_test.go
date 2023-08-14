@@ -20,10 +20,11 @@ func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 	assert.NoError(t, err)
 	processed := 0
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	b.SubscribeForTasks(qname, func(t task.Task) error {
+	err = b.SubscribeForTasks(qname, func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
+	assert.NoError(t, err)
 	err = b.PublishTask(ctx, qname, task.Task{})
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 100)
@@ -54,10 +55,11 @@ func TestRabbitMQPublishAndSubsribeForHeartbeat(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := 0
-	b.SubscribeForHeartbeats(func(n node.Node) error {
+	err = b.SubscribeForHeartbeats(func(n node.Node) error {
 		processed = processed + 1
 		return nil
 	})
+	assert.NoError(t, err)
 	err = b.PublishHeartbeat(ctx, node.Node{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
@@ -70,10 +72,11 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := 0
-	b.SubscribeForJobs(func(j job.Job) error {
+	err = b.SubscribeForJobs(func(j job.Job) error {
 		processed = processed + 1
 		return nil
 	})
+	assert.NoError(t, err)
 	err = b.PublishJob(ctx, job.Job{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)

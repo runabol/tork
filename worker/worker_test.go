@@ -47,11 +47,12 @@ func Test_handleTaskRun(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completions := 0
-	b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
 		completions = completions + 1
 		assert.NotEmpty(t, tk.Result)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -86,18 +87,20 @@ func Test_handleTaskCancel(t *testing.T) {
 		Broker:  b,
 		Runtime: rt,
 	})
+	assert.NoError(t, err)
 
 	tid := uuid.NewUUID()
 
 	errs := 0
-	b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	// cancel the task immediately upon start
-	b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk task.Task) error {
 		err = w.handleTask(task.Task{
 			ID:    tid,
 			State: task.Cancelled,
@@ -105,6 +108,7 @@ func Test_handleTaskCancel(t *testing.T) {
 		assert.NoError(t, err)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -132,11 +136,12 @@ func Test_handleTaskError(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	errs := 0
-	b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
 		Broker:  b,

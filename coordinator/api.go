@@ -63,7 +63,9 @@ func (s *api) status(c *gin.Context) {
 func (s *api) listQueues(c *gin.Context) {
 	qs, err := s.broker.Queues(c)
 	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, qs)
@@ -72,7 +74,9 @@ func (s *api) listQueues(c *gin.Context) {
 func (s *api) listActiveNodes(c *gin.Context) {
 	nodes, err := s.ds.GetActiveNodes(c, time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
 	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, nodes)
@@ -129,25 +133,36 @@ func (s *api) createJob(c *gin.Context) {
 	switch c.ContentType() {
 	case "application/json":
 		if err := c.BindJSON(&j); err != nil {
-			c.AbortWithError(http.StatusBadRequest, err)
+			if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+				log.Error().Err(err).Msg("error aborting")
+			}
 			return
 		}
 	case "text/yaml":
 		if err := c.BindYAML(&j); err != nil {
-			c.AbortWithError(http.StatusBadRequest, err)
+			if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+				log.Error().Err(err).Msg("error aborting")
+			}
 			return
 		}
 	default:
-		c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
+
+		if err := c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType())); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	if len(j.Tasks) == 0 {
-		c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks"))
+		if err := c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks")); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	for ix, t := range j.Tasks {
 		if err := validateTask(t); err != nil {
-			c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix))
+			if err := c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix)); err != nil {
+				log.Error().Err(err).Msg("error aborting")
+			}
 			return
 		}
 	}
@@ -156,12 +171,16 @@ func (s *api) createJob(c *gin.Context) {
 	j.State = job.Pending
 	j.CreatedAt = n
 	if err := s.ds.CreateJob(c, j); err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	log.Info().Str("task-id", j.ID).Msg("created job")
 	if err := s.broker.PublishJob(c, j); err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, redactJob(j))
@@ -171,7 +190,9 @@ func (s *api) getJob(c *gin.Context) {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c, id)
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		if err := c.AbortWithError(http.StatusNotFound, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, redactJob(j))
@@ -181,7 +202,9 @@ func (s *api) getTask(c *gin.Context) {
 	id := c.Param("id")
 	t, err := s.ds.GetTaskByID(c, id)
 	if err != nil {
-		c.AbortWithError(http.StatusNotFound, err)
+		if err := c.AbortWithError(http.StatusNotFound, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, redactTask(t))
@@ -206,7 +229,9 @@ func (s *api) cancelTask(c *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
+			log.Error().Err(err).Msg("error aborting")
+		}
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "OK"})

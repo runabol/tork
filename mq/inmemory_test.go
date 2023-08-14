@@ -16,11 +16,12 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForTasks("test-queue", func(t task.Task) error {
+	err := b.SubscribeForTasks("test-queue", func(t task.Task) error {
 		processed = processed + 1
 		return nil
 	})
-	err := b.PublishTask(ctx, "test-queue", task.Task{})
+	assert.NoError(t, err)
+	err = b.PublishTask(ctx, "test-queue", task.Task{})
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
@@ -51,11 +52,12 @@ func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForHeartbeats(func(n node.Node) error {
+	err := b.SubscribeForHeartbeats(func(n node.Node) error {
 		processed = processed + 1
 		return nil
 	})
-	err := b.PublishHeartbeat(ctx, node.Node{})
+	assert.NoError(t, err)
+	err = b.PublishHeartbeat(ctx, node.Node{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
@@ -66,11 +68,12 @@ func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	b.SubscribeForJobs(func(j job.Job) error {
+	err := b.SubscribeForJobs(func(j job.Job) error {
 		processed = processed + 1
 		return nil
 	})
-	err := b.PublishJob(ctx, job.Job{})
+	assert.NoError(t, err)
+	err = b.PublishJob(ctx, job.Job{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)

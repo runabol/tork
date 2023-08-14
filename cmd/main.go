@@ -203,10 +203,14 @@ func execute(ctx *cli.Context) error {
 		<-quit
 		log.Debug().Msg("shutting down")
 		if w != nil {
-			w.Stop()
+			if err := w.Stop(); err != nil {
+				log.Error().Err(err).Msg("error stopping worker")
+			}
 		}
 		if c != nil {
-			c.Stop()
+			if err := c.Stop(); err != nil {
+				log.Error().Err(err).Msg("error stopping coordinator")
+			}
 		}
 	}
 
