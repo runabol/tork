@@ -55,21 +55,15 @@ Submit a job in another terminal:
 # hello.yaml
 ---
 name: hello job
-inputs:
-  name: world
 tasks:
   - name: say hello
     image: ubuntu:mantic
-    env:
-      NAME: "{{ .inputs.name }}"
     run: |
-      echo -n hello $NAME
+      echo -n hello world
   - name: say goodbye
     image: ubuntu:mantic
-    env:
-      NAME: "{{ .inputs.name }}"
     run: |
-      echo -n bye $NAME
+      echo -n bye world
 ```
 
 ```bash
@@ -94,7 +88,6 @@ curl -s http://localhost:3000/job/$JOB_ID | jq .
     {
       ...
       "state": "COMPLETED",
-      "result": "hello world",
     }
   ],
 }
@@ -288,6 +281,29 @@ run: sleep 10
 limits:
   cpus: .5
   memory: 10m
+```
+
+# Outputs
+
+Tasks can write key-value pairs of output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
+
+```yaml
+tasks:
+  - name: populate a variable
+    image: ubuntu:mantic
+    # The task must specify the name of the
+    # variable under which its results will be
+    # stored in the job's context
+    var: task1
+    run: |
+      echo "name=world" >> "$TORK_OUTPUT"
+  - name: say hello
+    image: ubuntu:mantic
+    env:
+      # refer to the outputs of the previous task
+      NAME: "{{ .tasks.task1.name }}"
+    run: |
+      echo -n hello $NAME
 ```
 
 # Pre/Post Tasks

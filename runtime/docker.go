@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -27,6 +28,29 @@ type DockerRuntime struct {
 	mu     sync.RWMutex
 }
 
+type printableReader struct {
+	reader io.Reader
+}
+
+func (r printableReader) Read(p []byte) (int, error) {
+	buf := make([]byte, len(p))
+	n, err := r.reader.Read(buf)
+	if err != nil {
+		return n, err
+	}
+	j := 0
+	for i := 0; i < n; i++ {
+		if unicode.IsPrint(rune(buf[i])) {
+			p[j] = buf[i]
+			j++
+		}
+	}
+	if j == 0 {
+		return 0, io.EOF
+	}
+	return j, nil
+}
+
 func NewDockerRuntime() (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -38,30 +62,6 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 		images: make(map[string]bool),
 		mu:     sync.RWMutex{},
 	}, nil
-}
-
-type filteredReader struct {
-	reader io.Reader
-}
-
-func (r filteredReader) Read(p []byte) (int, error) {
-	n, err := r.reader.Read(p)
-	if err != nil {
-		return n, err
-	}
-	j := 0
-	for i := 0; i < n; i++ {
-		if p[i] != 0 && // null
-			p[i] != 1 && // start of heading
-			p[i] != 11 { // tab
-			p[j] = p[i]
-			j++
-		}
-	}
-	if j == 0 {
-		return 0, io.EOF
-	}
-	return j, nil
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t task.Task) error {
@@ -108,9 +108,9 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t task.Task) error {
 	return nil
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
+func (d *DockerRuntime) Run(ctx context.Context, t task.Task) error {
 	if err := d.imagePull(ctx, t); err != nil {
-		return "", errors.Wrapf(err, "error pulling image")
+		return errors.Wrapf(err, "error pulling image")
 	}
 
 	env := []string{}
@@ -123,7 +123,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 	for _, v := range t.Volumes {
 		vol := strings.Split(v, ":")
 		if len(vol) != 2 {
-			return "", errors.Errorf("invalid volume name: %s", v)
+			return errors.Errorf("invalid volume name: %s", v)
 		}
 		mount := mount.Mount{
 			Type:   mount.TypeBind,
@@ -135,12 +135,12 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 
 	cpus, err := parseCPUs(t.Limits)
 	if err != nil {
-		return "", errors.Wrapf(err, "invalid CPUs value")
+		return errors.Wrapf(err, "invalid CPUs value")
 	}
 
 	mem, err := parseMemory(t.Limits)
 	if err != nil {
-		return "", errors.Wrapf(err, "invalid memory value")
+		return errors.Wrapf(err, "invalid memory value")
 	}
 
 	hc := container.HostConfig{
@@ -173,7 +173,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 			"Error creating container using image %s: %v\n",
 			t.Image, err,
 		)
-		return "", err
+		return err
 	}
 
 	d.mu.Lock()
@@ -191,13 +191,11 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 				Msg("error removing container upon completion")
 		}
 	}()
-
 	err = d.client.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
+		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
 	}
-
 	out, err := d.client.ContainerLogs(
 		ctx,
 		resp.ID,
@@ -208,39 +206,51 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 		},
 	)
 	if err != nil {
-		return "", errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
+		return errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
 	}
-	stdout := filteredReader{reader: out}
 	defer func() {
 		if err := out.Close(); err != nil {
 			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
 		}
 	}()
-	// limit the amount of data read from stdout to prevent memory exhaustion
-	lr := &io.LimitedReader{R: stdout, N: 1024}
-	bufout := new(strings.Builder)
-	tee := io.TeeReader(lr, bufout)
-	_, err = io.Copy(os.Stdout, tee)
+	_, err = io.Copy(os.Stdout, out)
 	if err != nil {
-		return "", errors.Wrapf(err, "error reading the std out")
+		return errors.Wrapf(err, "error reading the std out")
 	}
 	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return "", err
+			return err
 		}
 	case status := <-statusCh:
 		if status.StatusCode != 0 {
-			return "", errors.Errorf("exit code %d: %s", status.StatusCode, bufout.String())
+			out, err := d.client.ContainerLogs(
+				ctx,
+				resp.ID,
+				types.ContainerLogsOptions{
+					ShowStdout: true,
+					ShowStderr: true,
+					Tail:       "10",
+				},
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("error tailing the log")
+				return errors.Errorf("exit code %d", status.StatusCode)
+			}
+			bufout := new(strings.Builder)
+			_, err = io.Copy(bufout, printableReader{reader: out})
+			if err != nil {
+				log.Error().Err(err).Msg("error copying the output")
+			}
+			return errors.Errorf("exit code %d: %s", status.StatusCode, bufout.String())
 		}
 		log.Debug().
 			Int64("status-code", status.StatusCode).
 			Str("task-id", t.ID).
 			Msg("task completed")
 	}
-
-	return bufout.String(), nil
+	return nil
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, t task.Task) error {

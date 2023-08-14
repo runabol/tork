@@ -36,7 +36,6 @@ type Task struct {
 	Image       string            `json:"image,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
 	Queue       string            `json:"queue,omitempty"`
-	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Pre         []Task            `json:"pre,omitempty"`
 	Post        []Task            `json:"post,omitempty"`
@@ -45,6 +44,8 @@ type Task struct {
 	Retry       *Retry            `json:"retry,omitempty"`
 	Limits      *Limits           `json:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty"`
+	Outputs     map[string]string `json:"outputs,omitempty"`
+	Var         string            `json:"var,omitempty"`
 }
 
 const (

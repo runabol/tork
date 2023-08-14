@@ -28,5 +28,10 @@ type Job struct {
 	Execution   []task.Task       `json:"execution,omitempty"`
 	Position    int               `json:"position,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
-	Context     map[string]any    `json:"context,omitempty"`
+	Context     Context           `json:"context,omitempty"`
+}
+
+type Context struct {
+	Inputs map[string]string            `json:"inputs,omitempty"`
+	Tasks  map[string]map[string]string `json:"tasks,omitempty"`
 }

@@ -52,12 +52,11 @@ func TestRunTask(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
-	output, err := rt.Run(context.Background(), task.Task{
+	err = rt.Run(context.Background(), task.Task{
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
-	assert.NotEmpty(t, output)
 }
 
 func TestRunTaskWithTimeout(t *testing.T) {
@@ -66,7 +65,7 @@ func TestRunTaskWithTimeout(t *testing.T) {
 	assert.NotNil(t, rt)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = rt.Run(ctx, task.Task{
+	err = rt.Run(ctx, task.Task{
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
 	})
@@ -83,7 +82,7 @@ func TestRunAndStopTask(t *testing.T) {
 		CMD:   []string{"sleep", "10"},
 	}
 	go func() {
-		_, err = rt.Run(context.Background(), t1)
+		err = rt.Run(context.Background(), t1)
 		assert.Error(t, err)
 	}()
 	// give the task a chance to get started
