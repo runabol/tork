@@ -165,10 +165,11 @@ func Test_creteJob(t *testing.T) {
 
 func Test_getJob(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	ds.CreateJob(context.Background(), job.Job{
+	err := ds.CreateJob(context.Background(), job.Job{
 		ID:    "1234",
 		State: job.Pending,
 	})
+	assert.NoError(t, err)
 	api := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
