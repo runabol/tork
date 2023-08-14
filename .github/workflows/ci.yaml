@@ -3,7 +3,7 @@ name: Go
 on: [push]
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     services:
       postgres:
