@@ -48,9 +48,15 @@ type runningTask struct {
 	cancel context.CancelFunc
 }
 
-func NewWorker(cfg Config) *Worker {
+func NewWorker(cfg Config) (*Worker, error) {
 	if len(cfg.Queues) == 0 {
 		cfg.Queues = map[string]int{mq.QUEUE_DEFAULT: 1}
+	}
+	if cfg.Broker == nil {
+		return nil, errors.New("must provide broker")
+	}
+	if cfg.Runtime == nil {
+		return nil, errors.New("must provide runtime")
 	}
 	w := &Worker{
 		id:        uuid.NewUUID(),
@@ -62,23 +68,20 @@ func NewWorker(cfg Config) *Worker {
 		limits:    cfg.Limits,
 		tempdir:   cfg.TempDir,
 	}
-	return w
+	return w, nil
 }
 
-func (w *Worker) handleTask(threadname string) func(t task.Task) error {
-	return func(t task.Task) error {
-		log.Debug().
-			Str("thread", threadname).
-			Str("task-id", t.ID).
-			Msg("received task")
-		switch t.State {
-		case task.Scheduled:
-			return w.runTask(t)
-		case task.Cancelled:
-			return w.cancelTask(t)
-		default:
-			return errors.Errorf("can't start a task in %s state", t.State)
-		}
+func (w *Worker) handleTask(t task.Task) error {
+	log.Debug().
+		Str("task-id", t.ID).
+		Msg("received task")
+	switch t.State {
+	case task.Scheduled:
+		return w.runTask(t)
+	case task.Cancelled:
+		return w.cancelTask(t)
+	default:
+		return errors.Errorf("can't start a task in %s state", t.State)
 	}
 }
 
@@ -90,6 +93,7 @@ func (w *Worker) cancelTask(t task.Task) error {
 		log.Debug().Msgf("unknown task %s. nothing to cancel", t.ID)
 		return nil
 	}
+	log.Debug().Msgf("cancelling task %s", t.ID)
 	rt.cancel()
 	delete(w.tasks, t.ID)
 	return nil
@@ -143,6 +147,10 @@ func (w *Worker) runTask(t task.Task) error {
 		result, err := w.doRunTask(ctx, pre)
 		finished := time.Now().UTC()
 		if err != nil {
+			log.Error().
+				Str("task-id", t.ID).
+				Err(err).
+				Msg("error processing pre-task")
 			// we also want to mark the
 			// actual task as FAILED
 			t.State = task.Failed
@@ -159,6 +167,10 @@ func (w *Worker) runTask(t task.Task) error {
 	result, err := w.doRunTask(ctx, t)
 	finished := time.Now().UTC()
 	if err != nil {
+		log.Error().
+			Str("task-id", t.ID).
+			Err(err).
+			Msg("error processing task")
 		t.State = task.Failed
 		t.Error = err.Error()
 		t.FailedAt = &finished
@@ -174,6 +186,10 @@ func (w *Worker) runTask(t task.Task) error {
 		result, err := w.doRunTask(ctx, post)
 		finished := time.Now().UTC()
 		if err != nil {
+			log.Error().
+				Str("task-id", t.ID).
+				Err(err).
+				Msg("error processing post-task")
 			// we also want to mark the
 			// actual task as FAILED
 			t.State = task.Failed
@@ -254,7 +270,7 @@ func (w *Worker) sendHeartbeats() {
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting worker %s", w.id)
 	// subscribe for a private queue for the node
-	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask("main")); err != nil {
+	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
 	// subscribe to shared work queues
@@ -263,7 +279,7 @@ func (w *Worker) Start() error {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
-			err := w.broker.SubscribeForTasks(qname, w.handleTask(fmt.Sprintf("%s-%d", qname, i)))
+			err := w.broker.SubscribeForTasks(qname, w.handleTask)
 			if err != nil {
 				return errors.Wrapf(err, "error subscribing for queue: %s", qname)
 			}

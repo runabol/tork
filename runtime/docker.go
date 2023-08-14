@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -179,21 +180,23 @@ func (d *DockerRuntime) Run(ctx context.Context, t task.Task) (string, error) {
 	d.tasks[t.ID] = resp.ID
 	d.mu.Unlock()
 
-	err = d.client.ContainerStart(
-		ctx, resp.ID, types.ContainerStartOptions{})
-	if err != nil {
-		return "", errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
-	}
-
 	// remove the container
 	defer func() {
-		if err := d.Stop(ctx, t); err != nil {
+		stopContext, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		if err := d.Stop(stopContext, t); err != nil {
 			log.Error().
 				Err(err).
 				Str("container-id", resp.ID).
 				Msg("error removing container upon completion")
 		}
 	}()
+
+	err = d.client.ContainerStart(
+		ctx, resp.ID, types.ContainerStartOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
+	}
 
 	out, err := d.client.ContainerLogs(
 		ctx,
