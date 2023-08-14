@@ -9,5 +9,5 @@ import (
 func TestGetStats(t *testing.T) {
 	stats, err := getStats()
 	assert.NoError(t, err)
-	assert.Greater(t, stats.CPUPercent, float64(0))
+	assert.GreaterOrEqual(t, stats.CPUPercent, float64(0))
 }

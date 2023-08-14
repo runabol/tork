@@ -277,7 +277,7 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := worker.NewWorker(worker.Config{
+	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
 		Queues:  queues,
@@ -287,6 +287,9 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 		},
 		TempDir: ctx.String("temp-dir"),
 	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating worker")
+	}
 	if err := w.Start(); err != nil {
 		return nil, err
 	}
