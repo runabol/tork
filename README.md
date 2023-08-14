@@ -1,5 +1,9 @@
 # Tork
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/runabol/tork)](https://goreportcard.com/report/github.com/runabol/tork)
+![Build Status](https://github.com/runabol/tork/workflows/ci/badge.svg)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 A Golang based high-performance, scalable and distributed job execution engine.
 
 # Features:
