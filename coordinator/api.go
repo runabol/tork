@@ -156,11 +156,8 @@ func (s *api) createJob(c *gin.Context) {
 	j.ID = uuid.NewUUID()
 	j.State = job.Pending
 	j.CreatedAt = n
-	if j.Inputs != nil {
-		j.Context = map[string]any{
-			"inputs": j.Inputs,
-		}
-	}
+	j.Context = job.Context{}
+	j.Context.Inputs = j.Inputs
 	if err := s.ds.CreateJob(c, j); err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return

@@ -39,33 +39,17 @@ func redactJob(j job.Job) job.Job {
 	// redact inputs
 	j.Inputs = redactVars(j.Inputs)
 	// redact context
-	j.Context = redactRaw(j.Context)
+	j.Context.Inputs = redactVars(j.Context.Inputs)
+	tasks := make(map[string]map[string]string)
+	for k, v := range j.Context.Tasks {
+		tasks[k] = redactVars(v)
+	}
+	j.Context.Tasks = tasks
 	// redact tasks
 	for i, t := range j.Tasks {
 		j.Tasks[i] = redactTask(t)
 	}
 	return j
-}
-
-func redactRaw(m map[string]any) map[string]any {
-	redacted := make(map[string]any)
-	for k, rv := range m {
-		for _, m := range matchers {
-			if m(k) {
-				rv = "[REDACTED]"
-				break
-			}
-		}
-		switch v := rv.(type) {
-		case map[string]string:
-			redacted[k] = redactVars(v)
-		case map[string]any:
-			redacted[k] = redactRaw(v)
-		default:
-			redacted[k] = v
-		}
-	}
-	return redacted
 }
 
 func redactVars(m map[string]string) map[string]string {

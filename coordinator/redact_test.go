@@ -64,13 +64,13 @@ func TestRedactJob(t *testing.T) {
 			"secret": "password",
 			"plain":  "helloworld",
 		},
-		Context: map[string]any{
-			"inputs": map[string]string{
+		Context: job.Context{
+			Inputs: map[string]string{
 				"secret": "password",
 				"plain":  "helloworld",
 			},
-			"steps": map[string]any{
-				"step1": map[string]string{
+			Tasks: map[string]map[string]string{
+				"task1": {
 					"secret": "password",
 					"plain":  "helloworld",
 				},
@@ -87,10 +87,10 @@ func TestRedactJob(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"secret": "[REDACTED]",
 		"plain":  "helloworld",
-	}, j.Context["inputs"])
-	assert.Equal(t, map[string]any{
-		"step1": map[string]string{
+	}, j.Context.Inputs)
+	assert.Equal(t, map[string]map[string]string{
+		"task1": {
 			"secret": "[REDACTED]",
 			"plain":  "helloworld",
-		}}, j.Context["steps"])
+		}}, j.Context.Tasks)
 }

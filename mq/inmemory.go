@@ -2,6 +2,7 @@ package mq
 
 import (
 	"context"
+	"encoding/json"
 
 	"sync"
 
@@ -43,7 +44,17 @@ func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t task.T
 		b.tasks[qname] = q
 		b.mu.Unlock()
 	}
-	q <- t
+	// copy the task to prevent unintended side-effects
+	// between the coordinator and worker
+	bs, err := json.Marshal(t)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling task")
+	}
+	copy := task.Task{}
+	if err := json.Unmarshal(bs, &copy); err != nil {
+		return errors.Wrapf(err, "error marshalling task")
+	}
+	q <- copy
 	return nil
 }
 

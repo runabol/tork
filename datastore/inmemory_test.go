@@ -131,21 +131,23 @@ func TestInMemoryUpdateJob(t *testing.T) {
 	j1 := job.Job{
 		ID:    uuid.NewUUID(),
 		State: job.Pending,
-		Context: map[string]any{
-			"var1": "val1",
+		Context: job.Context{
+			Inputs: map[string]string{
+				"var1": "val1",
+			},
 		},
 	}
 	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
 		u.State = job.Completed
-		u.Context["var2"] = "val2"
+		u.Context.Inputs["var2"] = "val2"
 		return nil
 	})
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, job.Completed, j2.State)
-	assert.Equal(t, "val1", j2.Context["var1"])
-	assert.Equal(t, "val2", j2.Context["var2"])
+	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
+	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 }

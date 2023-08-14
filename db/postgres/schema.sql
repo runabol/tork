@@ -39,7 +39,6 @@ CREATE TABLE tasks (
     image         varchar(256),
     env           jsonb,
     queue         varchar(256),
-    result        text,
     error_msg     text,
     pre_tasks     jsonb,
     post_tasks    jsonb,
@@ -47,7 +46,9 @@ CREATE TABLE tasks (
     node_id       varchar(32),
     retry         jsonb,
     limits        jsonb,
-    timeout       varchar(8)
+    timeout       varchar(8),
+    outputs       jsonb,
+    var           varchar(16)
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

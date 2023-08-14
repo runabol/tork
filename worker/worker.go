@@ -1,10 +1,12 @@
 package worker
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +19,8 @@ import (
 	"github.com/tork/task"
 	"github.com/tork/uuid"
 )
+
+const defaultOutputPath = "/tork/output"
 
 type Worker struct {
 	id        string
@@ -144,15 +148,15 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
 		pre.Limits = t.Limits
-		result, err := w.doRunTask(ctx, pre)
-		finished := time.Now().UTC()
-		if err != nil {
+		pre.Outputs = make(map[string]string)
+		if err := w.doRunTask(ctx, pre); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
 				Msg("error processing pre-task")
 			// we also want to mark the
 			// actual task as FAILED
+			finished := time.Now().UTC()
 			t.State = task.Failed
 			t.Error = err.Error()
 			t.FailedAt = &finished
@@ -161,16 +165,16 @@ func (w *Worker) runTask(t task.Task) error {
 			}
 			return nil
 		}
-		pre.Result = result
+		//pre.Result = result
 	}
 	// run the actual task
-	result, err := w.doRunTask(ctx, t)
-	finished := time.Now().UTC()
-	if err != nil {
+	t.Outputs = make(map[string]string)
+	if err := w.doRunTask(ctx, t); err != nil {
 		log.Error().
 			Str("task-id", t.ID).
 			Err(err).
 			Msg("error processing task")
+		finished := time.Now().UTC()
 		t.State = task.Failed
 		t.Error = err.Error()
 		t.FailedAt = &finished
@@ -183,15 +187,15 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
 		post.Limits = t.Limits
-		result, err := w.doRunTask(ctx, post)
-		finished := time.Now().UTC()
-		if err != nil {
+		post.Outputs = make(map[string]string)
+		if err := w.doRunTask(ctx, post); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
 				Msg("error processing post-task")
 			// we also want to mark the
 			// actual task as FAILED
+			finished := time.Now().UTC()
 			t.State = task.Failed
 			t.Error = err.Error()
 			t.FailedAt = &finished
@@ -200,39 +204,72 @@ func (w *Worker) runTask(t task.Task) error {
 			}
 			return nil
 		}
-		post.Result = result
+		//post.Result = result
 	}
+	finished := time.Now().UTC()
 	// send completion to the coordinator
-	t.Result = result
+	//t.Result = result
 	t.CompletedAt = &finished
 	t.State = task.Completed
 	return w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
-func (w *Worker) doRunTask(ctx context.Context, t task.Task) (string, error) {
+func (w *Worker) doRunTask(ctx context.Context, t task.Task) error {
 	// create a temporary mount point
 	// we can use to write the run script to
 	rundir, err := os.MkdirTemp(w.tempdir, "tork-")
 	if err != nil {
-		return "", errors.Wrapf(err, "error creating temp dir")
+		return errors.Wrapf(err, "error creating temp dir")
 	}
 	defer deleteTempDir(rundir)
 	if err := os.WriteFile(path.Join(rundir, "run"), []byte(t.Run), os.ModePerm); err != nil {
-		return "", err
+		return err
 	}
 	t.Volumes = append(t.Volumes, fmt.Sprintf("%s:%s", rundir, "/tork"))
+	// set the path for task outputs
+	if t.Env == nil {
+		t.Env = make(map[string]string)
+	}
+	t.Env["TORK_OUTPUT"] = defaultOutputPath
 	// create timeout context -- if timeout is defined
 	rctx := ctx
 	if t.Timeout != "" {
 		dur, err := time.ParseDuration(t.Timeout)
 		if err != nil {
-			return "", errors.Wrapf(err, "invalid timeout duration: %s", t.Timeout)
+			return errors.Wrapf(err, "invalid timeout duration: %s", t.Timeout)
 		}
 		tctx, cancel := context.WithTimeout(ctx, dur)
 		defer cancel()
 		rctx = tctx
 	}
-	return w.runtime.Run(rctx, t)
+	if err := w.runtime.Run(rctx, t); err != nil {
+		return err
+	}
+	if _, err := os.Stat(path.Join(rundir, "output")); err == nil {
+		file, err := os.Open(path.Join(rundir, "output"))
+		if err != nil {
+			return errors.Wrapf(err, "error opening %s", defaultOutputPath)
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 0 {
+				continue
+			}
+			if len(parts) == 1 {
+				return errors.Errorf("invalid output value: %s", line)
+			}
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			t.Outputs[k] = v
+		}
+		if err := scanner.Err(); err != nil {
+			return errors.Wrapf(err, "error parsing %s", defaultOutputPath)
+		}
+	}
+	return nil
 }
 
 func deleteTempDir(dirname string) {

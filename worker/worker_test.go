@@ -49,7 +49,6 @@ func Test_handleTaskRun(t *testing.T) {
 	completions := 0
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
 		completions = completions + 1
-		assert.NotEmpty(t, tk.Result)
 		return nil
 	})
 	assert.NoError(t, err)
