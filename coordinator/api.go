@@ -63,9 +63,7 @@ func (s *api) status(c *gin.Context) {
 func (s *api) listQueues(c *gin.Context) {
 	qs, err := s.broker.Queues(c)
 	if err != nil {
-		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	c.JSON(http.StatusOK, qs)
@@ -74,9 +72,7 @@ func (s *api) listQueues(c *gin.Context) {
 func (s *api) listActiveNodes(c *gin.Context) {
 	nodes, err := s.ds.GetActiveNodes(c, time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
 	if err != nil {
-		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	c.JSON(http.StatusOK, nodes)
@@ -133,36 +129,26 @@ func (s *api) createJob(c *gin.Context) {
 	switch c.ContentType() {
 	case "application/json":
 		if err := c.BindJSON(&j); err != nil {
-			if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-				log.Error().Err(err).Msg("error aborting")
-			}
+			_ = c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
 	case "text/yaml":
 		if err := c.BindYAML(&j); err != nil {
-			if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-				log.Error().Err(err).Msg("error aborting")
-			}
+			_ = c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
 	default:
 
-		if err := c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType())); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
 		return
 	}
 	if len(j.Tasks) == 0 {
-		if err := c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks")); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks"))
 		return
 	}
 	for ix, t := range j.Tasks {
 		if err := validateTask(t); err != nil {
-			if err := c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix)); err != nil {
-				log.Error().Err(err).Msg("error aborting")
-			}
+			_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix))
 			return
 		}
 	}
@@ -170,17 +156,18 @@ func (s *api) createJob(c *gin.Context) {
 	j.ID = uuid.NewUUID()
 	j.State = job.Pending
 	j.CreatedAt = n
-	if err := s.ds.CreateJob(c, j); err != nil {
-		if err := c.AbortWithError(http.StatusInternalServerError, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
+	if j.Inputs != nil {
+		j.Context = map[string]any{
+			"inputs": j.Inputs,
 		}
+	}
+	if err := s.ds.CreateJob(c, j); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	log.Info().Str("task-id", j.ID).Msg("created job")
 	if err := s.broker.PublishJob(c, j); err != nil {
-		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	c.JSON(http.StatusOK, redactJob(j))
@@ -190,9 +177,7 @@ func (s *api) getJob(c *gin.Context) {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c, id)
 	if err != nil {
-		if err := c.AbortWithError(http.StatusNotFound, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
 	c.JSON(http.StatusOK, redactJob(j))
@@ -202,9 +187,7 @@ func (s *api) getTask(c *gin.Context) {
 	id := c.Param("id")
 	t, err := s.ds.GetTaskByID(c, id)
 	if err != nil {
-		if err := c.AbortWithError(http.StatusNotFound, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusNotFound, err)
 		return
 	}
 	c.JSON(http.StatusOK, redactTask(t))
@@ -229,9 +212,7 @@ func (s *api) cancelTask(c *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		if err := c.AbortWithError(http.StatusBadRequest, err); err != nil {
-			log.Error().Err(err).Msg("error aborting")
-		}
+		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "OK"})

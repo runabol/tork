@@ -55,15 +55,17 @@ Submit a job in another terminal:
 # hello.yaml
 ---
 name: hello job
+inputs:
+  name: world
 tasks:
   - name: say hello
     image: ubuntu:mantic
     run: |
-      echo -n hello world
+      echo -n hello {{ .inputs.name }}
   - name: say goodbye
     image: ubuntu:mantic
     run: |
-      echo -n bye world
+      echo -n bye {{ .inputs.name }}
 ```
 
 ```bash
@@ -75,7 +77,7 @@ JOB_ID=$(curl \
   http://localhost:3000/job | jq -r .id)
 ```
 
-Query for the status of the task:
+Query for the status of the job:
 
 ```bash
 curl -s http://localhost:3000/job/$JOB_ID | jq .
@@ -106,6 +108,8 @@ The following job:
 # convert.yaml
 ---
 name: convert a video
+inputs:
+  source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
 tasks:
   - name: convert the first 5 seconds of a video
     image: jrottenberg/ffmpeg:3.4-alpine
@@ -116,9 +120,11 @@ tasks:
     pre:
       - name: download the remote file
         image: alpine:3.18.3
+        env:
+          SOURCE_URL: "{{ .inputs.source }}"
         run: |
           wget \
-          https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv \
+          $SOURCE_URL \
           -O /tmp/input.ogv
     post:
       - name: upload the converted file
@@ -341,6 +347,7 @@ Content-Type:text/yaml
 
 - `name` - a human-readable name for the job
 - `tasks` - the list of task to execute
+- `inputs` - input parameters allow you to specify data that the job expects to use during its runtime. Input values can be accessed by tasks by using a [template expression](https://pkg.go.dev/text/template), e.g. `{{ .inputs.someParam }}`
 
 task properties:
 
