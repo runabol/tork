@@ -543,3 +543,26 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 
 	return r.toJob(tasks, exec)
 }
+
+func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]task.Task, error) {
+	rs := make([]taskRecord, 0)
+	q := `SELECT * 
+	      FROM tasks 
+		  where job_id = $1 
+		  AND 
+		    (state = $2 OR state = $3 OR state = $4)
+		  ORDER BY position,created_at ASC`
+	if err := ds.db.Select(&rs, q, jobID, task.Pending, task.Scheduled, task.Running); err != nil {
+		return nil, errors.Wrapf(err, "error getting job execution from db")
+	}
+	actives := make([]task.Task, len(rs))
+	for i, r := range rs {
+		t, err := r.toTask()
+		if err != nil {
+			return nil, err
+		}
+		actives[i] = t
+	}
+
+	return actives, nil
+}

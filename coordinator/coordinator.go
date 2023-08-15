@@ -145,7 +145,7 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 	}); err != nil {
 		return errors.Wrapf(err, "error updating job in datastore")
 	}
-	// fire the next task (if the job isn't completed)
+	// fire the next task
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting job from datatstore")
@@ -171,11 +171,18 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 
 func (c *Coordinator) handleFailedTask(t task.Task) error {
 	ctx := context.Background()
+	j, err := c.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return errors.Wrapf(err, "unknown task: %s", t.ID)
+	}
 	log.Error().
 		Str("task-id", t.ID).
 		Str("task-error", t.Error).
+		Str("task-state", string(t.State)).
 		Msg("received task failure")
-	if t.Retry != nil && t.Retry.Attempts < t.Retry.Limit {
+	if j.State == job.Running &&
+		t.Retry != nil &&
+		t.Retry.Attempts < t.Retry.Limit {
 		// create a new retry task
 		rt := t
 		rt.ID = uuid.NewUUID()
@@ -200,8 +207,13 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 	} else {
 		// mark the job as FAILED
 		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-			u.State = job.Failed
-			u.FailedAt = t.FailedAt
+			// we only want to make the job as FAILED
+			// if it's actually running as opposed to
+			// possibly being CANCELLED
+			if u.State == job.Running {
+				u.State = job.Failed
+				u.FailedAt = t.FailedAt
+			}
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error marking the job as failed in the datastore")
@@ -209,9 +221,11 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 	}
 	// mark the task as FAILED
 	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		u.State = task.Failed
-		u.FailedAt = t.FailedAt
-		u.Error = t.Error
+		if u.State.IsActive() {
+			u.State = task.Failed
+			u.FailedAt = t.FailedAt
+			u.Error = t.Error
+		}
 		return nil
 	})
 }

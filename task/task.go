@@ -23,29 +23,29 @@ type Task struct {
 	ID          string            `json:"id,omitempty"`
 	JobID       string            `json:"jobId,omitempty"`
 	Position    int               `json:"position,omitempty"`
-	Name        string            `json:"name,omitempty"`
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
 	ScheduledAt *time.Time        `json:"scheduledAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	CMD         []string          `json:"cmd,omitempty"`
-	Entrypoint  []string          `json:"entrypoint,omitempty"`
-	Run         string            `json:"run,omitempty"`
-	Image       string            `json:"image,omitempty"`
-	Env         map[string]string `json:"env,omitempty"`
-	Queue       string            `json:"queue,omitempty"`
+	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
+	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
+	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
+	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
+	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty"`
 	Error       string            `json:"error,omitempty"`
-	Pre         []Task            `json:"pre,omitempty"`
-	Post        []Task            `json:"post,omitempty"`
-	Volumes     []string          `json:"volumes,omitempty"`
+	Pre         []Task            `json:"pre,omitempty" yaml:"pre,omitempty"`
+	Post        []Task            `json:"post,omitempty" yaml:"post,omitempty"`
+	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	Node        string            `json:"node,omitempty"`
-	Retry       *Retry            `json:"retry,omitempty"`
-	Limits      *Limits           `json:"limits,omitempty"`
-	Timeout     string            `json:"timeout,omitempty"`
+	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
+	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
+	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Outputs     map[string]string `json:"outputs,omitempty"`
-	Var         string            `json:"var,omitempty"`
+	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 }
 
 const (
@@ -56,15 +56,21 @@ const (
 // Retry allows to specify a retry policy for a given
 // task using the exponential backoff formula:
 //
-// initalDelay*scalingFactor^attempt
+// initialDelay*scalingFactor^attempt
 type Retry struct {
-	Limit         int    `json:"limit,omitempty"`
-	InitialDelay  string `json:"initialDelay,omitempty"`
-	ScalingFactor int    `json:"scalingFactor,omitempty"`
-	Attempts      int    `json:"attempts,omitempty"`
+	Limit         int    `json:"limit,omitempty" yaml:"limit,omitempty"`
+	InitialDelay  string `json:"initialDelay,omitempty" yaml:"initialDelay,omitempty"`
+	ScalingFactor int    `json:"scalingFactor,omitempty" yaml:"scalingFactor,omitempty"`
+	Attempts      int    `json:"attempts,omitempty" yaml:"attempts,omitempty"`
 }
 
 type Limits struct {
-	CPUs   string `json:"cpus,omitempty"`
-	Memory string `json:"memory,omitempty"`
+	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
+	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
+}
+
+func (s State) IsActive() bool {
+	return s == Pending ||
+		s == Scheduled ||
+		s == Running
 }

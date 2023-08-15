@@ -442,12 +442,12 @@ HTTP 200
 }
 ```
 
-## Cancel a running task
+## Cancel a running job
 
 **Path:**
 
 ```
-PUT /task/{task id}/cancel
+PUT /job/{job id}/cancel
 ```
 
 **Response:**
@@ -468,7 +468,7 @@ Failure:
 400 Bad Request
 
 {
-  "error": "task in not running"
+  "error": "job in not running"
 }
 ```
 

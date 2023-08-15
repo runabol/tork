@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"github.com/tork/mq"
 	"github.com/tork/node"
 	"github.com/tork/task"
+	"github.com/tork/uuid"
 )
 
 func Test_getQueues(t *testing.T) {
@@ -139,7 +141,7 @@ func Test_getTask(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func Test_creteJob(t *testing.T) {
+func Test_createJob(t *testing.T) {
 	api := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
@@ -190,8 +192,8 @@ func Test_getJob(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func Test_validateTaskRetry(t *testing.T) {
-	err := validateTask(task.Task{
+func Test_sanitizeTaskRetry(t *testing.T) {
+	err := sanitizeTask(&task.Task{
 		Image: "some:image",
 		Retry: &task.Retry{
 			Limit:         5,
@@ -200,7 +202,7 @@ func Test_validateTaskRetry(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	err = validateTask(task.Task{
+	err = sanitizeTask(&task.Task{
 		Image: "some:image",
 		Retry: &task.Retry{
 			Limit:        3,
@@ -208,28 +210,119 @@ func Test_validateTaskRetry(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
-	err = validateTask(task.Task{
+	err = sanitizeTask(&task.Task{
 		Image: "some:image",
 		Retry: &task.Retry{
 			Limit: 100,
 		},
 	})
 	assert.Error(t, err)
-	err = validateTask(task.Task{
+	err = sanitizeTask(&task.Task{
 		Image:   "some:image",
 		Timeout: "-10s",
 	})
 	assert.Error(t, err)
-	err = validateTask(task.Task{
+	err = sanitizeTask(&task.Task{
 		Image:   "some:image",
 		Timeout: "10s",
 	})
 	assert.NoError(t, err)
+	rt1 := &task.Task{
+		Image:   "some:image",
+		Timeout: "10s",
+		Retry:   &task.Retry{},
+	}
+	err = sanitizeTask(rt1)
+	assert.NoError(t, err)
+	assert.Equal(t, task.RETRY_DEFAULT_INITIAL_DELAY, rt1.Retry.InitialDelay)
+	assert.Equal(t, task.RETRY_DEFAULT_SCALING_FACTOR, rt1.Retry.ScalingFactor)
+	rt2 := &task.Task{
+		Image:   "some:image",
+		Timeout: "10s",
+		Retry: &task.Retry{
+			InitialDelay: "10s",
+		},
+	}
+	err = sanitizeTask(rt1)
+	assert.NoError(t, err)
+	assert.Equal(t, "10s", rt2.Retry.InitialDelay)
 }
 
 func Test_validateTaskBasic(t *testing.T) {
-	err := validateTask(task.Task{})
+	err := sanitizeTask(&task.Task{})
 	assert.Error(t, err)
-	err = validateTask(task.Task{Image: "some:image"})
+	err = sanitizeTask(&task.Task{Image: "some:image"})
 	assert.NoError(t, err)
+}
+
+func Test_cancelRunningJob(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	j1 := job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		CreatedAt: time.Now().UTC(),
+	}
+	err := ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []task.Task{{
+		ID:        uuid.NewUUID(),
+		State:     task.Pending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Scheduled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Running,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Cancelled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Completed,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Failed,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, ta)
+		assert.NoError(t, err)
+	}
+
+	api := newAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/job/%s/cancel", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, `{"status":"OK"}`, string(body))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	actives, err := ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Empty(t, actives)
 }

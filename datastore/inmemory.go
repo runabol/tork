@@ -154,8 +154,33 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 		}
 	}
 	sort.Slice(execution, func(i, j int) bool {
-		return execution[i].Position < execution[j].Position
+		posi := execution[i].Position
+		posj := execution[j].Position
+		if posi != posj {
+			return posi < posj
+		}
+		ci := execution[i].CreatedAt
+		cj := execution[j].CreatedAt
+		if ci == nil {
+			return true
+		}
+		if cj == nil {
+			return false
+		}
+		return ci.Before(*cj)
 	})
 	j.Execution = execution
 	return j, nil
+}
+
+func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]task.Task, error) {
+	ds.tmu.RLock()
+	defer ds.tmu.RUnlock()
+	result := make([]task.Task, 0)
+	for _, t := range ds.tasks {
+		if t.JobID == jobID && t.State.IsActive() {
+			result = append(result, t)
+		}
+	}
+	return result, nil
 }

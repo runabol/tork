@@ -18,16 +18,16 @@ const (
 
 type Job struct {
 	ID          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty"`
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	Tasks       []task.Task       `json:"tasks,omitempty"`
+	Tasks       []task.Task       `json:"tasks,omitempty" yaml:"tasks,omitempty"`
 	Execution   []task.Task       `json:"execution,omitempty"`
 	Position    int               `json:"position,omitempty"`
-	Inputs      map[string]string `json:"inputs,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Context     Context           `json:"context,omitempty"`
 }
 
