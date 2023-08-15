@@ -58,10 +58,8 @@ const (
 //
 // initialDelay*scalingFactor^attempt
 type Retry struct {
-	Limit         int    `json:"limit,omitempty" yaml:"limit,omitempty"`
-	InitialDelay  string `json:"initialDelay,omitempty" yaml:"initialDelay,omitempty"`
-	ScalingFactor int    `json:"scalingFactor,omitempty" yaml:"scalingFactor,omitempty"`
-	Attempts      int    `json:"attempts,omitempty" yaml:"attempts,omitempty"`
+	Limit    int `json:"limit,omitempty" yaml:"limit,omitempty"`
+	Attempts int `json:"attempts,omitempty" yaml:"attempts,omitempty"`
 }
 
 type Limits struct {

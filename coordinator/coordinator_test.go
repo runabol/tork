@@ -332,9 +332,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 		JobID:       j1.ID,
 		Position:    1,
 		Retry: &task.Retry{
-			Limit:         1,
-			InitialDelay:  "1ms",
-			ScalingFactor: 3,
+			Limit: 1,
 		},
 	}
 
