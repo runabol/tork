@@ -308,7 +308,9 @@ tasks:
 
 # Pre/Post Tasks
 
-Each task can define a set of tasks that will be executed prior to its execution (`pre`), and after its execution (`post`).
+It is sometimes desireable to execute a task - potentially using a different `image` - before or after a task executes and share the state of that execution with the "main" task we want to execute. This is where `pre` and `post` tasks come in.
+
+Each task can define a set of tasks that will be executed prior to its execution, and after its execution.
 
 The `pre` and `post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
 
