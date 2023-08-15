@@ -1,12 +1,10 @@
 package worker
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
@@ -148,8 +146,7 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
 		pre.Limits = t.Limits
-		pre.Outputs = make(map[string]string)
-		if err := w.doRunTask(ctx, pre); err != nil {
+		if err := w.doRunTask(ctx, &pre); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -168,8 +165,7 @@ func (w *Worker) runTask(t task.Task) error {
 		//pre.Result = result
 	}
 	// run the actual task
-	t.Outputs = make(map[string]string)
-	if err := w.doRunTask(ctx, t); err != nil {
+	if err := w.doRunTask(ctx, &t); err != nil {
 		log.Error().
 			Str("task-id", t.ID).
 			Err(err).
@@ -187,8 +183,7 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
 		post.Limits = t.Limits
-		post.Outputs = make(map[string]string)
-		if err := w.doRunTask(ctx, post); err != nil {
+		if err := w.doRunTask(ctx, &post); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -214,7 +209,7 @@ func (w *Worker) runTask(t task.Task) error {
 	return w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
-func (w *Worker) doRunTask(ctx context.Context, t task.Task) error {
+func (w *Worker) doRunTask(ctx context.Context, t *task.Task) error {
 	// create a temporary mount point
 	// we can use to write the run script to
 	rundir, err := os.MkdirTemp(w.tempdir, "tork-")
@@ -242,32 +237,15 @@ func (w *Worker) doRunTask(ctx context.Context, t task.Task) error {
 		defer cancel()
 		rctx = tctx
 	}
-	if err := w.runtime.Run(rctx, t); err != nil {
+	if err := w.runtime.Run(rctx, *t); err != nil {
 		return err
 	}
 	if _, err := os.Stat(path.Join(rundir, "output")); err == nil {
-		file, err := os.Open(path.Join(rundir, "output"))
+		contents, err := os.ReadFile(path.Join(rundir, "output"))
 		if err != nil {
-			return errors.Wrapf(err, "error opening %s", defaultOutputPath)
+			return errors.Wrapf(err, "error reading output file")
 		}
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 0 {
-				continue
-			}
-			if len(parts) == 1 {
-				return errors.Errorf("invalid output value: %s", line)
-			}
-			k := strings.TrimSpace(parts[0])
-			v := strings.TrimSpace(parts[1])
-			t.Outputs[k] = v
-		}
-		if err := scanner.Err(); err != nil {
-			return errors.Wrapf(err, "error parsing %s", defaultOutputPath)
-		}
+		t.Result = string(contents)
 	}
 	return nil
 }

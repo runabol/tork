@@ -164,3 +164,40 @@ func Test_handleTaskError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, errs)
 }
+
+func Test_handleTaskOutput(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	completions := 0
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
+		completions = completions + 1
+		assert.NotEmpty(t, tk.Result)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+	err = w.Start()
+	assert.NoError(t, err)
+
+	err = w.handleTask(task.Task{
+		ID:    uuid.NewUUID(),
+		State: task.Scheduled,
+		Image: "ubuntu:mantic",
+		Run:   "echo -n 'hello world' >> $TORK_OUTPUT",
+	})
+
+	// give the task some time to "process"
+	time.Sleep(time.Millisecond * 100)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, completions)
+}

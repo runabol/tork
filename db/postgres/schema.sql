@@ -47,7 +47,7 @@ CREATE TABLE tasks (
     retry         jsonb,
     limits        jsonb,
     timeout       varchar(8),
-    outputs       jsonb,
+    result        text,
     var           varchar(16)
 );
 

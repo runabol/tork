@@ -45,7 +45,7 @@ type taskRecord struct {
 	Limits      []byte         `db:"limits"`
 	Timeout     string         `db:"timeout"`
 	Var         string         `db:"var"`
-	Outputs     []byte         `db:"outputs"`
+	Result      string         `db:"result"`
 }
 
 type jobRecord struct {
@@ -103,12 +103,6 @@ func (r taskRecord) toTask() (task.Task, error) {
 			return task.Task{}, errors.Wrapf(err, "error deserializing task.limits")
 		}
 	}
-	var outputs map[string]string
-	if r.Outputs != nil {
-		if err := json.Unmarshal(r.Outputs, &outputs); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.outputs")
-		}
-	}
 	return task.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -135,7 +129,7 @@ func (r taskRecord) toTask() (task.Task, error) {
 		Limits:      limits,
 		Timeout:     r.Timeout,
 		Var:         r.Var,
-		Outputs:     outputs,
+		Result:      r.Result,
 	}, nil
 }
 
@@ -227,15 +221,6 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 		s := string(b)
 		limits = &s
 	}
-	var outputs *string
-	if t.Outputs != nil {
-		b, err := json.Marshal(t.Outputs)
-		if err != nil {
-			return errors.Wrapf(err, "failed to serialize task.outputs")
-		}
-		s := string(b)
-		outputs = &s
-	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -262,7 +247,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 			limits, -- $23
 			timeout, -- $24
 			var, -- $25
-			outputs -- $26
+			result -- $26
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
@@ -293,7 +278,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 		limits,                       // $23
 		t.Timeout,                    // $24
 		t.Var,                        // $25
-		outputs,                      // $26
+		t.Result,                     // $26
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -328,15 +313,6 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err := modify(&t); err != nil {
 		return err
 	}
-	var outputs *string
-	if t.Outputs != nil {
-		b, err := json.Marshal(t.Outputs)
-		if err != nil {
-			return errors.Wrapf(err, "failed to serialize task.outputs")
-		}
-		s := string(b)
-		outputs = &s
-	}
 	q := `update tasks set 
 	        position = $1,
 	        state = $2,
@@ -346,7 +322,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			failed_at = $6,
 			error_msg = $7,
 			node_id = $8,
-			outputs = $9
+			result = $9
 		  where id = $10`
 	_, err = ds.db.Exec(q,
 		t.Position,    // $1
@@ -357,7 +333,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.FailedAt,    // $6
 		t.Error,       // $7
 		t.Node,        // $8
-		outputs,       // $9
+		t.Result,      // $9
 		t.ID,          // $10
 	)
 	if err != nil {
