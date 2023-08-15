@@ -42,6 +42,12 @@ func Evaluate(t *task.Task, c job.Context) error {
 		env[k] = result
 	}
 	t.Env = env
+	// evaluate if expr
+	ifExpr, err := evaluateTemplate(t.If, c)
+	if err != nil {
+		return err
+	}
+	t.If = ifExpr
 	// evaluate pre-tasks
 	pres := make([]task.Task, len(t.Pre))
 	for i, pre := range t.Pre {

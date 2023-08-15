@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -77,15 +78,23 @@ func (c *Coordinator) handlePendingTask(t task.Task) error {
 	ctx := context.Background()
 	log.Info().
 		Str("task-id", t.ID).
-		Msg("routing task")
-	qname := t.Queue
-	if qname == "" {
-		qname = mq.QUEUE_DEFAULT
+		Msg("handling pending task")
+	var qname string
+	now := time.Now().UTC()
+	if strings.TrimSpace(t.If) == "false" {
+		qname = mq.QUEUE_COMPLETED
+		t.State = task.Completed
+		t.StartedAt = &now
+		t.CompletedAt = &now
+	} else {
+		qname = t.Queue
+		if qname == "" {
+			qname = mq.QUEUE_DEFAULT
+		}
+		t.State = task.Scheduled
+		t.ScheduledAt = &now
+		t.State = task.Scheduled
 	}
-	t.State = task.Scheduled
-	n := time.Now().UTC()
-	t.ScheduledAt = &n
-	t.State = task.Scheduled
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
