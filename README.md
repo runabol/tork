@@ -390,8 +390,6 @@ task properties:
   ```yaml
   retry:
     limit: 5 # will retry up to 5 times
-    initialDelay: 5s # optional: default 1s (max: 5m)
-    scalingFactor: # optional: default 2 (max: 10)
   ```
 - `timeout` - the amount of time (specified as `300ms` or `1h` or `45m` etc.) that a task may execute before it is cancelled.
 

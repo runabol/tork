@@ -196,20 +196,10 @@ func Test_sanitizeTaskRetry(t *testing.T) {
 	err := sanitizeTask(&task.Task{
 		Image: "some:image",
 		Retry: &task.Retry{
-			Limit:         5,
-			InitialDelay:  "1m",
-			ScalingFactor: 2,
+			Limit: 5,
 		},
 	})
 	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Image: "some:image",
-		Retry: &task.Retry{
-			Limit:        3,
-			InitialDelay: "1h",
-		},
-	})
-	assert.Error(t, err)
 	err = sanitizeTask(&task.Task{
 		Image: "some:image",
 		Retry: &task.Retry{
@@ -234,18 +224,6 @@ func Test_sanitizeTaskRetry(t *testing.T) {
 	}
 	err = sanitizeTask(rt1)
 	assert.NoError(t, err)
-	assert.Equal(t, task.RETRY_DEFAULT_INITIAL_DELAY, rt1.Retry.InitialDelay)
-	assert.Equal(t, task.RETRY_DEFAULT_SCALING_FACTOR, rt1.Retry.ScalingFactor)
-	rt2 := &task.Task{
-		Image:   "some:image",
-		Timeout: "10s",
-		Retry: &task.Retry{
-			InitialDelay: "10s",
-		},
-	}
-	err = sanitizeTask(rt1)
-	assert.NoError(t, err)
-	assert.Equal(t, "10s", rt2.Retry.InitialDelay)
 }
 
 func Test_validateTaskBasic(t *testing.T) {

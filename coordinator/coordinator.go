@@ -3,7 +3,6 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/pkg/errors"
@@ -192,18 +191,9 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 		if err := c.ds.CreateTask(ctx, rt); err != nil {
 			return errors.Wrapf(err, "error creating a retry task")
 		}
-		dur, err := time.ParseDuration(rt.Retry.InitialDelay)
-		if err != nil {
-			return errors.Wrapf(err, "invalid retry.initialDelay: %s", rt.Retry.InitialDelay)
+		if err := c.broker.PublishTask(ctx, mq.QUEUE_PENDING, rt); err != nil {
+			log.Error().Err(err).Msg("error publishing retry task")
 		}
-		go func() { // TODO: push the delay implementation to the broker
-			delay := dur * time.Duration(math.Pow(float64(rt.Retry.ScalingFactor), float64(rt.Retry.Attempts-1)))
-			log.Debug().Msgf("delaying retry %s", delay)
-			time.Sleep(delay)
-			if err := c.broker.PublishTask(ctx, mq.QUEUE_PENDING, rt); err != nil {
-				log.Error().Err(err).Msg("error publishing retry task")
-			}
-		}()
 	} else {
 		// mark the job as FAILED
 		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {

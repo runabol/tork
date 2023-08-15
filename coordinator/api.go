@@ -92,24 +92,11 @@ func sanitizeTask(t *task.Task) error {
 		if t.Retry.Limit > 10 {
 			return errors.Errorf("can't specify retry.limit > 10")
 		}
-		if t.Retry.ScalingFactor > 5 {
-			return errors.Errorf("can't specify a retry.scalingFactor > 5")
-		}
-		if t.Retry.ScalingFactor < 2 {
-			t.Retry.ScalingFactor = task.RETRY_DEFAULT_SCALING_FACTOR
-		}
 		if t.Retry.Limit < 0 {
 			t.Retry.Limit = 0
 		}
-		if t.Retry.InitialDelay == "" {
-			t.Retry.InitialDelay = task.RETRY_DEFAULT_INITIAL_DELAY
-		}
-		delay, err := time.ParseDuration(t.Retry.InitialDelay)
-		if err != nil {
-			return errors.Errorf("invalid initial delay duration: %s", t.Retry.InitialDelay)
-		}
-		if delay > (time.Minute * 5) {
-			return errors.Errorf("can't specify retry.initialDelay greater than 5 minutes")
+		if t.Retry.Attempts != 0 {
+			t.Retry.Attempts = 0
 		}
 	}
 	if t.Timeout != "" {
