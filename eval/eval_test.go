@@ -1,6 +1,7 @@
 package eval_test
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,7 @@ func TestEvalLiteral(t *testing.T) {
 func TestEvalVar(t *testing.T) {
 	t1 := &task.Task{
 		Env: map[string]string{
-			"HELLO": "{{ .inputs.SOMEVAR }}",
+			"HELLO": `{{inputs.SOMEVAR}}`,
 		},
 	}
 	err := eval.Evaluate(t1, job.Context{
@@ -44,7 +45,7 @@ func TestEvalVar(t *testing.T) {
 
 func TestEvalName(t *testing.T) {
 	t1 := &task.Task{
-		Name: "{{ .inputs.SOMENAME }}",
+		Name: "{{ inputs.SOMENAME }}y",
 	}
 	err := eval.Evaluate(t1, job.Context{
 		Inputs: map[string]string{
@@ -52,12 +53,12 @@ func TestEvalName(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "John Smith", t1.Name)
+	assert.Equal(t, "John Smithy", t1.Name)
 }
 
 func TestEvalImage(t *testing.T) {
 	t1 := &task.Task{
-		Image: "ubuntu:{{ .inputs.TAG }}",
+		Image: "ubuntu:{{ inputs.TAG }}",
 	}
 	err := eval.Evaluate(t1, job.Context{
 		Inputs: map[string]string{
@@ -70,7 +71,7 @@ func TestEvalImage(t *testing.T) {
 
 func TestEvalQueue(t *testing.T) {
 	t1 := &task.Task{
-		Queue: "{{ .inputs.QUEUE }}",
+		Queue: "{{ inputs.QUEUE }}",
 	}
 	err := eval.Evaluate(t1, job.Context{
 		Inputs: map[string]string{
@@ -81,9 +82,23 @@ func TestEvalQueue(t *testing.T) {
 	assert.Equal(t, "default", t1.Queue)
 }
 
+func TestEvalFunc(t *testing.T) {
+	t1 := &task.Task{
+		Env: map[string]string{
+			"RAND_NUM": "{{ randomInt() }}",
+		},
+	}
+	err := eval.Evaluate(t1, job.Context{})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, t1.Env["RAND_NUM"])
+	intVar, err := strconv.Atoi(t1.Env["RAND_NUM"])
+	assert.NoError(t, err)
+	assert.Greater(t, intVar, 0)
+}
+
 func TestDontEvalRun(t *testing.T) {
 	t1 := &task.Task{
-		Run: "Hello {{ .inputs.NAME }}",
+		Run: "Hello {{ inputs.NAME }}",
 	}
 	err := eval.Evaluate(t1, job.Context{
 		Inputs: map[string]string{
@@ -91,7 +106,7 @@ func TestDontEvalRun(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "Hello {{ .inputs.NAME }}", t1.Run)
+	assert.Equal(t, "Hello {{ inputs.NAME }}", t1.Run)
 }
 
 func TestEvalPre(t *testing.T) {
@@ -99,7 +114,7 @@ func TestEvalPre(t *testing.T) {
 		Pre: []task.Task{
 			{
 				Env: map[string]string{
-					"HELLO": "{{ .inputs.SOMEVAR }}",
+					"HELLO": "{{ inputs.SOMEVAR }}",
 				},
 			},
 		},
@@ -118,7 +133,7 @@ func TestEvalPost(t *testing.T) {
 		Post: []task.Task{
 			{
 				Env: map[string]string{
-					"HELLO": "{{ .inputs.SOMEVAR }}",
+					"HELLO": "{{ inputs.SOMEVAR }}",
 				},
 			},
 		},
@@ -136,7 +151,7 @@ func BenchmarkEval(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		t1 := &task.Task{
 			Env: map[string]string{
-				"HELLO": "{{ .SOMEVAR }}",
+				"HELLO": "{{ inputs.SOMEVAR }}",
 			},
 		}
 		err := eval.Evaluate(t1, job.Context{

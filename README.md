@@ -17,6 +17,7 @@ A Golang based high-performance, scalable and distributed job execution engine.
 - [Pre/Post tasks](#prepost-tasks)
 - No single point of failure.
 - Task timeout
+- [Expression Language](#expressions)
 
 # Architecture
 
@@ -118,7 +119,7 @@ tasks:
       - name: download the remote file
         image: alpine:3.18.3
         env:
-          SOURCE_URL: "{{ .inputs.source }}"
+          SOURCE_URL: "{{ inputs.source }}"
         run: |
           wget \
           $SOURCE_URL \
@@ -301,9 +302,53 @@ tasks:
     image: ubuntu:mantic
     env:
       # refer to the outputs of the previous task
-      NAME: "{{ .tasks.task1 }}"
+      NAME: "{{ tasks.task1 }}"
     run: |
       echo -n hello $NAME
+```
+
+# Expressions
+
+Tork uses [expr](https://github.com/antonmedv/expr) to evaluate embedded expressions in a task's environment variables.
+
+Expressions can be used to perform dynamic actions. some examples:
+
+- access the job's context
+
+```yaml
+inputs:
+  message: hello world
+tasks:
+  - name: say something
+    image: ubuntu:mantic
+    env:
+      MESSAGE: "{{inputs.message}}"
+    run: |
+      echo $MESSAGE
+```
+
+- execute a [built-in functions](https://expr.medv.io/docs/Language-Definition#built-in-functions).
+
+```yaml
+tasks:
+  - name: print the length of a string
+    image: ubuntu:mantic
+    env:
+      LENGTH: "{{len("hello world")}}"
+    run: |
+      echo "The length of the string is: $LENGTH"
+```
+
+- execute one of tork's [custom functions](eval/funcs.go):
+
+```yaml
+tasks:
+  - name: generate a random number
+    image: ubuntu:mantic
+    env:
+      RANDOM_NUMBER: "{{ randomInt() }}"
+    run: |
+      echo "a random number: $RANDOM_NUMBER"
 ```
 
 # Pre/Post Tasks
@@ -369,7 +414,7 @@ Content-Type:text/yaml
 
 - `name` - a human-readable name for the job
 - `tasks` - the list of task to execute
-- `inputs` - input parameters allow you to specify data that the job expects to use during its runtime. Input values can be accessed by tasks by using a [template expression](https://pkg.go.dev/text/template), e.g. `{{ .inputs.someParam }}`
+- `inputs` - input parameters allow you to specify data that the job expects to use during its runtime. Input values can be accessed by tasks by using a [template expression](https://pkg.go.dev/text/template), e.g. `{{ inputs.someParam }}`
 
 task properties:
 
