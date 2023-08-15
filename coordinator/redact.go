@@ -40,11 +40,7 @@ func redactJob(j job.Job) job.Job {
 	j.Inputs = redactVars(j.Inputs)
 	// redact context
 	j.Context.Inputs = redactVars(j.Context.Inputs)
-	tasks := make(map[string]map[string]string)
-	for k, v := range j.Context.Tasks {
-		tasks[k] = redactVars(v)
-	}
-	j.Context.Tasks = tasks
+	j.Context.Tasks = redactVars(j.Context.Tasks)
 	// redact tasks
 	for i, t := range j.Tasks {
 		j.Tasks[i] = redactTask(t)

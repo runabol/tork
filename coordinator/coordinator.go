@@ -121,7 +121,7 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Completed
 		u.CompletedAt = t.CompletedAt
-		u.Outputs = t.Outputs
+		u.Result = t.Result
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
@@ -134,11 +134,11 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 			u.State = job.Completed
 			u.CompletedAt = &now
 		}
-		if len(t.Outputs) > 0 && t.Var != "" {
+		if t.Result != "" && t.Var != "" {
 			if u.Context.Tasks == nil {
-				u.Context.Tasks = make(map[string]map[string]string)
+				u.Context.Tasks = make(map[string]string)
 			}
-			u.Context.Tasks[t.Var] = t.Outputs
+			u.Context.Tasks[t.Var] = t.Result
 		}
 		return nil
 	}); err != nil {

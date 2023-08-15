@@ -285,7 +285,7 @@ limits:
 
 # Outputs
 
-Tasks can write newline-separated, key-value pairs of output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
+Tasks can write arbitrary text output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
 
 ```yaml
 tasks:
@@ -296,12 +296,12 @@ tasks:
     # stored in the job's context
     var: task1
     run: |
-      echo "name=world" >> "$TORK_OUTPUT"
+      echo -n "world" >> "$TORK_OUTPUT"
   - name: say hello
     image: ubuntu:mantic
     env:
       # refer to the outputs of the previous task
-      NAME: "{{ .tasks.task1.name }}"
+      NAME: "{{ .tasks.task1 }}"
     run: |
       echo -n hello $NAME
 ```

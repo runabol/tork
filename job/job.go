@@ -32,6 +32,6 @@ type Job struct {
 }
 
 type Context struct {
-	Inputs map[string]string            `json:"inputs,omitempty"`
-	Tasks  map[string]map[string]string `json:"tasks,omitempty"`
+	Inputs map[string]string `json:"inputs,omitempty"`
+	Tasks  map[string]string `json:"tasks,omitempty"`
 }

@@ -44,7 +44,7 @@ type Task struct {
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
 	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	Outputs     map[string]string `json:"outputs,omitempty"`
+	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 }
 
