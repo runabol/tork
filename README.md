@@ -330,7 +330,7 @@ tasks:
       echo "this should not execute"
 ```
 
-- access the job's context
+- Access the job's context
 
 ```yaml
 inputs:
@@ -344,7 +344,7 @@ tasks:
       echo $MESSAGE
 ```
 
-- execute a [built-in functions](https://expr.medv.io/docs/Language-Definition#built-in-functions).
+- Execute a [built-in function](https://expr.medv.io/docs/Language-Definition#built-in-functions).
 
 ```yaml
 tasks:
@@ -356,7 +356,7 @@ tasks:
       echo "The length of the string is: $LENGTH"
 ```
 
-- execute one of tork's [custom functions](eval/funcs.go):
+- Execute one of Tork's [built-in functions](eval/funcs.go):
 
 ```yaml
 tasks:
