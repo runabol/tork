@@ -310,7 +310,7 @@ tasks:
 
 # Expressions
 
-Tork uses the [expr](https://github.com/antonmedv/expr) language to:
+Tork uses the [expr](https://github.com/antonmedv/expr) expression language to:
 
 - Evaluate embedded expressions in a task's environment variables.
 - Evaluate a task's `if` condition to determine whether a task should run. When an `if` expression evaluates to anything expect `false`, the task will run.
