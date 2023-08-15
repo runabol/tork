@@ -96,6 +96,29 @@ func TestEvalFunc(t *testing.T) {
 	assert.Greater(t, intVar, 0)
 }
 
+func TestEvalIf(t *testing.T) {
+	t1 := &task.Task{
+		If: `{{ 1 == 1 }}`,
+	}
+	err := eval.Evaluate(t1, job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, "true", t1.If)
+
+	t1 = &task.Task{
+		If: `{{ 1 == 2 }}`,
+	}
+	err = eval.Evaluate(t1, job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, "false", t1.If)
+
+	t1 = &task.Task{
+		If: `{{ !(1 == 2) }}`,
+	}
+	err = eval.Evaluate(t1, job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, "true", t1.If)
+}
+
 func TestDontEvalRun(t *testing.T) {
 	t1 := &task.Task{
 		Run: "Hello {{ inputs.NAME }}",

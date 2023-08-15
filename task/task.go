@@ -46,12 +46,8 @@ type Task struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
+	If          string            `json:"if,omitempty" yaml:"if,omitempty"`
 }
-
-const (
-	RETRY_DEFAULT_INITIAL_DELAY  = "1s"
-	RETRY_DEFAULT_SCALING_FACTOR = 2
-)
 
 // Retry allows to specify a retry policy for a given
 // task using the exponential backoff formula:

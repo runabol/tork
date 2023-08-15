@@ -18,6 +18,7 @@ A Golang based high-performance, scalable and distributed job execution engine.
 - No single point of failure.
 - Task timeout
 - [Expression Language](#expressions)
+- [Conditional Tasks](#expressions)
 
 # Architecture
 
@@ -309,9 +310,25 @@ tasks:
 
 # Expressions
 
-Tork uses [expr](https://github.com/antonmedv/expr) to evaluate embedded expressions in a task's environment variables.
+Tork uses the [expr](https://github.com/antonmedv/expr) language to:
 
-Expressions can be used to perform dynamic actions. some examples:
+- Evaluate embedded expressions in a task's environment variables.
+- Evaluate a task's `if` condition to determine whether a task should run. When an `if` expression evaluates to anything expect `false`, the task will run.
+
+Some examples:
+
+- Skip certain tasks using the `if` property:
+
+```yaml
+inputs:
+  run: "true"
+tasks:
+  - name: say something
+    if: "{{ inputs.run == 'true' }}"
+    image: ubuntu:mantic
+    run: |
+      echo "this should not execute"
+```
 
 - access the job's context
 

@@ -81,6 +81,47 @@ func Test_handlePendingTask(t *testing.T) {
 	assert.Equal(t, 1, processed)
 }
 
+func Test_handleConditionalTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	completed := 0
+	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t task.Task) error {
+		completed = completed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	tk := task.Task{
+		ID:    uuid.NewUUID(),
+		Queue: "test-queue",
+		If:    "false",
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = c.handlePendingTask(tk)
+	assert.NoError(t, err)
+
+	// wait for the task to get processed
+	time.Sleep(time.Millisecond * 100)
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, tk.State)
+	// task should only be processed once
+	assert.Equal(t, 1, completed)
+}
+
 func Test_handleStartedTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
