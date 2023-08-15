@@ -285,7 +285,7 @@ limits:
 
 # Outputs
 
-Tasks can write key-value pairs of output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
+Tasks can write newline-separated, key-value pairs of output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
 
 ```yaml
 tasks:
