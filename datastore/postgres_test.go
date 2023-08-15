@@ -36,6 +36,62 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.ID, t2.ID)
 }
 
+func TestPostgresGetActiveTasks(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	j1 := job.Job{
+		ID:        uuid.NewUUID(),
+		CreatedAt: time.Now().UTC(),
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []task.Task{{
+		ID:        uuid.NewUUID(),
+		State:     task.Pending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Scheduled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Running,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Cancelled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Completed,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     task.Failed,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, ta)
+		assert.NoError(t, err)
+	}
+	at, err := ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(at))
+}
+
 func TestPostgresUpdateTask(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"

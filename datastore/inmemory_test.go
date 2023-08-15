@@ -26,6 +26,46 @@ func TestInMemoryCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.ID, t2.ID)
 }
 
+func TestInMemoryGetActiveTasks(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	jid := uuid.NewUUID()
+
+	tasks := []task.Task{{
+		ID:    uuid.NewUUID(),
+		State: task.Pending,
+		JobID: jid,
+	}, {
+		ID:    uuid.NewUUID(),
+		State: task.Scheduled,
+		JobID: jid,
+	}, {
+		ID:    uuid.NewUUID(),
+		State: task.Running,
+		JobID: jid,
+	}, {
+		ID:    uuid.NewUUID(),
+		State: task.Cancelled,
+		JobID: jid,
+	}, {
+		ID:    uuid.NewUUID(),
+		State: task.Completed,
+		JobID: jid,
+	}, {
+		ID:    uuid.NewUUID(),
+		State: task.Failed,
+		JobID: jid,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, ta)
+		assert.NoError(t, err)
+	}
+	at, err := ds.GetActiveTasks(ctx, jid)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(at))
+}
+
 func TestInMemoryUpdateTask(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()

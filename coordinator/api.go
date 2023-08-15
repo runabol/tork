@@ -40,12 +40,12 @@ func newAPI(cfg Config) *api {
 		ds: cfg.DataStore,
 	}
 	r.GET("/status", s.status)
-	r.PUT("/task/:id/cancel", s.cancelTask) // TODO: replace with /job/:id/cancel
 	r.GET("/task/:id", s.getTask)
 	r.GET("/queue", s.listQueues)
 	r.GET("/node", s.listActiveNodes)
 	r.POST("/job", s.createJob)
 	r.GET("/job/:id", s.getJob)
+	r.PUT("/job/:id/cancel", s.cancelJob)
 	return s
 }
 
@@ -78,7 +78,7 @@ func (s *api) listActiveNodes(c *gin.Context) {
 	c.JSON(http.StatusOK, nodes)
 }
 
-func validateTask(t task.Task) error {
+func sanitizeTask(t *task.Task) error {
 	if strings.TrimSpace(t.Image) == "" {
 		return errors.New("missing required field: image")
 	}
@@ -96,13 +96,13 @@ func validateTask(t task.Task) error {
 			return errors.Errorf("can't specify a retry.scalingFactor > 5")
 		}
 		if t.Retry.ScalingFactor < 2 {
-			t.Retry.ScalingFactor = 2
+			t.Retry.ScalingFactor = task.RETRY_DEFAULT_SCALING_FACTOR
 		}
 		if t.Retry.Limit < 0 {
 			t.Retry.Limit = 0
 		}
 		if t.Retry.InitialDelay == "" {
-			t.Retry.InitialDelay = "1s"
+			t.Retry.InitialDelay = task.RETRY_DEFAULT_INITIAL_DELAY
 		}
 		delay, err := time.ParseDuration(t.Retry.InitialDelay)
 		if err != nil {
@@ -138,16 +138,15 @@ func (s *api) createJob(c *gin.Context) {
 			return
 		}
 	default:
-
 		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
 		return
 	}
 	if len(j.Tasks) == 0 {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("job has not tasks"))
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("job has no tasks"))
 		return
 	}
 	for ix, t := range j.Tasks {
-		if err := validateTask(t); err != nil {
+		if err := sanitizeTask(&t); err != nil {
 			_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix))
 			return
 		}
@@ -190,27 +189,43 @@ func (s *api) getTask(c *gin.Context) {
 	c.JSON(http.StatusOK, redactTask(t))
 }
 
-func (s *api) cancelTask(c *gin.Context) {
+func (s *api) cancelJob(c *gin.Context) {
 	id := c.Param("id")
-	err := s.ds.UpdateTask(c, id, func(u *task.Task) error {
-		if u.State != task.Running {
-			return errors.New("task in not running")
+	err := s.ds.UpdateJob(c, id, func(u *job.Job) error {
+		if u.State != job.Running {
+			return errors.New("job in not running")
 		}
-		u.State = task.Cancelled
-		if u.Node != "" {
-			node, err := s.ds.GetNodeByID(c, u.Node)
-			if err != nil {
-				return err
-			}
-			if err := s.broker.PublishTask(c, node.Queue, *u); err != nil {
-				return err
-			}
-		}
+		u.State = job.Cancelled
 		return nil
 	})
 	if err != nil {
 		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
+	}
+	tasks, err := s.ds.GetActiveTasks(c, id)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	for _, t := range tasks {
+		err := s.ds.UpdateTask(c, t.ID, func(u *task.Task) error {
+			u.State = task.Cancelled
+			// notify the node to cancel the task
+			if u.Node != "" {
+				node, err := s.ds.GetNodeByID(c, u.Node)
+				if err != nil {
+					return err
+				}
+				if err := s.broker.PublishTask(c, node.Queue, *u); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			_ = c.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "OK"})
 }
