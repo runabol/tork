@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"encoding/json"
 
 	"sort"
 	"sync"
@@ -51,6 +52,16 @@ func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (task.T
 	t, ok := ds.tasks[id]
 	if !ok {
 		return task.Task{}, ErrTaskNotFound
+	}
+	// create a deep-copy to prevent
+	// unintended side-effects mutations
+	bs, err := json.Marshal(t)
+	if err != nil {
+		return task.Task{}, errors.Wrapf(err, "error marshalling task")
+	}
+	copy := task.Task{}
+	if err := json.Unmarshal(bs, &copy); err != nil {
+		return task.Task{}, errors.Wrapf(err, "error unmarshalling task")
 	}
 	return t, nil
 }
@@ -170,7 +181,17 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 		return ci.Before(*cj)
 	})
 	j.Execution = execution
-	return j, nil
+	// create a deep-copy to prevent
+	// unintended side-effects mutations
+	bs, err := json.Marshal(j)
+	if err != nil {
+		return job.Job{}, errors.Wrapf(err, "error marshalling job")
+	}
+	copy := job.Job{}
+	if err := json.Unmarshal(bs, &copy); err != nil {
+		return job.Job{}, errors.Wrapf(err, "error unmarshalling job")
+	}
+	return copy, nil
 }
 
 func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]task.Task, error) {
