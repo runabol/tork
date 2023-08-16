@@ -2,6 +2,8 @@ package task
 
 import (
 	"time"
+
+	"github.com/tork/clone"
 )
 
 // State defines the list of states that a
@@ -38,8 +40,8 @@ type Task struct {
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty"`
 	Error       string            `json:"error,omitempty"`
-	Pre         []Task            `json:"pre,omitempty" yaml:"pre,omitempty"`
-	Post        []Task            `json:"post,omitempty" yaml:"post,omitempty"`
+	Pre         []*Task           `json:"pre,omitempty" yaml:"pre,omitempty"`
+	Post        []*Task           `json:"post,omitempty" yaml:"post,omitempty"`
 	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	Node        string            `json:"node,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
@@ -48,7 +50,7 @@ type Task struct {
 	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 	If          string            `json:"if,omitempty" yaml:"if,omitempty"`
-	Parallel    []Task            `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	Parallel    []*Task           `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Completions int               `json:"completions,omitempty"`
 }
 
@@ -66,4 +68,69 @@ func (s State) IsActive() bool {
 	return s == Pending ||
 		s == Scheduled ||
 		s == Running
+}
+
+func (t *Task) Clone() *Task {
+	var retry *Retry
+	if t.Retry != nil {
+		retry = t.Retry.Clone()
+	}
+	var limits *Limits
+	if t.Limits != nil {
+		limits = t.Limits.Clone()
+	}
+	return &Task{
+		ID:          t.ID,
+		JobID:       t.JobID,
+		ParentID:    t.ParentID,
+		Position:    t.Position,
+		Name:        t.Name,
+		State:       t.State,
+		CreatedAt:   t.CreatedAt,
+		ScheduledAt: t.ScheduledAt,
+		StartedAt:   t.StartedAt,
+		CompletedAt: t.CompletedAt,
+		FailedAt:    t.FailedAt,
+		CMD:         t.CMD,
+		Entrypoint:  t.Entrypoint,
+		Run:         t.Run,
+		Image:       t.Image,
+		Env:         clone.CloneStringMap(t.Env),
+		Queue:       t.Queue,
+		Error:       t.Error,
+		Pre:         CloneTasks(t.Pre),
+		Post:        CloneTasks(t.Post),
+		Volumes:     t.Volumes,
+		Node:        t.Node,
+		Retry:       retry,
+		Limits:      limits,
+		Timeout:     t.Timeout,
+		Result:      t.Result,
+		Var:         t.Var,
+		If:          t.If,
+		Parallel:    CloneTasks(t.Parallel),
+		Completions: t.Completions,
+	}
+}
+
+func CloneTasks(tasks []*Task) []*Task {
+	copy := make([]*Task, len(tasks))
+	for i, t := range tasks {
+		copy[i] = t.Clone()
+	}
+	return copy
+}
+
+func (r *Retry) Clone() *Retry {
+	return &Retry{
+		Limit:    r.Limit,
+		Attempts: r.Attempts,
+	}
+}
+
+func (l *Limits) Clone() *Limits {
+	return &Limits{
+		CPUs:   l.CPUs,
+		Memory: l.Memory,
+	}
 }

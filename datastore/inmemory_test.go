@@ -19,7 +19,7 @@ func TestInMemoryCreateAndGetTask(t *testing.T) {
 	t1 := task.Task{
 		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateTask(ctx, t1)
+	err := ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestInMemoryGetActiveTasks(t *testing.T) {
 	}}
 
 	for _, ta := range tasks {
-		err := ds.CreateTask(ctx, ta)
+		err := ds.CreateTask(ctx, &ta)
 		assert.NoError(t, err)
 	}
 	at, err := ds.GetActiveTasks(ctx, jid)
@@ -73,7 +73,7 @@ func TestInMemoryUpdateTask(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		State: task.Pending,
 	}
-	err := ds.CreateTask(ctx, t1)
+	err := ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 
 	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
@@ -158,7 +158,7 @@ func TestInMemoryCreateAndGetJob(t *testing.T) {
 	j1 := job.Job{
 		ID: uuid.NewUUID(),
 	}
-	err := ds.CreateJob(ctx, j1)
+	err := ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
@@ -177,7 +177,7 @@ func TestInMemoryUpdateJob(t *testing.T) {
 			},
 		},
 	}
-	err := ds.CreateJob(ctx, j1)
+	err := ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
 		u.State = job.Completed

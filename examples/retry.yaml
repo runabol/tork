@@ -1,14 +1,15 @@
 name: sample parallel job
 tasks:
   - image: ubuntu:mantic
-    env:
-      COINFLIP: "{{coinflip()}}"
+    entrypoint: ["bash","-c"]
     run: |
-      sleep 0.25
-      if [ "$COINFLIP" = "true" ]; then
+      COINFLIP=$((( RANDOM % 2 )) && echo "heads" || echo "tails")
+      echo -n "$COINFLIP"
+      echo -n "$COINFLIP" > $TORK_OUTPUT
+      if [ "$COINFLIP" = "heads" ]; then
           exit 0
       else
           exit 1
       fi
     retry: 
-      limit: 10
+      limit: 2

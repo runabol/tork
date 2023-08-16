@@ -134,7 +134,7 @@ func TestDontEvalRun(t *testing.T) {
 
 func TestEvalPre(t *testing.T) {
 	t1 := &task.Task{
-		Pre: []task.Task{
+		Pre: []*task.Task{
 			{
 				Env: map[string]string{
 					"HELLO": "{{ inputs.SOMEVAR }}",
@@ -153,7 +153,7 @@ func TestEvalPre(t *testing.T) {
 
 func TestEvalPost(t *testing.T) {
 	t1 := &task.Task{
-		Post: []task.Task{
+		Post: []*task.Task{
 			{
 				Env: map[string]string{
 					"HELLO": "{{ inputs.SOMEVAR }}",

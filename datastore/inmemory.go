@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"encoding/json"
 
 	"sort"
 	"sync"
@@ -20,9 +19,9 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
-	tasks map[string]task.Task
+	tasks map[string]*task.Task
 	nodes map[string]node.Node
-	jobs  map[string]job.Job
+	jobs  map[string]*job.Job
 	tmu   sync.RWMutex
 	nmu   sync.RWMutex
 	jmu   sync.RWMutex
@@ -30,40 +29,30 @@ type InMemoryDatastore struct {
 
 func NewInMemoryDatastore() *InMemoryDatastore {
 	return &InMemoryDatastore{
-		tasks: make(map[string]task.Task),
+		tasks: make(map[string]*task.Task),
 		nodes: make(map[string]node.Node),
-		jobs:  make(map[string]job.Job),
+		jobs:  make(map[string]*job.Job),
 	}
 }
 
-func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t task.Task) error {
+func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error {
 	if t.ID == "" {
 		return errors.New("must provide ID")
 	}
 	ds.tmu.Lock()
 	defer ds.tmu.Unlock()
-	ds.tasks[t.ID] = t
+	ds.tasks[t.ID] = t.Clone()
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (task.Task, error) {
+func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	ds.tmu.RLock()
 	defer ds.tmu.RUnlock()
 	t, ok := ds.tasks[id]
 	if !ok {
-		return task.Task{}, ErrTaskNotFound
+		return nil, ErrTaskNotFound
 	}
-	// create a deep-copy to prevent
-	// unintended side-effects mutations
-	bs, err := json.Marshal(t)
-	if err != nil {
-		return task.Task{}, errors.Wrapf(err, "error marshalling task")
-	}
-	copy := task.Task{}
-	if err := json.Unmarshal(bs, &copy); err != nil {
-		return task.Task{}, errors.Wrapf(err, "error unmarshalling task")
-	}
-	return t, nil
+	return t.Clone(), nil
 }
 
 func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *task.Task) error) error {
@@ -73,10 +62,9 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if !ok {
 		return ErrTaskNotFound
 	}
-	if err := modify(&t); err != nil {
+	if err := modify(t); err != nil {
 		return err
 	}
-	ds.tasks[t.ID] = t
 	return nil
 }
 
@@ -130,10 +118,10 @@ func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAf
 	return nodes, nil
 }
 
-func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j job.Job) error {
+func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	ds.jmu.Lock()
 	defer ds.jmu.Unlock()
-	ds.jobs[j.ID] = j
+	ds.jobs[j.ID] = j.Clone()
 	return nil
 }
 
@@ -144,24 +132,24 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	if !ok {
 		return ErrJobNotFound
 	}
-	if err := modify(&j); err != nil {
+	if err := modify(j); err != nil {
 		return err
 	}
 	ds.jobs[j.ID] = j
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (job.Job, error) {
+func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
 	ds.jmu.RLock()
 	defer ds.jmu.RUnlock()
 	j, ok := ds.jobs[id]
 	if !ok {
-		return job.Job{}, ErrJobNotFound
+		return nil, ErrJobNotFound
 	}
-	execution := make([]task.Task, 0)
+	execution := make([]*task.Task, 0)
 	for _, t := range ds.tasks {
 		if t.JobID == id {
-			execution = append(execution, t)
+			execution = append(execution, t.Clone())
 		}
 	}
 	sort.Slice(execution, func(i, j int) bool {
@@ -181,26 +169,16 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 		return ci.Before(*cj)
 	})
 	j.Execution = execution
-	// create a deep-copy to prevent
-	// unintended side-effects mutations
-	bs, err := json.Marshal(j)
-	if err != nil {
-		return job.Job{}, errors.Wrapf(err, "error marshalling job")
-	}
-	copy := job.Job{}
-	if err := json.Unmarshal(bs, &copy); err != nil {
-		return job.Job{}, errors.Wrapf(err, "error unmarshalling job")
-	}
-	return copy, nil
+	return j.Clone(), nil
 }
 
-func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]task.Task, error) {
+func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*task.Task, error) {
 	ds.tmu.RLock()
 	defer ds.tmu.RUnlock()
-	result := make([]task.Task, 0)
+	result := make([]*task.Task, 0)
 	for _, t := range ds.tasks {
 		if t.JobID == jobID && t.State.IsActive() {
-			result = append(result, t)
+			result = append(result, t.Clone())
 		}
 	}
 	return result, nil

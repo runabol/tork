@@ -74,7 +74,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}, nil
 }
 
-func (c *Coordinator) handlePendingTask(t task.Task) error {
+func (c *Coordinator) handlePendingTask(t *task.Task) error {
 	ctx := context.Background()
 	log.Info().
 		Str("task-id", t.ID).
@@ -86,14 +86,14 @@ func (c *Coordinator) handlePendingTask(t task.Task) error {
 	}
 }
 
-func (c *Coordinator) scheduleTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) scheduleTask(ctx context.Context, t *task.Task) error {
 	if len(t.Parallel) > 0 {
 		return c.scheduleParallelTask(ctx, t)
 	}
 	return c.scheduleRegularTask(ctx, t)
 }
 
-func (c *Coordinator) scheduleRegularTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *task.Task) error {
 	now := time.Now().UTC()
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
@@ -111,7 +111,7 @@ func (c *Coordinator) scheduleRegularTask(ctx context.Context, t task.Task) erro
 	return c.broker.PublishTask(ctx, t.Queue, t)
 }
 
-func (c *Coordinator) scheduleParallelTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) error {
 	now := time.Now().UTC()
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Running
@@ -132,7 +132,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t task.Task) err
 		pt.Position = t.Position
 		pt.CreatedAt = &now
 		pt.ParentID = t.ID
-		if err := eval.Evaluate(&pt, j.Context); err != nil {
+		if err := eval.Evaluate(pt, j.Context); err != nil {
 			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
 		}
 		if err := c.ds.CreateTask(ctx, pt); err != nil {
@@ -145,7 +145,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t task.Task) err
 	return nil
 }
 
-func (c *Coordinator) skipTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) skipTask(ctx context.Context, t *task.Task) error {
 	now := time.Now().UTC()
 	t.State = task.Scheduled
 	t.ScheduledAt = &now
@@ -162,7 +162,7 @@ func (c *Coordinator) skipTask(ctx context.Context, t task.Task) error {
 	return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
-func (c *Coordinator) handleStartedTask(t task.Task) error {
+func (c *Coordinator) handleStartedTask(t *task.Task) error {
 	ctx := context.Background()
 	log.Debug().
 		Str("task-id", t.ID).
@@ -180,7 +180,7 @@ func (c *Coordinator) handleStartedTask(t task.Task) error {
 	})
 }
 
-func (c *Coordinator) handleCompletedTask(t task.Task) error {
+func (c *Coordinator) handleCompletedTask(t *task.Task) error {
 	ctx := context.Background()
 	if t.ParentID != "" { // parallel task
 		return c.completeParallelTask(ctx, t)
@@ -188,7 +188,7 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 	return c.completeRegularTask(ctx, t)
 }
 
-func (c *Coordinator) completeParallelTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
 	// update actual task
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Completed
@@ -233,7 +233,7 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t task.Task) err
 	return nil
 }
 
-func (c *Coordinator) completeRegularTask(ctx context.Context, t task.Task) error {
+func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -275,7 +275,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t task.Task) erro
 		next.State = task.Pending
 		next.Position = j.Position
 		next.CreatedAt = &now
-		if err := eval.Evaluate(&next, j.Context); err != nil {
+		if err := eval.Evaluate(next, j.Context); err != nil {
 			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
 		}
 		if err := c.ds.CreateTask(ctx, next); err != nil {
@@ -286,7 +286,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t task.Task) erro
 	return nil
 }
 
-func (c *Coordinator) handleFailedTask(t task.Task) error {
+func (c *Coordinator) handleFailedTask(t *task.Task) error {
 	ctx := context.Background()
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
@@ -297,16 +297,31 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 		Str("task-error", t.Error).
 		Str("task-state", string(t.State)).
 		Msg("received task failure")
+
+	// mark the task as FAILED
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		if u.State.IsActive() {
+			u.State = task.Failed
+			u.FailedAt = t.FailedAt
+			u.Error = t.Error
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error marking task %s as FAILED", t.ID)
+	}
+	// eligible for retry?
 	if j.State == job.Running &&
 		t.Retry != nil &&
 		t.Retry.Attempts < t.Retry.Limit {
 		// create a new retry task
-		rt := t
+		now := time.Now().UTC()
+		rt := t.Clone()
 		rt.ID = uuid.NewUUID()
+		rt.CreatedAt = &now
 		rt.Retry.Attempts = rt.Retry.Attempts + 1
 		rt.State = task.Pending
 		rt.Error = ""
-		if err := eval.Evaluate(&rt, j.Context); err != nil {
+		if err := eval.Evaluate(rt, j.Context); err != nil {
 			return errors.Wrapf(err, "error evaluating task")
 		}
 		if err := c.ds.CreateTask(ctx, rt); err != nil {
@@ -330,15 +345,7 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 			return errors.Wrapf(err, "error marking the job as failed in the datastore")
 		}
 	}
-	// mark the task as FAILED
-	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		if u.State.IsActive() {
-			u.State = task.Failed
-			u.FailedAt = t.FailedAt
-			u.Error = t.Error
-		}
-		return nil
-	})
+	return nil
 }
 
 func (c *Coordinator) handleHeartbeats(n node.Node) error {
@@ -363,7 +370,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 
 }
 
-func (c *Coordinator) handleJob(j job.Job) error {
+func (c *Coordinator) handleJob(j *job.Job) error {
 	ctx := context.Background()
 	log.Debug().Msgf("starting job %s", j.ID)
 	now := time.Now().UTC()
@@ -373,7 +380,7 @@ func (c *Coordinator) handleJob(j job.Job) error {
 	t.State = task.Pending
 	t.Position = 1
 	t.CreatedAt = &now
-	if err := eval.Evaluate(&t, j.Context); err != nil {
+	if err := eval.Evaluate(t, j.Context); err != nil {
 		return errors.Wrapf(err, "error evaluating task")
 	}
 	if err := c.ds.CreateTask(ctx, t); err != nil {

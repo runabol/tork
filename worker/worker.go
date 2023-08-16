@@ -73,7 +73,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 	return w, nil
 }
 
-func (w *Worker) handleTask(t task.Task) error {
+func (w *Worker) handleTask(t *task.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task")
@@ -87,7 +87,7 @@ func (w *Worker) handleTask(t task.Task) error {
 	}
 }
 
-func (w *Worker) cancelTask(t task.Task) error {
+func (w *Worker) cancelTask(t *task.Task) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	rt, ok := w.tasks[t.ID]
@@ -101,7 +101,7 @@ func (w *Worker) cancelTask(t task.Task) error {
 	return nil
 }
 
-func (w *Worker) runTask(t task.Task) error {
+func (w *Worker) runTask(t *task.Task) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	w.mu.Lock()
 	w.tasks[t.ID] = runningTask{
@@ -146,7 +146,7 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
 		pre.Limits = t.Limits
-		if err := w.doRunTask(ctx, &pre); err != nil {
+		if err := w.doRunTask(ctx, pre); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -165,7 +165,7 @@ func (w *Worker) runTask(t task.Task) error {
 		//pre.Result = result
 	}
 	// run the actual task
-	if err := w.doRunTask(ctx, &t); err != nil {
+	if err := w.doRunTask(ctx, t); err != nil {
 		log.Error().
 			Str("task-id", t.ID).
 			Err(err).
@@ -183,7 +183,7 @@ func (w *Worker) runTask(t task.Task) error {
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
 		post.Limits = t.Limits
-		if err := w.doRunTask(ctx, &post); err != nil {
+		if err := w.doRunTask(ctx, post); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -210,7 +210,7 @@ func (w *Worker) runTask(t task.Task) error {
 }
 
 func (w *Worker) doRunTask(ctx context.Context, o *task.Task) error {
-	t := *o
+	t := o.Clone()
 	// create a temporary mount point
 	// we can use to write the run script to
 	rundir, err := os.MkdirTemp(w.tempdir, "tork-")

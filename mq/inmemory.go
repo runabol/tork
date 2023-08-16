@@ -2,7 +2,6 @@ package mq
 
 import (
 	"context"
-	"encoding/json"
 
 	"sync"
 
@@ -19,59 +18,49 @@ const defaultQueueSize = 10
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	tasks     map[string]chan task.Task
+	tasks     map[string]chan *task.Task
 	hearbeats chan node.Node
-	jobs      chan job.Job
+	jobs      chan *job.Job
 	mu        sync.RWMutex
 }
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		tasks:     make(map[string]chan task.Task),
+		tasks:     make(map[string]chan *task.Task),
 		hearbeats: make(chan node.Node, defaultQueueSize),
-		jobs:      make(chan job.Job, defaultQueueSize),
+		jobs:      make(chan *job.Job, defaultQueueSize),
 	}
 }
 
-func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t task.Task) error {
+func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	b.mu.RLock()
 	q, ok := b.tasks[qname]
 	b.mu.RUnlock()
 	if !ok {
 		b.mu.Lock()
-		q = make(chan task.Task, defaultQueueSize)
+		q = make(chan *task.Task, defaultQueueSize)
 		b.tasks[qname] = q
 		b.mu.Unlock()
 	}
-	// copy the task to prevent unintended side-effects
-	// between the coordinator and worker
-	bs, err := json.Marshal(t)
-	if err != nil {
-		return errors.Wrapf(err, "error marshalling task")
-	}
-	copy := task.Task{}
-	if err := json.Unmarshal(bs, &copy); err != nil {
-		return errors.Wrapf(err, "error marshalling task")
-	}
-	q <- copy
+	q <- t.Clone()
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t task.Task) error) error {
+func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	b.mu.RLock()
 	q, ok := b.tasks[qname]
 	b.mu.RUnlock()
 	if !ok {
-		q = make(chan task.Task, defaultQueueSize)
+		q = make(chan *task.Task, defaultQueueSize)
 		b.mu.Lock()
 		b.tasks[qname] = q
 		b.mu.Unlock()
 	}
 	go func() {
 		for t := range q {
-			err := handler(t)
+			err := handler(t.Clone())
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing task")
 			}
@@ -127,23 +116,14 @@ func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error)
 	return nil
 }
 
-func (b *InMemoryBroker) PublishJob(ctx context.Context, j job.Job) error {
-	// make a copy of the job to prevent unintended side-effects
-	bs, err := json.Marshal(j)
-	if err != nil {
-		return errors.Wrapf(err, "error marshalling job")
-	}
-	copy := job.Job{}
-	if err := json.Unmarshal(bs, &copy); err != nil {
-		return errors.Wrapf(err, "error unmarshalling job")
-	}
-	b.jobs <- copy
+func (b *InMemoryBroker) PublishJob(ctx context.Context, j *job.Job) error {
+	b.jobs <- j.Clone()
 	return nil
 }
-func (b *InMemoryBroker) SubscribeForJobs(handler func(j job.Job) error) error {
+func (b *InMemoryBroker) SubscribeForJobs(handler func(j *job.Job) error) error {
 	go func() {
 		for j := range b.jobs {
-			err := handler(j)
+			err := handler(j.Clone())
 			if err != nil {
 				log.Error().Err(err).Msg("unexpcted error occured while processing job")
 			}
