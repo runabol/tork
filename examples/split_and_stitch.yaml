@@ -1,0 +1,183 @@
+name: split and stitch demo
+description: |
+  this job splits an input video into 10s chunks, transcodes the various chunks in parallel, 
+  and finally stitches the final result into a single file.
+
+  This demo assumes a locally running instace of Minio (AWS S3-like service) which will be used to store the 
+  video chunks and the final video output
+
+  You can get a running instance of minio using the following command: 
+
+  docker run --name=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+
+  The default credentials for Minio Server are minioadmin/minioadmin
+inputs:
+  source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
+tasks:
+  - var: ffprobe
+    name: get the duration of the video
+    image: jrottenberg/ffmpeg:3.4-alpine
+    env:
+      SOURCE: "{{ inputs.source }}" 
+    run: |
+      ffprobe \
+        -v quiet \
+        -print_format json \
+        -show_error \
+        -show_format \
+        -show_streams \
+        $SOURCE > $TORK_OUTPUT
+
+  - var: duration
+    name: get the duration of the video
+    description: extract the duration of the video from the ffprobe output using jq
+    image: ubuntu:mantic
+    env:
+      FFPROBE: "{{ tasks.ffprobe }}" 
+    cmd: 
+    run: |
+      apt-get update && apt-get install -y jq
+      DURATION=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .duration')
+      echo -n $DURATION >> $TORK_OUTPUT
+
+  - var: framerate
+    name: get the framerate of the video
+    description: extract the video's framerate from the ffprobe output using jq
+    image: ubuntu:mantic
+    env:
+      FFPROBE: "{{ tasks.ffprobe }}" 
+    cmd: 
+    run: |
+      apt-get update && apt-get install -y jq
+      FRAMERATE=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .r_frame_rate')
+      echo -n $FRAMERATE >> $TORK_OUTPUT
+
+  - var: chunks
+    name: calculate chunks times 
+    image: python:3-slim
+    env:
+      DURATION: "{{ tasks.duration }}"
+      FRAMERATE: "{{ tasks.framerate }}" 
+    cmd: 
+    run: |
+      cat > script.py <<EOL
+      import math
+      import re
+      import json
+
+      duration = float("$DURATION")
+
+      # parse and clean the framerate
+      cfrate = re.sub(r"[^0-9/\\.]", "", "$FRAMERATE")
+      pfrate = cfrate.split("/")
+      frate = float(pfrate[0])/float(pfrate[1])
+
+      frate_ceil = math.ceil(frate)
+      time_unit = frate_ceil/frate
+      chunk_size = 10*time_unit
+
+      chunks = []
+      start = 0
+      length = 0
+      while(start<duration):
+        if(duration-start<chunk_size):
+          length=duration-start
+        else:
+          length=chunk_size
+
+        # if the next chunk is going to be 
+        # too small then we just append it
+        # to this chunk.
+        if duration-(start+length) < 5:
+          length=duration-start
+
+        chunks.append({"start":start,"length":length})
+        start = start+length;
+      
+      print(json.dumps(chunks))
+      EOL
+      python script.py > $TORK_OUTPUT
+
+  - var: bucketName
+    name: generate a random bucket name to store the results
+    image: ubuntu:mantic
+    run: echo -n "video-$(shuf -i 1-10000 -n1)" > $TORK_OUTPUT
+
+  - name: create a temporary bucket to house the chunks
+    image: "amazon/aws-cli:2.13.10"
+    env:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      BUCKET_NAME: "{{tasks.bucketName}}"
+    run: | 
+      aws \
+        --endpoint-url http://host.docker.internal:9000 \
+        s3api create-bucket --bucket $BUCKET_NAME
+
+  - name: transcode the chunks in parallel
+    each:
+      list: "{{ parseJSON(tasks.chunks) }}"
+      task:
+        name: encode the chunk
+        volumes:
+          - /tmp
+        env:
+          SOURCE: "{{ inputs.source }}"
+          START: "{{ item.value.start }}"
+          LENGTH: "{{ item.value.length }}"
+        var: "chunk{{ item.index }}"
+        image: jrottenberg/ffmpeg:3.4-alpine
+        run: |
+          ffmpeg -ss ${START} -i $SOURCE -to $LENGTH /tmp/chunk.mp4
+        post:
+          - name: upload the chunk to minio
+            image: "amazon/aws-cli:2.13.10"
+            env:
+              AWS_ACCESS_KEY_ID: minioadmin
+              AWS_SECRET_ACCESS_KEY: minioadmin
+              BUCKET_NAME: "{{tasks.bucketName}}"
+              NUMBER: "{{ item.index }}"
+            run:
+              aws --endpoint-url http://host.docker.internal:9000 s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
+
+  - name: list all the chunks in the bucket
+    image: "amazon/aws-cli:2.13.10"
+    env:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      BUCKET_NAME: "{{tasks.bucketName}}"
+    run: | 
+      aws --endpoint-url http://host.docker.internal:9000 s3 ls s3://$BUCKET_NAME/chunks
+
+  - name: stitch the chunks into a single video
+    volumes:
+      - /tmp
+    env:
+      BUCKET_NAME: "{{tasks.bucketName}}"
+    image: jrottenberg/ffmpeg:3.4-alpine
+    run: |
+      for filename in /tmp/chunks/*.mp4; do
+        echo "file $filename" >> /tmp/chunks.txt
+      done
+      ffmpeg -f concat -safe 0 -i /tmp/chunks.txt -c copy /tmp/output.mp4
+    pre:
+      - name: download the chunks 
+        image: "amazon/aws-cli:2.13.10"
+        env:
+          AWS_ACCESS_KEY_ID: minioadmin
+          AWS_SECRET_ACCESS_KEY: minioadmin
+          BUCKET_NAME: "{{tasks.bucketName}}"
+        run:
+          aws --endpoint-url http://host.docker.internal:9000 s3 sync s3://$BUCKET_NAME/chunks /tmp/chunks
+    post:
+      - name: upload the final video to minio
+        image: "amazon/aws-cli:2.13.10"
+        env:
+          AWS_ACCESS_KEY_ID: minioadmin
+          AWS_SECRET_ACCESS_KEY: minioadmin
+          BUCKET_NAME: "{{tasks.bucketName}}"
+        run:
+          aws --endpoint-url http://host.docker.internal:9000 s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/output.mp4
+      
+
+

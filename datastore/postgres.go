@@ -24,6 +24,7 @@ type taskRecord struct {
 	JobID       string         `db:"job_id"`
 	Position    int            `db:"position"`
 	Name        string         `db:"name"`
+	Description string         `db:"description"`
 	State       string         `db:"state"`
 	CreatedAt   time.Time      `db:"created_at"`
 	ScheduledAt *time.Time     `db:"scheduled_at"`
@@ -55,6 +56,7 @@ type taskRecord struct {
 type jobRecord struct {
 	ID          string     `db:"id"`
 	Name        string     `db:"name"`
+	Description string     `db:"description"`
 	State       string     `db:"state"`
 	CreatedAt   time.Time  `db:"created_at"`
 	StartedAt   *time.Time `db:"started_at"`
@@ -151,6 +153,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Completions: r.Completions,
 		ParentID:    r.ParentID,
 		Each:        each,
+		Description: r.Description,
 	}, nil
 }
 
@@ -186,6 +189,7 @@ func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
 		Position:    r.Position,
 		Context:     c,
 		Inputs:      inputs,
+		Description: r.Description,
 	}, nil
 }
 
@@ -285,12 +289,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			parallel, -- $27
 			completions, -- $28
 			parent_id, -- $29
-			each_ -- $30
+			each_, -- $30
+			description -- $31
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30)`
+			$27,$28,$29,$30,$31)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -322,6 +327,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		t.Completions,                // $28
 		t.ParentID,                   // $29
 		each,                         // $30
+		t.Description,                // $31
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -490,10 +496,10 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 		return errors.Wrapf(err, "failed to serialize job.inputs")
 	}
 	q := `insert into jobs 
-	       (id,name,state,created_at,started_at,tasks,position,inputs,context) 
+	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
+	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}

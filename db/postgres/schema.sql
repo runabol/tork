@@ -19,7 +19,8 @@ CREATE TABLE jobs (
     tasks         jsonb       not null,
     position      int         not null,
     inputs        jsonb       not null,
-    context       jsonb       not null
+    context       jsonb       not null,
+    description   text
 );
 
 CREATE TABLE tasks (
@@ -52,7 +53,8 @@ CREATE TABLE tasks (
     parallel      jsonb,
     completions   int,
     parent_id     varchar(32),
-    each_         jsonb
+    each_         jsonb,
+    description   text
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
