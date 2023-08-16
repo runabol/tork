@@ -371,7 +371,7 @@ tasks:
 
 # Parallel Tasks
 
-It is possible to run a collection of tasks by wrapping them in a `parallel` task. Example:
+To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 
 ```yaml
 - name: a parallel task
