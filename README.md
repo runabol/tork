@@ -23,7 +23,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 
 # Architecture
 
-![architecture diagram](arch.png)
+![architecture diagram](archv2.png)
 
 **Coordinator**: responsible for managing the lifecycle of a task through its various states and for exposing a REST API to the clients.
 
