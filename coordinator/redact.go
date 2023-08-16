@@ -21,31 +21,33 @@ func contains(substr string) func(s string) bool {
 	}
 }
 
-func redactTask(t task.Task) task.Task {
+func redactTask(t *task.Task) *task.Task {
+	redacted := t.Clone()
 	// redact env vars
-	t.Env = redactVars(t.Env)
+	redacted.Env = redactVars(redacted.Env)
 	// redact pre tasks
-	for i, p := range t.Pre {
-		t.Pre[i] = redactTask(p)
+	for i, p := range redacted.Pre {
+		redacted.Pre[i] = redactTask(p)
 	}
 	// redact post tasks
-	for i, p := range t.Post {
-		t.Post[i] = redactTask(p)
+	for i, p := range redacted.Post {
+		redacted.Post[i] = redactTask(p)
 	}
-	return t
+	return redacted
 }
 
-func redactJob(j job.Job) job.Job {
+func redactJob(j *job.Job) *job.Job {
+	redacted := j.Clone()
 	// redact inputs
-	j.Inputs = redactVars(j.Inputs)
+	redacted.Inputs = redactVars(redacted.Inputs)
 	// redact context
-	j.Context.Inputs = redactVars(j.Context.Inputs)
-	j.Context.Tasks = redactVars(j.Context.Tasks)
+	redacted.Context.Inputs = redactVars(redacted.Context.Inputs)
+	redacted.Context.Tasks = redactVars(redacted.Context.Tasks)
 	// redact tasks
-	for i, t := range j.Tasks {
-		j.Tasks[i] = redactTask(t)
+	for i, t := range redacted.Tasks {
+		redacted.Tasks[i] = redactTask(t)
 	}
-	return j
+	return redacted
 }
 
 func redactVars(m map[string]string) map[string]string {

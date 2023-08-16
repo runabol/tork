@@ -20,12 +20,12 @@ func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 	assert.NoError(t, err)
 	processed := 0
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err = b.SubscribeForTasks(qname, func(t task.Task) error {
+	err = b.SubscribeForTasks(qname, func(t *task.Task) error {
 		processed = processed + 1
 		return nil
 	})
 	assert.NoError(t, err)
-	err = b.PublishTask(ctx, qname, task.Task{})
+	err = b.PublishTask(ctx, qname, &task.Task{})
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
@@ -37,7 +37,7 @@ func TestRabbitMQGetQueues(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err = b.PublishTask(ctx, qname, task.Task{})
+	err = b.PublishTask(ctx, qname, &task.Task{})
 	assert.NoError(t, err)
 	qis, err := b.Queues(ctx)
 	assert.NoError(t, err)
@@ -72,12 +72,12 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := 0
-	err = b.SubscribeForJobs(func(j job.Job) error {
+	err = b.SubscribeForJobs(func(j *job.Job) error {
 		processed = processed + 1
 		return nil
 	})
 	assert.NoError(t, err)
-	err = b.PublishJob(ctx, job.Job{})
+	err = b.PublishJob(ctx, &job.Job{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)

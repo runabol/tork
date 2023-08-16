@@ -555,6 +555,7 @@ Failure:
 1. Better input validation (consider using cue-lang).
 2. Mapping task.
 3. Redis broker integration.
+4. Job-level defaults
 
 # License
 

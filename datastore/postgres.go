@@ -73,46 +73,46 @@ type nodeRecord struct {
 	Queue           string    `db:"queue"`
 }
 
-func (r taskRecord) toTask() (task.Task, error) {
+func (r taskRecord) toTask() (*task.Task, error) {
 	var env map[string]string
 	if r.Env != nil {
 		if err := json.Unmarshal(r.Env, &env); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.env")
+			return nil, errors.Wrapf(err, "error deserializing task.env")
 		}
 	}
-	var pre []task.Task
+	var pre []*task.Task
 	if r.Pre != nil {
 		if err := json.Unmarshal(r.Pre, &pre); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.pre")
+			return nil, errors.Wrapf(err, "error deserializing task.pre")
 		}
 	}
-	var post []task.Task
+	var post []*task.Task
 	if r.Post != nil {
 		if err := json.Unmarshal(r.Post, &post); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.post")
+			return nil, errors.Wrapf(err, "error deserializing task.post")
 		}
 	}
 	var retry *task.Retry
 	if r.Retry != nil {
 		retry = &task.Retry{}
 		if err := json.Unmarshal(r.Retry, retry); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.retry")
+			return nil, errors.Wrapf(err, "error deserializing task.retry")
 		}
 	}
 	var limits *task.Limits
 	if r.Limits != nil {
 		limits = &task.Limits{}
 		if err := json.Unmarshal(r.Limits, limits); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.limits")
+			return nil, errors.Wrapf(err, "error deserializing task.limits")
 		}
 	}
-	var parallel []task.Task
+	var parallel []*task.Task
 	if r.Parallel != nil {
 		if err := json.Unmarshal(r.Post, &parallel); err != nil {
-			return task.Task{}, errors.Wrapf(err, "error deserializing task.parallel")
+			return nil, errors.Wrapf(err, "error deserializing task.parallel")
 		}
 	}
-	return task.Task{
+	return &task.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
 		Position:    r.Position,
@@ -155,16 +155,16 @@ func (r nodeRecord) toNode() node.Node {
 	}
 }
 
-func (r jobRecord) toJob(tasks, execution []task.Task) (job.Job, error) {
+func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
 	var c job.Context
 	if err := json.Unmarshal(r.Context, &c); err != nil {
-		return job.Job{}, errors.Wrapf(err, "error deserializing task.context")
+		return nil, errors.Wrapf(err, "error deserializing task.context")
 	}
 	var inputs map[string]string
 	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
-		return job.Job{}, errors.Wrapf(err, "error deserializing task.inputs")
+		return nil, errors.Wrapf(err, "error deserializing task.inputs")
 	}
-	return job.Job{
+	return &job.Job{
 		ID:          r.ID,
 		Name:        r.Name,
 		State:       job.State(r.State),
@@ -197,7 +197,7 @@ func (ds *PostgresDatastore) CreateSchema() error {
 	return err
 }
 
-func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error {
+func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error {
 	var env *string
 	if t.Env != nil {
 		b, err := json.Marshal(t.Env)
@@ -309,13 +309,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t task.Task) error 
 	return nil
 }
 
-func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (task.Task, error) {
+func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	r := taskRecord{}
 	if err := ds.db.Get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return task.Task{}, ErrNodeNotFound
+			return nil, ErrNodeNotFound
 		}
-		return task.Task{}, errors.Wrapf(err, "error fetching task from db")
+		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
 	return r.toTask()
 }
@@ -333,7 +333,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err != nil {
 		return err
 	}
-	if err := modify(&t); err != nil {
+	if err := modify(t); err != nil {
 		return err
 	}
 	q := `update tasks set 
@@ -442,7 +442,7 @@ func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAf
 	return ns, nil
 }
 
-func (ds *PostgresDatastore) CreateJob(ctx context.Context, j job.Job) error {
+func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	if j.ID == "" {
 		return errors.Errorf("job id must not be empty")
 	}
@@ -477,15 +477,15 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	if err := ds.db.Get(&r, `SELECT * FROM jobs where id = $1 for update`, id); err != nil {
 		return errors.Wrapf(err, "error fetching job from db")
 	}
-	tasks := make([]task.Task, 0)
+	tasks := make([]*task.Task, 0)
 	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
 		return errors.Wrapf(err, "error desiralizing job.tasks")
 	}
-	j, err := r.toJob(tasks, []task.Task{})
+	j, err := r.toJob(tasks, []*task.Task{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to convert jobRecord")
 	}
-	if err := modify(&j); err != nil {
+	if err := modify(j); err != nil {
 		return err
 	}
 	c, err := json.Marshal(j.Context)
@@ -513,17 +513,17 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	return nil
 }
 
-func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job, error) {
+func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
 	r := jobRecord{}
 	if err := ds.db.Get(&r, `SELECT * FROM jobs where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return job.Job{}, ErrJobNotFound
+			return nil, ErrJobNotFound
 		}
-		return job.Job{}, errors.Wrapf(err, "error fetching job from db")
+		return nil, errors.Wrapf(err, "error fetching job from db")
 	}
-	tasks := make([]task.Task, 0)
+	tasks := make([]*task.Task, 0)
 	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
-		return job.Job{}, errors.Wrapf(err, "error desiralizing job.tasks")
+		return nil, errors.Wrapf(err, "error desiralizing job.tasks")
 	}
 	rs := make([]taskRecord, 0)
 	q := `SELECT * 
@@ -531,13 +531,13 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 		  where job_id = $1 
 		  ORDER BY position,created_at ASC`
 	if err := ds.db.Select(&rs, q, id); err != nil {
-		return job.Job{}, errors.Wrapf(err, "error getting job execution from db")
+		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
-	exec := make([]task.Task, len(rs))
+	exec := make([]*task.Task, len(rs))
 	for i, r := range rs {
 		t, err := r.toTask()
 		if err != nil {
-			return job.Job{}, err
+			return nil, err
 		}
 		exec[i] = t
 	}
@@ -545,7 +545,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (job.Job
 	return r.toJob(tasks, exec)
 }
 
-func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]task.Task, error) {
+func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*task.Task, error) {
 	rs := make([]taskRecord, 0)
 	q := `SELECT * 
 	      FROM tasks 
@@ -556,7 +556,7 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	if err := ds.db.Select(&rs, q, jobID, task.Pending, task.Scheduled, task.Running); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
-	actives := make([]task.Task, len(rs))
+	actives := make([]*task.Task, len(rs))
 	for i, r := range rs {
 		t, err := r.toTask()
 		if err != nil {

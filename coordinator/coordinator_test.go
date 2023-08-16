@@ -52,7 +52,7 @@ func Test_handlePendingTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks("test-queue", func(t task.Task) error {
+	err := b.SubscribeForTasks("test-queue", func(t *task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -66,7 +66,7 @@ func Test_handlePendingTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	tk := task.Task{
+	tk := &task.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
 	}
@@ -92,7 +92,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t task.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *task.Task) error {
 		completed = completed + 1
 		return nil
 	})
@@ -106,7 +106,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	tk := task.Task{
+	tk := &task.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
 		If:    "false",
@@ -142,7 +142,7 @@ func Test_handleStartedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:        uuid.NewUUID(),
 		State:     task.Scheduled,
 		StartedAt: &now,
@@ -176,11 +176,11 @@ func Test_handleCompletedLastTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
 		Position: 2,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
 			},
@@ -192,7 +192,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:          uuid.NewUUID(),
 		State:       task.Running,
 		StartedAt:   &now,
@@ -235,11 +235,11 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
 		Position: 1,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
 			},
@@ -251,7 +251,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:          uuid.NewUUID(),
 		State:       task.Running,
 		StartedAt:   &now,
@@ -294,14 +294,14 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
 		Position: 1,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
-				Parallel: []task.Task{
+				Parallel: []*task.Task{
 					{
 						Name: "parallel-task-1",
 					},
@@ -315,10 +315,10 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	pt := task.Task{
+	pt := &task.Task{
 		ID:    uuid.NewUUID(),
 		JobID: j1.ID,
-		Parallel: []task.Task{
+		Parallel: []*task.Task{
 			{
 				Name: "parallel-task-1",
 			},
@@ -328,7 +328,7 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	err = ds.CreateTask(ctx, pt)
 	assert.NoError(t, err)
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:          uuid.NewUUID(),
 		State:       task.Running,
 		StartedAt:   &now,
@@ -372,11 +372,11 @@ func Test_handleFailedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
 		Position: 1,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
 			},
@@ -385,7 +385,7 @@ func Test_handleFailedTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:          uuid.NewUUID(),
 		State:       task.Running,
 		StartedAt:   &now,
@@ -419,7 +419,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t task.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t *task.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -435,11 +435,11 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
 		Position: 1,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
 			},
@@ -448,7 +448,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:          uuid.NewUUID(),
 		State:       task.Running,
 		StartedAt:   &now,
@@ -523,10 +523,10 @@ func Test_handleJobs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := job.Job{
+	j1 := &job.Job{
 		ID:    uuid.NewUUID(),
 		State: job.Pending,
-		Tasks: []task.Task{
+		Tasks: []*task.Task{
 			{
 				Name: "task-1",
 			},
@@ -556,7 +556,7 @@ func TestRunParallelJob(t *testing.T) {
 	assert.Equal(t, 6, len(j1.Execution))
 }
 
-func doRunJob(t *testing.T, filename string) job.Job {
+func doRunJob(t *testing.T, filename string) *job.Job {
 	ctx := context.Background()
 
 	b := mq.NewInMemoryBroker()
@@ -586,8 +586,8 @@ func doRunJob(t *testing.T, filename string) job.Job {
 	contents, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
-	j1 := job.Job{}
-	err = yaml.Unmarshal(contents, &j1)
+	j1 := &job.Job{}
+	err = yaml.Unmarshal(contents, j1)
 	assert.NoError(t, err)
 
 	j1.ID = uuid.NewUUID()

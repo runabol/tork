@@ -3,6 +3,7 @@ package job
 import (
 	"time"
 
+	"github.com/tork/clone"
 	"github.com/tork/task"
 )
 
@@ -24,8 +25,8 @@ type Job struct {
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	Tasks       []task.Task       `json:"tasks,omitempty" yaml:"tasks,omitempty"`
-	Execution   []task.Task       `json:"execution,omitempty"`
+	Tasks       []*task.Task      `json:"tasks,omitempty" yaml:"tasks,omitempty"`
+	Execution   []*task.Task      `json:"execution,omitempty"`
 	Position    int               `json:"position,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Context     Context           `json:"context,omitempty"`
@@ -34,4 +35,24 @@ type Job struct {
 type Context struct {
 	Inputs map[string]string `json:"inputs,omitempty"`
 	Tasks  map[string]string `json:"tasks,omitempty"`
+}
+
+func (j *Job) Clone() *Job {
+	return &Job{
+		ID:          j.ID,
+		Name:        j.Name,
+		State:       j.State,
+		CreatedAt:   j.CreatedAt,
+		StartedAt:   j.StartedAt,
+		CompletedAt: j.CompletedAt,
+		FailedAt:    j.FailedAt,
+		Tasks:       task.CloneTasks(j.Tasks),
+		Execution:   task.CloneTasks(j.Execution),
+		Position:    j.Position,
+		Inputs:      j.Inputs,
+		Context: Context{
+			Inputs: clone.CloneStringMap(j.Context.Inputs),
+			Tasks:  clone.CloneStringMap(j.Context.Tasks),
+		},
+	}
 }

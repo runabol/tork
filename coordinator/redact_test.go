@@ -17,7 +17,7 @@ func TestRedactTask(t *testing.T) {
 			"AWS_ACCESS_KEY_ID": "some-key",
 			"harmless":          "hello world",
 		},
-		Pre: []task.Task{
+		Pre: []*task.Task{
 			{
 				Env: map[string]string{
 					"secret_1": "secret",
@@ -25,7 +25,7 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
-		Post: []task.Task{
+		Post: []*task.Task{
 			{
 				Env: map[string]string{
 					"secret_1": "secret",
@@ -34,7 +34,7 @@ func TestRedactTask(t *testing.T) {
 			},
 		},
 	}
-	tr := redactTask(ta)
+	tr := redactTask(&ta)
 
 	assert.Equal(t, "[REDACTED]", tr.Env["secret_1"])
 	assert.Equal(t, "[REDACTED]", tr.Env["SecrET_2"])
@@ -58,8 +58,8 @@ func TestRedactJob(t *testing.T) {
 			"harmless":          "hello world",
 		},
 	}
-	j := redactJob(job.Job{
-		Tasks: []task.Task{ta},
+	j := redactJob(&job.Job{
+		Tasks: []*task.Task{&ta},
 		Inputs: map[string]string{
 			"secret": "password",
 			"plain":  "helloworld",

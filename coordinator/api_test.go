@@ -22,7 +22,7 @@ import (
 
 func Test_getQueues(t *testing.T) {
 	b := mq.NewInMemoryBroker()
-	err := b.SubscribeForTasks("some-queue", func(t task.Task) error {
+	err := b.SubscribeForTasks("some-queue", func(t *task.Task) error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -120,7 +120,7 @@ func Test_getTask(t *testing.T) {
 		ID:   "1234",
 		Name: "test task",
 	}
-	err := ds.CreateTask(context.Background(), ta)
+	err := ds.CreateTask(context.Background(), &ta)
 	assert.NoError(t, err)
 	api := newAPI(Config{
 		DataStore: ds,
@@ -167,7 +167,7 @@ func Test_createJob(t *testing.T) {
 
 func Test_getJob(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	err := ds.CreateJob(context.Background(), job.Job{
+	err := ds.CreateJob(context.Background(), &job.Job{
 		ID:    "1234",
 		State: job.Pending,
 	})
@@ -232,11 +232,11 @@ func Test_sanitizeTaskBasic(t *testing.T) {
 	err = sanitizeTask(&task.Task{Image: "some:image"})
 	assert.NoError(t, err)
 	err = sanitizeTask(&task.Task{
-		Parallel: []task.Task{{Image: "some:image"}},
+		Parallel: []*task.Task{{Image: "some:image"}},
 	})
 	assert.NoError(t, err)
 	err = sanitizeTask(&task.Task{
-		Parallel: []task.Task{{Name: "bad task"}},
+		Parallel: []*task.Task{{Name: "bad task"}},
 	})
 	assert.Error(t, err)
 }
@@ -249,7 +249,7 @@ func Test_cancelRunningJob(t *testing.T) {
 		State:     job.Running,
 		CreatedAt: time.Now().UTC(),
 	}
-	err := ds.CreateJob(ctx, j1)
+	err := ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -287,7 +287,7 @@ func Test_cancelRunningJob(t *testing.T) {
 	}}
 
 	for _, ta := range tasks {
-		err := ds.CreateTask(ctx, ta)
+		err := ds.CreateTask(ctx, &ta)
 		assert.NoError(t, err)
 	}
 

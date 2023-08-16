@@ -22,14 +22,14 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	j1 := job.Job{
 		ID: uuid.NewUUID(),
 	}
-	err = ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	t1 := task.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}
-	err = ds.CreateTask(ctx, t1)
+	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
@@ -46,12 +46,12 @@ func TestPostgresGetActiveTasks(t *testing.T) {
 		ID:        uuid.NewUUID(),
 		CreatedAt: time.Now().UTC(),
 	}
-	err = ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
 
-	tasks := []task.Task{{
+	tasks := []*task.Task{{
 		ID:        uuid.NewUUID(),
 		State:     task.Pending,
 		CreatedAt: &now,
@@ -102,9 +102,9 @@ func TestPostgresUpdateTask(t *testing.T) {
 	j1 := job.Job{
 		ID: uuid.NewUUID(),
 	}
-	err = ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := task.Task{
+	t1 := &task.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
 		JobID:     j1.ID,
@@ -210,7 +210,7 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 			"var1": "val1",
 		},
 	}
-	err = ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
@@ -232,7 +232,7 @@ func TestPostgresUpdateJob(t *testing.T) {
 			},
 		},
 	}
-	err = ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
 		u.State = job.Completed

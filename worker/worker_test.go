@@ -47,7 +47,7 @@ func Test_handleTaskRun(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
 		completions = completions + 1
 		return nil
 	})
@@ -62,7 +62,7 @@ func Test_handleTaskRun(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(task.Task{
+	err = w.handleTask(&task.Task{
 		ID:    uuid.NewUUID(),
 		State: task.Scheduled,
 		Image: "ubuntu:mantic",
@@ -91,7 +91,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	tid := uuid.NewUUID()
 
 	errs := 0
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *task.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
@@ -99,8 +99,8 @@ func Test_handleTaskCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	// cancel the task immediately upon start
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk task.Task) error {
-		err = w.handleTask(task.Task{
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *task.Task) error {
+		err = w.handleTask(&task.Task{
 			ID:    tid,
 			State: task.Cancelled,
 		})
@@ -114,7 +114,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(task.Task{
+	err = w.handleTask(&task.Task{
 		ID:    tid,
 		State: task.Scheduled,
 		Image: "ubuntu:mantic",
@@ -135,7 +135,7 @@ func Test_handleTaskError(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	errs := 0
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *task.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
@@ -151,7 +151,7 @@ func Test_handleTaskError(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(task.Task{
+	err = w.handleTask(&task.Task{
 		ID:    uuid.NewUUID(),
 		State: task.Scheduled,
 		Image: "ubuntu:mantic",
@@ -172,7 +172,7 @@ func Test_handleTaskOutput(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
 		completions = completions + 1
 		assert.NotEmpty(t, tk.Result)
 		return nil
@@ -188,7 +188,7 @@ func Test_handleTaskOutput(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(task.Task{
+	err = w.handleTask(&task.Task{
 		ID:    uuid.NewUUID(),
 		State: task.Scheduled,
 		Image: "ubuntu:mantic",

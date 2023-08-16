@@ -80,7 +80,7 @@ func (s *api) listActiveNodes(c *gin.Context) {
 
 func sanitizeTask(t *task.Task) error {
 	for _, pt := range t.Parallel {
-		if err := sanitizeTask(&pt); err != nil {
+		if err := sanitizeTask(pt); err != nil {
 			return err
 		}
 	}
@@ -120,7 +120,7 @@ func sanitizeTask(t *task.Task) error {
 }
 
 func (s *api) createJob(c *gin.Context) {
-	j := job.Job{}
+	j := &job.Job{}
 	switch c.ContentType() {
 	case "application/json":
 		if err := c.BindJSON(&j); err != nil {
@@ -141,7 +141,7 @@ func (s *api) createJob(c *gin.Context) {
 		return
 	}
 	for ix, t := range j.Tasks {
-		if err := sanitizeTask(&t); err != nil {
+		if err := sanitizeTask(t); err != nil {
 			_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "tasks[%d]", ix))
 			return
 		}
@@ -211,7 +211,7 @@ func (s *api) cancelJob(c *gin.Context) {
 				if err != nil {
 					return err
 				}
-				if err := s.broker.PublishTask(c, node.Queue, *u); err != nil {
+				if err := s.broker.PublishTask(c, node.Queue, u); err != nil {
 					return err
 				}
 			}

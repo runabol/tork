@@ -49,18 +49,18 @@ func Evaluate(t *task.Task, c job.Context) error {
 	}
 	t.If = ifExpr
 	// evaluate pre-tasks
-	pres := make([]task.Task, len(t.Pre))
+	pres := make([]*task.Task, len(t.Pre))
 	for i, pre := range t.Pre {
-		if err := Evaluate(&pre, c); err != nil {
+		if err := Evaluate(pre, c); err != nil {
 			return err
 		}
 		pres[i] = pre
 	}
 	t.Pre = pres
 	// evaluate post-tasks
-	posts := make([]task.Task, len(t.Post))
+	posts := make([]*task.Task, len(t.Post))
 	for i, post := range t.Post {
-		if err := Evaluate(&post, c); err != nil {
+		if err := Evaluate(post, c); err != nil {
 			return err
 		}
 		posts[i] = post
