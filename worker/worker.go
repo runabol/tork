@@ -209,7 +209,8 @@ func (w *Worker) runTask(t task.Task) error {
 	return w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
-func (w *Worker) doRunTask(ctx context.Context, t *task.Task) error {
+func (w *Worker) doRunTask(ctx context.Context, o *task.Task) error {
+	t := *o
 	// create a temporary mount point
 	// we can use to write the run script to
 	rundir, err := os.MkdirTemp(w.tempdir, "tork-")
@@ -237,7 +238,7 @@ func (w *Worker) doRunTask(ctx context.Context, t *task.Task) error {
 		defer cancel()
 		rctx = tctx
 	}
-	if err := w.runtime.Run(rctx, *t); err != nil {
+	if err := w.runtime.Run(rctx, t); err != nil {
 		return err
 	}
 	if _, err := os.Stat(path.Join(rundir, "output")); err == nil {
@@ -245,7 +246,7 @@ func (w *Worker) doRunTask(ctx context.Context, t *task.Task) error {
 		if err != nil {
 			return errors.Wrapf(err, "error reading output file")
 		}
-		t.Result = string(contents)
+		o.Result = string(contents)
 	}
 	return nil
 }

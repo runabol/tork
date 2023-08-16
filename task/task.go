@@ -22,6 +22,7 @@ const (
 type Task struct {
 	ID          string            `json:"id,omitempty"`
 	JobID       string            `json:"jobId,omitempty"`
+	ParentID    string            `json:"parentId,omitempty"`
 	Position    int               `json:"position,omitempty"`
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
 	State       State             `json:"state,omitempty"`
@@ -47,12 +48,10 @@ type Task struct {
 	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 	If          string            `json:"if,omitempty" yaml:"if,omitempty"`
+	Parallel    []Task            `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	Completions int               `json:"completions,omitempty"`
 }
 
-// Retry allows to specify a retry policy for a given
-// task using the exponential backoff formula:
-//
-// initialDelay*scalingFactor^attempt
 type Retry struct {
 	Limit    int `json:"limit,omitempty" yaml:"limit,omitempty"`
 	Attempts int `json:"attempts,omitempty" yaml:"attempts,omitempty"`

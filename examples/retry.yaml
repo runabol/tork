@@ -1,0 +1,14 @@
+name: sample parallel job
+tasks:
+  - image: ubuntu:mantic
+    env:
+      COINFLIP: "{{coinflip()}}"
+    run: |
+      sleep 0.25
+      if [ "$COINFLIP" = "true" ]; then
+          exit 0
+      else
+          exit 1
+      fi
+    retry: 
+      limit: 10

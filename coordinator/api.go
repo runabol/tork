@@ -79,6 +79,14 @@ func (s *api) listActiveNodes(c *gin.Context) {
 }
 
 func sanitizeTask(t *task.Task) error {
+	for _, pt := range t.Parallel {
+		if err := sanitizeTask(&pt); err != nil {
+			return err
+		}
+	}
+	if len(t.Parallel) > 0 {
+		return nil
+	}
 	if strings.TrimSpace(t.Image) == "" {
 		return errors.New("missing required field: image")
 	}

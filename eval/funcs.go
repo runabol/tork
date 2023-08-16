@@ -6,3 +6,7 @@ import "math/rand"
 func randomInt() int {
 	return rand.Int()
 }
+
+func coinflip() bool {
+	return rand.Int()%2 == 0
+}
