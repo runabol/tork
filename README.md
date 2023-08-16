@@ -318,7 +318,7 @@ Tork uses the [expr](https://github.com/antonmedv/expr) expression language to:
 
 Some examples:
 
-- Skip certain tasks using the `if` property:
+Skip certain tasks using the `if` property:
 
 ```yaml
 inputs:
@@ -331,7 +331,7 @@ tasks:
       echo "this should not execute"
 ```
 
-- Access the job's context
+Access the job's context
 
 ```yaml
 inputs:
@@ -345,7 +345,7 @@ tasks:
       echo $MESSAGE
 ```
 
-- Execute a [built-in function](https://expr.medv.io/docs/Language-Definition#built-in-functions).
+Execute a [built-in function](https://expr.medv.io/docs/Language-Definition#built-in-functions).
 
 ```yaml
 tasks:
@@ -357,7 +357,7 @@ tasks:
       echo "The length of the string is: $LENGTH"
 ```
 
-- Execute one of Tork's [built-in functions](eval/funcs.go):
+Execute one of Tork's [built-in functions](eval/funcs.go):
 
 ```yaml
 tasks:
