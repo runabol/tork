@@ -368,7 +368,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		return errors.Wrapf(err, "error update task in db")
 	}
 	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error commiting tx")
+		return errors.Wrapf(err, "error committing tx")
 	}
 	return nil
 }
@@ -410,7 +410,7 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 		return errors.Wrapf(err, "error update task in db")
 	}
 	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error commiting tx")
+		return errors.Wrapf(err, "error committing tx")
 	}
 	return nil
 }
@@ -508,7 +508,7 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		return errors.Wrapf(err, "error updating job in db")
 	}
 	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error commiting tx")
+		return errors.Wrapf(err, "error committing tx")
 	}
 	return nil
 }

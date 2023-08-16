@@ -62,7 +62,7 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 		for t := range q {
 			err := handler(t.Clone())
 			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occured while processing task")
+				log.Error().Err(err).Msg("unexpcted error occurred while processing task")
 			}
 		}
 	}()
@@ -109,7 +109,7 @@ func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error)
 		for n := range b.hearbeats {
 			err := handler(n)
 			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occured while processing registration")
+				log.Error().Err(err).Msg("unexpcted error occurred while processing registration")
 			}
 		}
 	}()
@@ -125,7 +125,7 @@ func (b *InMemoryBroker) SubscribeForJobs(handler func(j *job.Job) error) error 
 		for j := range b.jobs {
 			err := handler(j.Clone())
 			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occured while processing job")
+				log.Error().Err(err).Msg("unexpcted error occurred while processing job")
 			}
 		}
 	}()
