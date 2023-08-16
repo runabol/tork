@@ -4,7 +4,7 @@
 ![Build Status](https://github.com/runabol/tork/workflows/ci/badge.svg)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-A Golang based high-performance, scalable and distributed job execution engine.
+A Golang based high-performance, scalable and distributed workflow engine.
 
 # Features:
 
