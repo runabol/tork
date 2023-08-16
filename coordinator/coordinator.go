@@ -94,10 +94,12 @@ func (c *Coordinator) handlePendingTask(t task.Task) error {
 		t.State = task.Scheduled
 		t.ScheduledAt = &now
 		t.State = task.Scheduled
+		t.Queue = qname
 	}
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
+		u.Queue = t.Queue
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
