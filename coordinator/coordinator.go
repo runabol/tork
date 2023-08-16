@@ -79,23 +79,27 @@ func (c *Coordinator) handlePendingTask(t task.Task) error {
 	log.Info().
 		Str("task-id", t.ID).
 		Msg("handling pending task")
-	var qname string
-	now := time.Now().UTC()
 	if strings.TrimSpace(t.If) == "false" {
-		qname = mq.QUEUE_COMPLETED
-		t.State = task.Completed
-		t.StartedAt = &now
-		t.CompletedAt = &now
+		return c.skipTask(ctx, t)
 	} else {
-		qname = t.Queue
-		if qname == "" {
-			qname = mq.QUEUE_DEFAULT
-		}
-		t.State = task.Scheduled
-		t.ScheduledAt = &now
-		t.State = task.Scheduled
-		t.Queue = qname
+		return c.scheduleTask(ctx, t)
 	}
+}
+
+func (c *Coordinator) scheduleTask(ctx context.Context, t task.Task) error {
+	if len(t.Parallel) > 0 {
+		return c.scheduleParallelTask(ctx, t)
+	}
+	return c.scheduleRegularTask(ctx, t)
+}
+
+func (c *Coordinator) scheduleRegularTask(ctx context.Context, t task.Task) error {
+	now := time.Now().UTC()
+	if t.Queue == "" {
+		t.Queue = mq.QUEUE_DEFAULT
+	}
+	t.State = task.Scheduled
+	t.ScheduledAt = &now
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
@@ -104,7 +108,58 @@ func (c *Coordinator) handlePendingTask(t task.Task) error {
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
-	return c.broker.PublishTask(ctx, qname, t)
+	return c.broker.PublishTask(ctx, t.Queue, t)
+}
+
+func (c *Coordinator) scheduleParallelTask(ctx context.Context, t task.Task) error {
+	now := time.Now().UTC()
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = task.Running
+		u.ScheduledAt = &now
+		u.StartedAt = &now
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	j, err := c.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting job: %s", t.JobID)
+	}
+	for _, pt := range t.Parallel {
+		pt.ID = uuid.NewUUID()
+		pt.JobID = j.ID
+		pt.State = task.Pending
+		pt.Position = t.Position
+		pt.CreatedAt = &now
+		pt.ParentID = t.ID
+		if err := eval.Evaluate(&pt, j.Context); err != nil {
+			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
+		}
+		if err := c.ds.CreateTask(ctx, pt); err != nil {
+			return err
+		}
+		if err := c.handlePendingTask(pt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Coordinator) skipTask(ctx context.Context, t task.Task) error {
+	now := time.Now().UTC()
+	t.State = task.Scheduled
+	t.ScheduledAt = &now
+	t.StartedAt = &now
+	t.CompletedAt = &now
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = t.State
+		u.ScheduledAt = t.ScheduledAt
+		u.StartedAt = t.StartedAt
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
 func (c *Coordinator) handleStartedTask(t task.Task) error {
@@ -127,6 +182,58 @@ func (c *Coordinator) handleStartedTask(t task.Task) error {
 
 func (c *Coordinator) handleCompletedTask(t task.Task) error {
 	ctx := context.Background()
+	if t.ParentID != "" { // parallel task
+		return c.completeParallelTask(ctx, t)
+	}
+	return c.completeRegularTask(ctx, t)
+}
+
+func (c *Coordinator) completeParallelTask(ctx context.Context, t task.Task) error {
+	// update actual task
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = task.Completed
+		u.CompletedAt = t.CompletedAt
+		u.Result = t.Result
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting parent parallel task: %s", t.ParentID)
+	}
+	// update parent task
+	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
+		u.Completions = u.Completions + 1
+		if u.Completions >= len(u.Parallel) {
+			now := time.Now().UTC()
+			parent.State = task.Completed
+			parent.CompletedAt = &now
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	// update job context
+	if t.Result != "" && t.Var != "" {
+		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+			if u.Context.Tasks == nil {
+				u.Context.Tasks = make(map[string]string)
+			}
+			u.Context.Tasks[t.Var] = t.Result
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error updating job in datastore")
+		}
+	}
+	// complete the parent task
+	if parent.State == task.Completed {
+		return c.completeRegularTask(ctx, parent)
+	}
+	return nil
+}
+
+func (c *Coordinator) completeRegularTask(ctx context.Context, t task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -139,7 +246,7 @@ func (c *Coordinator) handleCompletedTask(t task.Task) error {
 	}
 	// update job in DB
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-		u.Position = t.Position + 1
+		u.Position = u.Position + 1
 		if u.Position > len(u.Tasks) {
 			now := time.Now().UTC()
 			u.State = job.Completed
@@ -199,6 +306,9 @@ func (c *Coordinator) handleFailedTask(t task.Task) error {
 		rt.Retry.Attempts = rt.Retry.Attempts + 1
 		rt.State = task.Pending
 		rt.Error = ""
+		if err := eval.Evaluate(&rt, j.Context); err != nil {
+			return errors.Wrapf(err, "error evaluating task")
+		}
 		if err := c.ds.CreateTask(ctx, rt); err != nil {
 			return errors.Wrapf(err, "error creating a retry task")
 		}
@@ -273,6 +383,7 @@ func (c *Coordinator) handleJob(j job.Job) error {
 		n := time.Now().UTC()
 		u.State = job.Running
 		u.StartedAt = &n
+		u.Position = 1
 		return nil
 	}); err != nil {
 		return err

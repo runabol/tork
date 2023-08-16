@@ -128,7 +128,16 @@ func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error)
 }
 
 func (b *InMemoryBroker) PublishJob(ctx context.Context, j job.Job) error {
-	b.jobs <- j
+	// make a copy of the job to prevent unintended side-effects
+	bs, err := json.Marshal(j)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling job")
+	}
+	copy := job.Job{}
+	if err := json.Unmarshal(bs, &copy); err != nil {
+		return errors.Wrapf(err, "error unmarshalling job")
+	}
+	b.jobs <- copy
 	return nil
 }
 func (b *InMemoryBroker) SubscribeForJobs(handler func(j job.Job) error) error {

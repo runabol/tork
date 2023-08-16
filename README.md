@@ -19,6 +19,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - Task timeout
 - [Expression Language](#expressions)
 - [Conditional Tasks](#expressions)
+- [Parallel Tasks](#parallel-tasks)
 
 # Architecture
 
@@ -366,6 +367,21 @@ tasks:
       RANDOM_NUMBER: "{{ randomInt() }}"
     run: |
       echo "a random number: $RANDOM_NUMBER"
+```
+
+# Parallel Tasks
+
+It is possible to run a collection of tasks by wrapping them in a `parallel` task. Example:
+
+```yaml
+- name: a parallel task
+  parallel:
+    - image: ubuntu:mantic
+      run: sleep 2
+    - image: ubuntu:mantic
+      run: sleep 1
+    - image: ubuntu:mantic
+      run: sleep 3
 ```
 
 # Pre/Post Tasks

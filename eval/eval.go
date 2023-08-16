@@ -97,6 +97,7 @@ func evaluateExpression(ex string, c job.Context) (string, error) {
 		"inputs":    c.Inputs,
 		"tasks":     c.Tasks,
 		"randomInt": randomInt,
+		"coinflip":  coinflip,
 	}
 	program, err := expr.Compile(ex, expr.Env(env))
 	if err != nil {

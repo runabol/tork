@@ -226,11 +226,19 @@ func Test_sanitizeTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_validateTaskBasic(t *testing.T) {
+func Test_sanitizeTaskBasic(t *testing.T) {
 	err := sanitizeTask(&task.Task{})
 	assert.Error(t, err)
 	err = sanitizeTask(&task.Task{Image: "some:image"})
 	assert.NoError(t, err)
+	err = sanitizeTask(&task.Task{
+		Parallel: []task.Task{{Image: "some:image"}},
+	})
+	assert.NoError(t, err)
+	err = sanitizeTask(&task.Task{
+		Parallel: []task.Task{{Name: "bad task"}},
+	})
+	assert.Error(t, err)
 }
 
 func Test_cancelRunningJob(t *testing.T) {

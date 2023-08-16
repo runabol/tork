@@ -1,0 +1,18 @@
+name: sample parallel job
+tasks:
+  - name: hello task
+    image: ubuntu:mantic
+    run: echo start of job 
+
+  - name: a parallel task
+    parallel:
+      - image: ubuntu:mantic
+        run: sleep 2
+      - image: ubuntu:mantic
+        run: sleep 1
+      - image: ubuntu:mantic
+        run: sleep 3
+
+  - name: bye task
+    image: ubuntu:mantic
+    run: echo end of job

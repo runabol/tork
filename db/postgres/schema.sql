@@ -48,7 +48,10 @@ CREATE TABLE tasks (
     limits        jsonb,
     timeout       varchar(8),
     result        text,
-    var           varchar(16)
+    var           varchar(16),
+    parallel      jsonb,
+    completions   int,
+    parent_id     varchar(32)
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
