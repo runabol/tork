@@ -1,6 +1,9 @@
 package eval
 
-import "math/rand"
+import (
+	"encoding/json"
+	"math/rand"
+)
 
 // randomInt returns a non-negative pseudo-random int from the default Source.
 func randomInt() int {
@@ -23,4 +26,13 @@ func range_(start, stop int) []int {
 		start = start + 1
 	}
 	return result
+}
+
+func parseJSON(data string) (any, error) {
+	var object any
+	err := json.Unmarshal([]byte(data), &object)
+	if err != nil {
+		return nil, err
+	}
+	return object, nil
 }

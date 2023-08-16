@@ -7,13 +7,13 @@ import (
 
 	"github.com/antonmedv/expr"
 	"github.com/pkg/errors"
-	"github.com/tork/job"
+
 	"github.com/tork/task"
 )
 
 var exprMatcher = regexp.MustCompile(`{{\s*(.+?)\s*}}`)
 
-func EvaluateTask(t *task.Task, c job.Context) error {
+func EvaluateTask(t *task.Task, c map[string]any) error {
 	// evaluate name
 	name, err := evaluateTemplate(t.Name, c)
 	if err != nil {
@@ -84,7 +84,7 @@ func EvaluateTask(t *task.Task, c job.Context) error {
 	return nil
 }
 
-func evaluateTemplate(ex string, c job.Context) (string, error) {
+func evaluateTemplate(ex string, c map[string]any) (string, error) {
 	if ex == "" {
 		return "", nil
 	}
@@ -107,19 +107,20 @@ func evaluateTemplate(ex string, c job.Context) (string, error) {
 	return buf.String(), nil
 }
 
-func EvaluateExpr(ex string, c job.Context) (any, error) {
+func EvaluateExpr(ex string, c map[string]any) (any, error) {
 	// if the expression is marked with {{ }}
 	// we want to strip these off
 	if matches := exprMatcher.FindStringSubmatch(ex); matches != nil {
 		ex = matches[1]
 	}
-	env := map[string]interface{}{
-		"inputs":    c.Inputs,
-		"tasks":     c.Tasks,
-		"item":      c.Item,
+	env := map[string]any{
 		"randomInt": randomInt,
 		"coinflip":  coinflip,
 		"range":     range_,
+		"parseJSON": parseJSON,
+	}
+	for k, v := range c {
+		env[k] = v
 	}
 	program, err := expr.Compile(ex, expr.Env(env))
 	if err != nil {

@@ -136,6 +136,10 @@ tasks:
           https://devnull-as-a-service.com/dev/null
 ```
 
+## More examples
+
+Check out the [examples](examples/) folder for more examples.
+
 # Queues
 
 By default all tasks are routed to the `default` queue.
@@ -567,12 +571,15 @@ Failure:
 }
 ```
 
-# Roadmap
+# TODO
 
 1. Better input validation (consider using cue-lang).
-2. Mapping task.
-3. Redis broker integration.
-4. Job-level defaults
+2. Redis broker integration.
+3. Job-level defaults
+4. Podman runtime integration
+5. Check if a job is still running on task start singal and if not cancel the task.
+6. Mark task and job as FAILED when failing to evaluate a task.
+7. Sub jobs
 
 # License
 

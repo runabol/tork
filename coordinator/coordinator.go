@@ -122,7 +122,7 @@ func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error 
 		return errors.Wrapf(err, "error getting job: %s", t.JobID)
 	}
 	// evaluate the list expression
-	lraw, err := eval.EvaluateExpr(t.Each.List, j.Context)
+	lraw, err := eval.EvaluateExpr(t.Each.List, j.Context.AsMap())
 	if err != nil {
 		return errors.Wrapf(err, "error evaluating each.list expression: %s", t.Each.List)
 	}
@@ -147,10 +147,10 @@ func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error 
 	}
 	// schedule a task for each elements in the list
 	for ix, item := range list {
-		cx := j.Context.Clone()
-		cx.Item = map[string]string{
+		cx := j.Context.Clone().AsMap()
+		cx["item"] = map[string]any{
 			"index": fmt.Sprintf("%d", ix),
-			"value": fmt.Sprintf("%v", item),
+			"value": item,
 		}
 		et := t.Each.Task.Clone()
 		et.ID = uuid.NewUUID()
@@ -196,7 +196,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 		pt.Position = t.Position
 		pt.CreatedAt = &now
 		pt.ParentID = t.ID
-		if err := eval.EvaluateTask(pt, j.Context); err != nil {
+		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
 			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
 		}
 		if err := c.ds.CreateTask(ctx, pt); err != nil {
@@ -387,7 +387,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 		next.State = task.Pending
 		next.Position = j.Position
 		next.CreatedAt = &now
-		if err := eval.EvaluateTask(next, j.Context); err != nil {
+		if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
 			return errors.Wrapf(err, "error evaluating task for job: %s", j.ID)
 		}
 		if err := c.ds.CreateTask(ctx, next); err != nil {
@@ -433,7 +433,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 		rt.Retry.Attempts = rt.Retry.Attempts + 1
 		rt.State = task.Pending
 		rt.Error = ""
-		if err := eval.EvaluateTask(rt, j.Context); err != nil {
+		if err := eval.EvaluateTask(rt, j.Context.AsMap()); err != nil {
 			return errors.Wrapf(err, "error evaluating task")
 		}
 		if err := c.ds.CreateTask(ctx, rt); err != nil {
@@ -492,7 +492,7 @@ func (c *Coordinator) handleJob(j *job.Job) error {
 	t.State = task.Pending
 	t.Position = 1
 	t.CreatedAt = &now
-	if err := eval.EvaluateTask(t, j.Context); err != nil {
+	if err := eval.EvaluateTask(t, j.Context.AsMap()); err != nil {
 		return errors.Wrapf(err, "error evaluating task")
 	}
 	if err := c.ds.CreateTask(ctx, t); err != nil {

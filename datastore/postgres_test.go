@@ -25,15 +25,17 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	t1 := task.Task{
-		ID:        uuid.NewUUID(),
-		CreatedAt: &now,
-		JobID:     j1.ID,
+		ID:          uuid.NewUUID(),
+		CreatedAt:   &now,
+		JobID:       j1.ID,
+		Description: "some description",
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, t1.ID, t2.ID)
+	assert.Equal(t, t1.Description, t2.Description)
 }
 
 func TestPostgresGetActiveTasks(t *testing.T) {

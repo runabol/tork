@@ -27,6 +27,7 @@ type Task struct {
 	ParentID    string            `json:"parentId,omitempty"`
 	Position    int               `json:"position,omitempty"`
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
 	ScheduledAt *time.Time        `json:"scheduledAt,omitempty"`
@@ -122,6 +123,7 @@ func (t *Task) Clone() *Task {
 		Parallel:    CloneTasks(t.Parallel),
 		Completions: t.Completions,
 		Each:        each,
+		Description: t.Description,
 	}
 }
 

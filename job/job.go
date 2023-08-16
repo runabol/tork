@@ -20,6 +20,7 @@ const (
 type Job struct {
 	ID          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
@@ -35,7 +36,6 @@ type Job struct {
 type Context struct {
 	Inputs map[string]string `json:"inputs,omitempty"`
 	Tasks  map[string]string `json:"tasks,omitempty"`
-	Item   map[string]string `json:"item,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -59,6 +59,12 @@ func (c Context) Clone() Context {
 	return Context{
 		Inputs: clone.CloneStringMap(c.Inputs),
 		Tasks:  clone.CloneStringMap(c.Tasks),
-		Item:   clone.CloneStringMap(c.Item),
+	}
+}
+
+func (c Context) AsMap() map[string]any {
+	return map[string]any{
+		"inputs": c.Inputs,
+		"tasks":  c.Tasks,
 	}
 }
