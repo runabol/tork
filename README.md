@@ -550,6 +550,12 @@ Failure:
 }
 ```
 
+# Roadmap
+
+1. Better input validation (consider using cue-lang).
+2. Mapping task.
+3. Redis broker integration.
+
 # License
 
 Copyright (c) 2023-present Arik Cohen. Tork is free and open-source software licensed under the MIT License.
