@@ -322,7 +322,7 @@ Skip certain tasks using the `if` property:
 
 ```yaml
 inputs:
-  run: "true"
+  run: "false"
 tasks:
   - name: say something
     if: "{{ inputs.run == 'true' }}"
