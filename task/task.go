@@ -52,6 +52,13 @@ type Task struct {
 	If          string            `json:"if,omitempty" yaml:"if,omitempty"`
 	Parallel    []*Task           `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Completions int               `json:"completions,omitempty"`
+	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
+}
+
+type Each struct {
+	List string `json:"list,omitempty" yaml:"list,omitempty"`
+	Task *Task  `json:"task,omitempty" yaml:"task,omitempty"`
+	Size int    `json:"size,omitempty"`
 }
 
 type Retry struct {
@@ -78,6 +85,10 @@ func (t *Task) Clone() *Task {
 	var limits *Limits
 	if t.Limits != nil {
 		limits = t.Limits.Clone()
+	}
+	var each *Each
+	if t.Each != nil {
+		each = t.Each.Clone()
 	}
 	return &Task{
 		ID:          t.ID,
@@ -110,6 +121,7 @@ func (t *Task) Clone() *Task {
 		If:          t.If,
 		Parallel:    CloneTasks(t.Parallel),
 		Completions: t.Completions,
+		Each:        each,
 	}
 }
 
@@ -132,5 +144,12 @@ func (l *Limits) Clone() *Limits {
 	return &Limits{
 		CPUs:   l.CPUs,
 		Memory: l.Memory,
+	}
+}
+
+func (l *Each) Clone() *Each {
+	return &Each{
+		List: l.List,
+		Task: l.Task.Clone(),
 	}
 }

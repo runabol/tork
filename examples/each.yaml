@@ -1,0 +1,20 @@
+---
+name: sample each job
+tasks:
+  - name: hello task
+    image: ubuntu:mantic
+    run: echo start of job 
+
+  - name: sample each task
+    each:
+      list: "{{ range(1,5) }}"
+      task:
+        var: eachTask{{item.index}}
+        image: ubuntu:mantic
+        env:
+          ITEM: "{{item.value}}"
+        run: echo -n $ITEM > $TORK_OUTPUT
+
+  - name: bye task
+    image: ubuntu:mantic
+    run: echo end of job

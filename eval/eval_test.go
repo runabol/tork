@@ -12,7 +12,7 @@ import (
 
 func TestEvalNoop(t *testing.T) {
 	t1 := &task.Task{}
-	err := eval.Evaluate(t1, job.Context{})
+	err := eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.Empty(t, t1.Env)
 }
@@ -23,7 +23,7 @@ func TestEvalLiteral(t *testing.T) {
 			"HELLO": "WORLD",
 		},
 	}
-	err := eval.Evaluate(t1, job.Context{})
+	err := eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.Equal(t, "WORLD", t1.Env["HELLO"])
 }
@@ -34,7 +34,7 @@ func TestEvalVar(t *testing.T) {
 			"HELLO": `{{inputs.SOMEVAR}}`,
 		},
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"SOMEVAR": "SOME DATA",
 		},
@@ -47,7 +47,7 @@ func TestEvalName(t *testing.T) {
 	t1 := &task.Task{
 		Name: "{{ inputs.SOMENAME }}y",
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"SOMENAME": "John Smith",
 		},
@@ -60,7 +60,7 @@ func TestEvalImage(t *testing.T) {
 	t1 := &task.Task{
 		Image: "ubuntu:{{ inputs.TAG }}",
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"TAG": "maverick",
 		},
@@ -73,7 +73,7 @@ func TestEvalQueue(t *testing.T) {
 	t1 := &task.Task{
 		Queue: "{{ inputs.QUEUE }}",
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"QUEUE": "default",
 		},
@@ -88,7 +88,7 @@ func TestEvalFunc(t *testing.T) {
 			"RAND_NUM": "{{ randomInt() }}",
 		},
 	}
-	err := eval.Evaluate(t1, job.Context{})
+	err := eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, t1.Env["RAND_NUM"])
 	intVar, err := strconv.Atoi(t1.Env["RAND_NUM"])
@@ -100,21 +100,21 @@ func TestEvalIf(t *testing.T) {
 	t1 := &task.Task{
 		If: `{{ 1 == 1 }}`,
 	}
-	err := eval.Evaluate(t1, job.Context{})
+	err := eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.Equal(t, "true", t1.If)
 
 	t1 = &task.Task{
 		If: `{{ 1 == 2 }}`,
 	}
-	err = eval.Evaluate(t1, job.Context{})
+	err = eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.Equal(t, "false", t1.If)
 
 	t1 = &task.Task{
 		If: `{{ !(1 == 2) }}`,
 	}
-	err = eval.Evaluate(t1, job.Context{})
+	err = eval.EvaluateTask(t1, job.Context{})
 	assert.NoError(t, err)
 	assert.Equal(t, "true", t1.If)
 }
@@ -123,7 +123,7 @@ func TestDontEvalRun(t *testing.T) {
 	t1 := &task.Task{
 		Run: "Hello {{ inputs.NAME }}",
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"NAME": "world",
 		},
@@ -142,7 +142,7 @@ func TestEvalPre(t *testing.T) {
 			},
 		},
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"SOMEVAR": "SOME DATA",
 		},
@@ -161,13 +161,46 @@ func TestEvalPost(t *testing.T) {
 			},
 		},
 	}
-	err := eval.Evaluate(t1, job.Context{
+	err := eval.EvaluateTask(t1, job.Context{
 		Inputs: map[string]string{
 			"SOMEVAR": "SOME DATA",
 		},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "SOME DATA", t1.Post[0].Env["HELLO"])
+}
+
+func TestEvalParallel(t *testing.T) {
+	t1 := &task.Task{
+		Parallel: []*task.Task{
+			{
+				Env: map[string]string{
+					"HELLO": "{{ inputs.SOMEVAR }}",
+				},
+			},
+		},
+	}
+	err := eval.EvaluateTask(t1, job.Context{
+		Inputs: map[string]string{
+			"SOMEVAR": "SOME DATA",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "SOME DATA", t1.Parallel[0].Env["HELLO"])
+}
+
+func TestEvalExpr(t *testing.T) {
+	v, err := eval.EvaluateExpr("1+1", job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, v)
+
+	v, err = eval.EvaluateExpr("{{1+1}}", job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, v)
+
+	v, err = eval.EvaluateExpr("{{ [1,2,3] }}", job.Context{})
+	assert.NoError(t, err)
+	assert.Equal(t, []any{1, 2, 3}, v)
 }
 
 func BenchmarkEval(b *testing.B) {
@@ -177,7 +210,7 @@ func BenchmarkEval(b *testing.B) {
 				"HELLO": "{{ inputs.SOMEVAR }}",
 			},
 		}
-		err := eval.Evaluate(t1, job.Context{
+		err := eval.EvaluateTask(t1, job.Context{
 			Inputs: map[string]string{
 				"SOMEVAR": "SOME DATA",
 			},

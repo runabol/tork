@@ -224,6 +224,54 @@ func Test_sanitizeTaskRetry(t *testing.T) {
 	}
 	err = sanitizeTask(rt1)
 	assert.NoError(t, err)
+	err = sanitizeTask(&task.Task{
+		Parallel: []*task.Task{
+			{
+				Image: "some:image",
+			},
+		},
+	})
+	assert.NoError(t, err)
+	err = sanitizeTask(&task.Task{
+		Image: "some:image",
+		Parallel: []*task.Task{
+			{
+				Image: "some:image",
+			},
+		},
+	})
+	assert.Error(t, err)
+	err = sanitizeTask(&task.Task{
+		Parallel: []*task.Task{
+			{
+				Image: "some:image",
+			},
+		},
+		Each: &task.Each{
+			List: "${ some expression }",
+			Task: &task.Task{
+				Image: "some:image",
+			},
+		},
+	})
+	assert.Error(t, err)
+	err = sanitizeTask(&task.Task{
+		Each: &task.Each{
+			List: "${ some expression }",
+			Task: &task.Task{
+				Image: "some:image",
+			},
+		},
+	})
+	assert.NoError(t, err)
+	err = sanitizeTask(&task.Task{
+		Each: &task.Each{
+			Task: &task.Task{
+				Image: "some:image",
+			},
+		},
+	})
+	assert.Error(t, err)
 }
 
 func Test_sanitizeTaskBasic(t *testing.T) {
