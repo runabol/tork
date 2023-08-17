@@ -13,9 +13,12 @@ description: |
   The default credentials for Minio Server are minioadmin/minioadmin
 inputs:
   source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
+  accessKeyID: minioadmin
+  secretKeyID: minioadmin
+  endpointURL: http://host.docker.internal:9000
 tasks:
   - var: ffprobe
-    name: get the duration of the video
+    name: get the video metadata
     image: jrottenberg/ffmpeg:3.4-alpine
     env:
       SOURCE: "{{ inputs.source }}" 
@@ -29,8 +32,7 @@ tasks:
         $SOURCE > $TORK_OUTPUT
 
   - var: duration
-    name: get the duration of the video
-    description: extract the duration of the video from the ffprobe output using jq
+    name: extract the duration of the video
     image: ubuntu:mantic
     env:
       FFPROBE: "{{ tasks.ffprobe }}" 
@@ -41,8 +43,7 @@ tasks:
       echo -n $DURATION >> $TORK_OUTPUT
 
   - var: framerate
-    name: get the framerate of the video
-    description: extract the video's framerate from the ffprobe output using jq
+    name: extract the framerate of the video
     image: ubuntu:mantic
     env:
       FFPROBE: "{{ tasks.ffprobe }}" 
@@ -106,13 +107,13 @@ tasks:
   - name: create a temporary bucket to house the chunks
     image: "amazon/aws-cli:2.13.10"
     env:
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
       BUCKET_NAME: "{{tasks.bucketName}}"
+      ENDPOINT_URL: "{{inputs.endpointURL}}"
     run: | 
       aws \
-        --endpoint-url http://host.docker.internal:9000 \
-        s3api create-bucket --bucket $BUCKET_NAME
+        --endpoint-url $ENDPOINT_URL s3api create-bucket --bucket $BUCKET_NAME
 
   - name: transcode the chunks in parallel
     each:
@@ -133,21 +134,23 @@ tasks:
           - name: upload the chunk to minio
             image: "amazon/aws-cli:2.13.10"
             env:
-              AWS_ACCESS_KEY_ID: minioadmin
-              AWS_SECRET_ACCESS_KEY: minioadmin
+              AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+              AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
               BUCKET_NAME: "{{tasks.bucketName}}"
               NUMBER: "{{ item.index }}"
+              ENDPOINT_URL: "{{inputs.endpointURL}}"
             run:
-              aws --endpoint-url http://host.docker.internal:9000 s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
+              aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
 
   - name: list all the chunks in the bucket
     image: "amazon/aws-cli:2.13.10"
     env:
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
       BUCKET_NAME: "{{tasks.bucketName}}"
+      ENDPOINT_URL: "{{inputs.endpointURL}}"
     run: | 
-      aws --endpoint-url http://host.docker.internal:9000 s3 ls s3://$BUCKET_NAME/chunks
+      aws --endpoint-url $ENDPOINT_URL s3 ls s3://$BUCKET_NAME/chunks
 
   - name: stitch the chunks into a single video
     volumes:
@@ -164,20 +167,22 @@ tasks:
       - name: download the chunks 
         image: "amazon/aws-cli:2.13.10"
         env:
-          AWS_ACCESS_KEY_ID: minioadmin
-          AWS_SECRET_ACCESS_KEY: minioadmin
+          AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+          AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
           BUCKET_NAME: "{{tasks.bucketName}}"
+          ENDPOINT_URL: "{{inputs.endpointURL}}"
         run:
-          aws --endpoint-url http://host.docker.internal:9000 s3 sync s3://$BUCKET_NAME/chunks /tmp/chunks
+          aws --endpoint-url $ENDPOINT_URL s3 sync s3://$BUCKET_NAME/chunks /tmp/chunks
     post:
       - name: upload the final video to minio
         image: "amazon/aws-cli:2.13.10"
         env:
-          AWS_ACCESS_KEY_ID: minioadmin
-          AWS_SECRET_ACCESS_KEY: minioadmin
+          AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+          AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
           BUCKET_NAME: "{{tasks.bucketName}}"
+          ENDPOINT_URL: "{{inputs.endpointURL}}"
         run:
-          aws --endpoint-url http://host.docker.internal:9000 s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/output.mp4
+          aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/output.mp4
       
 
 
