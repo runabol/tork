@@ -142,16 +142,6 @@ tasks:
             run:
               aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
 
-  - name: list all the chunks in the bucket
-    image: "amazon/aws-cli:2.13.10"
-    env:
-      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
-      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
-      BUCKET_NAME: "{{tasks.bucketName}}"
-      ENDPOINT_URL: "{{inputs.endpointURL}}"
-    run: | 
-      aws --endpoint-url $ENDPOINT_URL s3 ls s3://$BUCKET_NAME/chunks
-
   - name: stitch the chunks into a single video
     volumes:
       - /tmp
