@@ -49,6 +49,7 @@ type taskRecord struct {
 	Parallel    []byte         `db:"parallel"`
 	Completions int            `db:"completions"`
 	ParentID    string         `db:"parent_id"`
+	Each        []byte         `db:"each_"`
 }
 
 type jobRecord struct {
@@ -112,6 +113,13 @@ func (r taskRecord) toTask() (*task.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.parallel")
 		}
 	}
+	var each *task.Each
+	if r.Each != nil {
+		each = &task.Each{}
+		if err := json.Unmarshal(r.Each, each); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.each")
+		}
+	}
 	return &task.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -142,6 +150,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Parallel:    parallel,
 		Completions: r.Completions,
 		ParentID:    r.ParentID,
+		Each:        each,
 	}, nil
 }
 
@@ -237,6 +246,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize task.parallel")
 	}
+	var each *string
+	if t.Each != nil {
+		b, err := json.Marshal(t.Each)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.each")
+		}
+		s := string(b)
+		each = &s
+	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -266,12 +284,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			result, -- $26
 			parallel, -- $27
 			completions, -- $28
-			parent_id -- $29
+			parent_id, -- $29
+			each_ -- $30
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29)`
+			$27,$28,$29,$30)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -302,6 +321,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		parallel,                     // $27
 		t.Completions,                // $28
 		t.ParentID,                   // $29
+		each,                         // $30
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -336,6 +356,15 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	if err := modify(t); err != nil {
 		return err
 	}
+	var each *string
+	if t.Each != nil {
+		b, err := json.Marshal(t.Each)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.each")
+		}
+		s := string(b)
+		each = &s
+	}
 	q := `update tasks set 
 	        position = $1,
 	        state = $2,
@@ -346,8 +375,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			error_msg = $7,
 			node_id = $8,
 			result = $9,
-			completions = $10
-		  where id = $11`
+			completions = $10,
+			each_ = $11
+		  where id = $12`
 	_, err = ds.db.Exec(q,
 		t.Position,    // $1
 		t.State,       // $2
@@ -359,7 +389,8 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.Node,        // $8
 		t.Result,      // $9
 		t.Completions, // $10
-		t.ID,          // $11
+		each,          // $11
+		t.ID,          // $12
 	)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {

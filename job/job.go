@@ -35,6 +35,7 @@ type Job struct {
 type Context struct {
 	Inputs map[string]string `json:"inputs,omitempty"`
 	Tasks  map[string]string `json:"tasks,omitempty"`
+	Item   map[string]string `json:"item,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -50,9 +51,14 @@ func (j *Job) Clone() *Job {
 		Execution:   task.CloneTasks(j.Execution),
 		Position:    j.Position,
 		Inputs:      j.Inputs,
-		Context: Context{
-			Inputs: clone.CloneStringMap(j.Context.Inputs),
-			Tasks:  clone.CloneStringMap(j.Context.Tasks),
-		},
+		Context:     j.Context.Clone(),
+	}
+}
+
+func (c Context) Clone() Context {
+	return Context{
+		Inputs: clone.CloneStringMap(c.Inputs),
+		Tasks:  clone.CloneStringMap(c.Tasks),
+		Item:   clone.CloneStringMap(c.Item),
 	}
 }

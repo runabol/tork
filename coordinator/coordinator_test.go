@@ -556,6 +556,12 @@ func TestRunParallelJob(t *testing.T) {
 	assert.Equal(t, 6, len(j1.Execution))
 }
 
+func TestRunEachJob(t *testing.T) {
+	j1 := doRunJob(t, "../examples/each.yaml")
+	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, 7, len(j1.Execution))
+}
+
 func doRunJob(t *testing.T, filename string) *job.Job {
 	ctx := context.Background()
 

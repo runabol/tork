@@ -19,7 +19,8 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - Task timeout
 - [Expression Language](#expressions)
 - [Conditional Tasks](#expressions)
-- [Parallel Tasks](#parallel-tasks)
+- [Parallel Task](#parallel-task)
+- [Each Task](#each-task)
 
 # Architecture
 
@@ -369,7 +370,7 @@ tasks:
       echo "a random number: $RANDOM_NUMBER"
 ```
 
-# Parallel Tasks
+# Parallel Task
 
 To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 
@@ -382,6 +383,22 @@ To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
       run: sleep 1
     - image: ubuntu:mantic
       run: sleep 3
+```
+
+# Each Task
+
+Executes the ` task` to for each `item` in `list`, in parallel.
+
+```yaml
+- name: sample each task
+  each:
+    list: "{{ range(1,5) }}"
+    task:
+      image: ubuntu:mantic
+      env:
+        ITEM: "{{item.value}}"
+        INDEX: "{{item.index}}"
+      run: echo -n HELLO $ITEM at $INDEX
 ```
 
 # Pre/Post Tasks

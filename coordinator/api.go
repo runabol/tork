@@ -79,12 +79,35 @@ func (s *api) listActiveNodes(c *gin.Context) {
 }
 
 func sanitizeTask(t *task.Task) error {
+	if len(t.Parallel) > 0 && t.Each != nil {
+		return errors.New("parallel and each tasks are mutually exclusive")
+	}
+	if (len(t.Parallel) > 0 || t.Each != nil) && (len(t.Pre) > 0 || len(t.Post) > 0) {
+		return errors.New("composite tasks do not support pre/post tasks")
+	}
+	if (len(t.Parallel) > 0 || t.Each != nil) && t.Image != "" {
+		return errors.New("composite tasks do not support image")
+	}
+	if (len(t.Parallel) > 0 || t.Each != nil) && t.Queue != "" {
+		return errors.New("composite tasks do not support queue assignment")
+	}
+	if t.Each != nil {
+		if t.Each.List == "" {
+			return errors.New("each must provide a list expression")
+		}
+		if t.Each.Task == nil {
+			return errors.New("each must provide a task")
+		}
+		if err := sanitizeTask(t.Each.Task); err != nil {
+			return err
+		}
+	}
 	for _, pt := range t.Parallel {
 		if err := sanitizeTask(pt); err != nil {
 			return err
 		}
 	}
-	if len(t.Parallel) > 0 {
+	if len(t.Parallel) > 0 || t.Each != nil {
 		return nil
 	}
 	if strings.TrimSpace(t.Image) == "" {
