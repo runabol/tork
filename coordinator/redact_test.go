@@ -33,6 +33,14 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
+		Parallel: []*task.Task{
+			{
+				Env: map[string]string{
+					"secret_1": "secret",
+					"harmless": "hello world",
+				},
+			},
+		},
 	}
 	tr := redactTask(&ta)
 
@@ -46,20 +54,34 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "hello world", tr.Pre[0].Env["harmless"])
 	assert.Equal(t, "[REDACTED]", tr.Post[0].Env["secret_1"])
 	assert.Equal(t, "hello world", tr.Post[0].Env["harmless"])
+	assert.Equal(t, "[REDACTED]", tr.Parallel[0].Env["secret_1"])
+	assert.Equal(t, "hello world", tr.Parallel[0].Env["harmless"])
 }
 
 func TestRedactJob(t *testing.T) {
-	ta := task.Task{
-		Env: map[string]string{
-			"secret_1":          "secret",
-			"SecrET_2":          "secret",
-			"PASSword":          "password",
-			"AWS_ACCESS_KEY_ID": "some-key",
-			"harmless":          "hello world",
-		},
-	}
 	j := redactJob(&job.Job{
-		Tasks: []*task.Task{&ta},
+		Tasks: []*task.Task{
+			{
+				Env: map[string]string{
+					"secret_1":          "secret",
+					"SecrET_2":          "secret",
+					"PASSword":          "password",
+					"AWS_ACCESS_KEY_ID": "some-key",
+					"harmless":          "hello world",
+				},
+			},
+		},
+		Execution: []*task.Task{
+			{
+				Env: map[string]string{
+					"secret_1":          "secret",
+					"SecrET_2":          "secret",
+					"PASSword":          "password",
+					"AWS_ACCESS_KEY_ID": "some-key",
+					"harmless":          "hello world",
+				},
+			},
+		},
 		Inputs: map[string]string{
 			"secret": "password",
 			"plain":  "helloworld",
@@ -90,4 +112,5 @@ func TestRedactJob(t *testing.T) {
 		"secret": "[REDACTED]",
 		"task2":  "helloworld",
 	}, j.Context.Tasks)
+	assert.Equal(t, "[REDACTED]", j.Execution[0].Env["secret_1"])
 }
