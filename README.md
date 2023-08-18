@@ -573,12 +573,12 @@ Failure:
 
 # TODO
 
-1. Better input validation (consider using cue-lang).
-2. Redis broker integration.
+1. Better input validation (consider using cue-lang)
+2. Redis broker integration
 3. Job-level defaults
 4. Podman runtime integration
 5. Sub jobs
-6. Ability to schedule tasks using a nodeSelector
+6. Ability to schedule tasks using a `nodeSelector`
 
 # License
 
