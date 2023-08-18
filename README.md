@@ -580,6 +580,7 @@ Failure:
 5. Sub jobs
 6. Ability to schedule tasks using a `nodeSelector`
 7. Webhooks
+8. Job outputs
 
 # License
 
