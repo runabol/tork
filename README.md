@@ -598,6 +598,7 @@ Failure:
 5. Ability to schedule tasks using a `nodeSelector`
 6. Webhooks
 7. Job outputs
+8. WASM integration.
 
 # License
 
