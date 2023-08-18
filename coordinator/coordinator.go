@@ -306,7 +306,7 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 
 func (c *Coordinator) handleCompletedTask(t *task.Task) error {
 	ctx := context.Background()
-	if t.ParentID != "" { // composite task
+	if t.ParentID != "" && t.SubJob == nil {
 		return c.completeCompositeTask(ctx, t)
 	}
 	return c.completeRegularTask(ctx, t)
