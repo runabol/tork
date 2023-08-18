@@ -579,6 +579,7 @@ Failure:
 4. Podman runtime integration
 5. Sub jobs
 6. Ability to schedule tasks using a `nodeSelector`
+7. Webhooks
 
 # License
 
