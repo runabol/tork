@@ -577,8 +577,7 @@ Failure:
 2. Redis broker integration.
 3. Job-level defaults
 4. Podman runtime integration
-5. Mark task and job as FAILED when failing to evaluate a task.
-6. Sub jobs
+5. Sub jobs
 
 # License
 

@@ -613,6 +613,42 @@ func Test_handleJobs(t *testing.T) {
 	assert.Equal(t, job.Running, j2.State)
 }
 
+func Test_handleJobWithTaskEvalFailure(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j1 := &job.Job{
+		ID:    uuid.NewUUID(),
+		State: job.Pending,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+				Env: map[string]string{
+					"SOMEVAR": "{{ bad_expression }}",
+				},
+			},
+		},
+	}
+
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Failed, j2.State)
+}
+
 func TestRunHelloWorldJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/hello.yaml")
 	assert.Equal(t, job.Completed, j1.State)
