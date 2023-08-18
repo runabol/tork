@@ -53,6 +53,23 @@ tasks:
       FRAMERATE=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .r_frame_rate')
       echo -n $FRAMERATE >> $TORK_OUTPUT
 
+  - var: framerate
+    name: clean and parse framerate
+    image: python:3-slim
+    env:
+      FRAMERATE: "{{ tasks.framerate }}" 
+    cmd: 
+    run: |
+      cat > script.py << SCRIPT
+      import re
+      # parse and clean the framerate
+      cfrate = re.sub(r"[^0-9/\\.]", "", "$FRAMERATE")
+      pfrate = cfrate.split("/")
+      frate = float(pfrate[0])/float(pfrate[1])
+      print(frate,end="")
+      SCRIPT
+      python script.py > $TORK_OUTPUT
+
   - var: chunks
     name: calculate chunks times 
     image: python:3-slim
@@ -61,17 +78,13 @@ tasks:
       FRAMERATE: "{{ tasks.framerate }}" 
     cmd: 
     run: |
-      cat > script.py <<EOL
+      cat > script.py << SCRIPT
       import math
       import re
       import json
 
       duration = float("$DURATION")
-
-      # parse and clean the framerate
-      cfrate = re.sub(r"[^0-9/\\.]", "", "$FRAMERATE")
-      pfrate = cfrate.split("/")
-      frate = float(pfrate[0])/float(pfrate[1])
+      frate = float("$FRAMERATE")
 
       frate_ceil = math.ceil(frate)
       time_unit = frate_ceil/frate
@@ -86,17 +99,15 @@ tasks:
         else:
           length=chunk_size
 
-        # if the next chunk is going to be 
-        # too small then we just append it
-        # to this chunk.
         if duration-(start+length) < 5:
           length=duration-start
 
         chunks.append({"start":start,"length":length})
+        
         start = start+length;
       
       print(json.dumps(chunks))
-      EOL
+      SCRIPT
       python script.py > $TORK_OUTPUT
 
   - var: bucketName
