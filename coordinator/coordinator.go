@@ -231,6 +231,21 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task start")
+	// verify that the job is still running
+	j, err := c.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return err
+	}
+	// if the job isn't running anymore we need
+	// to cancel the task
+	if j.State != job.Running {
+		t.State = task.Cancelled
+		node, err := c.ds.GetNodeByID(ctx, t.Node)
+		if err != nil {
+			return err
+		}
+		return c.broker.PublishTask(ctx, node.Queue, t)
+	}
 	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		// we don't want to mark the task as RUNNING
 		// if an out-of-order task completion/failure
@@ -402,7 +417,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 	ctx := context.Background()
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
-		return errors.Wrapf(err, "unknown task: %s", t.ID)
+		return errors.Wrapf(err, "unknown job: %s", t.JobID)
 	}
 	log.Error().
 		Str("task-id", t.ID).

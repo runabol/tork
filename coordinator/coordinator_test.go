@@ -142,11 +142,19 @@ func Test_handleStartedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
+	j1 := &job.Job{
+		ID:    uuid.NewUUID(),
+		State: job.Running,
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
 	t1 := &task.Task{
 		ID:        uuid.NewUUID(),
 		State:     task.Scheduled,
 		StartedAt: &now,
 		Node:      uuid.NewUUID(),
+		JobID:     j1.ID,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -158,6 +166,67 @@ func Test_handleStartedTask(t *testing.T) {
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, task.Running, t2.State)
+	assert.Equal(t, t1.StartedAt, t2.StartedAt)
+	assert.Equal(t, t1.Node, t2.Node)
+}
+
+func Test_handleStartedTaskOfFailedJob(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	qname := uuid.NewUUID()
+
+	cancellations := 0
+	err := b.SubscribeForTasks(qname, func(t *task.Task) error {
+		cancellations = cancellations + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	now := time.Now().UTC()
+
+	j1 := &job.Job{
+		ID:    uuid.NewUUID(),
+		State: job.Failed,
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	n1 := node.Node{
+		ID:    uuid.NewUUID(),
+		Queue: qname,
+	}
+	err = ds.CreateNode(ctx, n1)
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:        uuid.NewUUID(),
+		State:     task.Scheduled,
+		StartedAt: &now,
+		JobID:     j1.ID,
+		Node:      n1.ID,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = c.handleStartedTask(t1)
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 100)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, 1, cancellations)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
 	assert.Equal(t, t1.Node, t2.Node)
 }
