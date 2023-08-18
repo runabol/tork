@@ -768,7 +768,7 @@ func TestRunEachJob(t *testing.T) {
 func TestRunSubjobJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/subjob.yaml")
 	assert.Equal(t, job.Completed, j1.State)
-	assert.Equal(t, 3, len(j1.Execution))
+	assert.Equal(t, 5, len(j1.Execution))
 }
 
 func doRunJob(t *testing.T, filename string) *job.Job {
