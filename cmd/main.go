@@ -48,7 +48,7 @@ func modeFlag() cli.Flag {
 func queueFlag() cli.Flag {
 	return &cli.StringSliceFlag{
 		Name:  "queue",
-		Usage: "<queuename>:<concurrency>",
+		Usage: "Specify a task queue configuration: <queuename>:<concurrency>",
 	}
 }
 
@@ -75,7 +75,7 @@ func rabbitmqURLFlag() cli.Flag {
 func defaultCPUsLimit() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "default-cpus-limit",
-		Usage: "1",
+		Usage: "The default CPUs limit for an executing task (e.g. 1). Default is no limit.",
 		Value: "",
 	}
 }
@@ -83,7 +83,7 @@ func defaultCPUsLimit() cli.Flag {
 func defaultMemoryLimit() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "default-memory-limit",
-		Usage: "6MB",
+		Usage: "The default RAM limit for an executing task (e.g. 6MB). Default is no limit.",
 		Value: "",
 	}
 }
@@ -108,17 +108,17 @@ func postgresDSNFlag() cli.Flag {
 	}
 }
 
-func tempDir() cli.Flag {
+func tempDirFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "temp-dir",
-		Usage: "/tmp",
+		Usage: "The temporary dir to use by the worker: (e.g. /tmp)",
 	}
 }
 
-func address() cli.Flag {
+func addressFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "address",
-		Usage: ":3000",
+		Usage: "REST API Address (Default 0.0.0.0:3000)",
 	}
 }
 
@@ -135,8 +135,8 @@ func main() {
 			postgresDSNFlag(),
 			defaultCPUsLimit(),
 			defaultMemoryLimit(),
-			tempDir(),
-			address(),
+			tempDirFlag(),
+			addressFlag(),
 		},
 		Action: execute,
 	}
