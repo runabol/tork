@@ -375,7 +375,9 @@ tasks:
       echo "a random number: $RANDOM_NUMBER"
 ```
 
-# Parallel Task
+# Special Tasks
+
+## Parallel Task
 
 To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 
@@ -390,7 +392,7 @@ To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
       run: sleep 3
 ```
 
-# Each Task
+## Each Task
 
 Executes the `task` to for each `item` in `list`, in parallel.
 
@@ -406,7 +408,7 @@ Executes the `task` to for each `item` in `list`, in parallel.
       run: echo -n HELLO $ITEM at $INDEX
 ```
 
-# Sub-Job Task
+## Sub-Job Task
 
 A task can start another job. When a sub-job completes or fails it marks its parent task as `COMPLETED` or `FAILED` respectively.
 
