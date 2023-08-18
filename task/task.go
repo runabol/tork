@@ -54,6 +54,16 @@ type Task struct {
 	Parallel    []*Task           `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Completions int               `json:"completions,omitempty"`
 	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
+	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
+	SubJobID    string            `json:"subjobId,omitempty"`
+}
+
+type SubJob struct {
+	ID          string            `json:"id,omitempty"`
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Tasks       []*Task           `json:"tasks,omitempty" yaml:"tasks,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
 
 type Each struct {
@@ -91,6 +101,10 @@ func (t *Task) Clone() *Task {
 	if t.Each != nil {
 		each = t.Each.Clone()
 	}
+	var subjob *SubJob
+	if t.SubJob != nil {
+		subjob = t.SubJob.Clone()
+	}
 	return &Task{
 		ID:          t.ID,
 		JobID:       t.JobID,
@@ -124,6 +138,8 @@ func (t *Task) Clone() *Task {
 		Completions: t.Completions,
 		Each:        each,
 		Description: t.Description,
+		SubJob:      subjob,
+		SubJobID:    t.SubJobID,
 	}
 }
 
@@ -149,9 +165,19 @@ func (l *Limits) Clone() *Limits {
 	}
 }
 
-func (l *Each) Clone() *Each {
+func (e *Each) Clone() *Each {
 	return &Each{
-		List: l.List,
-		Task: l.Task.Clone(),
+		List: e.List,
+		Task: e.Task.Clone(),
+	}
+}
+
+func (s *SubJob) Clone() *SubJob {
+	return &SubJob{
+		ID:          s.ID,
+		Name:        s.Name,
+		Description: s.Description,
+		Inputs:      clone.CloneStringMap(s.Inputs),
+		Tasks:       CloneTasks(s.Tasks),
 	}
 }

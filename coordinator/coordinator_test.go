@@ -290,6 +290,104 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	assert.Equal(t, job.Completed, j2.State)
 }
 
+func Test_handleCompletedLastSubJobTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	err = c.Start()
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	parentJob := &job.Job{
+		ID:       uuid.NewUUID(),
+		State:    job.Running,
+		Position: 1,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, parentJob)
+	assert.NoError(t, err)
+
+	parentTask := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		Node:        uuid.NewUUID(),
+		JobID:       parentJob.ID,
+		Position:    2,
+	}
+	err = ds.CreateTask(ctx, parentTask)
+	assert.NoError(t, err)
+
+	j1 := &job.Job{
+		ID:       uuid.NewUUID(),
+		State:    job.Running,
+		Position: 1,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+				Run:  "echo hello",
+			},
+		},
+		ParentID: parentTask.ID,
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		Node:        uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    2,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = c.handleCompletedTask(t1)
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 100)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	// verify that the job was marked
+	// as COMPLETED
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, j1.ID, j2.ID)
+	assert.Equal(t, job.Completed, j2.State)
+
+	// verify that parent task is COMPLETED
+	pt, err := ds.GetTaskByID(ctx, parentTask.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, pt.State)
+
+	// verify that parent job is COMPLETED
+	pj, err := ds.GetJobByID(ctx, parentJob.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Completed, pj.State)
+}
+
 func Test_handleCompletedFirstTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
@@ -665,6 +763,12 @@ func TestRunEachJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/each.yaml")
 	assert.Equal(t, job.Completed, j1.State)
 	assert.Equal(t, 7, len(j1.Execution))
+}
+
+func TestRunSubjobJob(t *testing.T) {
+	j1 := doRunJob(t, "../examples/subjob.yaml")
+	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, 3, len(j1.Execution))
 }
 
 func doRunJob(t *testing.T, filename string) *job.Job {
