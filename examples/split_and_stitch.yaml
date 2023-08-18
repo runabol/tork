@@ -80,7 +80,6 @@ tasks:
     run: |
       cat > script.py << SCRIPT
       import math
-      import re
       import json
 
       duration = float("$DURATION")
@@ -103,7 +102,7 @@ tasks:
           length=duration-start
 
         chunks.append({"start":start,"length":length})
-        
+
         start = start+length;
       
       print(json.dumps(chunks))
