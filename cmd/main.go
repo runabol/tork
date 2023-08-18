@@ -115,6 +115,13 @@ func tempDir() cli.Flag {
 	}
 }
 
+func address() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "address",
+		Usage: ":3000",
+	}
+}
+
 func main() {
 	app := &cli.App{
 		Name:        "tork",
@@ -129,6 +136,7 @@ func main() {
 			defaultCPUsLimit(),
 			defaultMemoryLimit(),
 			tempDir(),
+			address(),
 		},
 		Action: execute,
 	}
@@ -262,6 +270,7 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Contex
 		Broker:    broker,
 		DataStore: ds,
 		Queues:    queues,
+		Address:   ctx.String("address"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
