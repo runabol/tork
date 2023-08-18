@@ -3,8 +3,8 @@ package mq_test
 import (
 	"testing"
 
+	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/mq"
 )
 
 func TestIsWorkerQueue(t *testing.T) {

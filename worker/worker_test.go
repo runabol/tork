@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/mq"
-	"github.com/tork/runtime"
-	"github.com/tork/task"
-	"github.com/tork/uuid"
 )
 
 func TestNewWorker(t *testing.T) {

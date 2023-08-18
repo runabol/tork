@@ -3,8 +3,8 @@ package coordinator
 import (
 	"strings"
 
-	"github.com/tork/job"
-	"github.com/tork/task"
+	"github.com/runabol/tork/job"
+	"github.com/runabol/tork/task"
 )
 
 type matcher func(string) bool

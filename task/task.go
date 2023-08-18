@@ -3,7 +3,7 @@ package task
 import (
 	"time"
 
-	"github.com/tork/clone"
+	"github.com/runabol/tork/clone"
 )
 
 // State defines the list of states that a

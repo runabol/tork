@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/runabol/tork/eval"
+	"github.com/runabol/tork/task"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/eval"
-	"github.com/tork/task"
 )
 
 func TestEvalNoop(t *testing.T) {

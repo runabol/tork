@@ -3,8 +3,8 @@ package task_test
 import (
 	"testing"
 
+	"github.com/runabol/tork/task"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/task"
 )
 
 func TestClone(t *testing.T) {

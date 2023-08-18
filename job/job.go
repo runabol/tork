@@ -3,8 +3,8 @@ package job
 import (
 	"time"
 
-	"github.com/tork/clone"
-	"github.com/tork/task"
+	"github.com/runabol/tork/clone"
+	"github.com/runabol/tork/task"
 )
 
 type State string

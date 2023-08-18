@@ -12,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/job"
-	"github.com/tork/node"
-	"github.com/tork/task"
+	"github.com/runabol/tork/job"
+	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/task"
 )
 
 type RabbitMQBroker struct {

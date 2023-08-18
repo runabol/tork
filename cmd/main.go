@@ -11,11 +11,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/coordinator"
-	"github.com/tork/datastore"
-	"github.com/tork/mq"
-	"github.com/tork/runtime"
-	"github.com/tork/worker"
+	"github.com/runabol/tork/coordinator"
+	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/worker"
 	"github.com/urfave/cli/v2"
 )
 

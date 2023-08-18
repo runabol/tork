@@ -3,8 +3,8 @@ package clone_test
 import (
 	"testing"
 
+	"github.com/runabol/tork/clone"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/clone"
 )
 
 func TestCloneStringMap(t *testing.T) {

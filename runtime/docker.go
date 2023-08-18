@@ -18,7 +18,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/task"
+	"github.com/runabol/tork/task"
 )
 
 type DockerRuntime struct {

@@ -3,9 +3,9 @@ package job_test
 import (
 	"testing"
 
+	"github.com/runabol/tork/job"
+	"github.com/runabol/tork/task"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/job"
-	"github.com/tork/task"
 )
 
 func TestClone(t *testing.T) {

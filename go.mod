@@ -1,4 +1,4 @@
-module github.com/tork
+module github.com/runabol/tork
 
 go 1.18
 

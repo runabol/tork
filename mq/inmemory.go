@@ -7,9 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/tork/job"
-	"github.com/tork/node"
-	"github.com/tork/task"
+	"github.com/runabol/tork/job"
+	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/task"
 )
 
 const defaultQueueSize = 10

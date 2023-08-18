@@ -3,8 +3,8 @@ package uuid_test
 import (
 	"testing"
 
+	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/tork/uuid"
 )
 
 func TestNewUUID(t *testing.T) {
