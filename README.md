@@ -578,6 +578,7 @@ Failure:
 3. Job-level defaults
 4. Podman runtime integration
 5. Sub jobs
+6. Ability to schedule tasks using a nodeSelector
 
 # License
 
