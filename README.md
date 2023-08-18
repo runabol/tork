@@ -21,6 +21,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - [Conditional Tasks](#expressions)
 - [Parallel Task](#parallel-task)
 - [Each Task](#each-task)
+- [Subjob Task](#sub-job-task)
 
 # Architecture
 
@@ -391,7 +392,7 @@ To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 
 # Each Task
 
-Executes the ` task` to for each `item` in `list`, in parallel.
+Executes the `task` to for each `item` in `list`, in parallel.
 
 ```yaml
 - name: sample each task
@@ -403,6 +404,23 @@ Executes the ` task` to for each `item` in `list`, in parallel.
         ITEM: "{{item.value}}"
         INDEX: "{{item.index}}"
       run: echo -n HELLO $ITEM at $INDEX
+```
+
+# Sub-Job Task
+
+A task can start another job. When a sub-job completes or fails it marks its parent task as `COMPLETED` or `FAILED` respectively.
+
+```yaml
+- name: a task that starts a sub-job
+  subjob:
+    name: my sub job
+    tasks:
+      - name: hello sub task
+        image: ubuntu:mantic
+        run: echo start of sub-job
+      - name: bye task
+        image: ubuntu:mantic
+        run: echo end of sub-job
 ```
 
 # Pre/Post Tasks
@@ -577,10 +595,9 @@ Failure:
 2. Redis broker integration
 3. Job-level defaults
 4. Podman runtime integration
-5. Sub jobs
-6. Ability to schedule tasks using a `nodeSelector`
-7. Webhooks
-8. Job outputs
+5. Ability to schedule tasks using a `nodeSelector`
+6. Webhooks
+7. Job outputs
 
 # License
 

@@ -51,6 +51,8 @@ type taskRecord struct {
 	Completions int            `db:"completions"`
 	ParentID    string         `db:"parent_id"`
 	Each        []byte         `db:"each_"`
+	SubJob      []byte         `db:"subjob"`
+	SubJobID    string         `db:"subjob_id"`
 }
 
 type jobRecord struct {
@@ -66,6 +68,7 @@ type jobRecord struct {
 	Position    int        `db:"position"`
 	Inputs      []byte     `db:"inputs"`
 	Context     []byte     `db:"context"`
+	ParentID    string     `db:"parent_id"`
 }
 
 type nodeRecord struct {
@@ -122,6 +125,13 @@ func (r taskRecord) toTask() (*task.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.each")
 		}
 	}
+	var subjob *task.SubJob
+	if r.SubJob != nil {
+		subjob = &task.SubJob{}
+		if err := json.Unmarshal(r.SubJob, subjob); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.subjob")
+		}
+	}
 	return &task.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -154,6 +164,8 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		ParentID:    r.ParentID,
 		Each:        each,
 		Description: r.Description,
+		SubJob:      subjob,
+		SubJobID:    r.SubJobID,
 	}, nil
 }
 
@@ -190,6 +202,7 @@ func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
 		Context:     c,
 		Inputs:      inputs,
 		Description: r.Description,
+		ParentID:    r.ParentID,
 	}, nil
 }
 
@@ -259,6 +272,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		s := string(b)
 		each = &s
 	}
+	var subjob *string
+	if t.SubJob != nil {
+		b, err := json.Marshal(t.SubJob)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.subjob")
+		}
+		s := string(b)
+		subjob = &s
+	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -290,12 +312,14 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			completions, -- $28
 			parent_id, -- $29
 			each_, -- $30
-			description -- $31
+			description, -- $31
+			subjob, -- $32
+			subjob_id -- $33
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31)`
+			$27,$28,$29,$30,$31,$32,$33)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -328,6 +352,8 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		t.ParentID,                   // $29
 		each,                         // $30
 		t.Description,                // $31
+		subjob,                       // $32
+		t.SubJobID,                   // $33
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -382,8 +408,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			node_id = $8,
 			result = $9,
 			completions = $10,
-			each_ = $11
-		  where id = $12`
+			each_ = $11,
+			subjob_id = $12
+		  where id = $13`
 	_, err = ds.db.Exec(q,
 		t.Position,    // $1
 		t.State,       // $2
@@ -396,7 +423,8 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.Result,      // $9
 		t.Completions, // $10
 		each,          // $11
-		t.ID,          // $12
+		t.SubJobID,    // $12
+		t.ID,          // $13
 	)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
@@ -496,10 +524,10 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 		return errors.Wrapf(err, "failed to serialize job.inputs")
 	}
 	q := `insert into jobs 
-	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context) 
+	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
+	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}

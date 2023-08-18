@@ -272,6 +272,11 @@ func Test_sanitizeTaskRetry(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
+	err = sanitizeTask(&task.Task{
+		SubJob: &task.SubJob{},
+		Each:   &task.Each{},
+	})
+	assert.Error(t, err)
 }
 
 func Test_sanitizeTaskBasic(t *testing.T) {

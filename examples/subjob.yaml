@@ -1,0 +1,20 @@
+name: sample sub job
+tasks:
+  - name: hello task
+    image: ubuntu:mantic
+    run: echo start of job 
+
+  - name: a sample sub job
+    subjob:
+      name: my sub job
+      tasks:
+        - name: hello sub task
+          image: ubuntu:mantic
+          run: echo start of sub-job 
+        - name: bye task
+          image: ubuntu:mantic
+          run: echo end of sub-job
+
+  - name: bye task
+    image: ubuntu:mantic
+    run: echo end of job

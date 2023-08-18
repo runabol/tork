@@ -20,7 +20,8 @@ CREATE TABLE jobs (
     position      int         not null,
     inputs        jsonb       not null,
     context       jsonb       not null,
-    description   text
+    description   text,
+    parent_id     varchar(32)
 );
 
 CREATE TABLE tasks (
@@ -54,7 +55,9 @@ CREATE TABLE tasks (
     completions   int,
     parent_id     varchar(32),
     each_         jsonb,
-    description   text
+    description   text,
+    subjob        jsonb,
+    subjob_id     varchar(32)
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

@@ -103,6 +103,8 @@ func (c *Coordinator) scheduleTask(ctx context.Context, t *task.Task) error {
 		return c.scheduleParallelTask(ctx, t)
 	} else if t.Each != nil {
 		return c.scheduleEachTask(ctx, t)
+	} else if t.SubJob != nil {
+		return c.scheduleSubJob(ctx, t)
 	}
 	return c.scheduleRegularTask(ctx, t)
 }
@@ -123,6 +125,34 @@ func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *task.Task) err
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
 	return c.broker.PublishTask(ctx, t.Queue, t)
+}
+
+func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
+	now := time.Now().UTC()
+	subjob := &job.Job{
+		ID:          uuid.NewUUID(),
+		CreatedAt:   now,
+		ParentID:    t.ID,
+		Name:        t.SubJob.Name,
+		Description: t.SubJob.Description,
+		State:       job.Pending,
+		Tasks:       t.SubJob.Tasks,
+		Inputs:      t.SubJob.Inputs,
+		Context:     job.Context{Inputs: t.SubJob.Inputs},
+	}
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		u.State = task.Running
+		u.ScheduledAt = &now
+		u.StartedAt = &now
+		u.SubJobID = subjob.ID
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	if err := c.ds.CreateJob(ctx, subjob); err != nil {
+		return errors.Wrapf(err, "error creating subjob")
+	}
+	return c.handleJob(subjob)
 }
 
 func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error {
@@ -388,7 +418,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 	}
 	// update job in DB
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-		u.Position = u.Position + 1
+		u.Position = u.Position + 1 // FIXME: make idempotent
 		if u.Position > len(u.Tasks) {
 			now := time.Now().UTC()
 			u.State = job.Completed
@@ -426,6 +456,16 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 			return err
 		}
 		return c.handleTask(next)
+	} else if j.State == job.Completed && j.ParentID != "" {
+		// if this is a sub-job -- complete the parent task
+		parent, err := c.ds.GetTaskByID(ctx, j.ParentID)
+		if err != nil {
+			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
+		}
+		now := time.Now().UTC()
+		parent.State = task.Completed
+		parent.CompletedAt = &now
+		return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
 	}
 	return nil
 }
@@ -487,6 +527,18 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error marking the job as failed in the datastore")
+		}
+		// if this is a sub-job -- FAIL the parent task
+		if j.ParentID != "" {
+			parent, err := c.ds.GetTaskByID(ctx, j.ParentID)
+			if err != nil {
+				return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
+			}
+			now := time.Now().UTC()
+			parent.State = task.Failed
+			parent.FailedAt = &now
+			parent.Error = t.Error
+			return c.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
 		}
 	}
 	return nil

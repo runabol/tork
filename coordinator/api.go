@@ -82,6 +82,12 @@ func sanitizeTask(t *task.Task) error {
 	if len(t.Parallel) > 0 && t.Each != nil {
 		return errors.New("parallel and each tasks are mutually exclusive")
 	}
+	if len(t.Parallel) > 0 && t.SubJob != nil {
+		return errors.New("parallel and subjob tasks are mutually exclusive")
+	}
+	if t.Each != nil && t.SubJob != nil {
+		return errors.New("each and subjob tasks are mutually exclusive")
+	}
 	if (len(t.Parallel) > 0 || t.Each != nil) && (len(t.Pre) > 0 || len(t.Post) > 0) {
 		return errors.New("composite tasks do not support pre/post tasks")
 	}
@@ -90,6 +96,15 @@ func sanitizeTask(t *task.Task) error {
 	}
 	if (len(t.Parallel) > 0 || t.Each != nil) && t.Queue != "" {
 		return errors.New("composite tasks do not support queue assignment")
+	}
+	if t.SubJob != nil && (len(t.Pre) > 0 || len(t.Post) > 0) {
+		return errors.New("subjob tasks do not support pre/post tasks")
+	}
+	if t.SubJob != nil && t.Image != "" {
+		return errors.New("subjob tasks do not support image")
+	}
+	if t.SubJob != nil && t.Queue != "" {
+		return errors.New("subjob tasks do not support queue assignment")
 	}
 	if t.Each != nil {
 		if t.Each.List == "" {
@@ -107,7 +122,7 @@ func sanitizeTask(t *task.Task) error {
 			return err
 		}
 	}
-	if len(t.Parallel) > 0 || t.Each != nil {
+	if len(t.Parallel) > 0 || t.Each != nil || t.SubJob != nil {
 		return nil
 	}
 	if strings.TrimSpace(t.Image) == "" {

@@ -19,6 +19,7 @@ const (
 
 type Job struct {
 	ID          string            `json:"id,omitempty"`
+	ParentID    string            `json:"parentId,omitempty"`
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	State       State             `json:"state,omitempty"`
@@ -52,6 +53,7 @@ func (j *Job) Clone() *Job {
 		Position:    j.Position,
 		Inputs:      j.Inputs,
 		Context:     j.Context.Clone(),
+		ParentID:    j.ParentID,
 	}
 }
 
