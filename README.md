@@ -601,6 +601,7 @@ Failure:
 6. Webhooks
 7. Job outputs
 8. WASM integration.
+9. CLI
 
 # License
 
