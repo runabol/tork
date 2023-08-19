@@ -285,7 +285,7 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 	// to cancel the task
 	if j.State != job.Running {
 		t.State = task.Cancelled
-		node, err := c.ds.GetNodeByID(ctx, t.Node)
+		node, err := c.ds.GetNodeByID(ctx, t.NodeID)
 		if err != nil {
 			return err
 		}
@@ -298,7 +298,7 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 		if u.State == task.Scheduled {
 			u.State = task.Running
 			u.StartedAt = t.StartedAt
-			u.Node = t.Node
+			u.NodeID = t.NodeID
 		}
 		return nil
 	})

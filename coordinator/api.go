@@ -244,8 +244,8 @@ func (s *api) cancelJob(c *gin.Context) {
 		err := s.ds.UpdateTask(c, t.ID, func(u *task.Task) error {
 			u.State = task.Cancelled
 			// notify the node to cancel the task
-			if u.Node != "" {
-				node, err := s.ds.GetNodeByID(c, u.Node)
+			if u.NodeID != "" {
+				node, err := s.ds.GetNodeByID(c, u.NodeID)
 				if err != nil {
 					return err
 				}

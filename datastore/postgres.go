@@ -41,7 +41,7 @@ type taskRecord struct {
 	Pre         []byte         `db:"pre_tasks"`
 	Post        []byte         `db:"post_tasks"`
 	Volumes     pq.StringArray `db:"volumes"`
-	Node        string         `db:"node_id"`
+	NodeID      string         `db:"node_id"`
 	Retry       []byte         `db:"retry"`
 	Limits      []byte         `db:"limits"`
 	Timeout     string         `db:"timeout"`
@@ -153,7 +153,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Pre:         pre,
 		Post:        post,
 		Volumes:     r.Volumes,
-		Node:        r.Node,
+		NodeID:      r.NodeID,
 		Retry:       retry,
 		Limits:      limits,
 		Timeout:     r.Timeout,
@@ -341,7 +341,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		pre,                          // $18
 		post,                         // $19
 		pq.StringArray(t.Volumes),    // $20
-		t.Node,                       // $21
+		t.NodeID,                     // $21
 		retry,                        // $22
 		limits,                       // $23
 		t.Timeout,                    // $24
@@ -419,7 +419,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.CompletedAt, // $5
 		t.FailedAt,    // $6
 		t.Error,       // $7
-		t.Node,        // $8
+		t.NodeID,      // $8
 		t.Result,      // $9
 		t.Completions, // $10
 		each,          // $11

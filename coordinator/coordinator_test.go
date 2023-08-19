@@ -153,7 +153,7 @@ func Test_handleStartedTask(t *testing.T) {
 		ID:        uuid.NewUUID(),
 		State:     task.Scheduled,
 		StartedAt: &now,
-		Node:      uuid.NewUUID(),
+		NodeID:    uuid.NewUUID(),
 		JobID:     j1.ID,
 	}
 
@@ -167,7 +167,7 @@ func Test_handleStartedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, task.Running, t2.State)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
-	assert.Equal(t, t1.Node, t2.Node)
+	assert.Equal(t, t1.NodeID, t2.NodeID)
 }
 
 func Test_handleStartedTaskOfFailedJob(t *testing.T) {
@@ -212,7 +212,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 		State:     task.Scheduled,
 		StartedAt: &now,
 		JobID:     j1.ID,
-		Node:      n1.ID,
+		NodeID:    n1.ID,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -228,7 +228,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	assert.Equal(t, task.Scheduled, t2.State)
 	assert.Equal(t, 1, cancellations)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
-	assert.Equal(t, t1.Node, t2.Node)
+	assert.Equal(t, t1.NodeID, t2.NodeID)
 }
 
 func Test_handleCompletedLastTask(t *testing.T) {
@@ -266,7 +266,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    2,
 	}
@@ -325,7 +325,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       parentJob.ID,
 		Position:    2,
 	}
@@ -352,7 +352,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    2,
 	}
@@ -423,7 +423,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    1,
 	}
@@ -500,7 +500,7 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    1,
 		ParentID:    pt.ID,
@@ -557,7 +557,7 @@ func Test_handleFailedTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    1,
 	}
@@ -620,7 +620,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		Node:        uuid.NewUUID(),
+		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    1,
 		Retry: &task.Retry{

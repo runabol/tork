@@ -116,7 +116,7 @@ func (w *Worker) runTask(t *task.Task) error {
 	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.State = task.Running
-	t.Node = w.id
+	t.NodeID = w.id
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
 	}
