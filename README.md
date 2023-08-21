@@ -593,15 +593,14 @@ Failure:
 
 # TODO
 
-1. Better input validation (consider using cue-lang)
-2. Redis broker integration
-3. Job-level defaults
-4. Podman runtime support
-5. Ability to schedule tasks using a `nodeSelector`
-6. Webhooks
-7. Job outputs
-8. WASM integration.
-9. CLI
+1. Redis broker integration
+2. Job-level defaults
+3. Podman runtime support
+4. Ability to schedule tasks using a `nodeSelector`
+5. Webhooks
+6. Job outputs
+7. WASM integration.
+8. CLI / Web UI
 
 # License
 
