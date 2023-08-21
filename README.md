@@ -601,6 +601,7 @@ Failure:
 6. Job outputs
 7. WASM integration.
 8. CLI / Web UI
+9. Create an example HLS output job
 
 # License
 
