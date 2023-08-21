@@ -26,60 +26,60 @@ type Task struct {
 	JobID       string            `json:"jobId,omitempty"`
 	ParentID    string            `json:"parentId,omitempty"`
 	Position    int               `json:"position,omitempty"`
-	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
 	ScheduledAt *time.Time        `json:"scheduledAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
-	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
-	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
-	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
-	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty"`
+	CMD         []string          `json:"cmd,omitempty"`
+	Entrypoint  []string          `json:"entrypoint,omitempty"`
+	Run         string            `json:"run,omitempty"`
+	Image       string            `json:"image,omitempty"`
+	Env         map[string]string `json:"env,omitempty"`
+	Queue       string            `json:"queue,omitempty"`
 	Error       string            `json:"error,omitempty"`
-	Pre         []*Task           `json:"pre,omitempty" yaml:"pre,omitempty"`
-	Post        []*Task           `json:"post,omitempty" yaml:"post,omitempty"`
-	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	Pre         []*Task           `json:"pre,omitempty"`
+	Post        []*Task           `json:"post,omitempty"`
+	Volumes     []string          `json:"volumes,omitempty"`
 	NodeID      string            `json:"nodeId,omitempty"`
-	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
-	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
-	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Retry       *Retry            `json:"retry,omitempty"`
+	Limits      *Limits           `json:"limits,omitempty"`
+	Timeout     string            `json:"timeout,omitempty"`
 	Result      string            `json:"result,omitempty"`
-	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
-	If          string            `json:"if,omitempty" yaml:"if,omitempty"`
-	Parallel    []*Task           `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	Var         string            `json:"var,omitempty"`
+	If          string            `json:"if,omitempty"`
+	Parallel    []*Task           `json:"parallel,omitempty"`
 	Completions int               `json:"completions,omitempty"`
-	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
-	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
+	Each        *Each             `json:"each,omitempty"`
+	SubJob      *SubJob           `json:"subjob,omitempty"`
 	SubJobID    string            `json:"subjobId,omitempty"`
 }
 
 type SubJob struct {
 	ID          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Tasks       []*Task           `json:"tasks,omitempty" yaml:"tasks,omitempty"`
-	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Tasks       []*Task           `json:"tasks,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
 }
 
 type Each struct {
-	List string `json:"list,omitempty" yaml:"list,omitempty"`
-	Task *Task  `json:"task,omitempty" yaml:"task,omitempty"`
+	List string `json:"list,omitempty"`
+	Task *Task  `json:"task,omitempty"`
 	Size int    `json:"size,omitempty"`
 }
 
 type Retry struct {
-	Limit    int `json:"limit,omitempty" yaml:"limit,omitempty"`
-	Attempts int `json:"attempts,omitempty" yaml:"attempts,omitempty"`
+	Limit    int `json:"limit,omitempty"`
+	Attempts int `json:"attempts,omitempty"`
 }
 
 type Limits struct {
-	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
-	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
+	CPUs   string `json:"cpus,omitempty"`
+	Memory string `json:"memory,omitempty"`
 }
 
 func (s State) IsActive() bool {

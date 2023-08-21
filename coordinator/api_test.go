@@ -148,7 +148,9 @@ func Test_createJob(t *testing.T) {
 	})
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("POST", "/job", strings.NewReader(`{
+		"name":"test job",
 		"tasks":[{
+			"name":"test task",
 			"image":"some:image"
 		}]
 	}`))
@@ -163,6 +165,25 @@ func Test_createJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, job.Pending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func Test_createJobInvalidProperty(t *testing.T) {
+	api := newAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("POST", "/job", strings.NewReader(`{
+		"tasks":[{
+			"nosuch":"thing",
+			"image":"some:image"
+		}]
+	}`))
+	req.Header.Add("Content-Type", "application/json")
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func Test_getJob(t *testing.T) {
@@ -190,108 +211,6 @@ func Test_getJob(t *testing.T) {
 	assert.Equal(t, "1234", j.ID)
 	assert.Equal(t, job.Pending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
-}
-
-func Test_sanitizeTaskRetry(t *testing.T) {
-	err := sanitizeTask(&task.Task{
-		Image: "some:image",
-		Retry: &task.Retry{
-			Limit: 5,
-		},
-	})
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Image: "some:image",
-		Retry: &task.Retry{
-			Limit: 100,
-		},
-	})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{
-		Image:   "some:image",
-		Timeout: "-10s",
-	})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{
-		Image:   "some:image",
-		Timeout: "10s",
-	})
-	assert.NoError(t, err)
-	rt1 := &task.Task{
-		Image:   "some:image",
-		Timeout: "10s",
-		Retry:   &task.Retry{},
-	}
-	err = sanitizeTask(rt1)
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Parallel: []*task.Task{
-			{
-				Image: "some:image",
-			},
-		},
-	})
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Image: "some:image",
-		Parallel: []*task.Task{
-			{
-				Image: "some:image",
-			},
-		},
-	})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{
-		Parallel: []*task.Task{
-			{
-				Image: "some:image",
-			},
-		},
-		Each: &task.Each{
-			List: "${ some expression }",
-			Task: &task.Task{
-				Image: "some:image",
-			},
-		},
-	})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{
-		Each: &task.Each{
-			List: "${ some expression }",
-			Task: &task.Task{
-				Image: "some:image",
-			},
-		},
-	})
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Each: &task.Each{
-			Task: &task.Task{
-				Image: "some:image",
-			},
-		},
-	})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{
-		SubJob: &task.SubJob{},
-		Each:   &task.Each{},
-	})
-	assert.Error(t, err)
-}
-
-func Test_sanitizeTaskBasic(t *testing.T) {
-	err := sanitizeTask(&task.Task{})
-	assert.Error(t, err)
-	err = sanitizeTask(&task.Task{Image: "some:image"})
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Parallel: []*task.Task{{Image: "some:image"}},
-	})
-	assert.NoError(t, err)
-	err = sanitizeTask(&task.Task{
-		Parallel: []*task.Task{{Name: "bad task"}},
-	})
-	assert.Error(t, err)
 }
 
 func Test_cancelRunningJob(t *testing.T) {

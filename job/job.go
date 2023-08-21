@@ -20,17 +20,17 @@ const (
 type Job struct {
 	ID          string            `json:"id,omitempty"`
 	ParentID    string            `json:"parentId,omitempty"`
-	Name        string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
 	State       State             `json:"state,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	Tasks       []*task.Task      `json:"tasks,omitempty" yaml:"tasks,omitempty"`
+	Tasks       []*task.Task      `json:"tasks,omitempty"`
 	Execution   []*task.Task      `json:"execution,omitempty"`
 	Position    int               `json:"position,omitempty"`
-	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
 	Context     Context           `json:"context,omitempty"`
 }
 

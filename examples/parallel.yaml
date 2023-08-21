@@ -6,11 +6,14 @@ tasks:
 
   - name: a parallel task
     parallel:
-      - image: ubuntu:mantic
+      - name: sleep for 2 seconds
+        image: ubuntu:mantic
         run: sleep 2
-      - image: ubuntu:mantic
+      - name: sleep for 1 second
+        image: ubuntu:mantic
         run: sleep 1
-      - image: ubuntu:mantic
+      - name: sleep for 3 seconds
+        image: ubuntu:mantic
         run: sleep 3
 
   - name: bye task

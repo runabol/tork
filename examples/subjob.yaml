@@ -4,7 +4,8 @@ tasks:
     image: ubuntu:mantic
     run: echo start of job 
 
-  - parallel:
+  - name: running 2 jobs in parallel
+    parallel:
       - name: sample job 1
         subjob:
           name: my sub job
