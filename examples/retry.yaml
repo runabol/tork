@@ -1,4 +1,4 @@
-name: sample parallel job
+name: sample retry job
 tasks:
   - name: a task that simulates a coin flip and fails unless the result is heads
     image: ubuntu:mantic
