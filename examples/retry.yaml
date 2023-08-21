@@ -1,6 +1,7 @@
 name: sample parallel job
 tasks:
-  - image: ubuntu:mantic
+  - name: a task that simulates a coin flip and fails unless the result is heads
+    image: ubuntu:mantic
     entrypoint: ["bash","-c"]
     run: |
       COINFLIP=$((( RANDOM % 2 )) && echo "heads" || echo "tails")

@@ -9,6 +9,7 @@ tasks:
     each:
       list: "{{ range(1,5) }}"
       task:
+        name: output task item
         var: eachTask{{item.index}}
         image: ubuntu:mantic
         env:

@@ -107,12 +107,21 @@ func evaluateTemplate(ex string, c map[string]any) (string, error) {
 	return buf.String(), nil
 }
 
-func EvaluateExpr(ex string, c map[string]any) (any, error) {
-	// if the expression is marked with {{ }}
-	// we want to strip these off
+func ValidExpr(ex string) bool {
+	ex = sanitizeExpr(ex)
+	_, err := expr.Compile(ex)
+	return err == nil
+}
+
+func sanitizeExpr(ex string) string {
 	if matches := exprMatcher.FindStringSubmatch(ex); matches != nil {
-		ex = matches[1]
+		return matches[1]
 	}
+	return ex
+}
+
+func EvaluateExpr(ex string, c map[string]any) (any, error) {
+	ex = sanitizeExpr(ex)
 	env := map[string]any{
 		"randomInt": randomInt,
 		"coinflip":  coinflip,
