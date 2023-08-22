@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -35,6 +36,11 @@ func newAPI(cfg Config) *api {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowHeaders: []string{"Origin"},
+		MaxAge:       12 * time.Hour,
+	}))
 	r.Use(errorHandler)
 	s := &api{
 		broker: cfg.Broker,
@@ -45,13 +51,13 @@ func newAPI(cfg Config) *api {
 		ds: cfg.DataStore,
 	}
 	r.GET("/status", s.status)
-	r.GET("/task/:id", s.getTask)
-	r.GET("/queue", s.listQueues)
-	r.GET("/node", s.listActiveNodes)
-	r.POST("/job", s.createJob)
-	r.GET("/job/:id", s.getJob)
-	r.GET("/job", s.listJobs)
-	r.PUT("/job/:id/cancel", s.cancelJob)
+	r.GET("/tasks/:id", s.getTask)
+	r.GET("/queues", s.listQueues)
+	r.GET("/nodes", s.listActiveNodes)
+	r.POST("/jobs", s.createJob)
+	r.GET("/jobs/:id", s.getJob)
+	r.GET("/jobs", s.listJobs)
+	r.PUT("/jobs/:id/cancel", s.cancelJob)
 	return s
 }
 

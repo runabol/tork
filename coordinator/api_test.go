@@ -31,7 +31,7 @@ func Test_getQueues(t *testing.T) {
 		Broker:    b,
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/queue", nil)
+	req, err := http.NewRequest("GET", "/queues", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -63,7 +63,7 @@ func Test_getJobs(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	req, err := http.NewRequest("GET", "/job", nil)
+	req, err := http.NewRequest("GET", "/jobs", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -80,7 +80,7 @@ func Test_getJobs(t *testing.T) {
 	assert.Equal(t, 1, js.Number)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	req, err = http.NewRequest("GET", "/job?page=2", nil)
+	req, err = http.NewRequest("GET", "/jobs?page=2", nil)
 	assert.NoError(t, err)
 	w = httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -116,7 +116,7 @@ func Test_getActiveNodes(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/node", nil)
+	req, err := http.NewRequest("GET", "/nodes", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -177,7 +177,7 @@ func Test_getTask(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/task/1234", nil)
+	req, err := http.NewRequest("GET", "/tasks/1234", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -197,7 +197,7 @@ func Test_createJob(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("POST", "/job", strings.NewReader(`{
+	req, err := http.NewRequest("POST", "/jobs", strings.NewReader(`{
 		"name":"test job",
 		"tasks":[{
 			"name":"test task",
@@ -223,7 +223,7 @@ func Test_createJobInvalidProperty(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("POST", "/job", strings.NewReader(`{
+	req, err := http.NewRequest("POST", "/jobs", strings.NewReader(`{
 		"tasks":[{
 			"nosuch":"thing",
 			"image":"some:image"
@@ -248,7 +248,7 @@ func Test_getJob(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/job/1234", nil)
+	req, err := http.NewRequest("GET", "/jobs/1234", nil)
 	req.Header.Add("Content-Type", "application/json")
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
@@ -319,7 +319,7 @@ func Test_cancelRunningJob(t *testing.T) {
 	})
 
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("PUT", fmt.Sprintf("/job/%s/cancel", j1.ID), nil)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/cancel", j1.ID), nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
