@@ -2,6 +2,7 @@ package datastore_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -170,7 +171,8 @@ func TestInMemoryGetJobs(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	for i := 0; i < 101; i++ {
 		j1 := job.Job{
-			ID: uuid.NewUUID(),
+			ID:   uuid.NewUUID(),
+			Name: fmt.Sprintf("Job %d", (i + 1)),
 		}
 		err := ds.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
@@ -178,6 +180,7 @@ func TestInMemoryGetJobs(t *testing.T) {
 	p1, err := ds.GetJobs(ctx, 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, "Job 101", p1.Items[0].Name)
 
 	p2, err := ds.GetJobs(ctx, 2, 10)
 	assert.NoError(t, err)

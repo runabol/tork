@@ -123,7 +123,7 @@ func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	ds.jmu.Lock()
 	defer ds.jmu.Unlock()
 	ds.jobs[j.ID] = j.Clone()
-	ds.jobIDs = append(ds.jobIDs, j.ID)
+	ds.jobIDs = append([]string{j.ID}, ds.jobIDs...) // prepend
 	return nil
 }
 
