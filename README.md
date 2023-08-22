@@ -77,13 +77,13 @@ JOB_ID=$(curl \
   -X POST \
   --data-binary @hello.yaml \
   -H "Content-type: text/yaml" \
-  http://localhost:3000/job | jq -r .id)
+  http://localhost:8000/job | jq -r .id)
 ```
 
 Query for the status of the job:
 
 ```bash
-curl -s http://localhost:3000/job/$JOB_ID | jq .
+curl -s http://localhost:8000/job/$JOB_ID | jq .
 
 {
   "id": "ed0dba93d262492b8cf26e6c1c4f1c98",
@@ -519,7 +519,7 @@ task properties:
 JSON:
 
 ```bash
-curl -X POST "http://localhost:3000/job" \
+curl -X POST "http://localhost:8000/job" \
      -H "Content-Type: application/json" \
      -d '{"name":"sample job","tasks":[{
        "name": "sample task",
@@ -531,7 +531,7 @@ curl -X POST "http://localhost:3000/job" \
 YAML:
 
 ```bash
-curl -X POST "http://localhost:3000/job" \
+curl -X POST "http://localhost:8000/job" \
      -H "Content-Type: text/yaml" \
      -d \
 '

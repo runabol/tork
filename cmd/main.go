@@ -118,7 +118,8 @@ func tempDirFlag() cli.Flag {
 func addressFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "address",
-		Usage: "REST API Address (Default 0.0.0.0:3000)",
+		Usage: "REST API Address",
+		Value: ":8000",
 	}
 }
 

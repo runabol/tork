@@ -28,7 +28,7 @@ type api struct {
 
 func newAPI(cfg Config) *api {
 	if cfg.Address == "" {
-		cfg.Address = ":3000"
+		cfg.Address = ":8000"
 	}
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
