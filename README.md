@@ -462,14 +462,18 @@ Additionally, any `volumes` defined are also accessible to the `pre` and `post` 
 
 ## List jobs
 
+Returns a list of the most recent jobs
+
+**Path:**
+
 ```
 GET /job
 ```
 
 **Query Params:**
 
-`page` - page number
-`size` - page size
+`page` - page number (default: 1)
+`size` - page size (default: 10)
 
 **Response:**
 
