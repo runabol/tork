@@ -141,6 +141,18 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	return nil
 }
 
+func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
+	ds.tmu.RLock()
+	defer ds.tmu.RUnlock()
+	execution := make([]*task.Task, 0)
+	for _, t := range ds.tasks {
+		if t.JobID == id {
+			execution = append(execution, t.Clone())
+		}
+	}
+	return execution
+}
+
 func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
 	ds.jmu.RLock()
 	defer ds.jmu.RUnlock()
@@ -148,12 +160,7 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 	if !ok {
 		return nil, ErrJobNotFound
 	}
-	execution := make([]*task.Task, 0)
-	for _, t := range ds.tasks {
-		if t.JobID == id {
-			execution = append(execution, t.Clone())
-		}
-	}
+	execution := ds.getExecution(id)
 	sort.Slice(execution, func(i, j int) bool {
 		posi := execution[i].Position
 		posj := execution[j].Position
