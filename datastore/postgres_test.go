@@ -1,11 +1,12 @@
-package datastore_test
+package datastore
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/task"
@@ -16,7 +17,7 @@ import (
 func TestPostgresCreateAndGetTask(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	now := time.Now().UTC()
 	j1 := job.Job{
@@ -41,7 +42,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 func TestPostgresGetActiveTasks(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	j1 := job.Job{
@@ -97,7 +98,7 @@ func TestPostgresGetActiveTasks(t *testing.T) {
 func TestPostgresUpdateTask(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -128,7 +129,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 func TestPostgresCreateAndGetNode(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	n1 := node.Node{
 		ID: uuid.NewUUID(),
@@ -143,7 +144,7 @@ func TestPostgresCreateAndGetNode(t *testing.T) {
 func TestPostgresUpdateNode(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	n1 := node.Node{
@@ -171,7 +172,7 @@ func TestPostgresUpdateNode(t *testing.T) {
 func TestPostgresGetActiveNodes(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
@@ -204,7 +205,7 @@ func TestPostgresGetActiveNodes(t *testing.T) {
 func TestPostgresCreateAndGetJob(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	j1 := job.Job{
 		ID: uuid.NewUUID(),
@@ -223,7 +224,7 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 func TestPostgresUpdateJob(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	j1 := job.Job{
 		ID:    uuid.NewUUID(),
@@ -247,4 +248,44 @@ func TestPostgresUpdateJob(t *testing.T) {
 	assert.Equal(t, job.Completed, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
+}
+
+func TestPostgresGetJobs(t *testing.T) {
+	ctx := context.Background()
+	schemaName := fmt.Sprintf("tork%d", rand.Int())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	assert.NoError(t, err)
+	_, err = ds.db.Exec(fmt.Sprintf("create schema %s", schemaName))
+	assert.NoError(t, err)
+	defer func() {
+		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
+		assert.NoError(t, err)
+	}()
+	err = ds.ExecScript("../db/postgres/schema.sql")
+	assert.NoError(t, err)
+	for i := 0; i < 101; i++ {
+		j1 := job.Job{
+			ID: uuid.NewUUID(),
+		}
+		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+	}
+	p1, err := ds.GetJobs(ctx, 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+
+	p2, err := ds.GetJobs(ctx, 2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p2.Size)
+
+	p10, err := ds.GetJobs(ctx, 10, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p10.Size)
+
+	p11, err := ds.GetJobs(ctx, 11, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p11.Size)
+
+	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
 }

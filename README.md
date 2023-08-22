@@ -460,6 +460,35 @@ Additionally, any `volumes` defined are also accessible to the `pre` and `post` 
 
 # REST API
 
+## List jobs
+
+```
+GET /job
+```
+
+**Query Params:**
+
+`page` - page number
+`size` - page size
+
+**Response:**
+
+```json
+{
+  "items": [{
+    "id": "c5873550dad7439e85ac781168e6e124",
+    "name": "sample job",
+    "state": "COMPLETED",
+    "createdAt": "2023-08-21T21:52:07.751041Z",
+    "startedAt": "2023-08-22T01:52:07.765393Z",
+    "completedAt": "2023-08-22T01:52:12.900569Z",
+  }, ...],
+  "number": 1,
+  "size": 4,
+  "totalPages": 1
+}
+```
+
 ## Submit a job
 
 Submit a new job to be scheduled for execution

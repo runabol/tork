@@ -195,7 +195,7 @@ func execute(ctx *cli.Context) error {
 		dstype := ctx.String("datastore")
 		switch dstype {
 		case datastore.DATASTORE_POSTGRES:
-			if err := ds.(*datastore.PostgresDatastore).CreateSchema(); err != nil {
+			if err := ds.(*datastore.PostgresDatastore).ExecScript("db/postgres/schema.sql"); err != nil {
 				return errors.Wrapf(err, "error when trying to create db schema")
 			}
 		default:

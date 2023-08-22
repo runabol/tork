@@ -165,6 +165,35 @@ func TestInMemoryCreateAndGetJob(t *testing.T) {
 	assert.Equal(t, j1.ID, j2.ID)
 }
 
+func TestInMemoryGetJobs(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	for i := 0; i < 101; i++ {
+		j1 := job.Job{
+			ID: uuid.NewUUID(),
+		}
+		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+	}
+	p1, err := ds.GetJobs(ctx, 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+
+	p2, err := ds.GetJobs(ctx, 2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p2.Size)
+
+	p10, err := ds.GetJobs(ctx, 10, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p10.Size)
+
+	p11, err := ds.GetJobs(ctx, 11, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p11.Size)
+
+	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
+}
+
 func TestInMemoryUpdateJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()

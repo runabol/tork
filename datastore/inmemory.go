@@ -19,12 +19,13 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
-	tasks map[string]*task.Task
-	nodes map[string]node.Node
-	jobs  map[string]*job.Job
-	tmu   sync.RWMutex
-	nmu   sync.RWMutex
-	jmu   sync.RWMutex
+	tasks  map[string]*task.Task
+	nodes  map[string]node.Node
+	jobs   map[string]*job.Job
+	jobIDs []string
+	tmu    sync.RWMutex
+	nmu    sync.RWMutex
+	jmu    sync.RWMutex
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
@@ -122,6 +123,7 @@ func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	ds.jmu.Lock()
 	defer ds.jmu.Unlock()
 	ds.jobs[j.ID] = j.Clone()
+	ds.jobIDs = append(ds.jobIDs, j.ID)
 	return nil
 }
 
@@ -182,4 +184,31 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 		}
 	}
 	return result, nil
+}
+
+func (ds *InMemoryDatastore) GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error) {
+	ds.tmu.RLock()
+	defer ds.tmu.RUnlock()
+	offset := (page - 1) * size
+	result := make([]*job.Job, 0)
+	for i := offset; i < (offset+size) && i < len(ds.jobIDs); i++ {
+		j, err := ds.GetJobByID(ctx, ds.jobIDs[i])
+		if err != nil {
+			return nil, err
+		}
+		jc := j.Clone()
+		jc.Tasks = make([]*task.Task, 0)
+		jc.Execution = make([]*task.Task, 0)
+		result = append(result, jc)
+	}
+	totalPages := len(ds.jobIDs) / size
+	if len(ds.jobIDs)%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &Page[*job.Job]{
+		Items:      result,
+		Number:     page,
+		Size:       len(result),
+		TotalPages: totalPages,
+	}, nil
 }
