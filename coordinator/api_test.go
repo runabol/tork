@@ -47,6 +47,56 @@ func Test_getQueues(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func Test_getJobs(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+	ds := datastore.NewInMemoryDatastore()
+	api := newAPI(Config{
+		DataStore: ds,
+		Broker:    b,
+	})
+	assert.NotNil(t, api)
+
+	for i := 0; i < 11; i++ {
+		err := ds.CreateJob(context.Background(), &job.Job{
+			ID: uuid.NewUUID(),
+		})
+		assert.NoError(t, err)
+	}
+
+	req, err := http.NewRequest("GET", "/job", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	js := datastore.Page[*job.Job]{}
+	err = json.Unmarshal(body, &js)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 10, js.Size)
+	assert.Equal(t, 2, js.TotalPages)
+	assert.Equal(t, 1, js.Number)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	req, err = http.NewRequest("GET", "/job?page=2", nil)
+	assert.NoError(t, err)
+	w = httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err = io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	js = datastore.Page[*job.Job]{}
+	err = json.Unmarshal(body, &js)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, js.Size)
+	assert.Equal(t, 2, js.TotalPages)
+	assert.Equal(t, 2, js.Number)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 func Test_getActiveNodes(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	active := node.Node{

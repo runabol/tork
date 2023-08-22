@@ -40,6 +40,14 @@ func redactTask(t *task.Task) *task.Task {
 	return redacted
 }
 
+func redactJobs(js []*job.Job) []*job.Job {
+	result := make([]*job.Job, len(js))
+	for i, j := range js {
+		result[i] = redactJob(j)
+	}
+	return result
+}
+
 func redactJob(j *job.Job) *job.Job {
 	redacted := j.Clone()
 	// redact inputs

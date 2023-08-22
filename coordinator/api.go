@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strconv"
 
 	"net/http"
 	"strings"
@@ -47,6 +48,7 @@ func newAPI(cfg Config) *api {
 	r.GET("/node", s.listActiveNodes)
 	r.POST("/job", s.createJob)
 	r.GET("/job/:id", s.getJob)
+	r.GET("/job", s.listJobs)
 	r.PUT("/job/:id/cancel", s.cancelJob)
 	return s
 }
@@ -153,6 +155,38 @@ func (s *api) getJob(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, redactJob(j))
+}
+
+func (s *api) listJobs(c *gin.Context) {
+	ps := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(ps)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "invalid page number: %s", ps))
+		return
+	}
+	if page < 1 {
+		page = 1
+	}
+	si := c.DefaultQuery("size", "10")
+	size, err := strconv.Atoi(si)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "invalid size: %s", ps))
+		return
+	}
+	if size < 1 {
+		size = 1
+	}
+	res, err := s.ds.GetJobs(c, page, size)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, datastore.Page[*job.Job]{
+		Number:     res.Number,
+		Size:       res.Size,
+		TotalPages: res.TotalPages,
+		Items:      redactJobs(res.Items),
+	})
 }
 
 func (s *api) getTask(c *gin.Context) {

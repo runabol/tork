@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -214,8 +215,8 @@ func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
 	return &PostgresDatastore{db: db}, nil
 }
 
-func (ds *PostgresDatastore) CreateSchema() error {
-	schema, err := os.ReadFile("db/postgres/schema.sql")
+func (ds *PostgresDatastore) ExecScript(script string) error {
+	schema, err := os.ReadFile(script)
 	if err != nil {
 		return errors.Wrapf(err, "erroring reading postgres schema file")
 	}
@@ -631,4 +632,38 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	}
 
 	return actives, nil
+}
+
+func (ds *PostgresDatastore) GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error) {
+	offset := (page - 1) * size
+	rs := make([]jobRecord, 0)
+	q := fmt.Sprintf(`SELECT * FROM jobs  ORDER BY created_at DESC OFFSET %d LIMIT %d`, offset, size)
+	if err := ds.db.Select(&rs, q); err != nil {
+		return nil, errors.Wrapf(err, "error getting a page of jobs")
+	}
+	result := make([]*job.Job, len(rs))
+	for i, r := range rs {
+		j, err := r.toJob([]*task.Task{}, []*task.Task{})
+		if err != nil {
+			return nil, err
+		}
+		result[i] = j
+	}
+
+	var count *int
+	if err := ds.db.Get(&count, "select count(*) from jobs"); err != nil {
+		return nil, errors.Wrapf(err, "error getting the jobs count")
+	}
+
+	totalPages := *count / size
+	if *count%size != 0 {
+		totalPages = totalPages + 1
+	}
+
+	return &Page[*job.Job]{
+		Items:      result,
+		Number:     page,
+		Size:       len(result),
+		TotalPages: totalPages,
+	}, nil
 }

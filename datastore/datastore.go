@@ -28,4 +28,12 @@ type Datastore interface {
 	CreateJob(ctx context.Context, j *job.Job) error
 	UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error
 	GetJobByID(ctx context.Context, id string) (*job.Job, error)
+	GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error)
+}
+
+type Page[T any] struct {
+	Items      []T `json:"items"`
+	Number     int `json:"number"`
+	Size       int `json:"size"`
+	TotalPages int `json:"totalPages"`
 }
