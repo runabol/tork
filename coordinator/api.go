@@ -31,7 +31,9 @@ func newAPI(cfg Config) *api {
 	if cfg.Address == "" {
 		cfg.Address = ":8000"
 	}
-	gin.SetMode(gin.ReleaseMode)
+	if !cfg.Debug {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.Default()
 	r.Use(errorHandler)
 	s := &api{
@@ -242,6 +244,7 @@ func (s *api) cancelJob(c *gin.Context) {
 
 func (s *api) start() error {
 	go func() {
+		log.Info().Msgf("listening on %s", s.server.Addr)
 		// service connections
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msgf("error starting up server")

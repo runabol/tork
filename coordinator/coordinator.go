@@ -35,6 +35,7 @@ type Config struct {
 	DataStore datastore.Datastore
 	Address   string
 	Queues    map[string]int
+	Debug     bool
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {

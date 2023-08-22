@@ -123,6 +123,14 @@ func addressFlag() cli.Flag {
 	}
 }
 
+func debugFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "debug",
+		Usage: "Enbale debug mode",
+		Value: "false",
+	}
+}
+
 func main() {
 	app := &cli.App{
 		Name:        "tork",
@@ -138,6 +146,7 @@ func main() {
 			defaultMemoryLimit(),
 			tempDirFlag(),
 			addressFlag(),
+			debugFlag(),
 		},
 		Action: execute,
 	}
@@ -272,6 +281,7 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Contex
 		DataStore: ds,
 		Queues:    queues,
 		Address:   ctx.String("address"),
+		Debug:     ctx.Bool("debug"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
