@@ -237,7 +237,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 		pt.ID = uuid.NewUUID()
 		pt.JobID = j.ID
 		pt.State = task.Pending
-		pt.Position = t.Position
+		pt.Position = 0
 		pt.CreatedAt = &now
 		pt.ParentID = t.ID
 		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
@@ -307,13 +307,17 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 
 func (c *Coordinator) handleCompletedTask(t *task.Task) error {
 	ctx := context.Background()
-	if t.ParentID != "" && t.SubJob == nil {
-		return c.completeCompositeTask(ctx, t)
-	}
-	return c.completeRegularTask(ctx, t)
+	return c.completeTask(ctx, t)
 }
 
-func (c *Coordinator) completeCompositeTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeTask(ctx context.Context, t *task.Task) error {
+	if t.ParentID != "" {
+		return c.completeSubTask(ctx, t)
+	}
+	return c.completeTopLevelTask(ctx, t)
+}
+
+func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 	parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting parent composite task: %s", t.ParentID)
@@ -364,7 +368,7 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 		return errors.New("error fetching the parent task")
 	}
 	if parent.State == task.Completed {
-		return c.completeRegularTask(ctx, parent)
+		return c.completeTask(ctx, parent)
 	}
 	return nil
 }
@@ -409,12 +413,12 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 	}
 	// complete the parent task
 	if parent.State == task.Completed {
-		return c.completeRegularTask(ctx, parent)
+		return c.completeTask(ctx, parent)
 	}
 	return nil
 }
 
-func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -427,7 +431,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 	}
 	// update job in DB
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-		u.Position = u.Position + 1 // FIXME: make idempotent
+		u.Position = u.Position + 1
 		if u.Position > len(u.Tasks) {
 			now := time.Now().UTC()
 			u.State = job.Completed
@@ -471,6 +475,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 		if err != nil {
 			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
 		}
+		fmt.Println("parent task", parent.ID)
 		now := time.Now().UTC()
 		parent.State = task.Completed
 		parent.CompletedAt = &now
