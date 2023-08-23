@@ -15,7 +15,7 @@ import (
 type jobInput struct {
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,dive"`
+	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
 

@@ -21,6 +21,15 @@ func TestValidateMinJobInput(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestValidateJobNoTasks(t *testing.T) {
+	j := jobInput{
+		Name:  "test job",
+		Tasks: []taskInput{},
+	}
+	err := j.validate()
+	assert.Error(t, err)
+}
+
 func TestValidateQueue(t *testing.T) {
 	j := jobInput{
 		Name: "test job",
