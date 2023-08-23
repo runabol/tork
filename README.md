@@ -1,4 +1,4 @@
-# Tork
+## Tork
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/runabol/tork)](https://goreportcard.com/report/github.com/runabol/tork)
 ![Build Status](https://github.com/runabol/tork/workflows/ci/badge.svg)
@@ -6,7 +6,7 @@
 
 A Golang based high-performance, scalable and distributed workflow engine.
 
-# Features:
+## Features:
 
 - [REST API](#rest-api)
 - Horizontally scalable
@@ -22,8 +22,9 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - [Parallel Task](#parallel-task)
 - [Each Task](#each-task)
 - [Subjob Task](#sub-job-task)
+- [Web UI](https://github.com/runabol/tork-web)
 
-# Architecture
+## Architecture
 
 ![architecture diagram](docs/arch.png)
 
@@ -37,16 +38,16 @@ A Golang based high-performance, scalable and distributed workflow engine.
 
 **Runtime**: the platform used by workers to execute tasks. Currently only Docker is supported.
 
-# Getting started
+## Getting started
 
-## Prerequisites
+### Prerequisites
 
 Before running the examples, ensure you have the following software installed:
 
 - [Go](https://golang.org/doc/install) 1.18 or later
 - [Docker](https://docs.docker.com/get-docker/) with API Version >= 1.42 (use `docker version | grep API` to check)
 
-## Hello World
+### Hello World
 
 Start in `standalone` mode:
 
@@ -98,7 +99,7 @@ curl -s http://localhost:8000/jobs/$JOB_ID | jq .
 }
 ```
 
-## A slightly more interesting example
+### A slightly more interesting example
 
 The following job:
 
@@ -137,11 +138,11 @@ tasks:
           https://devnull-as-a-service.com/dev/null
 ```
 
-## More examples
+### More examples
 
 Check out the [examples](examples/) folder for more examples.
 
-# Queues
+## Queues
 
 By default all tasks are routed to the `default` queue.
 
@@ -171,7 +172,7 @@ run: |
     output.mp4
 ```
 
-## Special queues
+### Special queues
 
 - `jobs` - incoming jobs land in this queue prior to being scheduled for processing by the Coordinator.
 
@@ -187,7 +188,7 @@ run: |
 
 - `x-<worker id>` - each worker subscribes to an exclusive queue which can be used by the coordinator to cancel tasks started by a particular worker.
 
-# Environment Variables
+## Environment Variables
 
 You can set custom environment variables for a given task by using the `env` property:
 
@@ -208,7 +209,7 @@ By convention, any environment variables which contain the keywords `SECRET`, `P
 
 **Warning**: Tork automatically redacts secrets printed to the log, but you should avoid printing secrets to the log intentionally.
 
-# Datastore
+## Datastore
 
 The `Datastore` is responsible for holding job and task metadata.
 
@@ -239,7 +240,7 @@ go run cmd/main.go \
   -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 ```
 
-# Running in a distributed mode
+## Running in a distributed mode
 
 To run in distributed mode we need to use an external message broker.
 
@@ -267,7 +268,7 @@ go run cmd/main.go \
  -rabbitmq-url amqp://guest:guest@localhost:5672
 ```
 
-# Limits
+## Limits
 
 By default, a task has no resource constraints and can use as much of a given resource as the host’s kernel scheduler allows.
 
@@ -292,7 +293,7 @@ limits:
   memory: 10m
 ```
 
-# Outputs
+## Outputs
 
 Tasks can write arbitrary text output to the standard output file defined in `$TORK_OUTPUT`. Downstream tasks may refer to outputs of previous tasks. Example:
 
@@ -315,11 +316,11 @@ tasks:
       echo -n hello $NAME
 ```
 
-# Expressions
+## Expressions
 
 Tork uses the [expr](https://github.com/antonmedv/expr) expression language to:
 
-- Evaluate embedded expressions in a task's environment variables.
+- Evaluate C-style embedded expressions in a task's environment variables.
 - Evaluate a task's `if` condition to determine whether a task should run. When an `if` expression evaluates to anything expect `false`, the task will run.
 
 Some examples:
@@ -375,9 +376,9 @@ tasks:
       echo "a random number: $RANDOM_NUMBER"
 ```
 
-# Special Tasks
+## Special Tasks
 
-## Parallel Task
+### Parallel Task
 
 To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 
@@ -392,7 +393,7 @@ To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
       run: sleep 3
 ```
 
-## Each Task
+### Each Task
 
 Executes the `task` to for each `item` in `list`, in parallel.
 
@@ -408,7 +409,7 @@ Executes the `task` to for each `item` in `list`, in parallel.
       run: echo -n HELLO $ITEM at $INDEX
 ```
 
-## Sub-Job Task
+### Sub-Job Task
 
 A task can start another job. When a sub-job completes or fails it marks its parent task as `COMPLETED` or `FAILED` respectively.
 
@@ -425,7 +426,7 @@ A task can start another job. When a sub-job completes or fails it marks its par
         run: echo end of sub-job
 ```
 
-# Pre/Post Tasks
+## Pre/Post Tasks
 
 It is sometimes desireable to execute a task - potentially using a different `image` - before or after a task executes and share the state of that execution with the "main" task we want to execute. This is where `pre` and `post` tasks come in.
 
@@ -458,9 +459,9 @@ Additionally, any `volumes` defined are also accessible to the `pre` and `post` 
         https://devnull-as-a-service.com/dev/null
 ```
 
-# REST API
+## REST API
 
-## List jobs
+### List jobs
 
 Returns a list of the most recent jobs
 
@@ -493,7 +494,7 @@ GET /jobs
 }
 ```
 
-## Submit a job
+### Submit a job
 
 Submit a new job to be scheduled for execution
 
@@ -624,7 +625,13 @@ Failure:
 }
 ```
 
-# TODO
+## Web UI
+
+[Tork Web](https://github.com/runabol/tork-web) is a web based tool for interacting with Tork.
+
+!["Tork Web"](docs/tork-web.png)
+
+## TODO
 
 1. Redis broker integration
 2. Job-level defaults
@@ -636,6 +643,6 @@ Failure:
 8. CLI / Web UI
 9. Create an example HLS output job
 
-# License
+## License
 
 Copyright (c) 2023-present Arik Cohen. Tork is free and open-source software licensed under the MIT License.
