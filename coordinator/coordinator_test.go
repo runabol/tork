@@ -288,6 +288,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, 100, j2.PercentCompleted)
 }
 
 func Test_handleCompletedLastSubJobTask(t *testing.T) {
@@ -386,6 +387,8 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	pj, err := ds.GetJobByID(ctx, parentJob.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, job.Completed, pj.State)
+
+	assert.Equal(t, 100, pj.PercentCompleted)
 }
 
 func Test_handleCompletedFirstTask(t *testing.T) {
@@ -445,6 +448,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, 50, j2.PercentCompleted)
 }
 
 func Test_handleCompletedParallelTask(t *testing.T) {
@@ -575,7 +579,8 @@ func Test_handleCompletedEachTask(t *testing.T) {
 				Name: "some task",
 			},
 		},
-		State: task.Running,
+		State:    task.Running,
+		Position: 1,
 	}
 
 	err = ds.CreateTask(ctx, pt)
@@ -846,7 +851,7 @@ func TestRunHelloWorldJob(t *testing.T) {
 func TestRunParallelJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/parallel.yaml")
 	assert.Equal(t, job.Completed, j1.State)
-	assert.Equal(t, 6, len(j1.Execution))
+	assert.Equal(t, 9, len(j1.Execution))
 }
 
 func TestRunEachJob(t *testing.T) {
@@ -858,6 +863,11 @@ func TestRunEachJob(t *testing.T) {
 func TestRunSubjobJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/subjob.yaml")
 	assert.Equal(t, job.Completed, j1.State)
+
+	for _, ta := range j1.Execution {
+		fmt.Println(ta.Name)
+	}
+
 	assert.Equal(t, 5, len(j1.Execution))
 }
 
@@ -882,6 +892,7 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
+		// Queues:  map[string]int{"default": 5},
 	})
 	assert.NoError(t, err)
 

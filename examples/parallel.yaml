@@ -8,13 +8,22 @@ tasks:
     parallel:
       - name: sleep for 2 seconds
         image: ubuntu:mantic
-        run: sleep 2
+        run: echo 2
       - name: sleep for 1 second
         image: ubuntu:mantic
-        run: sleep 1
+        run: echo 1
       - name: sleep for 3 seconds
         image: ubuntu:mantic
-        run: sleep 3
+        run: echo 3
+      - name: sleep for 2 seconds
+        image: ubuntu:mantic
+        run: echo 2
+      - name: sleep for 1 second
+        image: ubuntu:mantic
+        run: echo 1
+      - name: sleep for 3 seconds
+        image: ubuntu:mantic
+        run: echo 3
 
   - name: bye task
     image: ubuntu:mantic

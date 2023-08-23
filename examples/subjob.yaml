@@ -4,28 +4,28 @@ tasks:
     image: ubuntu:mantic
     run: echo start of job 
 
-  - name: running 2 jobs in parallel
-    parallel:
-      - name: sample job 1
-        subjob:
-          name: my sub job 1
-          tasks:
-            - name: hello sub task
-              image: ubuntu:mantic
-              run: echo start of sub-job 
-            - name: bye task
-              image: ubuntu:mantic
-              run: echo end of sub-job
-      - name: sample job 2
-        subjob:
-          name: my sub job 2
-          tasks:
-            - name: hello sub task
-              image: ubuntu:mantic
-              run: echo start of sub-job 
-            - name: bye task
-              image: ubuntu:mantic
-              run: echo end of sub-job
+  # - name: running 2 jobs in parallel
+  #   parallel:
+  #     - name: sample job 1
+  #       subjob:
+  #         name: my sub job 1
+  #         tasks:
+  #           - name: hello sub task job 1
+  #             image: ubuntu:mantic
+  #             run: echo start of sub-job 
+  #           - name: bye sub task job 1
+  #             image: ubuntu:mantic
+  #             run: echo end of sub-job
+  #     - name: sample job 2
+  #       subjob:
+  #         name: my sub job 2
+  #         tasks:
+  #           - name: hello sub task job 2
+  #             image: ubuntu:mantic
+  #             run: echo start of sub-job 
+  #           - name: bye sub task job 2
+  #             image: ubuntu:mantic
+  #             run: echo end of sub-job
 
   - name: bye task
     image: ubuntu:mantic

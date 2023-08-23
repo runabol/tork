@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -310,7 +311,7 @@ func (c *Coordinator) handleCompletedTask(t *task.Task) error {
 	if t.ParentID != "" && t.SubJob == nil {
 		return c.completeCompositeTask(ctx, t)
 	}
-	return c.completeRegularTask(ctx, t)
+	return c.completeTopLevelTask(ctx, t)
 }
 
 func (c *Coordinator) completeCompositeTask(ctx context.Context, t *task.Task) error {
@@ -364,7 +365,7 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 		return errors.New("error fetching the parent task")
 	}
 	if parent.State == task.Completed {
-		return c.completeRegularTask(ctx, parent)
+		return c.handleCompletedTask(parent)
 	}
 	return nil
 }
@@ -409,12 +410,12 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 	}
 	// complete the parent task
 	if parent.State == task.Completed {
-		return c.completeRegularTask(ctx, parent)
+		return c.handleCompletedTask(parent)
 	}
 	return nil
 }
 
-func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
@@ -425,13 +426,22 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
+	var running bool
 	// update job in DB
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-		u.Position = u.Position + 1 // FIXME: make idempotent
+		if u.State != job.Running {
+			return nil
+		}
+		fmt.Printf("\n----------\n%s %d\n----------\n", t.Name, t.Position)
+		u.Position = t.Position + 1
 		if u.Position > len(u.Tasks) {
 			now := time.Now().UTC()
 			u.State = job.Completed
 			u.CompletedAt = &now
+			u.PercentCompleted = 100
+		} else {
+			running = true
+			u.PercentCompleted = int(math.Round(float64(u.Position-1) / float64(len(u.Tasks)) * 100.0))
 		}
 		if t.Result != "" && t.Var != "" {
 			if u.Context.Tasks == nil {
@@ -448,7 +458,7 @@ func (c *Coordinator) completeRegularTask(ctx context.Context, t *task.Task) err
 	if err != nil {
 		return errors.Wrapf(err, "error getting job from datatstore")
 	}
-	if j.State == job.Running {
+	if running {
 		now := time.Now().UTC()
 		next := j.Tasks[j.Position-1]
 		next.ID = uuid.NewUUID()
