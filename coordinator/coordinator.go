@@ -140,6 +140,7 @@ func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
 		Tasks:       t.SubJob.Tasks,
 		Inputs:      t.SubJob.Inputs,
 		Context:     job.Context{Inputs: t.SubJob.Inputs},
+		TaskCount:   len(t.SubJob.Tasks),
 	}
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Running
