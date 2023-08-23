@@ -490,6 +490,7 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 				Name: "parallel-task-1",
 			},
 		},
+		State: task.Running,
 	}
 
 	err = ds.CreateTask(ctx, pt)
@@ -516,6 +517,95 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, task.Completed, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	pt1, err := ds.GetTaskByID(ctx, t1.ParentID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, pt1.State)
+
+	// verify that the job was NOT
+	// marked as COMPLETED
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, j1.ID, j2.ID)
+	assert.Equal(t, job.Running, j2.State)
+}
+
+func Test_handleCompletedEachTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	now := time.Now().UTC()
+
+	j1 := &job.Job{
+		ID:       uuid.NewUUID(),
+		State:    job.Running,
+		Position: 1,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+				Each: &task.Each{
+					List: "some expression",
+					Task: &task.Task{
+						Name: "some task",
+					},
+				},
+			},
+			{
+				Name: "task-2",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	pt := &task.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j1.ID,
+		Each: &task.Each{
+			List: "some expression",
+			Task: &task.Task{
+				Name: "some task",
+			},
+		},
+		State: task.Running,
+	}
+
+	err = ds.CreateTask(ctx, pt)
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    pt.ID,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = c.handleCompletedTask(t1)
+	assert.NoError(t, err)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	pt1, err := ds.GetTaskByID(ctx, t1.ParentID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, pt1.State)
 
 	// verify that the job was NOT
 	// marked as COMPLETED
