@@ -882,6 +882,9 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
+		Queues: map[string]int{
+			"default": 2,
+		},
 	})
 	assert.NoError(t, err)
 
