@@ -319,12 +319,12 @@ func (c *Coordinator) completeCompositeTask(ctx context.Context, t *task.Task) e
 		return errors.Wrapf(err, "error getting parent composite task: %s", t.ParentID)
 	}
 	if len(parent.Parallel) > 0 {
-		return c.completeParallelTask(ctx, t, parent)
+		return c.completeParallelTask(ctx, t)
 	}
-	return c.completeEachTask(ctx, t, parent)
+	return c.completeEachTask(ctx, t)
 }
 
-func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task, parent *task.Task) error {
+func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error {
 	// update actual task
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Completed
@@ -339,8 +339,8 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task, parent
 		u.Completions = u.Completions + 1
 		if u.Completions >= u.Each.Size {
 			now := time.Now().UTC()
-			parent.State = task.Completed
-			parent.CompletedAt = &now
+			u.State = task.Completed
+			u.CompletedAt = &now
 		}
 		return nil
 	}); err != nil {
@@ -359,13 +359,17 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task, parent
 		}
 	}
 	// complete the parent task
+	parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
+	if err != nil {
+		return errors.New("error fetching the parent task")
+	}
 	if parent.State == task.Completed {
 		return c.completeRegularTask(ctx, parent)
 	}
 	return nil
 }
 
-func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task, parent *task.Task) error {
+func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
 	// update actual task
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Completed
@@ -380,8 +384,8 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task, pa
 		u.Completions = u.Completions + 1
 		if u.Completions >= len(u.Parallel) {
 			now := time.Now().UTC()
-			parent.State = task.Completed
-			parent.CompletedAt = &now
+			u.State = task.Completed
+			u.CompletedAt = &now
 		}
 		return nil
 	}); err != nil {
@@ -398,6 +402,10 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task, pa
 		}); err != nil {
 			return errors.Wrapf(err, "error updating job in datastore")
 		}
+	}
+	parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
+	if err != nil {
+		return errors.New("error fetching the parent task")
 	}
 	// complete the parent task
 	if parent.State == task.Completed {
