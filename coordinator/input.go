@@ -68,6 +68,7 @@ func (ji jobInput) toJob() *job.Job {
 	j.CreatedAt = n
 	j.Context = job.Context{}
 	j.Context.Inputs = ji.Inputs
+	j.TaskCount = len(tasks)
 	return j
 }
 

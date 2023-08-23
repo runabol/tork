@@ -21,7 +21,8 @@ CREATE TABLE jobs (
     inputs        jsonb       not null,
     context       jsonb       not null,
     description   text,
-    parent_id     varchar(32)
+    parent_id     varchar(32),
+    task_count    int         not null
 );
 
 CREATE TABLE tasks (

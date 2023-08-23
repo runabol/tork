@@ -70,6 +70,7 @@ type jobRecord struct {
 	Inputs      []byte     `db:"inputs"`
 	Context     []byte     `db:"context"`
 	ParentID    string     `db:"parent_id"`
+	TaskCount   int        `db:"task_count"`
 }
 
 type nodeRecord struct {
@@ -204,6 +205,7 @@ func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
 		Inputs:      inputs,
 		Description: r.Description,
 		ParentID:    r.ParentID,
+		TaskCount:   r.TaskCount,
 	}, nil
 }
 
@@ -525,10 +527,10 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 		return errors.Wrapf(err, "failed to serialize job.inputs")
 	}
 	q := `insert into jobs 
-	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id) 
+	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id,task_count) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
+	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID, j.TaskCount)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
