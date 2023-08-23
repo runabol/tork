@@ -846,7 +846,7 @@ func TestRunHelloWorldJob(t *testing.T) {
 func TestRunParallelJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/parallel.yaml")
 	assert.Equal(t, job.Completed, j1.State)
-	assert.Equal(t, 6, len(j1.Execution))
+	assert.Equal(t, 9, len(j1.Execution))
 }
 
 func TestRunEachJob(t *testing.T) {
