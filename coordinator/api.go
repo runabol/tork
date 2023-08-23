@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -36,11 +35,7 @@ func newAPI(cfg Config) *api {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
-	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{"Origin"},
-		MaxAge:       12 * time.Hour,
-	}))
+
 	r.Use(errorHandler)
 	s := &api{
 		broker: cfg.Broker,

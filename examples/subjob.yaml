@@ -1,4 +1,4 @@
-name: sample sub job
+name: sample job with sub jobs
 tasks:
   - name: hello task
     image: ubuntu:mantic
@@ -8,7 +8,7 @@ tasks:
     parallel:
       - name: sample job 1
         subjob:
-          name: my sub job
+          name: my sub job 1
           tasks:
             - name: hello sub task
               image: ubuntu:mantic
@@ -18,7 +18,7 @@ tasks:
               run: echo end of sub-job
       - name: sample job 2
         subjob:
-          name: my sub job
+          name: my sub job 2
           tasks:
             - name: hello sub task
               image: ubuntu:mantic

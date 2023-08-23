@@ -1,0 +1,18 @@
+name: example of a "slow" job
+tasks:
+  - name: say hello
+    image: ubuntu:mantic
+    run: echo hello
+
+  - name: each
+    each:
+      list: "{{range(1,5)}}"
+      task: 
+        image: ubuntu:mantic
+        env:
+          SECONDS: "{{item.value}}"
+        run: sleep $SECONDS
+
+  - name: say bye
+    image: ubuntu:mantic
+    run: echo bye
