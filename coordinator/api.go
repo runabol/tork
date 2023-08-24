@@ -178,6 +178,8 @@ func (s *api) listJobs(c *gin.Context) {
 	}
 	if size < 1 {
 		size = 1
+	} else if size > 20 {
+		size = 20
 	}
 	res, err := s.ds.GetJobs(c, page, size)
 	if err != nil {

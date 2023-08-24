@@ -475,20 +475,23 @@ GET /jobs
 **Query Params:**
 
 `page` - page number (default: 1)
-`size` - page size (default: 10)
+`size` - page size (default: 10 min:1 max:20)
 
 **Response:**
 
 ```json
 {
-  "items": [{
-    "id": "c5873550dad7439e85ac781168e6e124",
-    "name": "sample job",
-    "state": "COMPLETED",
-    "createdAt": "2023-08-21T21:52:07.751041Z",
-    "startedAt": "2023-08-22T01:52:07.765393Z",
-    "completedAt": "2023-08-22T01:52:12.900569Z",
-  }, ...],
+  "items": [
+    {
+      "id": "c5873550dad7439e85ac781168e6e124",
+      "name": "sample job",
+      "state": "COMPLETED",
+      "createdAt": "2023-08-21T21:52:07.751041Z",
+      "startedAt": "2023-08-22T01:52:07.765393Z",
+      "completedAt": "2023-08-22T01:52:12.900569Z"
+    }
+    ...
+  ],
   "number": 1,
   "size": 4,
   "totalPages": 1
