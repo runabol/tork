@@ -640,8 +640,7 @@ Failure:
 5. Webhooks
 6. Job outputs
 7. WASM integration.
-8. CLI / Web UI
-9. Create an example HLS output job
+8. Create an example HLS output job
 
 ## License
 
