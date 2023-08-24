@@ -53,7 +53,7 @@ type auxTaskInput struct {
 }
 
 func (ji jobInput) toJob() *job.Job {
-	n := time.Now()
+	n := time.Now().UTC()
 	j := &job.Job{}
 	j.ID = uuid.NewUUID()
 	j.Description = ji.Description
