@@ -34,6 +34,9 @@ type Job struct {
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Context     Context           `json:"context,omitempty"`
 	TaskCount   int               `json:"taskCount,omitempty"`
+	Output      string            `json:"output,omitempty"`
+	Result      string            `json:"result,omitempty"`
+	Error       string            `json:"error,omitempty"`
 }
 
 type Context struct {
@@ -57,6 +60,9 @@ func (j *Job) Clone() *Job {
 		Context:     j.Context.Clone(),
 		ParentID:    j.ParentID,
 		TaskCount:   j.TaskCount,
+		Output:      j.Output,
+		Result:      j.Result,
+		Error:       j.Error,
 	}
 }
 

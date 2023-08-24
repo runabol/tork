@@ -141,6 +141,7 @@ func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
 		Inputs:      t.SubJob.Inputs,
 		Context:     job.Context{Inputs: t.SubJob.Inputs},
 		TaskCount:   len(t.SubJob.Tasks),
+		Output:      t.SubJob.Output,
 	}
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 		u.State = task.Running
@@ -238,7 +239,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 		pt.ID = uuid.NewUUID()
 		pt.JobID = j.ID
 		pt.State = task.Pending
-		pt.Position = 0
+		pt.Position = t.Position
 		pt.CreatedAt = &now
 		pt.ParentID = t.ID
 		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
@@ -433,11 +434,6 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 	// update job in DB
 	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
 		u.Position = u.Position + 1
-		if u.Position > len(u.Tasks) {
-			now := time.Now().UTC()
-			u.State = job.Completed
-			u.CompletedAt = &now
-		}
 		if t.Result != "" && t.Var != "" {
 			if u.Context.Tasks == nil {
 				u.Context.Tasks = make(map[string]string)
@@ -453,7 +449,7 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 	if err != nil {
 		return errors.Wrapf(err, "error getting job from datatstore")
 	}
-	if j.State == job.Running {
+	if j.Position <= len(j.Tasks) {
 		now := time.Now().UTC()
 		next := j.Tasks[j.Position-1]
 		next.ID = uuid.NewUUID()
@@ -470,18 +466,10 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 			return err
 		}
 		return c.handleTask(next)
-	} else if j.State == job.Completed && j.ParentID != "" {
-		// if this is a sub-job -- complete the parent task
-		parent, err := c.ds.GetTaskByID(ctx, j.ParentID)
-		if err != nil {
-			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
-		}
-		now := time.Now().UTC()
-		parent.State = task.Completed
-		parent.CompletedAt = &now
-		return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
+	} else {
+		j.State = job.Completed
+		return c.broker.PublishJob(ctx, j)
 	}
-	return nil
 }
 
 func (c *Coordinator) handleFailedTask(t *task.Task) error {
@@ -589,9 +577,57 @@ func (c *Coordinator) handleJob(j *job.Job) error {
 		return c.cancelJob(ctx, j)
 	case job.Restart:
 		return c.restartJob(ctx, j)
+	case job.Completed:
+		return c.completeJob(ctx, j)
 	default:
 		return errors.Errorf("invalud job state: %s", j.State)
 	}
+}
+
+func (c *Coordinator) completeJob(ctx context.Context, j *job.Job) error {
+	var result string
+	var jobErr error
+	// mark the job as completed
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
+		if u.State != job.Running {
+			return errors.Errorf("job %s is %s and can not be completed", u.ID, u.State)
+		}
+		now := time.Now().UTC()
+		// evaluate the job's output
+		result, jobErr = eval.EvaluateTemplate(j.Output, j.Context.AsMap())
+		if jobErr != nil {
+			log.Error().Err(jobErr).Msgf("error evaluating job %s output", j.ID)
+			j.State = job.Failed
+			u.FailedAt = &now
+			u.Error = jobErr.Error()
+		} else {
+			u.State = job.Completed
+			u.CompletedAt = &now
+			u.Result = result
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating job in datastore")
+	}
+	// if this is a sub-job -- complete/fail the parent task
+	if j.ParentID != "" {
+		parent, err := c.ds.GetTaskByID(ctx, j.ParentID)
+		if err != nil {
+			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
+		}
+		now := time.Now().UTC()
+		if jobErr != nil {
+			parent.State = task.Failed
+			parent.FailedAt = &now
+			parent.Error = jobErr.Error()
+		} else {
+			parent.State = task.Completed
+			parent.CompletedAt = &now
+			parent.Result = result
+		}
+		return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
+	}
+	return nil
 }
 
 func (c *Coordinator) restartJob(ctx context.Context, j *job.Job) error {

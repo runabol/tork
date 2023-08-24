@@ -239,9 +239,13 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
+		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
+
+	err = c.Start()
+	assert.NoError(t, err)
 
 	now := time.Now().UTC()
 
@@ -276,6 +280,9 @@ func Test_handleCompletedLastTask(t *testing.T) {
 
 	err = c.handleCompletedTask(t1)
 	assert.NoError(t, err)
+
+	// wait for the job itself to complete
+	time.Sleep(time.Millisecond * 100)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
@@ -1015,7 +1022,7 @@ func TestRunEachJob(t *testing.T) {
 func TestRunSubjobJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/subjob.yaml")
 	assert.Equal(t, job.Completed, j1.State)
-	assert.Equal(t, 5, len(j1.Execution))
+	assert.Equal(t, 6, len(j1.Execution))
 }
 
 func doRunJob(t *testing.T, filename string) *job.Job {
