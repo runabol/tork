@@ -53,7 +53,6 @@ CREATE TABLE tasks (
     result        text,
     var           varchar(16),
     parallel      jsonb,
-    completions   int,
     parent_id     varchar(32),
     each_         jsonb,
     description   text,

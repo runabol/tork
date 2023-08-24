@@ -468,9 +468,11 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 		Tasks: []*task.Task{
 			{
 				Name: "task-1",
-				Parallel: []*task.Task{
-					{
-						Name: "parallel-task-1",
+				Parallel: &task.Parallel{
+					Tasks: []*task.Task{
+						{
+							Name: "parallel-task-1",
+						},
 					},
 				},
 			},
@@ -485,9 +487,11 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	pt := &task.Task{
 		ID:    uuid.NewUUID(),
 		JobID: j1.ID,
-		Parallel: []*task.Task{
-			{
-				Name: "parallel-task-1",
+		Parallel: &task.Parallel{
+			Tasks: []*task.Task{
+				{
+					Name: "parallel-task-1",
+				},
 			},
 		},
 		State: task.Running,

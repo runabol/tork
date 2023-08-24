@@ -33,11 +33,13 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
-		Parallel: []*task.Task{
-			{
-				Env: map[string]string{
-					"secret_1": "secret",
-					"harmless": "hello world",
+		Parallel: &task.Parallel{
+			Tasks: []*task.Task{
+				{
+					Env: map[string]string{
+						"secret_1": "secret",
+						"harmless": "hello world",
+					},
 				},
 			},
 		},
@@ -54,8 +56,8 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "hello world", tr.Pre[0].Env["harmless"])
 	assert.Equal(t, "[REDACTED]", tr.Post[0].Env["secret_1"])
 	assert.Equal(t, "hello world", tr.Post[0].Env["harmless"])
-	assert.Equal(t, "[REDACTED]", tr.Parallel[0].Env["secret_1"])
-	assert.Equal(t, "hello world", tr.Parallel[0].Env["harmless"])
+	assert.Equal(t, "[REDACTED]", tr.Parallel.Tasks[0].Env["secret_1"])
+	assert.Equal(t, "hello world", tr.Parallel.Tasks[0].Env["harmless"])
 }
 
 func TestRedactJob(t *testing.T) {

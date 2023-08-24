@@ -51,8 +51,7 @@ type Task struct {
 	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty"`
 	If          string            `json:"if,omitempty"`
-	Parallel    []*Task           `json:"parallel,omitempty"`
-	Completions int               `json:"completions,omitempty"`
+	Parallel    *Parallel         `json:"parallel,omitempty"`
 	Each        *Each             `json:"each,omitempty"`
 	SubJob      *SubJob           `json:"subjob,omitempty"`
 	SubJobID    string            `json:"subjobId,omitempty"`
@@ -66,10 +65,16 @@ type SubJob struct {
 	Inputs      map[string]string `json:"inputs,omitempty"`
 }
 
+type Parallel struct {
+	Tasks       []*Task `json:"tasks,omitempty"`
+	Completions int     `json:"completions,omitempty"`
+}
+
 type Each struct {
-	List string `json:"list,omitempty"`
-	Task *Task  `json:"task,omitempty"`
-	Size int    `json:"size,omitempty"`
+	List        string `json:"list,omitempty"`
+	Task        *Task  `json:"task,omitempty"`
+	Size        int    `json:"size,omitempty"`
+	Completions int    `json:"completions,omitempty"`
 }
 
 type Retry struct {
@@ -105,6 +110,10 @@ func (t *Task) Clone() *Task {
 	if t.SubJob != nil {
 		subjob = t.SubJob.Clone()
 	}
+	var parallel *Parallel
+	if t.Parallel != nil {
+		parallel = t.Parallel.Clone()
+	}
 	return &Task{
 		ID:          t.ID,
 		JobID:       t.JobID,
@@ -134,8 +143,7 @@ func (t *Task) Clone() *Task {
 		Result:      t.Result,
 		Var:         t.Var,
 		If:          t.If,
-		Parallel:    CloneTasks(t.Parallel),
-		Completions: t.Completions,
+		Parallel:    parallel,
 		Each:        each,
 		Description: t.Description,
 		SubJob:      subjob,
@@ -179,5 +187,12 @@ func (s *SubJob) Clone() *SubJob {
 		Description: s.Description,
 		Inputs:      clone.CloneStringMap(s.Inputs),
 		Tasks:       CloneTasks(s.Tasks),
+	}
+}
+
+func (p *Parallel) Clone() *Parallel {
+	return &Parallel{
+		Tasks:       CloneTasks(p.Tasks),
+		Completions: p.Completions,
 	}
 }

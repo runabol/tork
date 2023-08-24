@@ -49,7 +49,6 @@ type taskRecord struct {
 	Var         string         `db:"var"`
 	Result      string         `db:"result"`
 	Parallel    []byte         `db:"parallel"`
-	Completions int            `db:"completions"`
 	ParentID    string         `db:"parent_id"`
 	Each        []byte         `db:"each_"`
 	SubJob      []byte         `db:"subjob"`
@@ -114,7 +113,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.limits")
 		}
 	}
-	var parallel []*task.Task
+	var parallel *task.Parallel
 	if r.Parallel != nil {
 		if err := json.Unmarshal(r.Parallel, &parallel); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.parallel")
@@ -134,6 +133,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.subjob")
 		}
 	}
+
 	return &task.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -162,7 +162,6 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Var:         r.Var,
 		Result:      r.Result,
 		Parallel:    parallel,
-		Completions: r.Completions,
 		ParentID:    r.ParentID,
 		Each:        each,
 		Description: r.Description,
@@ -312,17 +311,16 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			var, -- $25
 			result, -- $26
 			parallel, -- $27
-			completions, -- $28
-			parent_id, -- $29
-			each_, -- $30
-			description, -- $31
-			subjob, -- $32
-			subjob_id -- $33
+			parent_id, -- $28
+			each_, -- $29
+			description, -- $30
+			subjob, -- $31
+			subjob_id -- $32
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32,$33)`
+			$27,$28,$29,$30,$31,$32)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -351,12 +349,11 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		t.Var,                        // $25
 		t.Result,                     // $26
 		parallel,                     // $27
-		t.Completions,                // $28
-		t.ParentID,                   // $29
-		each,                         // $30
-		t.Description,                // $31
-		subjob,                       // $32
-		t.SubJobID,                   // $33
+		t.ParentID,                   // $28
+		each,                         // $29
+		t.Description,                // $30
+		subjob,                       // $31
+		t.SubJobID,                   // $32
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -400,6 +397,15 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		s := string(b)
 		each = &s
 	}
+	var parallel *string
+	if t.Parallel != nil {
+		b, err := json.Marshal(t.Parallel)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.parallel")
+		}
+		s := string(b)
+		parallel = &s
+	}
 	q := `update tasks set 
 	        position = $1,
 	        state = $2,
@@ -410,9 +416,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			error_msg = $7,
 			node_id = $8,
 			result = $9,
-			completions = $10,
-			each_ = $11,
-			subjob_id = $12
+			each_ = $10,
+			subjob_id = $11,
+			parallel = $12
 		  where id = $13`
 	_, err = ds.db.Exec(q,
 		t.Position,    // $1
@@ -424,9 +430,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.Error,       // $7
 		t.NodeID,      // $8
 		t.Result,      // $9
-		t.Completions, // $10
-		each,          // $11
-		t.SubJobID,    // $12
+		each,          // $10
+		t.SubJobID,    // $11
+		parallel,      // $12
 		t.ID,          // $13
 	)
 	if err != nil {

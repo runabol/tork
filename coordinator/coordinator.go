@@ -100,7 +100,7 @@ func (c *Coordinator) handlePendingTask(t *task.Task) error {
 }
 
 func (c *Coordinator) scheduleTask(ctx context.Context, t *task.Task) error {
-	if len(t.Parallel) > 0 {
+	if t.Parallel != nil {
 		return c.scheduleParallelTask(ctx, t)
 	} else if t.Each != nil {
 		return c.scheduleEachTask(ctx, t)
@@ -234,7 +234,7 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 		return errors.Wrapf(err, "error getting job: %s", t.JobID)
 	}
 	// fire all parallel tasks
-	for _, pt := range t.Parallel {
+	for _, pt := range t.Parallel.Tasks {
 		pt.ID = uuid.NewUUID()
 		pt.JobID = j.ID
 		pt.State = task.Pending
@@ -323,7 +323,7 @@ func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 	if err != nil {
 		return errors.Wrapf(err, "error getting parent composite task: %s", t.ParentID)
 	}
-	if len(parent.Parallel) > 0 {
+	if parent.Parallel != nil {
 		return c.completeParallelTask(ctx, t)
 	}
 	return c.completeEachTask(ctx, t)
@@ -341,8 +341,8 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 	}
 	// update parent task
 	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
-		u.Completions = u.Completions + 1
-		if u.Completions >= u.Each.Size {
+		u.Each.Completions = u.Each.Completions + 1
+		if u.Each.Completions >= u.Each.Size {
 			now := time.Now().UTC()
 			u.State = task.Completed
 			u.CompletedAt = &now
@@ -386,8 +386,8 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 	}
 	// update parent task
 	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
-		u.Completions = u.Completions + 1
-		if u.Completions >= len(u.Parallel) {
+		u.Parallel.Completions = u.Parallel.Completions + 1
+		if u.Parallel.Completions >= len(u.Parallel.Tasks) {
 			now := time.Now().UTC()
 			u.State = task.Completed
 			u.CompletedAt = &now
