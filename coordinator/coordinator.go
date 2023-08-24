@@ -582,6 +582,86 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 
 func (c *Coordinator) handleJob(j *job.Job) error {
 	ctx := context.Background()
+	switch j.State {
+	case job.Pending:
+		return c.startJob(ctx, j)
+	case job.Cancelled:
+		return c.cancelJob(ctx, j)
+	default:
+		return errors.Errorf("invalud job state: %s", j.State)
+	}
+}
+
+func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
+	// mark the job as cancelled
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
+		if u.State != job.Running {
+			// job is not running -- nothing to cancel
+			return nil
+		}
+		u.State = job.Cancelled
+		return nil
+	}); err != nil {
+		return err
+	}
+	// if there's a parent task notify the parent job to cancel as well
+	if j.ParentID != "" {
+		pt, err := c.ds.GetTaskByID(ctx, j.ParentID)
+		if err != nil {
+			return errors.Wrapf(err, "error fetching parent task: %s", pt.ID)
+		}
+		pj, err := c.ds.GetJobByID(ctx, pt.JobID)
+		if err != nil {
+			return errors.Wrapf(err, "error fetching parent job: %s", pj.ID)
+		}
+		pj.State = job.Cancelled
+		if err := c.broker.PublishJob(ctx, pj); err != nil {
+			log.Error().Err(err).Msgf("error cancelling sub-job: %s", pj.ID)
+		}
+	}
+	// get list of currently running tasks
+	tasks, err := c.ds.GetActiveTasks(ctx, j.ID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting active tasks for job: %s", j.ID)
+	}
+	for _, t := range tasks {
+		t.State = task.Cancelled
+		// mark tasks as cancelled
+		if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+			u.State = task.Cancelled
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error cancelling task: %s", t.ID)
+		}
+		// if this task is a sub-job, notify the sub-job to cancel
+		if t.SubJobID != "" {
+			// cancel the sub-job
+			sj, err := c.ds.GetJobByID(ctx, t.SubJobID)
+			if err != nil {
+				return err
+			}
+			sj.State = job.Cancelled
+			if err := c.broker.PublishJob(ctx, sj); err != nil {
+				log.Error().Err(err).Msgf("error cancelling sub-job: %s", sj.ID)
+			}
+		} else if t.NodeID != "" {
+			// notify the node currently running the task
+			// to cancel it
+			node, err := c.ds.GetNodeByID(ctx, t.NodeID)
+			if err != nil {
+				return err
+			}
+			if err := c.broker.PublishTask(ctx, node.Queue, t); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Coordinator) startJob(ctx context.Context, j *job.Job) error {
+
 	log.Debug().Msgf("starting job %s", j.ID)
 	now := time.Now().UTC()
 	t := j.Tasks[0]

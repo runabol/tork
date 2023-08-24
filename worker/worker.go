@@ -83,7 +83,7 @@ func (w *Worker) handleTask(t *task.Task) error {
 	case task.Cancelled:
 		return w.cancelTask(t)
 	default:
-		return errors.Errorf("can't start a task in %s state", t.State)
+		return errors.Errorf("invalid task state: %s", t.State)
 	}
 }
 

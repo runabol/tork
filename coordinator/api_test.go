@@ -345,8 +345,4 @@ func Test_cancelRunningJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"status":"OK"}`, string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
-
-	actives, err := ds.GetActiveTasks(ctx, j1.ID)
-	assert.NoError(t, err)
-	assert.Empty(t, actives)
 }

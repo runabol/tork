@@ -19,7 +19,8 @@ const (
 	// The queue used by workers to periodically
 	// notify the coordinator about their aliveness
 	QUEUE_HEARBEAT = "hearbeat"
-	// The queue used by the API to insert new jobs into
+	// The queue used by for job creation
+	// and job-related state changes (e.g. cancellation)
 	QUEUE_JOBS = "jobs"
 	// The prefix used for queues that
 	// are exclusive

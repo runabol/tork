@@ -17,7 +17,6 @@ import (
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
 	"gopkg.in/yaml.v3"
 )
 
@@ -206,42 +205,21 @@ func (s *api) getTask(c *gin.Context) {
 
 func (s *api) cancelJob(c *gin.Context) {
 	id := c.Param("id")
-	err := s.ds.UpdateJob(c, id, func(u *job.Job) error {
-		if u.State != job.Running {
-			return errors.New("job in not running")
-		}
-		u.State = job.Cancelled
-		return nil
-	})
-	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
-	}
-	tasks, err := s.ds.GetActiveTasks(c, id)
+	j, err := s.ds.GetJobByID(c, id)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	for _, t := range tasks {
-		err := s.ds.UpdateTask(c, t.ID, func(u *task.Task) error {
-			u.State = task.Cancelled
-			// notify the node to cancel the task
-			if u.NodeID != "" {
-				node, err := s.ds.GetNodeByID(c, u.NodeID)
-				if err != nil {
-					return err
-				}
-				if err := s.broker.PublishTask(c, node.Queue, u); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			_ = c.AbortWithError(http.StatusBadRequest, err)
-			return
-		}
+	if j.State != job.Running {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.New("job is not running"))
+		return
 	}
+	j.State = job.Cancelled
+	if err := s.broker.PublishJob(c, j); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"status": "OK"})
 }
 
