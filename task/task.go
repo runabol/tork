@@ -62,6 +62,7 @@ type SubJob struct {
 	Description string            `json:"description,omitempty"`
 	Tasks       []*Task           `json:"tasks,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
+	Output      string            `json:"output,omitempty"`
 }
 
 type Parallel struct {
@@ -185,6 +186,7 @@ func (s *SubJob) Clone() *SubJob {
 		Description: s.Description,
 		Inputs:      clone.CloneStringMap(s.Inputs),
 		Tasks:       CloneTasks(s.Tasks),
+		Output:      s.Output,
 	}
 }
 

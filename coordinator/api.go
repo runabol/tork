@@ -215,6 +215,10 @@ func (s *api) restartJob(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("job is %s and can not be restarted", j.State))
 		return
 	}
+	if j.Position > len(j.Tasks) {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("job has no more tasks to run"))
+		return
+	}
 	j.State = job.Restart
 	if err := s.broker.PublishJob(c, j); err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)

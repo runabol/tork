@@ -38,7 +38,7 @@ type taskRecord struct {
 	Image       string         `db:"image"`
 	Env         []byte         `db:"env"`
 	Queue       string         `db:"queue"`
-	Error       string         `db:"error_msg"`
+	Error       string         `db:"error_"`
 	Pre         []byte         `db:"pre_tasks"`
 	Post        []byte         `db:"post_tasks"`
 	Volumes     pq.StringArray `db:"volumes"`
@@ -70,6 +70,9 @@ type jobRecord struct {
 	Context     []byte     `db:"context"`
 	ParentID    string     `db:"parent_id"`
 	TaskCount   int        `db:"task_count"`
+	Output      string     `db:"output_"`
+	Result      string     `db:"result"`
+	Error       string     `db:"error_"`
 }
 
 type nodeRecord struct {
@@ -204,6 +207,9 @@ func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
 		Description: r.Description,
 		ParentID:    r.ParentID,
 		TaskCount:   r.TaskCount,
+		Output:      r.Output,
+		Result:      r.Result,
+		Error:       r.Error,
 	}, nil
 }
 
@@ -299,7 +305,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			image, -- $14
 			env, -- $15
 			queue, -- $16
-			error_msg, -- $17
+			error_, -- $17
 			pre_tasks, -- $18
 			post_tasks, -- $19
 			volumes, -- $20
@@ -419,7 +425,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			started_at = $4,
 			completed_at = $5,
 			failed_at = $6,
-			error_msg = $7,
+			error_ = $7,
 			node_id = $8,
 			result = $9,
 			each_ = $10,
@@ -539,10 +545,10 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 		return errors.Wrapf(err, "failed to serialize job.inputs")
 	}
 	q := `insert into jobs 
-	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id,task_count) 
+	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id,task_count,output_,result,error_) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID, j.TaskCount)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`
+	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
@@ -578,9 +584,11 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 			completed_at = $3,
 			failed_at = $4,
 			position = $5,
-			context = $6
-		  where id = $7`
-	_, err = ds.db.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.ID)
+			context = $6,
+			result = $7,
+			error_ = $8
+		  where id = $9`
+	_, err = ds.db.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")

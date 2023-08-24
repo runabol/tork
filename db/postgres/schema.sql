@@ -22,7 +22,10 @@ CREATE TABLE jobs (
     context       jsonb       not null,
     description   text,
     parent_id     varchar(32),
-    task_count    int         not null
+    task_count    int         not null,
+    output_       text,
+    result        text,
+    error_        text
 );
 
 CREATE TABLE tasks (
@@ -42,7 +45,7 @@ CREATE TABLE tasks (
     image         varchar(256),
     env           jsonb,
     queue         varchar(256),
-    error_msg     text,
+    error_        text,
     pre_tasks     jsonb,
     post_tasks    jsonb,
     volumes       text[],

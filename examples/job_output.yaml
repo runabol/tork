@@ -1,0 +1,7 @@
+name: job output example
+output: "hello {{ tasks.randomNumber }}"
+tasks:
+  - var: randomNumber
+    name: generate a random numbe
+    image: ubuntu:mantic
+    run: echo -n "$(shuf -i 1-10000 -n1)" > $TORK_OUTPUT

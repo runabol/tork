@@ -346,3 +346,144 @@ func Test_cancelRunningJob(t *testing.T) {
 	assert.Equal(t, `{"status":"OK"}`, string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+func Test_restartJob(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	j1 := job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Cancelled,
+		CreatedAt: time.Now().UTC(),
+		Position:  1,
+		Tasks: []*task.Task{
+			{
+				Name: "some fake task",
+			},
+		},
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []task.Task{{
+		ID:        uuid.NewUUID(),
+		State:     task.Pending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, &ta)
+		assert.NoError(t, err)
+	}
+
+	api := newAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, `{"status":"OK"}`, string(body))
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func Test_restartRunningJob(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	j1 := job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		CreatedAt: time.Now().UTC(),
+		Position:  1,
+		Tasks: []*task.Task{
+			{
+				Name: "some fake task",
+			},
+		},
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []task.Task{{
+		ID:        uuid.NewUUID(),
+		State:     task.Pending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, &ta)
+		assert.NoError(t, err)
+	}
+
+	api := newAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func Test_restartRunningNoMoreTasksJob(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	j1 := job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Failed,
+		CreatedAt: time.Now().UTC(),
+		Position:  2,
+		Tasks: []*task.Task{
+			{
+				Name: "some fake task",
+			},
+		},
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []task.Task{{
+		ID:        uuid.NewUUID(),
+		State:     task.Pending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, &ta)
+		assert.NoError(t, err)
+	}
+
+	api := newAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

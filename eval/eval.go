@@ -15,25 +15,25 @@ var exprMatcher = regexp.MustCompile(`{{\s*(.+?)\s*}}`)
 
 func EvaluateTask(t *task.Task, c map[string]any) error {
 	// evaluate name
-	name, err := evaluateTemplate(t.Name, c)
+	name, err := EvaluateTemplate(t.Name, c)
 	if err != nil {
 		return err
 	}
 	t.Name = name
 	// evaluate var
-	var_, err := evaluateTemplate(t.Var, c)
+	var_, err := EvaluateTemplate(t.Var, c)
 	if err != nil {
 		return err
 	}
 	t.Var = var_
 	// evaluate image
-	img, err := evaluateTemplate(t.Image, c)
+	img, err := EvaluateTemplate(t.Image, c)
 	if err != nil {
 		return err
 	}
 	t.Image = img
 	// evaluate queue
-	q, err := evaluateTemplate(t.Queue, c)
+	q, err := EvaluateTemplate(t.Queue, c)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	// evaluate the env vars
 	env := t.Env
 	for k, v := range env {
-		result, err := evaluateTemplate(v, c)
+		result, err := EvaluateTemplate(v, c)
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	}
 	t.Env = env
 	// evaluate if expr
-	ifExpr, err := evaluateTemplate(t.If, c)
+	ifExpr, err := EvaluateTemplate(t.If, c)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	return nil
 }
 
-func evaluateTemplate(ex string, c map[string]any) (string, error) {
+func EvaluateTemplate(ex string, c map[string]any) (string, error) {
 	if ex == "" {
 		return "", nil
 	}

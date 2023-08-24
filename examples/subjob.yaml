@@ -2,7 +2,18 @@ name: sample job with sub jobs
 tasks:
   - name: hello task
     image: ubuntu:mantic
-    run: echo start of job 
+    run: echo start of job  
+
+  - var: subJobOutput
+    name: sub job with output
+    subjob:
+      name: my sub job with output
+      output: "{{ tasks.dataStuff }}"
+      tasks:
+        - var: dataStuff
+          name: hello sub task job 1
+          image: ubuntu:mantic
+          run: echo -n data > $TORK_OUTPUT
 
   - name: running 2 jobs in parallel
     parallel:

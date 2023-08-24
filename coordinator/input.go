@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runabol/tork/clone"
 	"github.com/runabol/tork/eval"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
@@ -17,6 +18,7 @@ type jobInput struct {
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 }
 
 type taskInput struct {
@@ -69,6 +71,7 @@ func (ji jobInput) toJob() *job.Job {
 	j.Context = job.Context{}
 	j.Context.Inputs = ji.Inputs
 	j.TaskCount = len(tasks)
+	j.Output = ji.Output
 	return j
 }
 
@@ -143,9 +146,6 @@ func compositeTaskValidation(sl validator.StructLevel) {
 	}
 	if t.Timeout != "" {
 		sl.ReportError(t.Timeout, "timeout", "Timeout", "invalidcompositetask", "")
-	}
-	if t.Var != "" {
-		sl.ReportError(t.Var, "var", "Var", "invalidcompositetask", "")
 	}
 }
 
@@ -242,6 +242,8 @@ func (i taskInput) toTask() *task.Task {
 			Name:        i.SubJob.Name,
 			Description: i.SubJob.Description,
 			Tasks:       toTasks(i.SubJob.Tasks),
+			Inputs:      clone.CloneStringMap(i.SubJob.Inputs),
+			Output:      i.SubJob.Output,
 		}
 	}
 	var parallel *task.Parallel
@@ -295,6 +297,7 @@ type subJobInput struct {
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
 }
 
 type eachInput struct {
