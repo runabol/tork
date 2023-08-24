@@ -474,8 +474,8 @@ GET /jobs
 
 **Query Params:**
 
-`page` - page number (default: 1)
-`size` - page size (default: 10 min:1 max:20)
+- `page` - page number (default: 1)
+- `size` - page size (default: 10 min:1 max:20)
 
 **Response:**
 
