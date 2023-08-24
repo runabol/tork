@@ -171,10 +171,12 @@ func TestEvalPost(t *testing.T) {
 
 func TestEvalParallel(t *testing.T) {
 	t1 := &task.Task{
-		Parallel: []*task.Task{
-			{
-				Env: map[string]string{
-					"HELLO": "{{ inputs.SOMEVAR }}",
+		Parallel: &task.Parallel{
+			Tasks: []*task.Task{
+				{
+					Env: map[string]string{
+						"HELLO": "{{ inputs.SOMEVAR }}",
+					},
 				},
 			},
 		},
@@ -185,7 +187,7 @@ func TestEvalParallel(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "SOME DATA", t1.Parallel[0].Env["HELLO"])
+	assert.Equal(t, "SOME DATA", t1.Parallel.Tasks[0].Env["HELLO"])
 }
 
 func TestEvalExpr(t *testing.T) {

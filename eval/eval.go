@@ -73,14 +73,16 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	}
 	t.Post = posts
 	// evaluate parallel tasks
-	parallel := make([]*task.Task, len(t.Parallel))
-	for i, par := range t.Parallel {
-		if err := EvaluateTask(par, c); err != nil {
-			return err
+	if t.Parallel != nil {
+		parallel := make([]*task.Task, len(t.Parallel.Tasks))
+		for i, par := range t.Parallel.Tasks {
+			if err := EvaluateTask(par, c); err != nil {
+				return err
+			}
+			parallel[i] = par
 		}
-		parallel[i] = par
+		t.Parallel.Tasks = parallel
 	}
-	t.Parallel = parallel
 	return nil
 }
 

@@ -385,12 +385,13 @@ To run a group of tasks concurrently, wrap them in a `parallel` task. Example:
 ```yaml
 - name: a parallel task
   parallel:
-    - image: ubuntu:mantic
-      run: sleep 2
-    - image: ubuntu:mantic
-      run: sleep 1
-    - image: ubuntu:mantic
-      run: sleep 3
+    tasks:
+      - image: ubuntu:mantic
+        run: sleep 2
+      - image: ubuntu:mantic
+        run: sleep 1
+      - image: ubuntu:mantic
+        run: sleep 3
 ```
 
 ### Each Task

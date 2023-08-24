@@ -6,24 +6,25 @@ tasks:
 
   - name: a parallel task
     parallel:
-      - name: sleep for 2 seconds
-        image: ubuntu:mantic
-        run: sleep 2
-      - name: sleep for 1 second
-        image: ubuntu:mantic
-        run: sleep 1
-      - name: sleep for 3 seconds
-        image: ubuntu:mantic
-        run: sleep 3
-      - name: fast task 1
-        image: ubuntu:mantic
-        run: echo fast
-      - name: fast task 2
-        image: ubuntu:mantic
-        run: echo fast
-      - name: fast task 3
-        image: ubuntu:mantic
-        run: echo fast
+      tasks:
+        - name: sleep for 2 seconds
+          image: ubuntu:mantic
+          run: sleep 2
+        - name: sleep for 1 second
+          image: ubuntu:mantic
+          run: sleep 1
+        - name: sleep for 3 seconds
+          image: ubuntu:mantic
+          run: sleep 3
+        - name: fast task 1
+          image: ubuntu:mantic
+          run: echo fast
+        - name: fast task 2
+          image: ubuntu:mantic
+          run: echo fast
+        - name: fast task 3
+          image: ubuntu:mantic
+          run: echo fast
 
   - name: bye task
     image: ubuntu:mantic

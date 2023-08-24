@@ -34,8 +34,10 @@ func redactTask(t *task.Task) *task.Task {
 		redacted.Post[i] = redactTask(p)
 	}
 	// redact parallel tasks
-	for i, p := range redacted.Parallel {
-		redacted.Parallel[i] = redactTask(p)
+	if redacted.Parallel != nil {
+		for i, p := range redacted.Parallel.Tasks {
+			redacted.Parallel.Tasks[i] = redactTask(p)
+		}
 	}
 	return redacted
 }

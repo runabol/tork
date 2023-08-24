@@ -168,10 +168,12 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 		Tasks: []taskInput{
 			{
 				Name: "test task",
-				Parallel: []taskInput{
-					{
-						Name:  "test task",
-						Image: "some task",
+				Parallel: &parallelInput{
+					Tasks: []taskInput{
+						{
+							Name:  "test task",
+							Image: "some task",
+						},
 					},
 				},
 			},
@@ -194,10 +196,12 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 						Image: "some task",
 					},
 				},
-				Parallel: []taskInput{
-					{
-						Name:  "test task",
-						Image: "some task",
+				Parallel: &parallelInput{
+					Tasks: []taskInput{
+						{
+							Name:  "test task",
+							Image: "some task",
+						},
 					},
 				},
 			},
@@ -213,10 +217,12 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 		Tasks: []taskInput{
 			{
 				Name: "test task",
-				Parallel: []taskInput{
-					{
-						Name:  "test task",
-						Image: "some task",
+				Parallel: &parallelInput{
+					Tasks: []taskInput{
+						{
+							Name:  "test task",
+							Image: "some task",
+						},
 					},
 				},
 			},
@@ -231,10 +237,12 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			{
 				Name:  "test task",
 				Image: "some:image",
-				Parallel: []taskInput{
-					{
-						Name:  "test task",
-						Image: "some task",
+				Parallel: &parallelInput{
+					Tasks: []taskInput{
+						{
+							Name:  "test task",
+							Image: "some task",
+						},
 					},
 				},
 				SubJob: &subJobInput{

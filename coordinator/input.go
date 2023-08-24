@@ -36,7 +36,7 @@ type taskInput struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 	If          string            `json:"if,omitempty" yaml:"if,omitempty" validate:"expr"`
-	Parallel    []taskInput       `json:"parallel,omitempty" yaml:"parallel,omitempty" validate:"dive"`
+	Parallel    *parallelInput    `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Each        *eachInput        `json:"each,omitempty" yaml:"each,omitempty"`
 	SubJob      *subJobInput      `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 }
@@ -95,7 +95,7 @@ func taskInputValidation(sl validator.StructLevel) {
 
 func regularTaskValidation(sl validator.StructLevel) {
 	t := sl.Current().Interface().(taskInput)
-	if len(t.Parallel) > 0 || t.Each != nil || t.SubJob != nil {
+	if t.Parallel != nil || t.Each != nil || t.SubJob != nil {
 		return
 	}
 	if t.Image == "" {
@@ -105,7 +105,7 @@ func regularTaskValidation(sl validator.StructLevel) {
 
 func compositeTaskValidation(sl validator.StructLevel) {
 	t := sl.Current().Interface().(taskInput)
-	if len(t.Parallel) == 0 && t.Each == nil && t.SubJob == nil {
+	if t.Parallel == nil && t.Each == nil && t.SubJob == nil {
 		return
 	}
 	if t.Image != "" {
@@ -152,12 +152,12 @@ func compositeTaskValidation(sl validator.StructLevel) {
 func taskTypeValidation(sl validator.StructLevel) {
 	ti := sl.Current().Interface().(taskInput)
 
-	if len(ti.Parallel) > 0 && ti.Each != nil {
+	if ti.Parallel != nil && ti.Each != nil {
 		sl.ReportError(ti.Each, "each", "Each", "paralleloreach", "")
 		sl.ReportError(ti.Parallel, "parallel", "Parallel", "paralleloreach", "")
 	}
 
-	if len(ti.Parallel) > 0 && ti.SubJob != nil {
+	if ti.Parallel != nil && ti.SubJob != nil {
 		sl.ReportError(ti.Each, "subjob", "SubJob", "parallelorsubjob", "")
 		sl.ReportError(ti.Parallel, "parallel", "Parallel", "parallelorsubjob", "")
 	}
@@ -229,7 +229,6 @@ func (i taskInput) toTask() *task.Task {
 			Memory: i.Limits.Memory,
 		}
 	}
-	parallel := toTasks(i.Parallel)
 	var each *task.Each
 	if i.Each != nil {
 		each = &task.Each{
@@ -243,6 +242,12 @@ func (i taskInput) toTask() *task.Task {
 			Name:        i.SubJob.Name,
 			Description: i.SubJob.Description,
 			Tasks:       toTasks(i.SubJob.Tasks),
+		}
+	}
+	var parallel *task.Parallel
+	if i.Parallel != nil {
+		parallel = &task.Parallel{
+			Tasks: toTasks(i.Parallel.Tasks),
 		}
 	}
 	return &task.Task{
@@ -295,6 +300,10 @@ type subJobInput struct {
 type eachInput struct {
 	List string    `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
 	Task taskInput `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
+}
+
+type parallelInput struct {
+	Tasks []taskInput `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 }
 
 type retryInput struct {
