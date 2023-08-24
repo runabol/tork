@@ -603,7 +603,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 	q := `SELECT * 
 	      FROM tasks 
 		  where job_id = $1 
-		  ORDER BY position,created_at ASC`
+		  ORDER BY position DESC,created_at DESC`
 	if err := ds.db.Select(&rs, q, id); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
