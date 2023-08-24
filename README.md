@@ -646,8 +646,7 @@ Failure:
 7. WASM integration.
 8. Create an example HLS output job
 9. Worker monitors the health of the runtime
-10. Move `SubJobID` to `SubJob` struct
-11. Propogate errors in sub job to parent job.
+10. Propogate errors in sub job to parent job.
 
 ## License
 

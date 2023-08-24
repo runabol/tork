@@ -166,7 +166,6 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Each:        each,
 		Description: r.Description,
 		SubJob:      subjob,
-		SubJobID:    r.SubJobID,
 	}, nil
 }
 
@@ -314,13 +313,12 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			parent_id, -- $28
 			each_, -- $29
 			description, -- $30
-			subjob, -- $31
-			subjob_id -- $32
+			subjob -- $31
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32)`
+			$27,$28,$29,$30,$31)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -353,7 +351,6 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		each,                         // $29
 		t.Description,                // $30
 		subjob,                       // $31
-		t.SubJobID,                   // $32
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -406,6 +403,15 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		s := string(b)
 		parallel = &s
 	}
+	var subjob *string
+	if t.SubJob != nil {
+		b, err := json.Marshal(t.SubJob)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.subjob")
+		}
+		s := string(b)
+		subjob = &s
+	}
 	q := `update tasks set 
 	        position = $1,
 	        state = $2,
@@ -417,7 +423,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			node_id = $8,
 			result = $9,
 			each_ = $10,
-			subjob_id = $11,
+			subjob = $11,
 			parallel = $12
 		  where id = $13`
 	_, err = ds.db.Exec(q,
@@ -431,7 +437,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		t.NodeID,      // $8
 		t.Result,      // $9
 		each,          // $10
-		t.SubJobID,    // $11
+		subjob,        // $11
 		parallel,      // $12
 		t.ID,          // $13
 	)

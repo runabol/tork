@@ -146,7 +146,7 @@ func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
 		u.State = task.Running
 		u.ScheduledAt = &now
 		u.StartedAt = &now
-		u.SubJobID = subjob.ID
+		u.SubJob.ID = subjob.ID
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
@@ -634,9 +634,9 @@ func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
 			return errors.Wrapf(err, "error cancelling task: %s", t.ID)
 		}
 		// if this task is a sub-job, notify the sub-job to cancel
-		if t.SubJobID != "" {
+		if t.SubJob != nil {
 			// cancel the sub-job
-			sj, err := c.ds.GetJobByID(ctx, t.SubJobID)
+			sj, err := c.ds.GetJobByID(ctx, t.SubJob.ID)
 			if err != nil {
 				return err
 			}

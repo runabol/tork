@@ -56,8 +56,7 @@ CREATE TABLE tasks (
     parent_id     varchar(32),
     each_         jsonb,
     description   text,
-    subjob        jsonb,
-    subjob_id     varchar(32)
+    subjob        jsonb
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
