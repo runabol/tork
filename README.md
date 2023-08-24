@@ -641,6 +641,7 @@ Failure:
 6. Job outputs
 7. WASM integration.
 8. Create an example HLS output job
+9. Worker monitors the health of the runtime
 
 ## License
 
