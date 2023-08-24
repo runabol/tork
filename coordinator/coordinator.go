@@ -587,9 +587,42 @@ func (c *Coordinator) handleJob(j *job.Job) error {
 		return c.startJob(ctx, j)
 	case job.Cancelled:
 		return c.cancelJob(ctx, j)
+	case job.Restart:
+		return c.restartJob(ctx, j)
 	default:
 		return errors.Errorf("invalud job state: %s", j.State)
 	}
+}
+
+func (c *Coordinator) restartJob(ctx context.Context, j *job.Job) error {
+	// mark the job as running
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
+		if u.State != job.Failed && u.State != job.Cancelled {
+			return errors.Errorf("job %s is in %s state and can't be restarted", j.ID, j.State)
+		}
+		u.State = job.Running
+		u.FailedAt = nil
+		return nil
+	}); err != nil {
+		return err
+	}
+	// retry the current top level task
+	now := time.Now().UTC()
+	t := j.Tasks[j.Position-1]
+	t.ID = uuid.NewUUID()
+	t.JobID = j.ID
+	t.State = task.Pending
+	t.Position = j.Position
+	t.CreatedAt = &now
+	if err := eval.EvaluateTask(t, j.Context.AsMap()); err != nil {
+		t.Error = err.Error()
+		t.State = task.Failed
+		t.FailedAt = &now
+	}
+	if err := c.ds.CreateTask(ctx, t); err != nil {
+		return err
+	}
+	return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, t)
 }
 
 func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {

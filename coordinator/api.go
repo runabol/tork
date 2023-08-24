@@ -52,6 +52,7 @@ func newAPI(cfg Config) *api {
 	r.GET("/jobs/:id", s.getJob)
 	r.GET("/jobs", s.listJobs)
 	r.PUT("/jobs/:id/cancel", s.cancelJob)
+	r.PUT("/jobs/:id/restart", s.restartJob)
 	return s
 }
 
@@ -201,6 +202,26 @@ func (s *api) getTask(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, redactTask(t))
+}
+
+func (s *api) restartJob(c *gin.Context) {
+	id := c.Param("id")
+	j, err := s.ds.GetJobByID(c, id)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	if j.State != job.Failed && j.State != job.Cancelled {
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("job is %s and can not be restarted", j.State))
+		return
+	}
+	j.State = job.Restart
+	if err := s.broker.PublishJob(c, j); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "OK"})
 }
 
 func (s *api) cancelJob(c *gin.Context) {

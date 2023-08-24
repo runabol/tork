@@ -15,6 +15,7 @@ const (
 	Cancelled State = "CANCELLED"
 	Completed State = "COMPLETED"
 	Failed    State = "FAILED"
+	Restart   State = "RESTART"
 )
 
 type Job struct {
