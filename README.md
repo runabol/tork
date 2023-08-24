@@ -629,6 +629,38 @@ Failure:
 }
 ```
 
+## Restart a job
+
+An endpoint to restart a failed/cancelled job.
+
+**Path:**
+
+```
+PUT /jobs/{job id}/restart
+```
+
+**Response:**
+
+Success:
+
+```
+HTTP 200
+
+{
+  "status": "OK"
+}
+```
+
+Failure:
+
+```
+400 Bad Request
+
+{
+  "error": "job is COMPLETED and can not be restarted"
+}
+```
+
 ## Web UI
 
 [Tork Web](https://github.com/runabol/tork-web) is a web based tool for interacting with Tork.

@@ -897,6 +897,67 @@ func Test_handleCancelJob(t *testing.T) {
 	assert.Equal(t, job.Cancelled, pj1.State)
 }
 
+func Test_handleRestartJob(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	now := time.Now().UTC()
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Pending,
+		CreatedAt: now,
+		Position:  1,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	// start the job
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Running, j2.State)
+
+	// cancel the job
+	j1.State = job.Cancelled
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	j2, err = ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Cancelled, j2.State)
+
+	// restart the job
+	j1.State = job.Restart
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	j2, err = ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Running, j2.State)
+
+	// try to restart again
+	j1.State = job.Restart
+	err = c.handleJob(j1)
+	assert.Error(t, err)
+}
+
 func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
