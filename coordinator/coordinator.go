@@ -476,7 +476,6 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 		if err != nil {
 			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
 		}
-		fmt.Println("parent task", parent.ID)
 		now := time.Now().UTC()
 		parent.State = task.Completed
 		parent.CompletedAt = &now

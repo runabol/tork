@@ -116,7 +116,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 	}
 	var parallel []*task.Task
 	if r.Parallel != nil {
-		if err := json.Unmarshal(r.Post, &parallel); err != nil {
+		if err := json.Unmarshal(r.Parallel, &parallel); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.parallel")
 		}
 	}
