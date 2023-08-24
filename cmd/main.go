@@ -158,6 +158,11 @@ func main() {
 
 func execute(ctx *cli.Context) error {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	if ctx.Bool("debug") {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	}
 
 	mode := ctx.String("mode")
 	if !isValidMode(mode) {

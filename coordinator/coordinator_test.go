@@ -298,12 +298,17 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
+		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
 	err = c.Start()
 	assert.NoError(t, err)
+	defer func() {
+		err = c.Stop()
+		assert.NoError(t, err)
+	}()
 
 	now := time.Now().UTC()
 
@@ -803,6 +808,93 @@ func Test_handleJobs(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, job.Running, j2.State)
+}
+
+func Test_handleCancelJob(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	err = c.Start()
+	assert.NoError(t, err)
+
+	defer func() {
+		err = c.Stop()
+		assert.NoError(t, err)
+	}()
+
+	now := time.Now().UTC()
+
+	pj := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		CreatedAt: now,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, pj)
+	assert.NoError(t, err)
+
+	pt := &task.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     pj.ID,
+		State:     task.Running,
+		CreatedAt: &now,
+	}
+
+	err = ds.CreateTask(ctx, pt)
+	assert.NoError(t, err)
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Pending,
+		CreatedAt: now,
+		ParentID:  pt.ID,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	// start the job
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Running, j2.State)
+
+	j1.State = job.Cancelled
+	// cancel the job
+	err = c.handleJob(j1)
+	assert.NoError(t, err)
+
+	// wait for the cancellation
+	// to propogate to the parent job
+	time.Sleep(time.Millisecond * 100)
+
+	j3, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Cancelled, j3.State)
+
+	pj1, err := ds.GetJobByID(ctx, pj.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Cancelled, pj1.State)
 }
 
 func Test_handleJobWithTaskEvalFailure(t *testing.T) {
