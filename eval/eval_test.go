@@ -216,6 +216,13 @@ func TestEvalExpr(t *testing.T) {
 	assert.Equal(t, map[string]any(map[string]any{"hello": "world"}), v)
 }
 
+func TestValidExpr(t *testing.T) {
+	assert.True(t, eval.ValidExpr("{{1+1}}"))
+	assert.False(t, eval.ValidExpr("{1+1}}"))
+	assert.True(t, eval.ValidExpr("1+1"))
+	assert.False(t, eval.ValidExpr(""))
+}
+
 func BenchmarkEval(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		t1 := &task.Task{
