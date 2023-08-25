@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/stats"
 	"github.com/runabol/tork/task"
 )
 
@@ -219,4 +220,39 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, page, size int) (*Page
 		TotalPages: totalPages,
 		TotalItems: len(ds.jobIDs),
 	}, nil
+}
+
+func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
+	s := &stats.Stats{}
+
+	ds.jmu.RLock()
+	for _, j := range ds.jobs {
+		if j.State == job.Running {
+			s.Jobs.Running = s.Jobs.Running + 1
+		}
+	}
+	ds.jmu.RUnlock()
+
+	ds.tmu.RLock()
+	for _, t := range ds.tasks {
+		if t.State == task.Running {
+			s.Tasks.Running = s.Tasks.Running + 1
+		}
+	}
+	ds.tmu.RUnlock()
+
+	ds.nmu.RLock()
+	for _, n := range ds.nodes {
+		if n.LastHeartbeatAt.After(time.Now().UTC().Add(-(time.Minute * 5))) {
+			s.Nodes.Running = s.Nodes.Running + 1
+			s.Nodes.CPUPercent = s.Nodes.CPUPercent + n.CPUPercent
+		}
+	}
+	// calculate average
+	if s.Nodes.Running > 0 {
+		s.Nodes.CPUPercent = s.Nodes.CPUPercent / float64(s.Nodes.Running)
+	}
+	ds.nmu.RUnlock()
+
+	return s, nil
 }

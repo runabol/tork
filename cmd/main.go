@@ -161,7 +161,7 @@ func execute(ctx *cli.Context) error {
 	if ctx.Bool("debug") {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	} else {
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
 	mode := ctx.String("mode")
