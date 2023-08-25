@@ -333,6 +333,9 @@ func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error {
 	// update actual task
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		if u.State != task.Running {
+			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
+		}
 		u.State = task.Completed
 		u.CompletedAt = t.CompletedAt
 		u.Result = t.Result
@@ -376,6 +379,9 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
 	// update actual task
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		if u.State != task.Running {
+			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
+		}
 		u.State = task.Completed
 		u.CompletedAt = t.CompletedAt
 		u.Result = t.Result
