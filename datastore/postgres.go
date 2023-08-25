@@ -687,5 +687,6 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, page, size int) (*Page
 		Number:     page,
 		Size:       len(result),
 		TotalPages: totalPages,
+		TotalItems: *count,
 	}, nil
 }

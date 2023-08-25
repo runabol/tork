@@ -194,14 +194,14 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error) {
-	ds.tmu.RLock()
-	defer ds.tmu.RUnlock()
+	ds.jmu.RLock()
+	defer ds.jmu.RUnlock()
 	offset := (page - 1) * size
 	result := make([]*job.Job, 0)
 	for i := offset; i < (offset+size) && i < len(ds.jobIDs); i++ {
-		j, err := ds.GetJobByID(ctx, ds.jobIDs[i])
-		if err != nil {
-			return nil, err
+		j, ok := ds.jobs[ds.jobIDs[i]]
+		if !ok {
+			return nil, ErrJobNotFound
 		}
 		jc := j.Clone()
 		jc.Tasks = make([]*task.Task, 0)
@@ -217,5 +217,6 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, page, size int) (*Page
 		Number:     page,
 		Size:       len(result),
 		TotalPages: totalPages,
+		TotalItems: len(ds.jobIDs),
 	}, nil
 }

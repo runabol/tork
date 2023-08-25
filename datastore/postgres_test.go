@@ -266,14 +266,32 @@ func TestPostgresGetJobs(t *testing.T) {
 	assert.NoError(t, err)
 	for i := 0; i < 101; i++ {
 		j1 := job.Job{
-			ID: uuid.NewUUID(),
+			ID:   uuid.NewUUID(),
+			Name: fmt.Sprintf("Job %d", (i + 1)),
+			Tasks: []*task.Task{
+				{
+					Name: "some task",
+				},
+			},
 		}
 		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+
+		now := time.Now().UTC()
+		err = ds.CreateTask(ctx, &task.Task{
+			ID:        uuid.NewUUID(),
+			JobID:     j1.ID,
+			State:     task.Running,
+			CreatedAt: &now,
+		})
 		assert.NoError(t, err)
 	}
 	p1, err := ds.GetJobs(ctx, 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
+	assert.Empty(t, p1.Items[0].Tasks)
+	assert.Empty(t, p1.Items[0].Execution)
+	assert.Equal(t, 101, p1.TotalItems)
 
 	p2, err := ds.GetJobs(ctx, 2, 10)
 	assert.NoError(t, err)
@@ -287,5 +305,6 @@ func TestPostgresGetJobs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p11.Size)
 
+	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
 	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
 }

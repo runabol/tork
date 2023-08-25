@@ -173,14 +173,28 @@ func TestInMemoryGetJobs(t *testing.T) {
 		j1 := job.Job{
 			ID:   uuid.NewUUID(),
 			Name: fmt.Sprintf("Job %d", (i + 1)),
+			Tasks: []*task.Task{
+				{
+					Name: "some task",
+				},
+			},
 		}
 		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+
+		err = ds.CreateTask(ctx, &task.Task{
+			ID:    uuid.NewUUID(),
+			JobID: j1.ID,
+			State: task.Running,
+		})
 		assert.NoError(t, err)
 	}
 	p1, err := ds.GetJobs(ctx, 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
 	assert.Equal(t, "Job 101", p1.Items[0].Name)
+	assert.Empty(t, p1.Items[0].Tasks)
+	assert.Empty(t, p1.Items[0].Execution)
 
 	p2, err := ds.GetJobs(ctx, 2, 10)
 	assert.NoError(t, err)
@@ -195,6 +209,7 @@ func TestInMemoryGetJobs(t *testing.T) {
 	assert.Equal(t, 1, p11.Size)
 
 	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
+	assert.Equal(t, 101, p1.TotalItems)
 }
 
 func TestInMemoryUpdateJob(t *testing.T) {
