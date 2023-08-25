@@ -191,6 +191,7 @@ func (s *api) listJobs(c *gin.Context) {
 		Size:       res.Size,
 		TotalPages: res.TotalPages,
 		Items:      redactJobs(res.Items),
+		TotalItems: res.TotalItems,
 	})
 }
 
