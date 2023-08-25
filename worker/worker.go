@@ -279,7 +279,7 @@ func (w *Worker) sendHeartbeats() {
 		if err != nil {
 			log.Error().Msgf("error publishing heartbeat for %s", w.id)
 		}
-		time.Sleep(1 * time.Minute)
+		time.Sleep(30 * time.Second)
 	}
 }
 
