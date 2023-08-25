@@ -343,11 +343,6 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 	// update parent task
 	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
 		u.Each.Completions = u.Each.Completions + 1
-		if u.Each.Completions >= u.Each.Size {
-			now := time.Now().UTC()
-			u.State = task.Completed
-			u.CompletedAt = &now
-		}
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
@@ -369,7 +364,10 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 	if err != nil {
 		return errors.New("error fetching the parent task")
 	}
-	if parent.State == task.Completed {
+	if parent.Each.Completions >= parent.Each.Size {
+		now := time.Now().UTC()
+		parent.State = task.Completed
+		parent.CompletedAt = &now
 		return c.completeTask(ctx, parent)
 	}
 	return nil
@@ -388,11 +386,6 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 	// update parent task
 	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
 		u.Parallel.Completions = u.Parallel.Completions + 1
-		if u.Parallel.Completions >= len(u.Parallel.Tasks) {
-			now := time.Now().UTC()
-			u.State = task.Completed
-			u.CompletedAt = &now
-		}
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
@@ -414,7 +407,10 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 		return errors.New("error fetching the parent task")
 	}
 	// complete the parent task
-	if parent.State == task.Completed {
+	if parent.Parallel.Completions >= len(parent.Parallel.Tasks) {
+		now := time.Now().UTC()
+		parent.State = task.Completed
+		parent.CompletedAt = &now
 		return c.completeTask(ctx, parent)
 	}
 	return nil
@@ -424,6 +420,9 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	// update task in DB
 	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+		if u.State != task.Running {
+			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
+		}
 		u.State = task.Completed
 		u.CompletedAt = t.CompletedAt
 		u.Result = t.Result

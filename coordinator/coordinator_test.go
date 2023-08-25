@@ -583,8 +583,9 @@ func Test_handleCompletedEachTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	pt := &task.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j1.ID,
+		ID:       uuid.NewUUID(),
+		JobID:    j1.ID,
+		Position: 1,
 		Each: &task.Each{
 			List: "some expression",
 			Task: &task.Task{

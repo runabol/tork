@@ -9,13 +9,13 @@ tasks:
       tasks:
         - name: sleep for 2 seconds
           image: ubuntu:mantic
-          run: sleep 2
+          run: sleep 1
         - name: sleep for 1 second
           image: ubuntu:mantic
-          run: sleep 1
+          run: sleep 0.5
         - name: sleep for 3 seconds
           image: ubuntu:mantic
-          run: sleep 3
+          run: sleep 1.5
         - name: fast task 1
           image: ubuntu:mantic
           run: echo fast
