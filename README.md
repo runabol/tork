@@ -665,7 +665,7 @@ Failure:
 
 [Tork Web](https://github.com/runabol/tork-web) is a web based tool for interacting with Tork.
 
-!["Tork Web"](docs/tork-web.png)
+!["Tork Web"](docs/tork-web-v2.png)
 
 ## TODO
 
