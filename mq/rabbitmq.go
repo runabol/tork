@@ -134,13 +134,14 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 				if err := d.Reject(false); err != nil {
 					log.Error().
 						Err(err).
-						Msg("failed to reject task")
+						Msg("failed to ack message")
 				}
-			}
-			if err := d.Ack(false); err != nil {
-				log.Error().
-					Err(err).
-					Msg("failed to ack message")
+			} else {
+				if err := d.Ack(false); err != nil {
+					log.Error().
+						Err(err).
+						Msg("failed to ack message")
+				}
 			}
 		}
 	}()
