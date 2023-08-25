@@ -28,6 +28,8 @@ CREATE TABLE jobs (
     error_        text
 );
 
+CREATE INDEX idx_jobs_state ON jobs (state);
+
 CREATE TABLE tasks (
     id            varchar(32) not null primary key,
     job_id        varchar(32) not null references jobs(id),
