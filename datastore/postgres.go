@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/stats"
 	"github.com/runabol/tork/task"
 )
 
@@ -689,4 +690,26 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, page, size int) (*Page
 		TotalPages: totalPages,
 		TotalItems: *count,
 	}, nil
+}
+
+func (ds *PostgresDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
+	s := &stats.Stats{}
+
+	if err := ds.db.Get(&s.Jobs.Running, "select count(*) from jobs where state = 'RUNNING'"); err != nil {
+		return nil, errors.Wrapf(err, "error getting the running jobs count")
+	}
+
+	if err := ds.db.Get(&s.Tasks.Running, "select count(*) from tasks where state = 'RUNNING'"); err != nil {
+		return nil, errors.Wrapf(err, "error getting the running tasks count")
+	}
+
+	if err := ds.db.Get(&s.Nodes.Running, "select count(*) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
+		return nil, errors.Wrapf(err, "error getting the running tasks count")
+	}
+
+	if err := ds.db.Get(&s.Nodes.CPUPercent, "select coalesce(avg(cpu_percent),0) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
+		return nil, errors.Wrapf(err, "error getting the running tasks count")
+	}
+
+	return s, nil
 }

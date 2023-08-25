@@ -53,6 +53,7 @@ func newAPI(cfg Config) *api {
 	r.GET("/jobs", s.listJobs)
 	r.PUT("/jobs/:id/cancel", s.cancelJob)
 	r.PUT("/jobs/:id/restart", s.restartJob)
+	r.GET("/stats", s.getStats)
 	return s
 }
 
@@ -203,6 +204,15 @@ func (s *api) getTask(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, redactTask(t))
+}
+
+func (s *api) getStats(c *gin.Context) {
+	stats, err := s.ds.GetStats(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }
 
 func (s *api) restartJob(c *gin.Context) {

@@ -4,16 +4,16 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 )
 
-type Stats struct {
+type HostStats struct {
 	CPUPercent float64
 }
 
-func getStats() (*Stats, error) {
+func getStats() (*HostStats, error) {
 	perc, err := cpu.Percent(0, false)
 	if err != nil {
 		return nil, err
 	}
-	return &Stats{
+	return &HostStats{
 		CPUPercent: perc[0],
 	}, nil
 }

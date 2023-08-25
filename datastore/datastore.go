@@ -6,6 +6,7 @@ import (
 
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/stats"
 	"github.com/runabol/tork/task"
 )
 
@@ -29,6 +30,8 @@ type Datastore interface {
 	UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error
 	GetJobByID(ctx context.Context, id string) (*job.Job, error)
 	GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error)
+
+	GetStats(ctx context.Context) (*stats.Stats, error)
 }
 
 type Page[T any] struct {

@@ -238,3 +238,59 @@ func TestInMemoryUpdateJob(t *testing.T) {
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 }
+
+func TestInMemoryGetStats(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+
+	s, err := ds.GetStats(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, s.Jobs.Running)
+	assert.Equal(t, 0, s.Tasks.Running)
+	assert.Equal(t, float64(0), s.Nodes.CPUPercent)
+	assert.Equal(t, 0, s.Nodes.Running)
+
+	for i := 0; i < 100; i++ {
+		var state job.State
+		if i%2 == 0 {
+			state = job.Running
+		} else {
+			state = job.Pending
+		}
+		err := ds.CreateJob(ctx, &job.Job{
+			ID:    uuid.NewUUID(),
+			State: state,
+		})
+		assert.NoError(t, err)
+	}
+
+	for i := 0; i < 100; i++ {
+		var state task.State
+		if i%2 == 0 {
+			state = task.Running
+		} else {
+			state = task.Pending
+		}
+		err := ds.CreateTask(ctx, &task.Task{
+			ID:    uuid.NewUUID(),
+			State: state,
+		})
+		assert.NoError(t, err)
+	}
+
+	for i := 0; i < 10; i++ {
+		err := ds.CreateNode(ctx, node.Node{
+			ID:              uuid.NewUUID(),
+			LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * time.Duration(i)),
+			CPUPercent:      float64(i * 10),
+		})
+		assert.NoError(t, err)
+	}
+
+	s, err = ds.GetStats(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 50, s.Jobs.Running)
+	assert.Equal(t, 50, s.Tasks.Running)
+	assert.Equal(t, float64(20), s.Nodes.CPUPercent)
+	assert.Equal(t, 5, s.Nodes.Running)
+}
