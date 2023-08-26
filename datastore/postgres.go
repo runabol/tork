@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -343,7 +344,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		t.Image,                      // $14
 		env,                          // $15
 		t.Queue,                      // $16
-		t.Error,                      // $17
+		sanitizeString(t.Error),      // $17
 		pre,                          // $18
 		post,                         // $19
 		pq.StringArray(t.Volumes),    // $20
@@ -352,7 +353,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		limits,                       // $23
 		t.Timeout,                    // $24
 		t.Var,                        // $25
-		t.Result,                     // $26
+		sanitizeString(t.Result),     // $26
 		parallel,                     // $27
 		t.ParentID,                   // $28
 		each,                         // $29
@@ -363,6 +364,10 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		return errors.Wrapf(err, "error inserting task to the db")
 	}
 	return nil
+}
+
+func sanitizeString(s string) string {
+	return strings.ReplaceAll(s, "\u0000", "")
 }
 
 func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
@@ -434,19 +439,19 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			parallel = $12
 		  where id = $13`
 	_, err = ds.db.Exec(q,
-		t.Position,    // $1
-		t.State,       // $2
-		t.ScheduledAt, // $3
-		t.StartedAt,   // $4
-		t.CompletedAt, // $5
-		t.FailedAt,    // $6
-		t.Error,       // $7
-		t.NodeID,      // $8
-		t.Result,      // $9
-		each,          // $10
-		subjob,        // $11
-		parallel,      // $12
-		t.ID,          // $13
+		t.Position,               // $1
+		t.State,                  // $2
+		t.ScheduledAt,            // $3
+		t.StartedAt,              // $4
+		t.CompletedAt,            // $5
+		t.FailedAt,               // $6
+		sanitizeString(t.Error),  // $7
+		t.NodeID,                 // $8
+		sanitizeString(t.Result), // $9
+		each,                     // $10
+		subjob,                   // $11
+		parallel,                 // $12
+		t.ID,                     // $13
 	)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {

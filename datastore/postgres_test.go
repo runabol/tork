@@ -39,6 +39,33 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.Description, t2.Description)
 }
 
+func TestPostgresCreateTaskBadOutput(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := task.Task{
+		ID:          uuid.NewUUID(),
+		CreatedAt:   &now,
+		JobID:       j1.ID,
+		Description: "some description",
+		Result:      string([]byte{0}),
+		Error:       string([]byte{0}),
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, t1.ID, t2.ID)
+	assert.Equal(t, t1.Description, t2.Description)
+}
+
 func TestPostgresGetActiveTasks(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
@@ -117,6 +144,41 @@ func TestPostgresUpdateTask(t *testing.T) {
 
 	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
 		u.State = task.Scheduled
+		u.Result = "my result"
+		return nil
+	})
+	assert.NoError(t, err)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, "my result", t2.Result)
+}
+
+func TestPostgresUpdateTaskBadStrings(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := &task.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
+		u.State = task.Scheduled
+		u.Result = string([]byte{0})
+		u.Error = string([]byte{0})
 		return nil
 	})
 	assert.NoError(t, err)
