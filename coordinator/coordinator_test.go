@@ -646,6 +646,10 @@ func Test_handleFailedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
+	node := node.Node{ID: uuid.NewUUID(), Queue: uuid.NewUUID()}
+	err = ds.CreateNode(ctx, node)
+	assert.NoError(t, err)
+
 	j1 := &job.Job{
 		ID:       uuid.NewUUID(),
 		State:    job.Running,
@@ -664,7 +668,17 @@ func Test_handleFailedTask(t *testing.T) {
 		State:       task.Running,
 		StartedAt:   &now,
 		CompletedAt: &now,
-		NodeID:      uuid.NewUUID(),
+		NodeID:      node.ID,
+		JobID:       j1.ID,
+		Position:    1,
+	}
+
+	t2 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      node.ID,
 		JobID:       j1.ID,
 		Position:    1,
 	}
@@ -672,13 +686,20 @@ func Test_handleFailedTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	err = ds.CreateTask(ctx, t2)
+	assert.NoError(t, err)
+
+	actives, err := ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Len(t, actives, 2)
+
 	err = c.handleFailedTask(t1)
 	assert.NoError(t, err)
 
-	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Failed, t2.State)
-	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+	assert.Equal(t, task.Failed, t11.State)
+	assert.Equal(t, t1.CompletedAt, t11.CompletedAt)
 
 	// verify that the job was
 	// marked as FAILED
@@ -686,6 +707,10 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, job.Failed, j2.State)
+
+	actives, err = ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Len(t, actives, 0)
 }
 
 func Test_handleFailedTaskRetry(t *testing.T) {
@@ -816,6 +841,54 @@ func Test_handleJobs(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, job.Running, j2.State)
+}
+
+func Test_cancelActiveTasks(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j1 := &job.Job{
+		ID:    uuid.NewUUID(),
+		State: job.Pending,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	err = ds.CreateTask(ctx, &task.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     j1.ID,
+		State:     task.Running,
+		Position:  1,
+		CreatedAt: &now,
+	})
+	assert.NoError(t, err)
+
+	actives, err := ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Len(t, actives, 1)
+
+	err = c.cancelActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+
+	actives, err = ds.GetActiveTasks(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Len(t, actives, 0)
 }
 
 func Test_handleCancelJob(t *testing.T) {
