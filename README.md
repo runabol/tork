@@ -625,7 +625,7 @@ Failure:
 400 Bad Request
 
 {
-  "error": "job in not running"
+  "message": "job in not running"
 }
 ```
 
@@ -657,7 +657,7 @@ Failure:
 400 Bad Request
 
 {
-  "error": "job is COMPLETED and can not be restarted"
+  "message": "job is COMPLETED and can not be restarted"
 }
 ```
 
