@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 
@@ -10,8 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
+	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/job"
@@ -30,12 +30,8 @@ func newAPI(cfg Config) *api {
 	if cfg.Address == "" {
 		cfg.Address = ":8000"
 	}
-	if !cfg.Debug {
-		gin.SetMode(gin.ReleaseMode)
-	}
-	r := gin.Default()
+	r := echo.New()
 
-	r.Use(errorHandler)
 	s := &api{
 		broker: cfg.Broker,
 		server: &http.Server{
@@ -57,70 +53,56 @@ func newAPI(cfg Config) *api {
 	return s
 }
 
-func errorHandler(c *gin.Context) {
-	c.Next()
-	if len(c.Errors) > 0 {
-		c.JSON(-1, c.Errors[0])
-	}
+func (s *api) status(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
-func (s *api) status(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "OK"})
-}
-
-func (s *api) listQueues(c *gin.Context) {
-	qs, err := s.broker.Queues(c)
+func (s *api) listQueues(c echo.Context) error {
+	qs, err := s.broker.Queues(c.Request().Context())
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	c.JSON(http.StatusOK, qs)
+	return c.JSON(http.StatusOK, qs)
 }
 
-func (s *api) listActiveNodes(c *gin.Context) {
-	nodes, err := s.ds.GetActiveNodes(c, time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
+func (s *api) listActiveNodes(c echo.Context) error {
+	nodes, err := s.ds.GetActiveNodes(c.Request().Context(), time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	c.JSON(http.StatusOK, nodes)
+	return c.JSON(http.StatusOK, nodes)
 }
 
-func (s *api) createJob(c *gin.Context) {
+func (s *api) createJob(c echo.Context) error {
 	var ji *jobInput
 	var err error
-	switch c.ContentType() {
+	contentType := c.Request().Header.Get("content-type")
+	switch contentType {
 	case "application/json":
-		ji, err = bindJobInputJSON(c.Request.Body)
+		ji, err = bindJobInputJSON(c.Request().Body)
 		if err != nil {
-			_ = c.AbortWithError(http.StatusBadRequest, err)
-			return
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	case "text/yaml":
-		ji, err = bindJobInputYAML(c.Request.Body)
+		ji, err = bindJobInputYAML(c.Request().Body)
 		if err != nil {
-			_ = c.AbortWithError(http.StatusBadRequest, err)
-			return
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	default:
-		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("unknown content type: %s", c.ContentType()))
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
 	if err := ji.validate(); err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	j := ji.toJob()
-	if err := s.ds.CreateJob(c, j); err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+	if err := s.ds.CreateJob(c.Request().Context(), j); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	log.Info().Str("job-id", j.ID).Msg("created job")
-	if err := s.broker.PublishJob(c, j); err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
-		return
+	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	c.JSON(http.StatusOK, redactJob(j))
+	return c.JSON(http.StatusOK, redactJob(j))
 }
 
 func bindJobInputJSON(r io.ReadCloser) (*jobInput, error) {
@@ -151,43 +133,45 @@ func bindJobInputYAML(r io.ReadCloser) (*jobInput, error) {
 	return &ji, nil
 }
 
-func (s *api) getJob(c *gin.Context) {
+func (s *api) getJob(c echo.Context) error {
 	id := c.Param("id")
-	j, err := s.ds.GetJobByID(c, id)
+	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusNotFound, err)
-		return
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	c.JSON(http.StatusOK, redactJob(j))
+	return c.JSON(http.StatusOK, redactJob(j))
 }
 
-func (s *api) listJobs(c *gin.Context) {
-	ps := c.DefaultQuery("page", "1")
+func (s *api) listJobs(c echo.Context) error {
+	ps := c.QueryParam("page")
+	if ps == "" {
+		ps = "1"
+	}
 	page, err := strconv.Atoi(ps)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "invalid page number: %s", ps))
-		return
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid page number: %s", ps))
 	}
 	if page < 1 {
 		page = 1
 	}
-	si := c.DefaultQuery("size", "10")
+	si := c.QueryParam("size")
+	if si == "" {
+		si = "10"
+	}
 	size, err := strconv.Atoi(si)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrapf(err, "invalid size: %s", ps))
-		return
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid size: %s", ps))
 	}
 	if size < 1 {
 		size = 1
 	} else if size > 20 {
 		size = 20
 	}
-	res, err := s.ds.GetJobs(c, page, size)
+	res, err := s.ds.GetJobs(c.Request().Context(), page, size)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, datastore.Page[*job.Job]{
+	return c.JSON(http.StatusOK, datastore.Page[*job.Job]{
 		Number:     res.Number,
 		Size:       res.Size,
 		TotalPages: res.TotalPages,
@@ -196,67 +180,58 @@ func (s *api) listJobs(c *gin.Context) {
 	})
 }
 
-func (s *api) getTask(c *gin.Context) {
+func (s *api) getTask(c echo.Context) error {
 	id := c.Param("id")
-	t, err := s.ds.GetTaskByID(c, id)
+	t, err := s.ds.GetTaskByID(c.Request().Context(), id)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusNotFound, err)
-		return
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	c.JSON(http.StatusOK, redactTask(t))
+	return c.JSON(http.StatusOK, redactTask(t))
 }
 
-func (s *api) getStats(c *gin.Context) {
-	stats, err := s.ds.GetStats(c)
+func (s *api) getStats(c echo.Context) error {
+	stats, err := s.ds.GetStats(c.Request().Context())
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, stats)
+	return c.JSON(http.StatusOK, stats)
 }
 
-func (s *api) restartJob(c *gin.Context) {
+func (s *api) restartJob(c echo.Context) error {
 	id := c.Param("id")
-	j, err := s.ds.GetJobByID(c, id)
+	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	if j.State != job.Failed && j.State != job.Cancelled {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("job is %s and can not be restarted", j.State))
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("job is %s and can not be restarted", j.State))
 	}
 	if j.Position > len(j.Tasks) {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.Errorf("job has no more tasks to run"))
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, "job has no more tasks to run")
 	}
 	j.State = job.Restart
-	if err := s.broker.PublishJob(c, j); err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "OK"})
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
-func (s *api) cancelJob(c *gin.Context) {
+func (s *api) cancelJob(c echo.Context) error {
 	id := c.Param("id")
-	j, err := s.ds.GetJobByID(c, id)
+	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	if j.State != job.Running {
-		_ = c.AbortWithError(http.StatusBadRequest, errors.New("job is not running"))
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, "job is not running")
 	}
 	j.State = job.Cancelled
-	if err := s.broker.PublishJob(c, j); err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
-		return
+	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "OK"})
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
 func (s *api) start() error {

@@ -161,7 +161,7 @@ func Test_getStatus(t *testing.T) {
 	body, err := io.ReadAll(w.Body)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `{"status":"OK"}`, string(body))
+	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -343,7 +343,7 @@ func Test_cancelRunningJob(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `{"status":"OK"}`, string(body))
+	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -392,7 +392,7 @@ func Test_restartJob(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	assert.Equal(t, `{"status":"OK"}`, string(body))
+	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
