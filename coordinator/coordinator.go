@@ -547,6 +547,10 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 			parent.Error = t.Error
 			return c.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
 		}
+		// cancel all currently running tasks
+		if err := c.cancelActiveTasks(ctx, j.ID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -693,10 +697,19 @@ func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
 			log.Error().Err(err).Msgf("error cancelling sub-job: %s", pj.ID)
 		}
 	}
-	// get list of currently running tasks
-	tasks, err := c.ds.GetActiveTasks(ctx, j.ID)
+	// cancel all running tasks
+	if err := c.cancelActiveTasks(ctx, j.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Coordinator) cancelActiveTasks(ctx context.Context, jobID string) error {
+	// get a list of active tasks for the job
+	tasks, err := c.ds.GetActiveTasks(ctx, jobID)
 	if err != nil {
-		return errors.Wrapf(err, "error getting active tasks for job: %s", j.ID)
+		return errors.Wrapf(err, "error getting active tasks for job: %s", jobID)
 	}
 	for _, t := range tasks {
 		t.State = task.Cancelled
@@ -716,7 +729,7 @@ func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
 			}
 			sj.State = job.Cancelled
 			if err := c.broker.PublishJob(ctx, sj); err != nil {
-				log.Error().Err(err).Msgf("error cancelling sub-job: %s", sj.ID)
+				return errors.Wrapf(err, "error publishing cancelllation for sub-job %s", sj.ID)
 			}
 		} else if t.NodeID != "" {
 			// notify the node currently running the task
@@ -730,7 +743,6 @@ func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
 			}
 		}
 	}
-
 	return nil
 }
 
