@@ -55,6 +55,8 @@ tasks:
     parallel:
       tasks:
         - name: Generate 360p HLS stream
+          retry: 
+            limit: 2
           volumes:
             - /tmp
           networks:
@@ -79,6 +81,8 @@ tasks:
                 aws --endpoint-url $ENDPOINT_URL s3 sync /tmp/output/ s3://$BUCKET_NAME/hls/
 
         - name: Generate 480p HLS stream
+          retry: 
+            limit: 2
           volumes:
             - /tmp
           networks:
@@ -103,6 +107,8 @@ tasks:
                 aws --endpoint-url $ENDPOINT_URL s3 sync /tmp/output/ s3://$BUCKET_NAME/hls/
 
         - name: Generate 720p HLS stream
+          retry: 
+            limit: 2
           volumes:
             - /tmp
           networks:
