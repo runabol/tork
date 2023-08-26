@@ -43,7 +43,7 @@ jobs:
         run: go build -v ./...
 
       - name: Run DB migration
-        run: go run cmd/main.go -mode migration -datastore postgres -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+        run: go run cmd/main.go migration -datastore postgres -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 
       - name: Run tests
         run: go test -v ./...
