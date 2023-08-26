@@ -49,7 +49,7 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	}
 	manager := fmt.Sprintf("http://%s:15672/api/queues/", u.Hostname())
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", manager, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", manager, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to build get queues request")
 	}
@@ -174,17 +174,30 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	log.Debug().Msgf("(re)declaring queue: %s", qname)
-	_, err := ch.QueueDeclare(
-		qname,
-		false, // durable
-		false, // delete when unused
-		strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
+	// get a list of existing queues
+	qs, err := b.Queues(context.Background())
 	if err != nil {
 		return err
+	}
+	exists := false
+	for _, q := range qs {
+		if q.Name == qname {
+			exists = true
+		}
+	}
+	if !exists {
+		log.Debug().Msgf("declaring queue: %s", qname)
+		_, err := ch.QueueDeclare(
+			qname,
+			false, // durable
+			false, // delete when unused
+			strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
+			false, // no-wait
+			nil,   // arguments
+		)
+		if err != nil {
+			return err
+		}
 	}
 	b.queues[qname] = qname
 	return nil
