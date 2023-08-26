@@ -1120,6 +1120,7 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 		Queues: map[string]int{
 			"default": 2,
 		},

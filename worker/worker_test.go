@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -14,13 +16,16 @@ import (
 func TestNewWorker(t *testing.T) {
 	rt, err := runtime.NewDockerRuntime()
 	assert.NoError(t, err)
-	w, err := NewWorker(Config{})
+	w, err := NewWorker(Config{
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+	})
 	assert.Error(t, err)
 	assert.Nil(t, w)
 
 	w, err = NewWorker(Config{
 		Broker:  mq.NewInMemoryBroker(),
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -33,6 +38,7 @@ func TestStart(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  mq.NewInMemoryBroker(),
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -56,6 +62,7 @@ func Test_handleTaskRun(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -85,6 +92,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 
@@ -145,6 +153,7 @@ func Test_handleTaskError(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -182,6 +191,7 @@ func Test_handleTaskOutput(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)

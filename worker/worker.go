@@ -31,6 +31,7 @@ type Worker struct {
 	mu        sync.RWMutex
 	limits    Limits
 	tempdir   string
+	api       *api
 }
 
 type Limits struct {
@@ -39,6 +40,7 @@ type Limits struct {
 }
 
 type Config struct {
+	Address string
 	Broker  mq.Broker
 	Runtime runtime.Runtime
 	Queues  map[string]int
@@ -69,6 +71,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		tasks:     make(map[string]runningTask),
 		limits:    cfg.Limits,
 		tempdir:   cfg.TempDir,
+		api:       newAPI(cfg),
 	}
 	return w, nil
 }
@@ -295,6 +298,9 @@ func (w *Worker) sendHeartbeats() {
 
 func (w *Worker) Start() error {
 	log.Info().Msgf("starting worker %s", w.id)
+	if err := w.api.start(); err != nil {
+		return err
+	}
 	// subscribe for a private queue for the node
 	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
@@ -318,5 +324,8 @@ func (w *Worker) Start() error {
 func (w *Worker) Stop() error {
 	log.Debug().Msgf("shutting down worker %s", w.id)
 	w.stop = true
+	if err := w.api.shutdown(context.Background()); err != nil {
+		return errors.Wrapf(err, "error shutting down worker %s", w.id)
+	}
 	return nil
 }
