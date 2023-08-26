@@ -1,6 +1,6 @@
 name: Sample HLS Job Multiple Bitrates
 description: |
-  This job generates a Multi-Bitrate HLS package from a sample source video.
+  This job generates a multi-bitrate HLS package from a sample source video.
 
   This demo assumes a locally running instace of Minio (AWS S3-like service) which will be used to store the 
   video chunks and the final video output
@@ -10,6 +10,8 @@ description: |
   docker run --name=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
 
   The default credentials for Minio Server are minioadmin/minioadmin
+
+  You can view the output using the minio console on http://127.0.0.1:9001/browser
 inputs:
   source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
   accessKeyID: minioadmin
