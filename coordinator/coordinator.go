@@ -569,6 +569,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 		log.Info().
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
+			Str("status", string(n.Status)).
 			Msg("received heartbeat")
 		u.LastHeartbeatAt = time.Now().UTC()
 		u.CPUPercent = n.CPUPercent
