@@ -1,0 +1,113 @@
+name: Sample HLS Job Multiple Bitrates
+description: |
+  This job generates a Multi-Bitrate HLS package from a sample source video.
+
+  This demo assumes a locally running instace of Minio (AWS S3-like service) which will be used to store the 
+  video chunks and the final video output
+
+  You can get a running instance of minio using the following command: 
+
+  docker run --name=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+
+  The default credentials for Minio Server are minioadmin/minioadmin
+inputs:
+  source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
+  accessKeyID: minioadmin
+  secretKeyID: minioadmin
+  endpointURL: http://host.docker.internal:9000
+tasks:
+  - var: bucketName
+    name: generate a random bucket name to store the results
+    image: ubuntu:mantic
+    run: echo -n "video-$(shuf -i 1-10000 -n1)" > $TORK_OUTPUT
+
+  - name: create a temporary bucket to house the chunks
+    image: "amazon/aws-cli:2.13.10"
+    env:
+      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+      BUCKET_NAME: "{{tasks.bucketName}}"
+      ENDPOINT_URL: "{{inputs.endpointURL}}"
+    run: | 
+      aws \
+        --endpoint-url $ENDPOINT_URL s3api create-bucket --bucket $BUCKET_NAME
+
+  - name: create the master playlist
+    image: "amazon/aws-cli:2.13.10"
+    env:
+      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+      BUCKET_NAME: "{{tasks.bucketName}}"
+      ENDPOINT_URL: "{{inputs.endpointURL}}"
+    run: |
+      printf "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360\n360p.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=842x480\n480p.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720\n720p.m3u8" > /tmp/playlist.m3u8
+      aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/playlist.m3u8 s3://$BUCKET_NAME/hls/playlist.m3u8
+
+  - name: Generate the HLS streams
+    parallel:
+      tasks:
+        - name: Generate 360p HLS stream
+          volumes:
+            - /tmp
+          run: |
+            mkdir /tmp/output
+            ffmpeg -y -i $SOURCE -vf scale=w=-2:h=360 -c:a aac -ar 48000 -b:a 96k -c:v h264 -profile:v main \
+            -crf 20 -g 48 -keyint_min 48 -sc_threshold 0 -b:v 800k -maxrate 856k -bufsize 1200k -hls_time 4 \
+            -hls_playlist_type vod -hls_segment_filename /tmp/output/360p_%03d.ts /tmp/output/360p.m3u8
+          image: jrottenberg/ffmpeg:3.4-alpine
+          env:
+            SOURCE: "{{ inputs.source }}"
+          post:
+            - name: upload the chunk to minio
+              image: "amazon/aws-cli:2.13.10"
+              env:
+                AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+                AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+                BUCKET_NAME: "{{tasks.bucketName}}"
+                ENDPOINT_URL: "{{inputs.endpointURL}}"
+              run:
+                aws --endpoint-url $ENDPOINT_URL s3 sync /tmp/output/ s3://$BUCKET_NAME/hls/
+
+        - name: Generate 480p HLS stream
+          volumes:
+            - /tmp
+          run: |
+            mkdir /tmp/output
+            ffmpeg -y -i $SOURCE -vf scale=w=-2:h=480 -c:a aac -ar 48000 -b:a 128k -c:v h264 -profile:v main \
+            -crf 20 -g 48 -keyint_min 48 -sc_threshold 0 -b:v 1400k -maxrate 1498k -bufsize 2100k -hls_time 4 \
+            -hls_playlist_type vod -hls_segment_filename /tmp/output/480p_%03d.ts /tmp/output/480p.m3u8
+          image: jrottenberg/ffmpeg:3.4-alpine
+          env:
+            SOURCE: "{{ inputs.source }}"
+          post:
+            - name: upload the chunk to minio
+              image: "amazon/aws-cli:2.13.10"
+              env:
+                AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+                AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+                BUCKET_NAME: "{{tasks.bucketName}}"
+                ENDPOINT_URL: "{{inputs.endpointURL}}"
+              run:
+                aws --endpoint-url $ENDPOINT_URL s3 sync /tmp/output/ s3://$BUCKET_NAME/hls/
+
+        - name: Generate 720p HLS stream
+          volumes:
+            - /tmp
+          run: |
+            mkdir /tmp/output
+            ffmpeg -y -i $SOURCE -vf scale=w=-2:h=720 -c:a aac -ar 48000 -b:a 128k -c:v h264 -profile:v main \
+            -crf 20 -g 48 -keyint_min 48 -sc_threshold 0 -b:v 2800k -maxrate 2800k -bufsize 4200k -hls_time 4 \
+            -hls_playlist_type vod -hls_segment_filename /tmp/output/720p_%03d.ts /tmp/output/720p.m3u8
+          image: jrottenberg/ffmpeg:3.4-alpine
+          env:
+            SOURCE: "{{ inputs.source }}"
+          post:
+            - name: upload the chunk to minio
+              image: "amazon/aws-cli:2.13.10"
+              env:
+                AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+                AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+                BUCKET_NAME: "{{tasks.bucketName}}"
+                ENDPOINT_URL: "{{inputs.endpointURL}}"
+              run:
+                aws --endpoint-url $ENDPOINT_URL s3 sync /tmp/output/ s3://$BUCKET_NAME/hls/
