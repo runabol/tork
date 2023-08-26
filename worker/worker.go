@@ -148,6 +148,7 @@ func (w *Worker) runTask(t *task.Task) error {
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.Volumes = t.Volumes
+		pre.Networks = t.Networks
 		pre.Limits = t.Limits
 		if err := w.doRunTask(ctx, pre); err != nil {
 			log.Error().
@@ -185,6 +186,7 @@ func (w *Worker) runTask(t *task.Task) error {
 	// execute post tasks
 	for _, post := range t.Post {
 		post.Volumes = t.Volumes
+		post.Networks = t.Networks
 		post.Limits = t.Limits
 		if err := w.doRunTask(ctx, post); err != nil {
 			log.Error().

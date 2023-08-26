@@ -44,6 +44,7 @@ type taskRecord struct {
 	Pre         []byte         `db:"pre_tasks"`
 	Post        []byte         `db:"post_tasks"`
 	Volumes     pq.StringArray `db:"volumes"`
+	Networks    pq.StringArray `db:"networks"`
 	NodeID      string         `db:"node_id"`
 	Retry       []byte         `db:"retry"`
 	Limits      []byte         `db:"limits"`
@@ -161,6 +162,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Pre:         pre,
 		Post:        post,
 		Volumes:     r.Volumes,
+		Networks:    r.Networks,
 		NodeID:      r.NodeID,
 		Retry:       retry,
 		Limits:      limits,
@@ -323,12 +325,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			parent_id, -- $28
 			each_, -- $29
 			description, -- $30
-			subjob -- $31
+			subjob, -- $31
+			networks -- $32
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31)`
+			$27,$28,$29,$30,$31,$32)`
 	_, err = ds.db.Exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -361,6 +364,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		each,                         // $29
 		t.Description,                // $30
 		subjob,                       // $31
+		pq.StringArray(t.Networks),   // $32
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")

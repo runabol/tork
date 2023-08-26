@@ -33,6 +33,7 @@ type taskInput struct {
 	Pre         []auxTaskInput    `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
 	Post        []auxTaskInput    `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
 	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	Networks    []string          `json:"networks,omitempty" yaml:"networks,omitempty"`
 	Retry       *retryInput       `json:"retry,omitempty" yaml:"retry,omitempty"`
 	Limits      *limitsInput      `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
@@ -264,6 +265,7 @@ func (i taskInput) toTask() *task.Task {
 		Pre:         pre,
 		Post:        post,
 		Volumes:     i.Volumes,
+		Networks:    i.Networks,
 		Retry:       retry,
 		Limits:      limits,
 		Timeout:     i.Timeout,
