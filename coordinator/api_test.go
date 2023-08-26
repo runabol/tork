@@ -154,14 +154,14 @@ func Test_getStatus(t *testing.T) {
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/status", nil)
+	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 	body, err := io.ReadAll(w.Body)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
+	assert.Equal(t, "{\"status\":\"UP\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
