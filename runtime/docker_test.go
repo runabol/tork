@@ -108,3 +108,25 @@ func TestHealthCheckFailed(t *testing.T) {
 	cancel()
 	assert.Error(t, rt.HealthCheck(ctx))
 }
+
+func TestRunTaskWithNetwork(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	err = rt.Run(context.Background(), &task.Task{
+		Image:    "ubuntu:mantic",
+		CMD:      []string{"ls"},
+		Networks: []string{"default"},
+	})
+	assert.NoError(t, err)
+
+	rt, err = NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	err = rt.Run(context.Background(), &task.Task{
+		Image:    "ubuntu:mantic",
+		CMD:      []string{"ls"},
+		Networks: []string{"no-such-network"},
+	})
+	assert.Error(t, err)
+}

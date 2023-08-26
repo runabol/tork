@@ -435,7 +435,7 @@ Each task can define a set of tasks that will be executed prior to its execution
 
 The `pre` and `post` tasks always execute on the same worker node which will execute the task itself and are considered to be an atomic part of the task. That is, a failure in any of the `pre`/`post` tasks is considered a failure of the entire task.
 
-Additionally, any `volumes` defined are also accessible to the `pre` and `post` tasks.
+Additionally, any `volumes` and `networks` defined on the primary task are also accessible to the `pre` and `post` tasks.
 
 ```yaml
 - name: convert the first 5 seconds of a video
@@ -545,6 +545,11 @@ task properties:
     - /data2
   ```
   **note**: if you get an `invalid mount config for type "bind": bind source path does not exist` error it's most likely due to the fact that the Docker daemon isn't allowed to mount volumes from your default `$TMPDIR`. Try using the `--temp-dir` flag to explictly set it to another directory.
+- `networks` - Networks are the layer that allow task containers within the same node to communicate with each other. This could be useful when certain nodes are configured with long-running services which the task needs access to.
+  ```yaml
+  networks:
+    - some-network
+  ```
 - `retry` - the retry configuration to execute in case of a failure. Example:
   ```yaml
   retry:

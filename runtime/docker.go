@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
@@ -166,8 +167,16 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 		Entrypoint: entrypoint,
 	}
 
+	nc := network.NetworkingConfig{
+		EndpointsConfig: make(map[string]*network.EndpointSettings),
+	}
+
+	for _, nw := range t.Networks {
+		nc.EndpointsConfig[nw] = &network.EndpointSettings{NetworkID: nw}
+	}
+
 	resp, err := d.client.ContainerCreate(
-		ctx, &cc, &hc, nil, nil, "")
+		ctx, &cc, &hc, &nc, nil, "")
 	if err != nil {
 		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
