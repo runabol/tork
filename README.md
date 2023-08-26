@@ -140,7 +140,7 @@ tasks:
 
 ### More examples
 
-Check out the [examples](examples/) folder for more examples.
+Check out the [examples](examples/) folder.
 
 ## Queues
 
