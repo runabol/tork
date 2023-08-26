@@ -83,6 +83,7 @@ type nodeRecord struct {
 	LastHeartbeatAt time.Time `db:"last_heartbeat_at"`
 	CPUPercent      float64   `db:"cpu_percent"`
 	Queue           string    `db:"queue"`
+	Status          string    `db:"status"`
 }
 
 func (r taskRecord) toTask() (*task.Task, error) {
@@ -181,6 +182,7 @@ func (r nodeRecord) toNode() node.Node {
 		CPUPercent:      r.CPUPercent,
 		LastHeartbeatAt: r.LastHeartbeatAt,
 		Queue:           r.Queue,
+		Status:          node.Status(r.Status),
 	}
 }
 
@@ -467,10 +469,10 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	q := `insert into nodes 
-	       (id,started_at,last_heartbeat_at,cpu_percent,queue) 
+	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status) 
 	      values
-	       ($1,$2,$3,$4,$5)`
-	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue)
+	       ($1,$2,$3,$4,$5,$6)`
+	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}
@@ -492,9 +494,10 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 	}
 	q := `update nodes set 
 	        last_heartbeat_at = $1,
-			cpu_percent = $2
-		  where id = $3`
-	_, err = ds.db.Exec(q, n.LastHeartbeatAt, n.CPUPercent, id)
+			cpu_percent = $2,
+			status = $3
+		  where id = $4`
+	_, err = ds.db.Exec(q, n.LastHeartbeatAt, n.CPUPercent, n.Status, id)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")

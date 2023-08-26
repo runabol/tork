@@ -3,7 +3,8 @@ CREATE TABLE nodes (
     queue              varchar(64) not null,
     started_at         timestamp   not null,
     last_heartbeat_at  timestamp   not null,
-    cpu_percent        float       not null
+    cpu_percent        float       not null,
+    status             varchar(10) not null
 );
 
 CREATE INDEX idx_nodes_heartbeat ON nodes (last_heartbeat_at);

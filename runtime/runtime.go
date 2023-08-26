@@ -16,4 +16,5 @@ const (
 type Runtime interface {
 	Run(ctx context.Context, t *task.Task) error
 	Stop(ctx context.Context, t *task.Task) error
+	HealthCheck(ctx context.Context) error
 }
