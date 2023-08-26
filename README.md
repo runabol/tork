@@ -675,9 +675,8 @@ Failure:
 4. Ability to schedule tasks using a `nodeSelector`
 5. Webhooks
 6. WASM integration.
-7. Create an example HLS output job
-8. Worker monitors the health of the runtime
-9. Worker to send periodic updates of tasks it's working on
+7. Worker monitors the health of the runtime
+8. Worker to send periodic updates of tasks it's working on
 
 ## License
 
