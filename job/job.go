@@ -48,6 +48,7 @@ func (j *Job) Clone() *Job {
 	return &Job{
 		ID:          j.ID,
 		Name:        j.Name,
+		Description: j.Description,
 		State:       j.State,
 		CreatedAt:   j.CreatedAt,
 		StartedAt:   j.StartedAt,
