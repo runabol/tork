@@ -89,7 +89,15 @@ func tempDirFlag() cli.Flag {
 	}
 }
 
-func addressFlag() cli.Flag {
+func workerAddressFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "address",
+		Usage: "API Address",
+		Value: ":8001",
+	}
+}
+
+func coordinatorAddressFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "address",
 		Usage: "REST API Address",
@@ -122,7 +130,7 @@ func main() {
 					defaultMemoryLimit(),
 					tempDirFlag(),
 					debugFlag(),
-					addressFlag(),
+					coordinatorAddressFlag(),
 				},
 				Action: execCoorinator,
 			},
@@ -135,7 +143,7 @@ func main() {
 					defaultCPUsLimit(),
 					defaultMemoryLimit(),
 					tempDirFlag(),
-					addressFlag(),
+					workerAddressFlag(),
 					debugFlag(),
 				},
 				Action: execWorker,
