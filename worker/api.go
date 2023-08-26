@@ -31,11 +31,11 @@ func newAPI(cfg Config) *api {
 			Handler: r,
 		},
 	}
-	r.GET("/status", s.status)
+	r.GET("/health", s.health)
 	return s
 }
 
-func (s *api) status(c echo.Context) error {
+func (s *api) health(c echo.Context) error {
 	if err := s.runtime.HealthCheck(c.Request().Context()); err != nil {
 		return c.JSON(http.StatusOK, map[string]string{"status": "DOWN"})
 	}

@@ -19,7 +19,7 @@ func Test_getStatus(t *testing.T) {
 		Runtime: rt,
 	})
 	assert.NotNil(t, api)
-	req, err := http.NewRequest("GET", "/status", nil)
+	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)

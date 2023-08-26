@@ -40,7 +40,7 @@ func newAPI(cfg Config) *api {
 		},
 		ds: cfg.DataStore,
 	}
-	r.GET("/status", s.status)
+	r.GET("/health", s.health)
 	r.GET("/tasks/:id", s.getTask)
 	r.GET("/queues", s.listQueues)
 	r.GET("/nodes", s.listActiveNodes)
@@ -53,8 +53,8 @@ func newAPI(cfg Config) *api {
 	return s
 }
 
-func (s *api) status(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
+func (s *api) health(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{"status": "UP"})
 }
 
 func (s *api) listQueues(c echo.Context) error {
