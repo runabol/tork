@@ -267,6 +267,13 @@ func (w *Worker) sendHeartbeats() {
 		} else {
 			log.Debug().Float64("cpu-percent", s.CPUPercent).Msgf("collecting stats for %s", w.id)
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		status := node.UP
+		if err := w.runtime.HealthCheck(ctx); err != nil {
+			log.Error().Err(err).Msgf("node %s failed health check", w.id)
+			status = node.Down
+		}
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
 			node.Node{
@@ -274,6 +281,7 @@ func (w *Worker) sendHeartbeats() {
 				StartedAt:  w.startTime,
 				CPUPercent: s.CPUPercent,
 				Queue:      fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
+				Status:     status,
 			},
 		)
 		if err != nil {

@@ -271,6 +271,11 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
 	})
 }
 
+func (d *DockerRuntime) HealthCheck(ctx context.Context) error {
+	_, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
+	return err
+}
+
 // take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403
 func parseCPUs(limits *task.Limits) (int64, error) {
 	if limits == nil || limits.CPUs == "" {

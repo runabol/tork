@@ -90,3 +90,21 @@ func TestRunAndStopTask(t *testing.T) {
 	err = rt.Stop(context.Background(), t1)
 	assert.NoError(t, err)
 }
+
+func TestHealthCheck(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	assert.NoError(t, rt.HealthCheck(ctx))
+}
+
+func TestHealthCheckFailed(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	assert.Error(t, rt.HealthCheck(ctx))
+}
