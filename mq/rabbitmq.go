@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -18,27 +19,26 @@ import (
 )
 
 type RabbitMQBroker struct {
-	pconn  *amqp.Connection
-	sconn  *amqp.Connection
-	queues map[string]string
-	qmu    sync.RWMutex
-	url    string
+	connPool []*amqp.Connection
+	nextConn int
+	queues   map[string]string
+	mu       sync.RWMutex
+	url      string
 }
 
 func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
-	pconn, err := amqp.Dial(url)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
-	}
-	sconn, err := amqp.Dial(url)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
+	connPool := make([]*amqp.Connection, 3)
+	for i := 0; i < len(connPool); i++ {
+		conn, err := amqp.Dial(url)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
+		}
+		connPool[i] = conn
 	}
 	return &RabbitMQBroker{
-		pconn:  pconn,
-		sconn:  sconn,
-		queues: make(map[string]string),
-		url:    url,
+		queues:   make(map[string]string),
+		url:      url,
+		connPool: connPool,
 	}, nil
 }
 
@@ -101,7 +101,11 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 
 func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
 	log.Debug().Msgf("Subscribing for queue: %s", qname)
-	ch, err := b.sconn.Channel()
+	conn, err := b.getConnection()
+	if err != nil {
+		return errors.Wrapf(err, "error getting a connection")
+	}
+	ch, err := conn.Channel()
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
@@ -144,19 +148,33 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 				}
 			}
 		}
+		maxAttempts := 20
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			log.Info().Msgf("%s channel closed. reconnecting", qname)
+			if err := b.subscribe(qname, handler); err != nil {
+				log.Error().
+					Err(err).
+					Msgf("error reconneting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
+				time.Sleep(time.Second * time.Duration(attempt))
+			} else {
+				return
+			}
+		}
+		log.Error().Err(err).Msgf("error reconneting to %s. giving up", qname)
 	}()
 	return nil
 }
 
 func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
-	b.qmu.RLock()
+	b.mu.RLock()
 	_, ok := b.queues[qname]
-	b.qmu.RUnlock()
+	b.mu.RUnlock()
 	if ok {
 		return nil
 	}
-	b.qmu.Lock()
-	defer b.qmu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	log.Debug().Msgf("(re)declaring queue: %s", qname)
 	_, err := ch.QueueDeclare(
 		qname,
 		false, // durable
@@ -177,7 +195,11 @@ func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n node.Node) erro
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) error {
-	ch, err := b.pconn.Channel()
+	conn, err := b.getConnection()
+	if err != nil {
+		return errors.Wrapf(err, "error getting a connection")
+	}
+	ch, err := conn.Channel()
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
@@ -231,4 +253,29 @@ func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *job.Job) error) error 
 		}
 		return handler(j)
 	})
+}
+
+func (b *RabbitMQBroker) getConnection() (*amqp.Connection, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var err error
+	var conn *amqp.Connection
+	conn = b.connPool[b.nextConn]
+	if conn.IsClosed() {
+		// clearing the known queues because rabbitmq
+		// might have crashed and we would need to
+		// re-declare them
+		b.queues = make(map[string]string)
+		log.Warn().Msg("connection is closed. reconnecting to RabbitMQ")
+		conn, err = amqp.Dial(b.url)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error dialing to RabbitMQ")
+		}
+		b.connPool[b.nextConn] = conn
+	}
+	b.nextConn = b.nextConn + 1
+	if b.nextConn >= len(b.connPool) {
+		b.nextConn = 0
+	}
+	return conn, nil
 }

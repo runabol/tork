@@ -3,6 +3,7 @@ package mq_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,4 +83,32 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, processed)
+}
+
+func TestRabbitMQPublisConcurrent(t *testing.T) {
+	ctx := context.Background()
+	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	testq := fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, "test")
+	processed := 0
+	err = b.SubscribeForTasks(testq, func(t *task.Task) error {
+		processed = processed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+	for i := 0; i < 3; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				err = b.PublishTask(ctx, testq, &task.Task{})
+			}
+		}()
+	}
+	wg.Wait()
+	// wait for heartbeat to be processed
+	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, err)
+	assert.Equal(t, 300, processed)
 }
