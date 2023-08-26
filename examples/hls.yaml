@@ -7,7 +7,9 @@ description: |
 
   You can get a running instance of minio using the following command: 
 
-  docker run --name=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+  docker network create minio
+
+  docker run --name=minio --network=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
 
   The default credentials for Minio Server are minioadmin/minioadmin
 
@@ -16,7 +18,7 @@ inputs:
   source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
   accessKeyID: minioadmin
   secretKeyID: minioadmin
-  endpointURL: http://host.docker.internal:9000
+  endpointURL: http://minio:9000
 tasks:
   - var: bucketName
     name: generate a random bucket name to store the results
@@ -25,6 +27,8 @@ tasks:
 
   - name: create a temporary bucket to house the chunks
     image: "amazon/aws-cli:2.13.10"
+    networks:
+      - minio
     env:
       AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
       AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
@@ -36,6 +40,8 @@ tasks:
 
   - name: create the master playlist
     image: "amazon/aws-cli:2.13.10"
+    networks:
+      - minio
     env:
       AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
       AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
@@ -51,6 +57,8 @@ tasks:
         - name: Generate 360p HLS stream
           volumes:
             - /tmp
+          networks:
+            - minio
           run: |
             mkdir /tmp/output
             ffmpeg -y -i $SOURCE -vf scale=w=-2:h=360 -c:a aac -ar 48000 -b:a 96k -c:v h264 -profile:v main \
@@ -73,6 +81,8 @@ tasks:
         - name: Generate 480p HLS stream
           volumes:
             - /tmp
+          networks:
+            - minio
           run: |
             mkdir /tmp/output
             ffmpeg -y -i $SOURCE -vf scale=w=-2:h=480 -c:a aac -ar 48000 -b:a 128k -c:v h264 -profile:v main \
@@ -95,6 +105,8 @@ tasks:
         - name: Generate 720p HLS stream
           volumes:
             - /tmp
+          networks:
+            - minio
           run: |
             mkdir /tmp/output
             ffmpeg -y -i $SOURCE -vf scale=w=-2:h=720 -c:a aac -ar 48000 -b:a 128k -c:v h264 -profile:v main \

@@ -8,14 +8,16 @@ description: |
 
   You can get a running instance of minio using the following command: 
 
-  docker run --name=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+  docker network create minio
+
+  docker run --name=minio --network=minio -it --rm -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
 
   The default credentials for Minio Server are minioadmin/minioadmin
 inputs:
   source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
   accessKeyID: minioadmin
   secretKeyID: minioadmin
-  endpointURL: http://host.docker.internal:9000
+  endpointURL: http://minio:9000
 tasks:
   - var: ffprobe
     name: get the video metadata
@@ -116,6 +118,8 @@ tasks:
 
   - name: create a temporary bucket to house the chunks
     image: "amazon/aws-cli:2.13.10"
+    networks:
+      - minio
     env:
       AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
       AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
@@ -132,6 +136,8 @@ tasks:
         name: encode the chunk
         volumes:
           - /tmp
+        networks:
+          - minio
         env:
           SOURCE: "{{ inputs.source }}"
           START: "{{ item.value.start }}"
@@ -155,6 +161,8 @@ tasks:
   - name: stitch the chunks into a single video
     volumes:
       - /tmp
+    networks:
+      - minio
     env:
       BUCKET_NAME: "{{tasks.bucketName}}"
     image: jrottenberg/ffmpeg:3.4-alpine
