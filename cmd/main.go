@@ -19,32 +19,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const (
-	// runs as both a coordinator and workers
-	MODE_STANDALONE = "standalone"
-	// runs as a coordinator
-	MODE_COORDINATOR = "coordinator"
-	// runs as a worker
-	MODE_WORKER = "worker"
-	// executes the database migration script
-	// for the string datastore
-	MODE_MIGRATION = "migration"
-)
-
-func modeFlag() cli.Flag {
-	allModes := []string{
-		MODE_STANDALONE,
-		MODE_COORDINATOR,
-		MODE_WORKER,
-		MODE_MIGRATION,
-	}
-	return &cli.StringFlag{
-		Name:     "mode",
-		Usage:    strings.Join(allModes, "|"),
-		Required: true,
-	}
-}
-
 func queueFlag() cli.Flag {
 	return &cli.StringSliceFlag{
 		Name:  "queue",
@@ -135,20 +109,62 @@ func main() {
 	app := &cli.App{
 		Name:        "tork",
 		Description: "a distributed workflow engine",
-		Flags: []cli.Flag{
-			modeFlag(),
-			queueFlag(),
-			brokerFlag(),
-			rabbitmqURLFlag(),
-			datastoreFlag(),
-			postgresDSNFlag(),
-			defaultCPUsLimit(),
-			defaultMemoryLimit(),
-			tempDirFlag(),
-			addressFlag(),
-			debugFlag(),
+		Commands: []*cli.Command{
+			{
+				Name: "coordinator",
+				Flags: []cli.Flag{
+					queueFlag(),
+					brokerFlag(),
+					rabbitmqURLFlag(),
+					datastoreFlag(),
+					postgresDSNFlag(),
+					defaultCPUsLimit(),
+					defaultMemoryLimit(),
+					tempDirFlag(),
+					debugFlag(),
+					addressFlag(),
+				},
+				Action: execCoorinator,
+			},
+			{
+				Name: "worker",
+				Flags: []cli.Flag{
+					queueFlag(),
+					brokerFlag(),
+					rabbitmqURLFlag(),
+					defaultCPUsLimit(),
+					defaultMemoryLimit(),
+					tempDirFlag(),
+					addressFlag(),
+					debugFlag(),
+				},
+				Action: execWorker,
+			},
+			{
+				Name: "standalone",
+				Flags: []cli.Flag{
+					queueFlag(),
+					brokerFlag(),
+					rabbitmqURLFlag(),
+					datastoreFlag(),
+					postgresDSNFlag(),
+					defaultCPUsLimit(),
+					defaultMemoryLimit(),
+					tempDirFlag(),
+					debugFlag(),
+				},
+				Action: execStandalone,
+			},
+			{
+				Name: "migration",
+				Flags: []cli.Flag{
+					datastoreFlag(),
+					postgresDSNFlag(),
+					debugFlag(),
+				},
+				Action: execMigration,
+			},
 		},
-		Action: execute,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Println(err)
@@ -156,87 +172,125 @@ func main() {
 	}
 }
 
-func execute(ctx *cli.Context) error {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if ctx.Bool("debug") {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	}
+func execCoorinator(ctx *cli.Context) error {
+	initLogging(ctx)
 
-	mode := ctx.String("mode")
-	if !isValidMode(mode) {
-		return errors.Errorf("invalid mode: %s", mode)
-	}
-
-	var broker mq.Broker
-	var ds datastore.Datastore
-	var w *worker.Worker
-	var c *coordinator.Coordinator
-	var err error
-
-	broker, err = createBroker(ctx)
+	broker, err := createBroker(ctx)
 	if err != nil {
 		return err
 	}
 
-	ds, err = createDatastore(ctx)
+	ds, err := createDatastore(ctx)
 	if err != nil {
 		return err
 	}
 
-	switch mode {
-	case MODE_STANDALONE:
-		w, err = createWorker(broker, ctx)
-		if err != nil {
-			return err
-		}
-		c, err = createCoordinator(broker, ds, ctx)
-		if err != nil {
-			return err
-		}
-	case MODE_COORDINATOR:
-		c, err = createCoordinator(broker, ds, ctx)
-		if err != nil {
-			return err
-		}
-	case MODE_WORKER:
-		w, err = createWorker(broker, ctx)
-		if err != nil {
-			return err
-		}
-	case MODE_MIGRATION:
-		dstype := ctx.String("datastore")
-		switch dstype {
-		case datastore.DATASTORE_POSTGRES:
-			if err := ds.(*datastore.PostgresDatastore).ExecScript("db/postgres/schema.sql"); err != nil {
-				return errors.Wrapf(err, "error when trying to create db schema")
-			}
-		default:
-			return errors.Errorf("can't perform db migration on: %s", dstype)
-		}
-		log.Info().Msg("migration completed!")
+	c, err := createCoordinator(broker, ds, ctx)
+	if err != nil {
+		return err
 	}
 
-	if mode != MODE_MIGRATION {
-		// wait for the termination signal
-		// so we can do a clean shutdown
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-		log.Debug().Msg("shutting down")
-		if w != nil {
-			if err := w.Stop(); err != nil {
-				log.Error().Err(err).Msg("error stopping worker")
-			}
+	// wait for the termination signal
+	// so we can do a clean shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Debug().Msg("shutting down")
+	if c != nil {
+		if err := c.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping coordinator")
 		}
-		if c != nil {
-			if err := c.Stop(); err != nil {
-				log.Error().Err(err).Msg("error stopping coordinator")
-			}
+	}
+	return nil
+}
+
+func execWorker(ctx *cli.Context) error {
+	initLogging(ctx)
+
+	broker, err := createBroker(ctx)
+	if err != nil {
+		return err
+	}
+
+	w, err := createWorker(broker, ctx)
+	if err != nil {
+		return err
+	}
+
+	// wait for the termination signal
+	// so we can do a clean shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Debug().Msg("shutting down")
+	if w != nil {
+		if err := w.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping worker")
 		}
 	}
 
+	return nil
+}
+
+func execStandalone(ctx *cli.Context) error {
+	initLogging(ctx)
+
+	broker, err := createBroker(ctx)
+	if err != nil {
+		return err
+	}
+
+	ds, err := createDatastore(ctx)
+	if err != nil {
+		return err
+	}
+
+	w, err := createWorker(broker, ctx)
+	if err != nil {
+		return err
+	}
+	c, err := createCoordinator(broker, ds, ctx)
+	if err != nil {
+		return err
+	}
+
+	// wait for the termination signal
+	// so we can do a clean shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Debug().Msg("shutting down")
+	if w != nil {
+		if err := w.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping worker")
+		}
+	}
+	if c != nil {
+		if err := c.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping coordinator")
+		}
+	}
+
+	return nil
+}
+
+func execMigration(ctx *cli.Context) error {
+	initLogging(ctx)
+
+	ds, err := createDatastore(ctx)
+	if err != nil {
+		return err
+	}
+	dstype := ctx.String("datastore")
+	switch dstype {
+	case datastore.DATASTORE_POSTGRES:
+		if err := ds.(*datastore.PostgresDatastore).ExecScript("db/postgres/schema.sql"); err != nil {
+			return errors.Wrapf(err, "error when trying to create db schema")
+		}
+	default:
+		return errors.Errorf("can't perform db migration on: %s", dstype)
+	}
+	log.Info().Msg("migration completed!")
 	return nil
 }
 
@@ -315,6 +369,7 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 			DefaultMemoryLimit: ctx.String("default-memory-limit"),
 		},
 		TempDir: ctx.String("temp-dir"),
+		Address: ctx.String("address"),
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating worker")
@@ -340,13 +395,11 @@ func parseQueueConfig(ctx *cli.Context) (map[string]int, error) {
 	return queues, nil
 }
 
-func isValidMode(m string) bool {
-	switch m {
-	case MODE_STANDALONE,
-		MODE_COORDINATOR,
-		MODE_WORKER,
-		MODE_MIGRATION:
-		return true
+func initLogging(ctx *cli.Context) {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	if ctx.Bool("debug") {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
-	return false
 }

@@ -52,7 +52,7 @@ Before running the examples, ensure you have the following software installed:
 Start in `standalone` mode:
 
 ```
-go run cmd/main.go -mode standalone
+go run cmd/main.go standalone
 ```
 
 Submit a job in another terminal:
@@ -153,7 +153,7 @@ It is often desirable to route tasks to different queues in order to create spec
 For example, one pool of workers, specially configured to handle video transcoding can listen to video processing related tasks:
 
 ```
-go run cmd/main.go -mode worker -queue transcoding:3 -queue default:10
+go run cmd/main.go worker -queue transcoding:3 -queue default:10
 ```
 
 In this example the worker would handle up to 3 transcoding-related tasks and up to 10 "regular" tasks concurrently.
@@ -235,7 +235,7 @@ Start Tork
 
 ```bash
 go run cmd/main.go \
-  -mode standalone \
+  standalone \
   -datastore postgres \
   -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 ```
@@ -254,7 +254,7 @@ Start the Coordinator:
 
 ```bash
 go run cmd/main.go \
- -mode coordinator \
+ coordinator \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
 ```
@@ -263,7 +263,7 @@ Start the worker(s):
 
 ```bash
 go run cmd/main.go \
- -mode worker \
+ worker \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
 ```
