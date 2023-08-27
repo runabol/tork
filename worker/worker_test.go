@@ -69,18 +69,23 @@ func Test_handleTaskRun(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(&task.Task{
-		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
-		Image: "ubuntu:mantic",
-		CMD:   []string{"ls"},
-	})
+	t1 := &task.Task{
+		ID:      uuid.NewUUID(),
+		State:   task.Scheduled,
+		Image:   "ubuntu:mantic",
+		CMD:     []string{"ls"},
+		Volumes: []string{"/somevolume"},
+	}
+
+	err = w.handleTask(t1)
 
 	// give the task some time to "process"
 	time.Sleep(time.Millisecond * 100)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, completions)
+	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
+
 }
 
 func Test_handleTaskCancel(t *testing.T) {
