@@ -43,7 +43,7 @@ func Test_getQueues(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(qs))
+	assert.Equal(t, 1, len(qs))
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 

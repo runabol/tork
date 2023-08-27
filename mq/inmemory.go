@@ -18,116 +18,119 @@ const defaultQueueSize = 10
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	tasks     map[string]chan *task.Task
-	hearbeats chan node.Node
-	jobs      chan *job.Job
-	mu        sync.RWMutex
+	queues      map[string]chan any
+	subscribers map[string][]func(m any) error
+	nextSub     map[string]int
+	mu          sync.RWMutex
 }
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		tasks:     make(map[string]chan *task.Task),
-		hearbeats: make(chan node.Node, defaultQueueSize),
-		jobs:      make(chan *job.Job, defaultQueueSize),
+		queues:      make(map[string]chan any),
+		subscribers: make(map[string][]func(m any) error),
+		nextSub:     make(map[string]int),
 	}
 }
 
 func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
-	b.mu.RLock()
-	q, ok := b.tasks[qname]
-	b.mu.RUnlock()
-	if !ok {
-		b.mu.Lock()
-		q = make(chan *task.Task, defaultQueueSize)
-		b.tasks[qname] = q
-		b.mu.Unlock()
-	}
-	q <- t.Clone()
-	return nil
+	return b.publish(qname, t.Clone())
 }
 
 func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
-	log.Debug().Msgf("subscribing for tasks on %s", qname)
-	b.mu.RLock()
-	q, ok := b.tasks[qname]
-	b.mu.RUnlock()
-	if !ok {
-		q = make(chan *task.Task, defaultQueueSize)
-		b.mu.Lock()
-		b.tasks[qname] = q
-		b.mu.Unlock()
-	}
-	go func() {
-		for t := range q {
-			err := handler(t.Clone())
-			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occurred while processing task")
-			}
+	return b.subscribe(qname, func(m any) error {
+		t, ok := m.(*task.Task)
+		if !ok {
+			return errors.Errorf("can't cast message to task")
 		}
-	}()
-	return nil
+		return handler(t.Clone())
+	})
 }
 
-func (b *InMemoryBroker) Queue(ctx context.Context, qname string) (QueueInfo, error) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	switch qname {
-	case QUEUE_JOBS:
-		return QueueInfo{Name: QUEUE_JOBS, Size: len(b.jobs)}, nil
-	case QUEUE_HEARBEAT:
-		return QueueInfo{Name: QUEUE_HEARBEAT, Size: len(b.hearbeats)}, nil
-	default:
-		q, ok := b.tasks[qname]
-		if !ok {
-			return QueueInfo{}, errors.Errorf("unknown queue: %s", qname)
-		}
-		return QueueInfo{Name: qname, Size: len(q)}, nil
+func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) error {
+	log.Debug().Msgf("subscribing for tasks on %s", qname)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	q, ok := b.queues[qname]
+	if !ok {
+		q = make(chan any, defaultQueueSize)
+		b.queues[qname] = q
 	}
+	subs, ok := b.subscribers[qname]
+	subs = append(subs, handler)
+	b.subscribers[qname] = subs
+	if !ok {
+		go func() {
+			for m := range q {
+				b.mu.Lock()
+				// round-robin to next subscriber
+				subs := b.subscribers[qname]
+				nextSub := b.nextSub[qname]
+				sub := subs[nextSub]
+				nextSub = nextSub + 1
+				if nextSub >= len(subs) {
+					nextSub = 0
+				}
+				b.nextSub[qname] = nextSub
+				b.mu.Unlock()
+				if err := sub(m); err != nil {
+					log.Error().Err(err).Msg("unexpcted error occurred while processing task")
+				}
+			}
+		}()
+	}
+	return nil
 }
 
 func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	qi := make([]QueueInfo, 0)
-	for k := range b.tasks {
-		qi = append(qi, QueueInfo{Name: k, Size: len(b.tasks[k])})
+	for k := range b.queues {
+		qi = append(qi, QueueInfo{Name: k, Size: len(b.queues[k]), Subscribers: len(b.subscribers[k])})
 
 	}
-	qi = append(qi, QueueInfo{Name: QUEUE_JOBS, Size: len(b.jobs)})
-	qi = append(qi, QueueInfo{Name: QUEUE_HEARBEAT, Size: len(b.hearbeats)})
 	return qi, nil
 }
 
 func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n node.Node) error {
-	b.hearbeats <- n
-	return nil
+	return b.publish(QUEUE_HEARBEAT, n)
 }
 
 func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error) error {
-	go func() {
-		for n := range b.hearbeats {
-			err := handler(n)
-			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occurred while processing registration")
-			}
+	return b.subscribe(QUEUE_HEARBEAT, func(m any) error {
+		n, ok := m.(node.Node)
+		if !ok {
+			return errors.New("can't cast to node")
 		}
-	}()
-	return nil
+		return handler(n)
+	})
 }
 
 func (b *InMemoryBroker) PublishJob(ctx context.Context, j *job.Job) error {
-	b.jobs <- j.Clone()
-	return nil
+	return b.publish(QUEUE_JOBS, j.Clone())
 }
+
 func (b *InMemoryBroker) SubscribeForJobs(handler func(j *job.Job) error) error {
-	go func() {
-		for j := range b.jobs {
-			err := handler(j.Clone())
-			if err != nil {
-				log.Error().Err(err).Msg("unexpcted error occurred while processing job")
-			}
+	return b.subscribe(QUEUE_JOBS, func(m any) error {
+		j, ok := m.(*job.Job)
+		if !ok {
+			return errors.New("can't cast to Job")
 		}
-	}()
+		return handler(j)
+	})
+}
+
+func (b *InMemoryBroker) publish(qname string, m any) error {
+	b.mu.RLock()
+	q, ok := b.queues[qname]
+	b.mu.RUnlock()
+	if !ok {
+		b.mu.Lock()
+		q = make(chan any, defaultQueueSize)
+		b.queues[qname] = q
+		b.mu.Unlock()
+	}
+	q <- m
 	return nil
 }
