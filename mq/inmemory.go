@@ -20,6 +20,7 @@ const defaultQueueSize = 10
 type InMemoryBroker struct {
 	queues      map[string]chan any
 	subscribers map[string][]func(m any) error
+	unacked     map[string]int
 	nextSub     map[string]int
 	mu          sync.RWMutex
 }
@@ -29,6 +30,7 @@ func NewInMemoryBroker() *InMemoryBroker {
 		queues:      make(map[string]chan any),
 		subscribers: make(map[string][]func(m any) error),
 		nextSub:     make(map[string]int),
+		unacked:     make(map[string]int),
 	}
 }
 
@@ -72,10 +74,14 @@ func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) erro
 					nextSub = 0
 				}
 				b.nextSub[qname] = nextSub
+				b.unacked[qname] = b.unacked[qname] + 1
 				b.mu.Unlock()
 				if err := sub(m); err != nil {
 					log.Error().Err(err).Msg("unexpcted error occurred while processing task")
 				}
+				b.mu.Lock()
+				b.unacked[qname] = b.unacked[qname] - 1
+				b.mu.Unlock()
 			}
 		}()
 	}
@@ -87,7 +93,12 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	defer b.mu.RUnlock()
 	qi := make([]QueueInfo, 0)
 	for k := range b.queues {
-		qi = append(qi, QueueInfo{Name: k, Size: len(b.queues[k]), Subscribers: len(b.subscribers[k])})
+		qi = append(qi, QueueInfo{
+			Name:        k,
+			Size:        len(b.queues[k]),
+			Subscribers: len(b.subscribers[k]),
+			Unacked:     b.unacked[k],
+		})
 
 	}
 	return qi, nil
