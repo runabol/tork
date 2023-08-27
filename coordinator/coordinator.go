@@ -89,7 +89,7 @@ func (c *Coordinator) handleTask(t *task.Task) error {
 
 func (c *Coordinator) handlePendingTask(t *task.Task) error {
 	ctx := context.Background()
-	log.Info().
+	log.Debug().
 		Str("task-id", t.ID).
 		Msg("handling pending task")
 	if strings.TrimSpace(t.If) == "false" {
