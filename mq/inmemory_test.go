@@ -9,6 +9,7 @@ import (
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,11 +22,17 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 		return nil
 	})
 	assert.NoError(t, err)
-	err = b.PublishTask(ctx, "test-queue", &task.Task{})
+
+	t1 := &task.Task{
+		ID:      uuid.NewUUID(),
+		Volumes: []string{"/somevolume"},
+	}
+	err = b.PublishTask(ctx, "test-queue", t1)
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, processed)
+	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 }
 
 func TestInMemoryGetQueue(t *testing.T) {

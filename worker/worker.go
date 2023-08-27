@@ -105,7 +105,11 @@ func (w *Worker) cancelTask(t *task.Task) error {
 }
 
 func (w *Worker) runTask(t *task.Task) error {
+	// create a cancellation context in case
+	// the coordinator wants to cancel the
+	// task later on
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w.mu.Lock()
 	w.tasks[t.ID] = runningTask{
 		cancel: cancel,
@@ -116,6 +120,7 @@ func (w *Worker) runTask(t *task.Task) error {
 		defer w.mu.Unlock()
 		delete(w.tasks, t.ID)
 	}()
+	// let the coordinator know that the task started executing
 	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.State = task.Running
@@ -123,6 +128,35 @@ func (w *Worker) runTask(t *task.Task) error {
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
 	}
+	// clone the task so that the downstream
+	// process can mutate the task without
+	// affecting the original
+	rt := t.Clone()
+	if err := w.executeTask(ctx, rt); err != nil {
+		return err
+	}
+	switch rt.State {
+	case task.Completed:
+		t.Result = rt.Result
+		t.CompletedAt = rt.CompletedAt
+		t.State = rt.State
+		if err := w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
+			return err
+		}
+	case task.Failed:
+		t.Error = rt.Error
+		t.FailedAt = rt.FailedAt
+		t.State = rt.State
+		if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("unexpected state %s for task %s", rt.State, t.ID)
+	}
+	return nil
+}
+
+func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 	// prepare limits
 	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
 		t.Limits = &task.Limits{}
@@ -150,7 +184,7 @@ func (w *Worker) runTask(t *task.Task) error {
 		pre.Volumes = t.Volumes
 		pre.Networks = t.Networks
 		pre.Limits = t.Limits
-		if err := w.doRunTask(ctx, pre); err != nil {
+		if err := w.doExecuteTask(ctx, pre); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -161,15 +195,12 @@ func (w *Worker) runTask(t *task.Task) error {
 			t.State = task.Failed
 			t.Error = err.Error()
 			t.FailedAt = &finished
-			if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
-				return err
-			}
 			return nil
 		}
 		//pre.Result = result
 	}
 	// run the actual task
-	if err := w.doRunTask(ctx, t); err != nil {
+	if err := w.doExecuteTask(ctx, t); err != nil {
 		log.Error().
 			Str("task-id", t.ID).
 			Err(err).
@@ -178,9 +209,6 @@ func (w *Worker) runTask(t *task.Task) error {
 		t.State = task.Failed
 		t.Error = err.Error()
 		t.FailedAt = &finished
-		if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
-			return err
-		}
 		return nil
 	}
 	// execute post tasks
@@ -188,7 +216,7 @@ func (w *Worker) runTask(t *task.Task) error {
 		post.Volumes = t.Volumes
 		post.Networks = t.Networks
 		post.Limits = t.Limits
-		if err := w.doRunTask(ctx, post); err != nil {
+		if err := w.doExecuteTask(ctx, post); err != nil {
 			log.Error().
 				Str("task-id", t.ID).
 				Err(err).
@@ -199,9 +227,6 @@ func (w *Worker) runTask(t *task.Task) error {
 			t.State = task.Failed
 			t.Error = err.Error()
 			t.FailedAt = &finished
-			if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
-				return err
-			}
 			return nil
 		}
 		//post.Result = result
@@ -211,10 +236,10 @@ func (w *Worker) runTask(t *task.Task) error {
 	//t.Result = result
 	t.CompletedAt = &finished
 	t.State = task.Completed
-	return w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
+	return nil
 }
 
-func (w *Worker) doRunTask(ctx context.Context, o *task.Task) error {
+func (w *Worker) doExecuteTask(ctx context.Context, o *task.Task) error {
 	t := o.Clone()
 	// create a temporary mount point
 	// we can use to write the run script to
