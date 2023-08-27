@@ -136,6 +136,8 @@ tasks:
       list: "{{ parseJSON(tasks.chunks) }}"
       task:
         name: encode the chunk
+        retry: 
+          limit: 2
         volumes:
           - /tmp
         networks:
@@ -161,6 +163,8 @@ tasks:
               aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
 
   - name: stitch the chunks into a single video
+    retry: 
+      limit: 2
     volumes:
       - /tmp
     networks:
