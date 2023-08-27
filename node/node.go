@@ -3,12 +3,14 @@ package node
 import "time"
 
 var LAST_HEARTBEAT_TIMEOUT = time.Minute * 5
+var HEARTBEAT_RATE = time.Second * 30
 
 type Status string
 
 const (
-	UP   Status = "UP"
-	Down Status = "DOWN"
+	UP      Status = "UP"
+	Down    Status = "DOWN"
+	Offline Status = "OFFLINE"
 )
 
 type Node struct {

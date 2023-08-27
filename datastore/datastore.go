@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"time"
 
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
@@ -24,7 +23,7 @@ type Datastore interface {
 	CreateNode(ctx context.Context, n node.Node) error
 	UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error
 	GetNodeByID(ctx context.Context, id string) (node.Node, error)
-	GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]node.Node, error)
+	GetActiveNodes(ctx context.Context) ([]node.Node, error)
 
 	CreateJob(ctx context.Context, j *job.Job) error
 	UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error

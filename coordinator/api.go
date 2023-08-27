@@ -9,14 +9,12 @@ import (
 
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +64,7 @@ func (s *api) listQueues(c echo.Context) error {
 }
 
 func (s *api) listActiveNodes(c echo.Context) error {
-	nodes, err := s.ds.GetActiveNodes(c.Request().Context(), time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT))
+	nodes, err := s.ds.GetActiveNodes(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

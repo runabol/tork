@@ -105,12 +105,18 @@ func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.N
 	return n, nil
 }
 
-func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]node.Node, error) {
+func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, error) {
 	ds.nmu.RLock()
 	defer ds.nmu.RUnlock()
 	nodes := make([]node.Node, 0)
+	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
 	for _, n := range ds.nodes {
-		if n.LastHeartbeatAt.After(lastHeartbeatAfter) {
+		if n.LastHeartbeatAt.After(timeout) {
+			// if we hadn't seen an heartbeat for two or more
+			// consecutive periods we consider the node as offline
+			if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-node.HEARTBEAT_RATE * 2)) {
+				n.Status = node.Offline
+			}
 			nodes = append(nodes, n)
 		}
 	}

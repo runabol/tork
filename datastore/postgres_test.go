@@ -235,19 +235,31 @@ func TestPostgresUpdateNode(t *testing.T) {
 
 func TestPostgresGetActiveNodes(t *testing.T) {
 	ctx := context.Background()
-	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := NewPostgresDataStore(dsn)
+	schemaName := fmt.Sprintf("tork%d", rand.Int())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	assert.NoError(t, err)
+	_, err = ds.db.Exec(fmt.Sprintf("create schema %s", schemaName))
+	assert.NoError(t, err)
+	defer func() {
+		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
+		assert.NoError(t, err)
+	}()
+	err = ds.ExecScript("../db/postgres/schema.sql")
 	assert.NoError(t, err)
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
-		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
+		Status:          node.UP,
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Second * 20),
 	}
 	n2 := node.Node{
 		ID:              uuid.NewUUID(),
+		Status:          node.UP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 4),
 	}
 	n3 := node.Node{ // inactive
 		ID:              uuid.NewUUID(),
+		Status:          node.UP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
 	}
 	err = ds.CreateNode(ctx, n1)
@@ -259,11 +271,11 @@ func TestPostgresGetActiveNodes(t *testing.T) {
 	err = ds.CreateNode(ctx, n3)
 	assert.NoError(t, err)
 
-	ns, err := ds.GetActiveNodes(ctx, time.Now().UTC().Add(-time.Minute*5))
-	for _, n := range ns {
-		assert.True(t, n.LastHeartbeatAt.After(time.Now().UTC().Add(-time.Minute*5)))
-	}
+	ns, err := ds.GetActiveNodes(ctx)
 	assert.NoError(t, err)
+	assert.Equal(t, 2, len(ns))
+	assert.Equal(t, node.UP, ns[0].Status)
+	assert.Equal(t, node.Offline, ns[1].Status)
 }
 
 func TestPostgresCreateAndGetJob(t *testing.T) {
