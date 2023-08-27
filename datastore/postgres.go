@@ -76,6 +76,7 @@ type jobRecord struct {
 	Output      string     `db:"output_"`
 	Result      string     `db:"result"`
 	Error       string     `db:"error_"`
+	TS          string     `db:"ts"`
 }
 
 type nodeRecord struct {
@@ -677,11 +678,17 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return actives, nil
 }
 
-func (ds *PostgresDatastore) GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error) {
+func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
-	q := fmt.Sprintf(`SELECT * FROM jobs  ORDER BY created_at DESC OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.db.Select(&rs, q); err != nil {
+	qry := fmt.Sprintf(`
+	  SELECT * 
+	  FROM jobs 
+	  where 
+	    case when $1 != '' then ts @@ plainto_tsquery('english', $1) else true end
+	  ORDER BY created_at DESC 
+	  OFFSET %d LIMIT %d`, offset, size)
+	if err := ds.db.Select(&rs, qry, q); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
 	result := make([]*job.Job, len(rs))
@@ -694,7 +701,13 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, page, size int) (*Page
 	}
 
 	var count *int
-	if err := ds.db.Get(&count, "select count(*) from jobs"); err != nil {
+	if err := ds.db.Get(&count, `
+	  select count(*) 
+	  from jobs
+	  where case when $1 != '' 
+	    then ts @@ plainto_tsquery('english', $1) 
+		else true 
+	  end`, q); err != nil {
 		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 

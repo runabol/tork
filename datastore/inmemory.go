@@ -200,7 +200,10 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return result, nil
 }
 
-func (ds *InMemoryDatastore) GetJobs(ctx context.Context, page, size int) (*Page[*job.Job], error) {
+func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
+	if q != "" {
+		return nil, errors.New("full text-search is not supported in the inmem datastore")
+	}
 	ds.jmu.RLock()
 	defer ds.jmu.RUnlock()
 	offset := (page - 1) * size

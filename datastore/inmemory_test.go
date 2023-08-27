@@ -194,22 +194,22 @@ func TestInMemoryGetJobs(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	}
-	p1, err := ds.GetJobs(ctx, 1, 10)
+	p1, err := ds.GetJobs(ctx, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
 	assert.Equal(t, "Job 101", p1.Items[0].Name)
 	assert.Empty(t, p1.Items[0].Tasks)
 	assert.Empty(t, p1.Items[0].Execution)
 
-	p2, err := ds.GetJobs(ctx, 2, 10)
+	p2, err := ds.GetJobs(ctx, "", 2, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p2.Size)
 
-	p10, err := ds.GetJobs(ctx, 10, 10)
+	p10, err := ds.GetJobs(ctx, "", 10, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p10.Size)
 
-	p11, err := ds.GetJobs(ctx, 11, 10)
+	p11, err := ds.GetJobs(ctx, "", 11, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p11.Size)
 

@@ -31,6 +31,17 @@ CREATE TABLE jobs (
 
 CREATE INDEX idx_jobs_state ON jobs (state);
 
+ALTER TABLE jobs ADD COLUMN ts tsvector NOT NULL
+    GENERATED ALWAYS AS (
+        setweight(to_tsvector('english',description),'C')  ||  
+        setweight(to_tsvector('english',name),'B') ||
+        setweight(to_tsvector('english',state),'A') 
+    ) STORED;
+
+
+CREATE INDEX jobs_ts_idx ON jobs USING GIN (ts);
+
+
 CREATE TABLE tasks (
     id            varchar(32) not null primary key,
     job_id        varchar(32) not null references jobs(id),
