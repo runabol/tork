@@ -17,6 +17,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - [Pre/Post tasks](#prepost-tasks)
 - No single point of failure.
 - Task timeout
+- [Full-text search](#list-jobs) when using Postgres as the datastore.
 - [Expression Language](#expressions)
 - [Conditional Tasks](#expressions)
 - [Parallel Task](#parallel-task)
@@ -476,6 +477,7 @@ GET /jobs
 
 - `page` - page number (default: 1)
 - `size` - page size (default: 10 min:1 max:20)
+- `q` - full text search query
 
 **Response:**
 
