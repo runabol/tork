@@ -64,6 +64,7 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 		Name      string `json:"name"`
 		Messages  int    `json:"messages"`
 		Consumers int    `json:"consumers"`
+		Unacked   int    `json:"messages_unacknowledged"`
 	}
 
 	rqs := make([]rabbitq, 0)
@@ -78,6 +79,7 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 			Name:        rq.Name,
 			Size:        rq.Messages,
 			Subscribers: rq.Consumers,
+			Unacked:     rq.Unacked,
 		}
 	}
 

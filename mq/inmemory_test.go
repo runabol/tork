@@ -52,7 +52,9 @@ func TestInMemoryGetQueues(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			err := b.SubscribeForTasks(qname, func(t *task.Task) error { return nil })
+			err := b.SubscribeForTasks(qname, func(t *task.Task) error {
+				return nil
+			})
 			assert.NoError(t, err)
 		}()
 	}
@@ -61,6 +63,39 @@ func TestInMemoryGetQueues(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(qis))
 	assert.Equal(t, 10, qis[0].Subscribers)
+}
+
+func TestInMemoryGetQueuesUnacked(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
+	err := b.PublishTask(ctx, qname, &task.Task{})
+	assert.NoError(t, err)
+	qis, err := b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(qis))
+	assert.Equal(t, 0, qis[0].Subscribers)
+	wg1 := sync.WaitGroup{}
+	wg1.Add(1)
+	wg2 := sync.WaitGroup{}
+	wg2.Add(1)
+	err = b.SubscribeForTasks(qname, func(t *task.Task) error {
+		wg1.Done()
+		wg2.Wait()
+		return nil
+	})
+	assert.NoError(t, err)
+	wg1.Wait()
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, qis[0].Unacked)
+	wg2.Done()
+	time.Sleep(time.Millisecond * 100)
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, qis[0].Unacked)
+	assert.Equal(t, 1, len(qis))
+	assert.Equal(t, 1, qis[0].Subscribers)
 }
 
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
