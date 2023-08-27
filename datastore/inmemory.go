@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"strings"
 
 	"sort"
 	"sync"
@@ -20,13 +21,12 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
-	tasks  map[string]*task.Task
-	nodes  map[string]node.Node
-	jobs   map[string]*job.Job
-	jobIDs []string
-	tmu    sync.RWMutex
-	nmu    sync.RWMutex
-	jmu    sync.RWMutex
+	tasks map[string]*task.Task
+	nodes map[string]node.Node
+	jobs  map[string]*job.Job
+	tmu   sync.RWMutex
+	nmu   sync.RWMutex
+	jmu   sync.RWMutex
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
@@ -130,7 +130,6 @@ func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	ds.jmu.Lock()
 	defer ds.jmu.Unlock()
 	ds.jobs[j.ID] = j.Clone()
-	ds.jobIDs = append([]string{j.ID}, ds.jobIDs...) // prepend
 	return nil
 }
 
@@ -201,25 +200,29 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
-	if q != "" {
-		return nil, errors.New("full text-search is not supported in the inmem datastore")
-	}
 	ds.jmu.RLock()
 	defer ds.jmu.RUnlock()
 	offset := (page - 1) * size
-	result := make([]*job.Job, 0)
-	for i := offset; i < (offset+size) && i < len(ds.jobIDs); i++ {
-		j, ok := ds.jobs[ds.jobIDs[i]]
-		if !ok {
-			return nil, ErrJobNotFound
+	filtered := make([]*job.Job, 0)
+	for _, j := range ds.jobs {
+		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(q)) ||
+			strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(q)) {
+			filtered = append(filtered, j)
 		}
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+	})
+	result := make([]*job.Job, 0)
+	for i := offset; i < (offset+size) && i < len(filtered); i++ {
+		j := filtered[i]
 		jc := j.Clone()
 		jc.Tasks = make([]*task.Task, 0)
 		jc.Execution = make([]*task.Task, 0)
 		result = append(result, jc)
 	}
-	totalPages := len(ds.jobIDs) / size
-	if len(ds.jobIDs)%size != 0 {
+	totalPages := len(filtered) / size
+	if len(filtered)%size != 0 {
 		totalPages = totalPages + 1
 	}
 	return &Page[*job.Job]{
@@ -227,7 +230,7 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 		Number:     page,
 		Size:       len(result),
 		TotalPages: totalPages,
-		TotalItems: len(ds.jobIDs),
+		TotalItems: len(filtered),
 	}, nil
 }
 

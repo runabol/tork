@@ -175,9 +175,12 @@ func TestInMemoryGetJobs(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
 	for i := 0; i < 101; i++ {
+		now := time.Now().UTC()
 		j1 := job.Job{
-			ID:   uuid.NewUUID(),
-			Name: fmt.Sprintf("Job %d", (i + 1)),
+			ID:        uuid.NewUUID(),
+			Name:      fmt.Sprintf("Job %d", (i + 1)),
+			CreatedAt: now,
+			State:     job.Running,
 			Tasks: []*task.Task{
 				{
 					Name: "some task",
@@ -193,6 +196,7 @@ func TestInMemoryGetJobs(t *testing.T) {
 			State: task.Running,
 		})
 		assert.NoError(t, err)
+		time.Sleep(time.Millisecond)
 	}
 	p1, err := ds.GetJobs(ctx, "", 1, 10)
 	assert.NoError(t, err)
@@ -212,9 +216,23 @@ func TestInMemoryGetJobs(t *testing.T) {
 	p11, err := ds.GetJobs(ctx, "", 11, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p11.Size)
-
 	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
 	assert.Equal(t, 101, p1.TotalItems)
+
+	ps1, err := ds.GetJobs(ctx, "Job", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, ps1.Size)
+	assert.Equal(t, 101, ps1.TotalItems)
+
+	ps1, err = ds.GetJobs(ctx, "101", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, ps1.Size)
+	assert.Equal(t, 1, ps1.TotalItems)
+
+	ps1, err = ds.GetJobs(ctx, "running", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, ps1.Size)
+	assert.Equal(t, 101, ps1.TotalItems)
 }
 
 func TestInMemoryUpdateJob(t *testing.T) {
