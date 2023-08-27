@@ -178,7 +178,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 }
 
 func (r nodeRecord) toNode() node.Node {
-	return node.Node{
+	n := node.Node{
 		ID:              r.ID,
 		StartedAt:       r.StartedAt,
 		CPUPercent:      r.CPUPercent,
@@ -186,6 +186,12 @@ func (r nodeRecord) toNode() node.Node {
 		Queue:           r.Queue,
 		Status:          node.Status(r.Status),
 	}
+	// if we hadn't seen an heartbeat for two or more
+	// consecutive periods we consider the node as offline
+	if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-node.HEARTBEAT_RATE * 2)) {
+		n.Status = node.Offline
+	}
+	return n
 }
 
 func (r jobRecord) toJob(tasks, execution []*task.Task) (*job.Job, error) {
@@ -525,17 +531,19 @@ func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (node.N
 	return nr.toNode(), nil
 }
 
-func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context, lastHeartbeatAfter time.Time) ([]node.Node, error) {
+func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, error) {
 	nrs := []nodeRecord{}
 	q := `SELECT * 
 	      FROM nodes 
 		  where last_heartbeat_at > $1 
 		  ORDER BY last_heartbeat_at DESC`
-	if err := ds.db.Select(&nrs, q, lastHeartbeatAfter); err != nil {
+	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
+	if err := ds.db.Select(&nrs, q, timeout); err != nil {
 		return nil, errors.Wrapf(err, "error getting active nodes from db")
 	}
 	ns := make([]node.Node, len(nrs))
 	for i, n := range nrs {
+
 		ns[i] = n.toNode()
 	}
 	return ns, nil

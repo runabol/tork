@@ -129,14 +129,17 @@ func TestInMemoryGetActiveNodes(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
-		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
+		Status:          node.UP,
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Second * 20),
 	}
 	n2 := node.Node{
 		ID:              uuid.NewUUID(),
+		Status:          node.UP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 4),
 	}
 	n3 := node.Node{ // inactive
 		ID:              uuid.NewUUID(),
+		Status:          node.UP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
 	}
 	err := ds.CreateNode(ctx, n1)
@@ -148,9 +151,11 @@ func TestInMemoryGetActiveNodes(t *testing.T) {
 	err = ds.CreateNode(ctx, n3)
 	assert.NoError(t, err)
 
-	ns, err := ds.GetActiveNodes(ctx, time.Now().UTC().Add(-time.Minute*5))
+	ns, err := ds.GetActiveNodes(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(ns))
+	assert.Equal(t, node.UP, ns[0].Status)
+	assert.Equal(t, node.Offline, ns[1].Status)
 }
 
 func TestInMemoryCreateAndGetJob(t *testing.T) {

@@ -326,7 +326,7 @@ func (w *Worker) sendHeartbeats() {
 				Err(err).
 				Msgf("error publishing heartbeat for %s", w.id)
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(node.HEARTBEAT_RATE)
 	}
 }
 
