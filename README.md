@@ -161,7 +161,7 @@ In this example the worker would handle up to 3 transcoding-related tasks and up
 
 This could make sense because transcoding tends to be very resource intensive so a single worker might not want to handle more than 3 concurrent tasks.
 
-To route a task to a special queue use the `queue` property:
+To route a task to a specific queue use the `queue` property:
 
 ```yaml
 name: transcode a video
