@@ -797,17 +797,46 @@ func Test_handleHeartbeat(t *testing.T) {
 
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
-		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 5),
 		CPUPercent:      75,
 	}
 
 	err = c.handleHeartbeats(n1)
 	assert.NoError(t, err)
 
-	n2, err := ds.GetNodeByID(ctx, n1.ID)
+	n11, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
-	assert.True(t, n2.LastHeartbeatAt.After(n1.LastHeartbeatAt))
-	assert.Equal(t, n1.CPUPercent, n2.CPUPercent)
+	assert.Equal(t, n1.LastHeartbeatAt, n11.LastHeartbeatAt)
+	assert.Equal(t, n1.CPUPercent, n11.CPUPercent)
+
+	n2 := node.Node{
+		ID:              n1.ID,
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 2),
+		CPUPercent:      75,
+	}
+
+	err = c.handleHeartbeats(n2)
+	assert.NoError(t, err)
+
+	n22, err := ds.GetNodeByID(ctx, n1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, n2.LastHeartbeatAt, n22.LastHeartbeatAt)
+	assert.Equal(t, n2.CPUPercent, n22.CPUPercent)
+
+	n3 := node.Node{
+		ID:              n1.ID,
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 7),
+		CPUPercent:      75,
+	}
+
+	err = c.handleHeartbeats(n3)
+	assert.NoError(t, err)
+
+	n33, err := ds.GetNodeByID(ctx, n1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, n2.LastHeartbeatAt, n33.LastHeartbeatAt) // should keep the latest
+	assert.Equal(t, n3.CPUPercent, n33.CPUPercent)
+
 }
 
 func Test_handleJobs(t *testing.T) {

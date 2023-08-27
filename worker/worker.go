@@ -313,11 +313,12 @@ func (w *Worker) sendHeartbeats() {
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
 			node.Node{
-				ID:         w.id,
-				StartedAt:  w.startTime,
-				CPUPercent: s.CPUPercent,
-				Queue:      fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
-				Status:     status,
+				ID:              w.id,
+				StartedAt:       w.startTime,
+				CPUPercent:      s.CPUPercent,
+				Queue:           fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
+				Status:          status,
+				LastHeartbeatAt: time.Now().UTC(),
 			},
 		)
 		if err != nil {

@@ -557,7 +557,6 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 
 func (c *Coordinator) handleHeartbeats(n node.Node) error {
 	ctx := context.Background()
-	n.LastHeartbeatAt = time.Now().UTC()
 	_, err := c.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
@@ -566,12 +565,17 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 		return c.ds.CreateNode(ctx, n)
 	}
 	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) error {
-		log.Info().
+		// ignore "old" heartbeats
+		if u.LastHeartbeatAt.After(n.LastHeartbeatAt) {
+			return nil
+		}
+		log.Debug().
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
 			Str("status", string(n.Status)).
+			Time("heartbeat-time", n.LastHeartbeatAt).
 			Msg("received heartbeat")
-		u.LastHeartbeatAt = time.Now().UTC()
+		u.LastHeartbeatAt = n.LastHeartbeatAt
 		u.CPUPercent = n.CPUPercent
 		return nil
 	})
