@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
@@ -129,4 +130,34 @@ func TestRunTaskWithNetwork(t *testing.T) {
 		Networks: []string{"no-such-network"},
 	})
 	assert.Error(t, err)
+}
+
+func TestCreateVolume(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	err = rt.CreateVolume(ctx, "testvol")
+	assert.NoError(t, err)
+
+	ls, err := rt.client.VolumeList(ctx, filters.Args{})
+	assert.NoError(t, err)
+	found := false
+	for _, v := range ls.Volumes {
+		if v.Name == "testvol" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found)
+
+	err = rt.DeleteVolume(ctx, "testvol")
+	assert.NoError(t, err)
+
+	ls, err = rt.client.VolumeList(ctx, filters.Args{})
+	assert.NoError(t, err)
+
+	for _, v := range ls.Volumes {
+		assert.NotEqual(t, "testvol", v.Name)
+	}
 }
