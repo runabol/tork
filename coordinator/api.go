@@ -165,7 +165,8 @@ func (s *api) listJobs(c echo.Context) error {
 	} else if size > 20 {
 		size = 20
 	}
-	res, err := s.ds.GetJobs(c.Request().Context(), page, size)
+	q := c.QueryParam("q")
+	res, err := s.ds.GetJobs(c.Request().Context(), q, page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
