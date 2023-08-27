@@ -28,8 +28,9 @@ const (
 )
 
 type QueueInfo struct {
-	Name string `json:"name"`
-	Size int    `json:"size"`
+	Name        string `json:"name"`
+	Size        int    `json:"size"`
+	Subscribers int    `json:"subscribers"`
 }
 
 func IsCoordinatorQueue(qname string) bool {

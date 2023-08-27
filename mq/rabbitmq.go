@@ -61,8 +61,9 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	}
 
 	type rabbitq struct {
-		Name     string `json:"name"`
-		Messages int    `json:"messages"`
+		Name      string `json:"name"`
+		Messages  int    `json:"messages"`
+		Consumers int    `json:"consumers"`
 	}
 
 	rqs := make([]rabbitq, 0)
@@ -74,8 +75,9 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	qis := make([]QueueInfo, len(rqs))
 	for i, rq := range rqs {
 		qis[i] = QueueInfo{
-			Name: rq.Name,
-			Size: rq.Messages,
+			Name:        rq.Name,
+			Size:        rq.Messages,
+			Subscribers: rq.Consumers,
 		}
 	}
 

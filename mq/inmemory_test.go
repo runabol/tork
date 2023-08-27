@@ -2,6 +2,8 @@ package mq_test
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,24 +37,30 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 }
 
-func TestInMemoryGetQueue(t *testing.T) {
-	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
-	err := b.PublishTask(ctx, "test-queue", &task.Task{})
-	assert.NoError(t, err)
-	qi, err := b.Queue(ctx, "test-queue")
-	assert.NoError(t, err)
-	assert.Equal(t, 1, qi.Size)
-}
-
 func TestInMemoryGetQueues(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	err := b.PublishTask(ctx, "test-queue", &task.Task{})
+	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
+	err := b.PublishTask(ctx, qname, &task.Task{})
 	assert.NoError(t, err)
 	qis, err := b.Queues(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(qis))
+	assert.Equal(t, 1, len(qis))
+	assert.Equal(t, 0, qis[0].Subscribers)
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			err := b.SubscribeForTasks(qname, func(t *task.Task) error { return nil })
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(qis))
+	assert.Equal(t, 10, qis[0].Subscribers)
 }
 
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
@@ -85,4 +93,38 @@ func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, processed)
+}
+
+func TestMultipleSubsSubsribeForJob(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := 0
+	mu := sync.Mutex{}
+	err := b.SubscribeForJobs(func(j *job.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
+		processed = processed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+	err = b.SubscribeForJobs(func(j *job.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
+		processed = processed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func() {
+			wg.Done()
+			err = b.PublishJob(ctx, &job.Job{})
+		}()
+	}
+	wg.Wait()
+	// wait for heartbeat to be processed
+	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, err)
+	assert.Equal(t, 100, processed)
 }
