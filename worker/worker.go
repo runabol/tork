@@ -168,16 +168,22 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
 	// prepare shared volumes
+
 	vols := []string{}
 	for _, v := range t.Volumes {
-		tempvol, err := os.MkdirTemp(w.tempdir, "vol-")
-		if err != nil {
-			return errors.Wrapf(err, "error creating temp dir")
+		volName := uuid.NewUUID()
+		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
+			return err
 		}
-		defer deleteTempDir(tempvol)
-		vols = append(vols, fmt.Sprintf("%s:%s", tempvol, v))
+		defer func() {
+			if err := w.runtime.DeleteVolume(ctx, volName); err != nil {
+				log.Error().
+					Err(err).
+					Msgf("error deleting volume: %s", volName)
+			}
+		}()
+		vols = append(vols, fmt.Sprintf("volume:%s:%s", volName, v))
 	}
-
 	t.Volumes = vols
 	// excute pre-tasks
 	for _, pre := range t.Pre {
@@ -251,7 +257,7 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *task.Task) error {
 	if err := os.WriteFile(path.Join(rundir, "run"), []byte(t.Run), os.ModePerm); err != nil {
 		return err
 	}
-	t.Volumes = append(t.Volumes, fmt.Sprintf("%s:%s", rundir, "/tork"))
+	t.Volumes = append(t.Volumes, fmt.Sprintf("bind:%s:%s", rundir, "/tork"))
 	// set the path for task outputs
 	if t.Env == nil {
 		t.Env = make(map[string]string)

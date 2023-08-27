@@ -13,8 +13,10 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
@@ -123,13 +125,22 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 
 	for _, v := range t.Volumes {
 		vol := strings.Split(v, ":")
-		if len(vol) != 2 {
-			return errors.Errorf("invalid volume name: %s", v)
+		if len(vol) != 3 {
+			return errors.Errorf("invalid volume %s", v)
+		}
+		var mt mount.Type
+		switch vol[0] {
+		case "volume":
+			mt = mount.TypeVolume
+		case "bind":
+			mt = mount.TypeBind
+		default:
+			return errors.Errorf("unknown volume type: %s", vol[0])
 		}
 		mount := mount.Mount{
-			Type:   mount.TypeBind,
-			Source: vol[0],
-			Target: vol[1],
+			Type:   mt,
+			Source: vol[1],
+			Target: vol[2],
 		}
 		mounts = append(mounts, mount)
 	}
@@ -306,4 +317,29 @@ func parseMemory(limits *task.Limits) (int64, error) {
 		return 0, nil
 	}
 	return units.RAMInBytes(limits.Memory)
+}
+
+func (d *DockerRuntime) CreateVolume(ctx context.Context, name string) error {
+	v, err := d.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
+	if err != nil {
+		return err
+	}
+	log.Debug().
+		Str("mount-point", v.Mountpoint).Msgf("created volume %s", v.Name)
+	return nil
+}
+
+func (d *DockerRuntime) DeleteVolume(ctx context.Context, name string) error {
+	ls, err := d.client.VolumeList(ctx, filters.NewArgs(filters.Arg("name", name)))
+	if err != nil {
+		return err
+	}
+	if len(ls.Volumes) == 0 {
+		return errors.Errorf("unknown volume: %s", name)
+	}
+	if err := d.client.VolumeRemove(ctx, name, true); err != nil {
+		return err
+	}
+	log.Debug().Msgf("removed volume %s", name)
+	return nil
 }

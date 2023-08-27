@@ -16,5 +16,7 @@ const (
 type Runtime interface {
 	Run(ctx context.Context, t *task.Task) error
 	Stop(ctx context.Context, t *task.Task) error
+	CreateVolume(ctx context.Context, name string) error
+	DeleteVolume(ctx context.Context, name string) error
 	HealthCheck(ctx context.Context) error
 }
