@@ -966,7 +966,7 @@ func Test_handleCancelJob(t *testing.T) {
 	assert.NoError(t, err)
 
 	// wait for the cancellation
-	// to propogate to the parent job
+	// to propagate to the parent job
 	time.Sleep(time.Millisecond * 100)
 
 	j3, err := ds.GetJobByID(ctx, j1.ID)
