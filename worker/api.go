@@ -44,7 +44,7 @@ func (s *api) health(c echo.Context) error {
 
 func (s *api) start() error {
 	go func() {
-		log.Info().Msgf("listening on %s", s.server.Addr)
+		log.Info().Msgf("worker listening on %s", s.server.Addr)
 		// service connections
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msgf("error starting up server")

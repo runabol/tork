@@ -235,7 +235,7 @@ func (s *api) cancelJob(c echo.Context) error {
 
 func (s *api) start() error {
 	go func() {
-		log.Info().Msgf("listening on %s", s.server.Addr)
+		log.Info().Msgf("coordinator listening on %s", s.server.Addr)
 		// service connections
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msgf("error starting up server")
