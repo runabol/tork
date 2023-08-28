@@ -408,9 +408,18 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
+		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
+
+	err = c.Start()
+	assert.NoError(t, err)
+
+	defer func() {
+		err := c.Stop()
+		assert.NoError(t, err)
+	}()
 
 	now := time.Now().UTC()
 
@@ -446,6 +455,8 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = c.handleCompletedTask(t1)
 	assert.NoError(t, err)
 
+	time.Sleep(time.Millisecond * 100)
+
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, task.Completed, t2.State)
@@ -457,6 +468,71 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, job.Running, j2.State)
+}
+
+func Test_handleCompletedScheduledTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	err = c.Start()
+	assert.NoError(t, err)
+
+	defer func() {
+		err := c.Stop()
+		assert.NoError(t, err)
+	}()
+
+	now := time.Now().UTC()
+
+	j1 := &job.Job{
+		ID:       uuid.NewUUID(),
+		State:    job.Running,
+		Position: 1,
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Scheduled,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = c.handleCompletedTask(t1)
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 100)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, j1.ID, j2.ID)
+	assert.Equal(t, job.Completed, j2.State)
 }
 
 func Test_handleCompletedParallelTask(t *testing.T) {
@@ -485,6 +561,9 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 						{
 							Name: "parallel-task-1",
 						},
+						{
+							Name: "parallel-task-2",
+						},
 					},
 				},
 			},
@@ -503,6 +582,9 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 			Tasks: []*task.Task{
 				{
 					Name: "parallel-task-1",
+				},
+				{
+					Name: "parallel-task-2",
 				},
 			},
 		},
@@ -523,10 +605,27 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 		ParentID:    pt.ID,
 	}
 
+	t5 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Scheduled,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    pt.ID,
+	}
+
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	err = ds.CreateTask(ctx, t5)
+	assert.NoError(t, err)
+
 	err = c.handleCompletedTask(t1)
+	assert.NoError(t, err)
+
+	err = c.handleCompletedTask(t5)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -568,6 +667,7 @@ func Test_handleCompletedEachTask(t *testing.T) {
 			{
 				Name: "task-1",
 				Each: &task.Each{
+					Size: 2,
 					List: "some expression",
 					Task: &task.Task{
 						Name: "some task",
@@ -586,7 +686,9 @@ func Test_handleCompletedEachTask(t *testing.T) {
 		ID:       uuid.NewUUID(),
 		JobID:    j1.ID,
 		Position: 1,
+		Name:     "parent task",
 		Each: &task.Each{
+			Size: 2,
 			List: "some expression",
 			Task: &task.Task{
 				Name: "some task",
@@ -609,10 +711,27 @@ func Test_handleCompletedEachTask(t *testing.T) {
 		ParentID:    pt.ID,
 	}
 
+	t5 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Scheduled,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    pt.ID,
+	}
+
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	err = ds.CreateTask(ctx, t5)
+	assert.NoError(t, err)
+
 	err = c.handleCompletedTask(t1)
+	assert.NoError(t, err)
+
+	err = c.handleCompletedTask(t5)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)

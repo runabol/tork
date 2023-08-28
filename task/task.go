@@ -176,8 +176,10 @@ func (l *Limits) Clone() *Limits {
 
 func (e *Each) Clone() *Each {
 	return &Each{
-		List: e.List,
-		Task: e.Task.Clone(),
+		List:        e.List,
+		Task:        e.Task.Clone(),
+		Size:        e.Size,
+		Completions: e.Completions,
 	}
 }
 
