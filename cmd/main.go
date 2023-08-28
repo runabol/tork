@@ -119,7 +119,8 @@ func main() {
 		Description: "a distributed workflow engine",
 		Commands: []*cli.Command{
 			{
-				Name: "coordinator",
+				Name:  "coordinator",
+				Usage: "start the coordinator",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
@@ -135,7 +136,8 @@ func main() {
 				Action: execCoorinator,
 			},
 			{
-				Name: "worker",
+				Name:  "worker",
+				Usage: "start a worker",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
@@ -149,7 +151,8 @@ func main() {
 				Action: execWorker,
 			},
 			{
-				Name: "standalone",
+				Name:  "standalone",
+				Usage: "start the coordinator and a worker",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
@@ -164,7 +167,8 @@ func main() {
 				Action: execStandalone,
 			},
 			{
-				Name: "migration",
+				Name:  "migration",
+				Usage: "run the db migration script",
 				Flags: []cli.Flag{
 					datastoreFlag(),
 					postgresDSNFlag(),
