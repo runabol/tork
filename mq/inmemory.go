@@ -145,3 +145,15 @@ func (b *InMemoryBroker) publish(qname string, m any) error {
 	q <- m
 	return nil
 }
+
+func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for qname, q := range b.queues {
+		close(q)
+		delete(b.subscribers, qname)
+		delete(b.unacked, qname)
+		delete(b.queues, qname)
+	}
+	return nil
+}
