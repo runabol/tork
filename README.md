@@ -64,7 +64,7 @@ Submit a job in another terminal:
 name: hello job
 tasks:
   - name: say hello
-    image: ubuntu:mantic
+    image: ubuntu:mantic #docker image
     run: |
       echo -n hello world
   - name: say goodbye
