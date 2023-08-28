@@ -1,10 +1,11 @@
 CREATE TABLE nodes (
-    id                 varchar(32) not null primary key,
-    queue              varchar(64) not null,
-    started_at         timestamp   not null,
-    last_heartbeat_at  timestamp   not null,
-    cpu_percent        float       not null,
-    status             varchar(10) not null
+    id                 varchar(32)  not null primary key,
+    queue              varchar(64)  not null,
+    started_at         timestamp    not null,
+    last_heartbeat_at  timestamp    not null,
+    cpu_percent        float        not null,
+    status             varchar(10)  not null,
+    hostname           varchar(128) not null
 );
 
 CREATE INDEX idx_nodes_heartbeat ON nodes (last_heartbeat_at);

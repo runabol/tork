@@ -20,4 +20,5 @@ type Node struct {
 	LastHeartbeatAt time.Time `json:"lastHeartbeatAt,omitempty"`
 	Queue           string    `json:"queue,omitempty"`
 	Status          Status    `json:"status,omitempty"`
+	Hostname        string    `json:"hostname,omitempty"`
 }
