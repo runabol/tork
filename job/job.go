@@ -28,9 +28,9 @@ type Job struct {
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
 	CompletedAt *time.Time        `json:"completedAt,omitempty"`
 	FailedAt    *time.Time        `json:"failedAt,omitempty"`
-	Tasks       []*task.Task      `json:"tasks,omitempty"`
-	Execution   []*task.Task      `json:"execution,omitempty"`
-	Position    int               `json:"position,omitempty"`
+	Tasks       []*task.Task      `json:"tasks"`
+	Execution   []*task.Task      `json:"execution"`
+	Position    int               `json:"position"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Context     Context           `json:"context,omitempty"`
 	TaskCount   int               `json:"taskCount,omitempty"`
