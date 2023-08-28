@@ -16,14 +16,23 @@ import (
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/uuid"
 )
 
 type RabbitMQBroker struct {
-	connPool []*amqp.Connection
-	nextConn int
-	queues   map[string]string
-	mu       sync.RWMutex
-	url      string
+	connPool      []*amqp.Connection
+	nextConn      int
+	queues        map[string]string
+	subscriptions []*subscription
+	mu            sync.RWMutex
+	url           string
+	shuttingDown  bool
+}
+
+type subscription struct {
+	qname string
+	ch    *amqp.Channel
+	name  string
 }
 
 func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
@@ -36,9 +45,10 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 		connPool[i] = conn
 	}
 	return &RabbitMQBroker{
-		queues:   make(map[string]string),
-		url:      url,
-		connPool: connPool,
+		queues:        make(map[string]string),
+		url:           url,
+		connPool:      connPool,
+		subscriptions: make([]*subscription, 0),
 	}, nil
 }
 
@@ -104,7 +114,6 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 }
 
 func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
-	log.Debug().Msgf("Subscribing for queue: %s", qname)
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -119,9 +128,10 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 	if err := ch.Qos(1, 0, false); err != nil {
 		return errors.Wrapf(err, "error setting qos on channel")
 	}
+	cname := uuid.NewUUID()
 	msgs, err := ch.Consume(
 		qname, // queue
-		"",    // consumer name
+		cname, // consumer name
 		false, // auto-ack
 		false, // exclusive
 		false, // no-local
@@ -131,6 +141,10 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 	if err != nil {
 		return errors.Wrapf(err, "unable to subscribe on q: %s", qname)
 	}
+	log.Debug().Msgf("created channel %s for queue: %s", cname, qname)
+	b.mu.Lock()
+	b.subscriptions = append(b.subscriptions, &subscription{ch: ch, qname: qname, name: cname})
+	b.mu.Unlock()
 	go func() {
 		for d := range msgs {
 			if err := handler(d.Body); err != nil {
@@ -152,19 +166,21 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 				}
 			}
 		}
-		maxAttempts := 20
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			log.Info().Msgf("%s channel closed. reconnecting", qname)
-			if err := b.subscribe(qname, handler); err != nil {
-				log.Error().
-					Err(err).
-					Msgf("error reconneting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
-				time.Sleep(time.Second * time.Duration(attempt))
-			} else {
-				return
+		if !b.shuttingDown {
+			maxAttempts := 20
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				log.Info().Msgf("%s channel closed. reconnecting", qname)
+				if err := b.subscribe(qname, handler); err != nil {
+					log.Error().
+						Err(err).
+						Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
+					time.Sleep(time.Second * time.Duration(attempt))
+				} else {
+					return
+				}
 			}
+			log.Error().Err(err).Msgf("error reconnecting to %s. giving up", qname)
 		}
-		log.Error().Err(err).Msgf("error reconneting to %s. giving up", qname)
 	}()
 	return nil
 }
@@ -295,4 +311,17 @@ func (b *RabbitMQBroker) getConnection() (*amqp.Connection, error) {
 		b.nextConn = 0
 	}
 	return conn, nil
+}
+
+func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.shuttingDown = true
+	for _, sub := range b.subscriptions {
+		log.Info().Msgf("shutting down subscription %s for %s", sub.name, sub.qname)
+		if err := sub.ch.Cancel(sub.name, false); err != nil {
+			log.Error().Err(err).Msgf("error closing channel for %s", sub.qname)
+		}
+	}
+	return nil
 }

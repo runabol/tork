@@ -22,4 +22,5 @@ type Broker interface {
 	SubscribeForHeartbeats(handler func(n node.Node) error) error
 	PublishJob(ctx context.Context, j *job.Job) error
 	SubscribeForJobs(handler func(j *job.Job) error) error
+	Shutdown(ctx context.Context) error
 }

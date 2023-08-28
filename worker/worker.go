@@ -363,7 +363,12 @@ func (w *Worker) Start() error {
 func (w *Worker) Stop() error {
 	log.Debug().Msgf("shutting down worker %s", w.id)
 	w.stop = true
-	if err := w.api.shutdown(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := w.broker.Shutdown(ctx); err != nil {
+		return errors.Wrapf(err, "error shutting down broker")
+	}
+	if err := w.api.shutdown(ctx); err != nil {
 		return errors.Wrapf(err, "error shutting down worker %s", w.id)
 	}
 	return nil

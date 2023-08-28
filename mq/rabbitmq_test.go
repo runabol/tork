@@ -112,3 +112,33 @@ func TestRabbitMQPublisConcurrent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 300, processed)
 }
+
+func TestRabbitMQShutdown(t *testing.T) {
+	ctx := context.Background()
+	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	mu := sync.Mutex{}
+	processed := 0
+	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	err = b.SubscribeForTasks(qname, func(j *task.Task) error {
+		mu.Lock()
+		defer mu.Unlock()
+		processed = processed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		err = b.PublishTask(ctx, qname, &task.Task{})
+		assert.NoError(t, err)
+	}
+	// cleanly shutdown
+	err = b.Shutdown(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, processed)
+	// there should be no more processing past the shutdown
+	for i := 0; i < 10; i++ {
+		err = b.PublishTask(ctx, qname, &task.Task{})
+		assert.NoError(t, err)
+	}
+	assert.Equal(t, 10, processed)
+}
