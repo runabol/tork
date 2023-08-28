@@ -310,6 +310,10 @@ func (w *Worker) sendHeartbeats() {
 			log.Error().Err(err).Msgf("node %s failed health check", w.id)
 			status = node.Down
 		}
+		hostname, err := os.Hostname()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to get hostname for worker %s", w.id)
+		}
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
 			node.Node{
@@ -319,6 +323,7 @@ func (w *Worker) sendHeartbeats() {
 				Queue:           fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
 				Status:          status,
 				LastHeartbeatAt: time.Now().UTC(),
+				Hostname:        hostname,
 			},
 		)
 		if err != nil {

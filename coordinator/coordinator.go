@@ -561,6 +561,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
 			Str("node-id", n.ID).
+			Str("hostname", n.Hostname).
 			Msg("received first heartbeat")
 		return c.ds.CreateNode(ctx, n)
 	}
@@ -572,6 +573,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 		log.Debug().
 			Str("node-id", n.ID).
 			Float64("cpu-percent", n.CPUPercent).
+			Str("hostname", n.Hostname).
 			Str("status", string(n.Status)).
 			Time("heartbeat-time", n.LastHeartbeatAt).
 			Msg("received heartbeat")

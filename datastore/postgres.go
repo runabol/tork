@@ -86,6 +86,7 @@ type nodeRecord struct {
 	CPUPercent      float64   `db:"cpu_percent"`
 	Queue           string    `db:"queue"`
 	Status          string    `db:"status"`
+	Hostname        string    `db:"hostname"`
 }
 
 func (r taskRecord) toTask() (*task.Task, error) {
@@ -186,6 +187,7 @@ func (r nodeRecord) toNode() node.Node {
 		LastHeartbeatAt: r.LastHeartbeatAt,
 		Queue:           r.Queue,
 		Status:          node.Status(r.Status),
+		Hostname:        r.Hostname,
 	}
 	// if we hadn't seen an heartbeat for two or more
 	// consecutive periods we consider the node as offline
@@ -480,10 +482,10 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	q := `insert into nodes 
-	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status) 
+	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname) 
 	      values
-	       ($1,$2,$3,$4,$5,$6)`
-	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status)
+	       ($1,$2,$3,$4,$5,$6,$7)`
+	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}

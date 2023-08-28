@@ -196,13 +196,15 @@ func TestPostgresCreateAndGetNode(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	n1 := node.Node{
-		ID: uuid.NewUUID(),
+		ID:       uuid.NewUUID(),
+		Hostname: "some-name",
 	}
 	err = ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, n1.ID, n2.ID)
+	assert.Equal(t, "some-name", n2.Hostname)
 }
 
 func TestPostgresUpdateNode(t *testing.T) {
