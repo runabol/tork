@@ -120,11 +120,12 @@ func TestRabbitMQShutdown(t *testing.T) {
 	mu := sync.Mutex{}
 	processed := 0
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err = b.SubscribeForTasks(qname, func(j *task.Task) error {
+	err = b.SubscribeForTasks(qname, func(t1 *task.Task) error {
 		mu.Lock()
+		defer mu.Unlock()
 		processed = processed + 1
-		mu.Unlock()
-		time.Sleep(time.Millisecond * 10)
+		err := b.PublishTask(ctx, qname, t1)
+		assert.NoError(t, err)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -135,7 +136,6 @@ func TestRabbitMQShutdown(t *testing.T) {
 	// cleanly shutdown
 	err = b.Shutdown(ctx)
 	assert.NoError(t, err)
-	assert.Less(t, processed, 10)
 	assert.Greater(t, processed, 0)
 	// there should be no more processing past the shutdown
 	err = b.PublishTask(ctx, qname, &task.Task{})

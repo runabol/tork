@@ -101,12 +101,6 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.
 	return b.publish(ctx, qname, t)
 }
 
-func (b *RabbitMQBroker) isShuttingDown() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.shuttingDown
-}
-
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
 	return b.subscribe(qname, func(body []byte) error {
 		t := &task.Task{}
@@ -121,9 +115,6 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 }
 
 func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
-	if b.isShuttingDown() {
-		return errors.New("broker is shutting down")
-	}
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -245,9 +236,6 @@ func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n node.Node) erro
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) error {
-	if b.isShuttingDown() {
-		return errors.New("broker is shutting down")
-	}
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -311,6 +299,9 @@ func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *job.Job) error) error 
 func (b *RabbitMQBroker) getConnection() (*amqp.Connection, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if len(b.connPool) == 0 {
+		return nil, errors.Errorf("connection pool is empty")
+	}
 	var err error
 	var conn *amqp.Connection
 	conn = b.connPool[b.nextConn]
@@ -333,9 +324,18 @@ func (b *RabbitMQBroker) getConnection() (*amqp.Connection, error) {
 	return conn, nil
 }
 
+func (b *RabbitMQBroker) isShuttingDown() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.shuttingDown
+}
+
 func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	// when running in standalone mode both the coordinator
+	// and the worker will attempt to shutdown the broker
+	if b.isShuttingDown() {
+		return nil
+	}
 	b.shuttingDown = true
 	// close channels cleanly
 	for _, sub := range b.subscriptions {
@@ -346,16 +346,18 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 				Err(err).
 				Msgf("error closing channel for %s", sub.qname)
 		}
+	}
+	// let's give the subscribers a grace
+	// period to allow them to cleanly exit
+	for _, sub := range b.subscriptions {
 		select {
 		case <-ctx.Done():
 		case <-sub.done:
-		// let's give up to 5 seconds of grace
-		// period for the subscriber to release
-		// the channel cleanly
-		case <-time.After(5 * time.Second):
 		}
 	}
+	b.mu.Lock()
 	b.subscriptions = []*subscription{}
+	b.mu.Unlock()
 	// terminate connections cleanly
 	for _, conn := range b.connPool {
 		log.Info().
@@ -372,9 +374,10 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 		case <-done:
-		case <-time.After(5 * time.Second):
 		}
 	}
+	b.mu.Lock()
 	b.connPool = []*amqp.Connection{}
+	b.mu.Unlock()
 	return nil
 }
