@@ -175,13 +175,13 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
 			return err
 		}
-		defer func() {
-			if err := w.runtime.DeleteVolume(ctx, volName); err != nil {
+		defer func(vname string) {
+			if err := w.runtime.DeleteVolume(ctx, vname); err != nil {
 				log.Error().
 					Err(err).
-					Msgf("error deleting volume: %s", volName)
+					Msgf("error deleting volume: %s", vname)
 			}
-		}()
+		}(volName)
 		vols = append(vols, fmt.Sprintf("volume:%s:%s", volName, v))
 	}
 	t.Volumes = vols
