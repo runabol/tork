@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -19,108 +20,16 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func queueFlag() cli.Flag {
-	return &cli.StringSliceFlag{
-		Name:  "queue",
-		Usage: "Specify a task queue configuration: <queuename>:<concurrency>",
-	}
-}
-
-func brokerFlag() cli.Flag {
-	allBrokerTypes := []string{
-		mq.BROKER_INMEMORY,
-		mq.BROKER_RABBITMQ,
-	}
-	return &cli.StringFlag{
-		Name:  "broker",
-		Usage: strings.Join(allBrokerTypes, "|"),
-		Value: mq.BROKER_INMEMORY,
-	}
-}
-
-func rabbitmqURLFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "rabbitmq-url",
-		Usage: "amqp://<username>:<password>@<hostname>:<port>/",
-		Value: "amqp://guest:guest@localhost:5672/",
-	}
-}
-
-func defaultCPUsLimit() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "default-cpus-limit",
-		Usage: "The default CPUs limit for an executing task (e.g. 1). Default is no limit.",
-		Value: "",
-	}
-}
-
-func defaultMemoryLimit() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "default-memory-limit",
-		Usage: "The default RAM limit for an executing task (e.g. 6MB). Default is no limit.",
-		Value: "",
-	}
-}
-
-func datastoreFlag() cli.Flag {
-	allDSTypes := []string{
-		datastore.DATASTORE_INMEMORY,
-		datastore.DATASTORE_POSTGRES,
-	}
-	return &cli.StringFlag{
-		Name:  "datastore",
-		Usage: strings.Join(allDSTypes, "|"),
-		Value: datastore.DATASTORE_INMEMORY,
-	}
-}
-
-func postgresDSNFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "postgres-dsn",
-		Usage: "host=<hostname> user=<username> password=<username> dbname=<username> port=<port> sslmode=<disable|enable>",
-		Value: "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
-	}
-}
-
-func tempDirFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "temp-dir",
-		Usage: "The temporary dir to use by the worker: (e.g. /tmp)",
-	}
-}
-
-func workerAddressFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "address",
-		Usage: "API Address",
-		Value: ":8001",
-	}
-}
-
-func coordinatorAddressFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "address",
-		Usage: "REST API Address",
-		Value: ":8000",
-	}
-}
-
-func debugFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "debug",
-		Usage: "Enbale debug mode",
-		Value: "false",
-	}
-}
-
 func main() {
+	fmt.Println(getBanner())
+
 	app := &cli.App{
-		Name:        "tork",
-		Description: "a distributed workflow engine",
+		Name:  "tork",
+		Usage: "a distributed workflow engine",
 		Commands: []*cli.Command{
 			{
 				Name:  "coordinator",
-				Usage: "start the coordinator",
+				Usage: "run the coordinator",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
@@ -133,11 +42,11 @@ func main() {
 					debugFlag(),
 					coordinatorAddressFlag(),
 				},
-				Action: execCoorinator,
+				Action: runCoordinator,
 			},
 			{
 				Name:  "worker",
-				Usage: "start a worker",
+				Usage: "run a worker",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
@@ -148,7 +57,7 @@ func main() {
 					workerAddressFlag(),
 					debugFlag(),
 				},
-				Action: execWorker,
+				Action: runWorker,
 			},
 			{
 				Name:  "standalone",
@@ -164,7 +73,7 @@ func main() {
 					tempDirFlag(),
 					debugFlag(),
 				},
-				Action: execStandalone,
+				Action: runStandalone,
 			},
 			{
 				Name:  "migration",
@@ -174,7 +83,7 @@ func main() {
 					postgresDSNFlag(),
 					debugFlag(),
 				},
-				Action: execMigration,
+				Action: runMigration,
 			},
 		},
 	}
@@ -184,7 +93,7 @@ func main() {
 	}
 }
 
-func execCoorinator(ctx *cli.Context) error {
+func runCoordinator(ctx *cli.Context) error {
 	initLogging(ctx)
 
 	broker, err := createBroker(ctx)
@@ -216,7 +125,7 @@ func execCoorinator(ctx *cli.Context) error {
 	return nil
 }
 
-func execWorker(ctx *cli.Context) error {
+func runWorker(ctx *cli.Context) error {
 	initLogging(ctx)
 
 	broker, err := createBroker(ctx)
@@ -244,7 +153,7 @@ func execWorker(ctx *cli.Context) error {
 	return nil
 }
 
-func execStandalone(ctx *cli.Context) error {
+func runStandalone(ctx *cli.Context) error {
 	initLogging(ctx)
 
 	broker, err := createBroker(ctx)
@@ -286,7 +195,7 @@ func execStandalone(ctx *cli.Context) error {
 	return nil
 }
 
-func execMigration(ctx *cli.Context) error {
+func runMigration(ctx *cli.Context) error {
 	initLogging(ctx)
 
 	ds, err := createDatastore(ctx)
@@ -414,4 +323,110 @@ func initLogging(ctx *cli.Context) {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
+}
+
+func queueFlag() cli.Flag {
+	return &cli.StringSliceFlag{
+		Name:  "queue",
+		Usage: "Specify a task queue configuration: <queuename>:<concurrency>",
+	}
+}
+
+func brokerFlag() cli.Flag {
+	allBrokerTypes := []string{
+		mq.BROKER_INMEMORY,
+		mq.BROKER_RABBITMQ,
+	}
+	return &cli.StringFlag{
+		Name:  "broker",
+		Usage: strings.Join(allBrokerTypes, "|"),
+		Value: mq.BROKER_INMEMORY,
+	}
+}
+
+func rabbitmqURLFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "rabbitmq-url",
+		Usage: "amqp://<username>:<password>@<hostname>:<port>/",
+		Value: "amqp://guest:guest@localhost:5672/",
+	}
+}
+
+func defaultCPUsLimit() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "default-cpus-limit",
+		Usage: "The default CPUs limit for an executing task (e.g. 1). Default is no limit.",
+		Value: "",
+	}
+}
+
+func defaultMemoryLimit() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "default-memory-limit",
+		Usage: "The default RAM limit for an executing task (e.g. 6MB). Default is no limit.",
+		Value: "",
+	}
+}
+
+func datastoreFlag() cli.Flag {
+	allDSTypes := []string{
+		datastore.DATASTORE_INMEMORY,
+		datastore.DATASTORE_POSTGRES,
+	}
+	return &cli.StringFlag{
+		Name:  "datastore",
+		Usage: strings.Join(allDSTypes, "|"),
+		Value: datastore.DATASTORE_INMEMORY,
+	}
+}
+
+func postgresDSNFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "postgres-dsn",
+		Usage: "host=<hostname> user=<username> password=<username> dbname=<username> port=<port> sslmode=<disable|enable>",
+		Value: "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
+	}
+}
+
+func tempDirFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "temp-dir",
+		Usage: "The temporary dir to use by the worker: (e.g. /tmp)",
+	}
+}
+
+func workerAddressFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "address",
+		Usage: "API Address",
+		Value: ":8001",
+	}
+}
+
+func coordinatorAddressFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "address",
+		Usage: "REST API Address",
+		Value: ":8000",
+	}
+}
+
+func debugFlag() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "debug",
+		Usage: "Enbale debug mode",
+		Value: "false",
+	}
+}
+
+func getBanner() string {
+	return color.WhiteString(`
+_______  _______  ______    ___   _ 
+|       ||       ||    _ |  |   | | |
+|_     _||   _   ||   | ||  |   |_| |
+  |   |  |  | |  ||   |_||_ |      _|
+  |   |  |  |_|  ||    __  ||     |_ 
+  |   |  |       ||   |  | ||    _  |
+  |___|  |_______||___|  |_||___| |_|
+`)
 }
