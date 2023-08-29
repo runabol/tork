@@ -33,6 +33,7 @@ type subscription struct {
 	qname string
 	ch    *amqp.Channel
 	name  string
+	done  chan int
 }
 
 func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
@@ -100,6 +101,12 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.
 	return b.publish(ctx, qname, t)
 }
 
+func (b *RabbitMQBroker) isShuttingDown() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.shuttingDown
+}
+
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
 	return b.subscribe(qname, func(body []byte) error {
 		t := &task.Task{}
@@ -114,6 +121,9 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 }
 
 func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
+	if b.isShuttingDown() {
+		return errors.New("broker is shutting down")
+	}
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -142,8 +152,14 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 		return errors.Wrapf(err, "unable to subscribe on q: %s", qname)
 	}
 	log.Debug().Msgf("created channel %s for queue: %s", cname, qname)
+	sub := &subscription{
+		ch:    ch,
+		qname: qname,
+		name:  cname,
+		done:  make(chan int),
+	}
 	b.mu.Lock()
-	b.subscriptions = append(b.subscriptions, &subscription{ch: ch, qname: qname, name: cname})
+	b.subscriptions = append(b.subscriptions, sub)
 	b.mu.Unlock()
 	go func() {
 		for d := range msgs {
@@ -181,6 +197,7 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 			}
 			log.Error().Err(err).Msgf("error reconnecting to %s. giving up", qname)
 		}
+		sub.done <- 1
 	}()
 	return nil
 }
@@ -228,6 +245,9 @@ func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n node.Node) erro
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) error {
+	if b.isShuttingDown() {
+		return errors.New("broker is shutting down")
+	}
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -317,11 +337,44 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.shuttingDown = true
+	// close channels cleanly
 	for _, sub := range b.subscriptions {
-		log.Info().Msgf("shutting down subscription %s for %s", sub.name, sub.qname)
+		log.Info().
+			Msgf("shutting down subscription %s for %s", sub.name, sub.qname)
 		if err := sub.ch.Cancel(sub.name, false); err != nil {
-			log.Error().Err(err).Msgf("error closing channel for %s", sub.qname)
+			log.Error().
+				Err(err).
+				Msgf("error closing channel for %s", sub.qname)
+		}
+		select {
+		case <-ctx.Done():
+		case <-sub.done:
+		// let's give up to 5 seconds of grace
+		// period for the subscriber to release
+		// the channel cleanly
+		case <-time.After(5 * time.Second):
 		}
 	}
+	b.subscriptions = []*subscription{}
+	// terminate connections cleanly
+	for _, conn := range b.connPool {
+		log.Info().
+			Msgf("shutting down connection to %s", conn.RemoteAddr())
+		var done chan int = make(chan int)
+		go func(c *amqp.Connection) {
+			if err := c.Close(); err != nil {
+				log.Error().
+					Err(err).
+					Msg("error closing rabbitmq connection")
+			}
+			done <- 1
+		}(conn)
+		select {
+		case <-ctx.Done():
+		case <-done:
+		case <-time.After(5 * time.Second):
+		}
+	}
+	b.connPool = []*amqp.Connection{}
 	return nil
 }

@@ -825,7 +825,7 @@ func (c *Coordinator) Start() error {
 
 func (c *Coordinator) Stop() error {
 	log.Debug().Msgf("shutting down %s", c.Name)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := c.broker.Shutdown(ctx); err != nil {
 		return errors.Wrapf(err, "error shutting down broker")

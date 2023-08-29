@@ -361,7 +361,7 @@ func (w *Worker) Start() error {
 func (w *Worker) Stop() error {
 	log.Debug().Msgf("shutting down worker %s", w.id)
 	w.stop = true
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := w.broker.Shutdown(ctx); err != nil {
 		return errors.Wrapf(err, "error shutting down broker")
