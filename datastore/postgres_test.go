@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,6 +158,50 @@ func TestPostgresUpdateTask(t *testing.T) {
 	assert.Equal(t, "my result", t2.Result)
 }
 
+func TestPostgresUpdateTaskConcurrently(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := &task.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+		Parallel:  &task.Parallel{},
+	}
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+	for i := 0; i < 5; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
+				u.State = task.Scheduled
+				u.Result = "my result"
+				u.Parallel.Completions = u.Parallel.Completions + 1
+				return nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, "my result", t2.Result)
+	assert.Equal(t, 5, t2.Parallel.Completions)
+}
+
 func TestPostgresUpdateTaskBadStrings(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
@@ -233,6 +278,44 @@ func TestPostgresUpdateNode(t *testing.T) {
 	assert.Equal(t, now.Hour(), n2.LastHeartbeatAt.Hour())
 	assert.Equal(t, now.Minute(), n2.LastHeartbeatAt.Minute())
 	assert.Equal(t, now.Second(), n2.LastHeartbeatAt.Second())
+}
+
+func TestPostgresUpdateNodeConcurrently(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	n1 := node.Node{
+		ID:              uuid.NewUUID(),
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
+	}
+	err = ds.CreateNode(ctx, n1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+	for i := 0; i < 5; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateNode(ctx, n1.ID, func(u *node.Node) error {
+				u.LastHeartbeatAt = now
+				u.CPUPercent = u.CPUPercent + 1
+				return nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	n2, err := ds.GetNodeByID(ctx, n1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, now.Hour(), n2.LastHeartbeatAt.Hour())
+	assert.Equal(t, now.Minute(), n2.LastHeartbeatAt.Minute())
+	assert.Equal(t, now.Second(), n2.LastHeartbeatAt.Second())
+	assert.Equal(t, float64(5), n2.CPUPercent)
 }
 
 func TestPostgresGetActiveNodes(t *testing.T) {
@@ -326,6 +409,47 @@ func TestPostgresUpdateJob(t *testing.T) {
 	assert.Equal(t, job.Completed, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
+}
+
+func TestPostgresUpdateJobConcurrently(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	j1 := job.Job{
+		ID:    uuid.NewUUID(),
+		State: job.Pending,
+		Context: job.Context{
+			Inputs: map[string]string{
+				"var1": "val1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(5)
+	for i := 0; i < 5; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
+				u.State = job.Completed
+				u.Context.Inputs["var2"] = "val2"
+				u.Position = u.Position + 1
+				return nil
+			})
+		}()
+	}
+	wg.Wait()
+
+	assert.NoError(t, err)
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
+	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
+	assert.Equal(t, 5, j2.Position)
 }
 
 func TestPostgresGetJobs(t *testing.T) {

@@ -397,12 +397,12 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 }
 
 func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task) error) error {
-	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
 	}
 	tr := taskRecord{}
-	if err := ds.db.Get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
+	if err := tx.Get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
 		return errors.Wrapf(err, "error fetching task from db")
 	}
 	t, err := tr.toTask()
@@ -453,7 +453,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			subjob = $11,
 			parallel = $12
 		  where id = $13`
-	_, err = ds.db.Exec(q,
+	_, err = tx.Exec(q,
 		t.Position,               // $1
 		t.State,                  // $2
 		t.ScheduledAt,            // $3
@@ -493,12 +493,12 @@ func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error 
 }
 
 func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
-	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
 	}
 	nr := nodeRecord{}
-	if err := ds.db.Get(&nr, `SELECT * FROM nodes where id = $1 for update`, id); err != nil {
+	if err := tx.Get(&nr, `SELECT * FROM nodes where id = $1 for update`, id); err != nil {
 		return errors.Wrapf(err, "error fetching node from db")
 	}
 	n := nr.toNode()
@@ -510,7 +510,7 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 			cpu_percent = $2,
 			status = $3
 		  where id = $4`
-	_, err = ds.db.Exec(q, n.LastHeartbeatAt, n.CPUPercent, n.Status, id)
+	_, err = tx.Exec(q, n.LastHeartbeatAt, n.CPUPercent, n.Status, id)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")
@@ -579,12 +579,12 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	return nil
 }
 func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error {
-	tx, err := ds.db.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "unable to begin tx")
 	}
 	r := jobRecord{}
-	if err := ds.db.Get(&r, `SELECT * FROM jobs where id = $1 for update`, id); err != nil {
+	if err := tx.Get(&r, `SELECT * FROM jobs where id = $1 for update`, id); err != nil {
 		return errors.Wrapf(err, "error fetching job from db")
 	}
 	tasks := make([]*task.Task, 0)
@@ -612,7 +612,7 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 			result = $7,
 			error_ = $8
 		  where id = $9`
-	_, err = ds.db.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
+	_, err = tx.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return errors.Wrapf(err, "error rolling-back tx")
