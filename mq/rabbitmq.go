@@ -339,7 +339,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.shuttingDown = true
 	// close channels cleanly
 	for _, sub := range b.subscriptions {
-		log.Info().
+		log.Debug().
 			Msgf("shutting down subscription %s for %s", sub.name, sub.qname)
 		if err := sub.ch.Cancel(sub.name, false); err != nil {
 			log.Error().
@@ -360,7 +360,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.mu.Unlock()
 	// terminate connections cleanly
 	for _, conn := range b.connPool {
-		log.Info().
+		log.Debug().
 			Msgf("shutting down connection to %s", conn.RemoteAddr())
 		var done chan int = make(chan int)
 		go func(c *amqp.Connection) {
