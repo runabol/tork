@@ -333,7 +333,9 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	if b.isShuttingDown() {
 		return nil
 	}
+	b.mu.Lock()
 	b.shuttingDown = true
+	b.mu.Unlock()
 	// close channels cleanly
 	for _, sub := range b.subscriptions {
 		log.Debug().
