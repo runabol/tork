@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/stats"
@@ -20,6 +21,7 @@ import (
 
 type PostgresDatastore struct {
 	db *sqlx.DB
+	tx *sqlx.Tx
 }
 
 type taskRecord struct {
@@ -233,7 +235,9 @@ func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to connect to postgres")
 	}
-	return &PostgresDatastore{db: db}, nil
+	return &PostgresDatastore{
+		db: db,
+	}, nil
 }
 
 func (ds *PostgresDatastore) ExecScript(script string) error {
@@ -241,7 +245,7 @@ func (ds *PostgresDatastore) ExecScript(script string) error {
 	if err != nil {
 		return errors.Wrapf(err, "erroring reading postgres schema file")
 	}
-	_, err = ds.db.Exec(string(schema))
+	_, err = ds.exec(string(schema))
 	return err
 }
 
@@ -341,7 +345,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 			$27,$28,$29,$30,$31,$32)`
-	_, err = ds.db.Exec(q,
+	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
 		t.Position,                   // $3
@@ -387,7 +391,7 @@ func sanitizeString(s string) string {
 
 func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
 	r := taskRecord{}
-	if err := ds.db.Get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
+	if err := ds.get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNodeNotFound
 		}
@@ -397,87 +401,83 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 }
 
 func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *task.Task) error) error {
-	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "unable to begin tx")
-	}
-	tr := taskRecord{}
-	if err := tx.Get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
-		return errors.Wrapf(err, "error fetching task from db")
-	}
-	t, err := tr.toTask()
-	if err != nil {
-		return err
-	}
-	if err := modify(t); err != nil {
-		return err
-	}
-	var each *string
-	if t.Each != nil {
-		b, err := json.Marshal(t.Each)
+	return ds.WithTx(ctx, func(tx Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		tr := taskRecord{}
+		if err := ptx.get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
+			return errors.Wrapf(err, "error fetching task from db")
+		}
+		t, err := tr.toTask()
 		if err != nil {
-			return errors.Wrapf(err, "failed to serialize task.each")
+			return err
 		}
-		s := string(b)
-		each = &s
-	}
-	var parallel *string
-	if t.Parallel != nil {
-		b, err := json.Marshal(t.Parallel)
+		if err := modify(t); err != nil {
+			return err
+		}
+		var each *string
+		if t.Each != nil {
+			b, err := json.Marshal(t.Each)
+			if err != nil {
+				return errors.Wrapf(err, "failed to serialize task.each")
+			}
+			s := string(b)
+			each = &s
+		}
+		var parallel *string
+		if t.Parallel != nil {
+			b, err := json.Marshal(t.Parallel)
+			if err != nil {
+				return errors.Wrapf(err, "failed to serialize task.parallel")
+			}
+			s := string(b)
+			parallel = &s
+		}
+		var subjob *string
+		if t.SubJob != nil {
+			b, err := json.Marshal(t.SubJob)
+			if err != nil {
+				return errors.Wrapf(err, "failed to serialize task.subjob")
+			}
+			s := string(b)
+			subjob = &s
+		}
+		q := `update tasks set 
+				position = $1,
+				state = $2,
+				scheduled_at = $3,
+				started_at = $4,
+				completed_at = $5,
+				failed_at = $6,
+				error_ = $7,
+				node_id = $8,
+				result = $9,
+				each_ = $10,
+				subjob = $11,
+				parallel = $12
+			  where id = $13`
+		_, err = ptx.exec(q,
+			t.Position,               // $1
+			t.State,                  // $2
+			t.ScheduledAt,            // $3
+			t.StartedAt,              // $4
+			t.CompletedAt,            // $5
+			t.FailedAt,               // $6
+			sanitizeString(t.Error),  // $7
+			t.NodeID,                 // $8
+			sanitizeString(t.Result), // $9
+			each,                     // $10
+			subjob,                   // $11
+			parallel,                 // $12
+			t.ID,                     // $13
+		)
 		if err != nil {
-			return errors.Wrapf(err, "failed to serialize task.parallel")
+			return errors.Wrapf(err, "error updating task %s", t.ID)
 		}
-		s := string(b)
-		parallel = &s
-	}
-	var subjob *string
-	if t.SubJob != nil {
-		b, err := json.Marshal(t.SubJob)
-		if err != nil {
-			return errors.Wrapf(err, "failed to serialize task.subjob")
-		}
-		s := string(b)
-		subjob = &s
-	}
-	q := `update tasks set 
-	        position = $1,
-	        state = $2,
-			scheduled_at = $3,
-			started_at = $4,
-			completed_at = $5,
-			failed_at = $6,
-			error_ = $7,
-			node_id = $8,
-			result = $9,
-			each_ = $10,
-			subjob = $11,
-			parallel = $12
-		  where id = $13`
-	_, err = tx.Exec(q,
-		t.Position,               // $1
-		t.State,                  // $2
-		t.ScheduledAt,            // $3
-		t.StartedAt,              // $4
-		t.CompletedAt,            // $5
-		t.FailedAt,               // $6
-		sanitizeString(t.Error),  // $7
-		t.NodeID,                 // $8
-		sanitizeString(t.Result), // $9
-		each,                     // $10
-		subjob,                   // $11
-		parallel,                 // $12
-		t.ID,                     // $13
-	)
-	if err != nil {
-		if err := tx.Rollback(); err != nil {
-			return errors.Wrapf(err, "error rolling-back tx")
-		}
-		return errors.Wrapf(err, "error update task in db")
-	}
-	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error committing tx")
-	}
-	return nil
+		return nil
+	})
 }
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error {
@@ -485,7 +485,7 @@ func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error 
 	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname) 
 	      values
 	       ($1,$2,$3,$4,$5,$6,$7)`
-	_, err := ds.db.Exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname)
+	_, err := ds.exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}
@@ -493,39 +493,35 @@ func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error 
 }
 
 func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
-	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "unable to begin tx")
-	}
-	nr := nodeRecord{}
-	if err := tx.Get(&nr, `SELECT * FROM nodes where id = $1 for update`, id); err != nil {
-		return errors.Wrapf(err, "error fetching node from db")
-	}
-	n := nr.toNode()
-	if err := modify(&n); err != nil {
-		return err
-	}
-	q := `update nodes set 
+	return ds.WithTx(ctx, func(tx Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		nr := nodeRecord{}
+		if err := ptx.get(&nr, `SELECT * FROM nodes where id = $1 for update`, id); err != nil {
+			return errors.Wrapf(err, "error fetching node from db")
+		}
+		n := nr.toNode()
+		if err := modify(&n); err != nil {
+			return err
+		}
+		q := `update nodes set 
 	        last_heartbeat_at = $1,
 			cpu_percent = $2,
 			status = $3
 		  where id = $4`
-	_, err = tx.Exec(q, n.LastHeartbeatAt, n.CPUPercent, n.Status, id)
-	if err != nil {
-		if err := tx.Rollback(); err != nil {
-			return errors.Wrapf(err, "error rolling-back tx")
+		_, err := ptx.exec(q, n.LastHeartbeatAt, n.CPUPercent, n.Status, id)
+		if err != nil {
+			return errors.Wrapf(err, "error update node in db")
 		}
-		return errors.Wrapf(err, "error update task in db")
-	}
-	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error committing tx")
-	}
-	return nil
+		return nil
+	})
 }
 
 func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (node.Node, error) {
 	nr := nodeRecord{}
-	if err := ds.db.Get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
+	if err := ds.get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
 			return node.Node{}, ErrNodeNotFound
 		}
@@ -541,7 +537,7 @@ func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, e
 		  where last_heartbeat_at > $1 
 		  ORDER BY last_heartbeat_at DESC`
 	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
-	if err := ds.db.Select(&nrs, q, timeout); err != nil {
+	if err := ds.select_(&nrs, q, timeout); err != nil {
 		return nil, errors.Wrapf(err, "error getting active nodes from db")
 	}
 	ns := make([]node.Node, len(nrs))
@@ -572,62 +568,55 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *job.Job) error {
 	       (id,name,description,state,created_at,started_at,tasks,position,inputs,context,parent_id,task_count,output_,result,error_) 
 	      values
 	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`
-	_, err = ds.db.Exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error)
+	_, err = ds.exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position, inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
 	return nil
 }
 func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error {
-	tx, err := ds.db.BeginTxx(ctx, &sql.TxOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "unable to begin tx")
-	}
-	r := jobRecord{}
-	if err := tx.Get(&r, `SELECT * FROM jobs where id = $1 for update`, id); err != nil {
-		return errors.Wrapf(err, "error fetching job from db")
-	}
-	tasks := make([]*task.Task, 0)
-	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
-		return errors.Wrapf(err, "error desiralizing job.tasks")
-	}
-	j, err := r.toJob(tasks, []*task.Task{})
-	if err != nil {
-		return errors.Wrapf(err, "failed to convert jobRecord")
-	}
-	if err := modify(j); err != nil {
-		return err
-	}
-	c, err := json.Marshal(j.Context)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize job.context")
-	}
-	q := `update jobs set 
-	        state = $1,
-			started_at = $2,
-			completed_at = $3,
-			failed_at = $4,
-			position = $5,
-			context = $6,
-			result = $7,
-			error_ = $8
-		  where id = $9`
-	_, err = tx.Exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
-	if err != nil {
-		if err := tx.Rollback(); err != nil {
-			return errors.Wrapf(err, "error rolling-back tx")
+	return ds.WithTx(ctx, func(tx Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
 		}
-		return errors.Wrapf(err, "error updating job in db")
-	}
-	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "error committing tx")
-	}
-	return nil
+		r := jobRecord{}
+		if err := ptx.get(&r, `SELECT * FROM jobs where id = $1 for update`, id); err != nil {
+			return errors.Wrapf(err, "error fetching job from db")
+		}
+		tasks := make([]*task.Task, 0)
+		if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
+			return errors.Wrapf(err, "error desiralizing job.tasks")
+		}
+		j, err := r.toJob(tasks, []*task.Task{})
+		if err != nil {
+			return errors.Wrapf(err, "failed to convert jobRecord")
+		}
+		if err := modify(j); err != nil {
+			return err
+		}
+		c, err := json.Marshal(j.Context)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.context")
+		}
+		q := `update jobs set 
+				state = $1,
+				started_at = $2,
+				completed_at = $3,
+				failed_at = $4,
+				position = $5,
+				context = $6,
+				result = $7,
+				error_ = $8
+			  where id = $9`
+		_, err = ptx.exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
+		return err
+	})
 }
 
 func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
 	r := jobRecord{}
-	if err := ds.db.Get(&r, `SELECT * FROM jobs where id = $1`, id); err != nil {
+	if err := ds.get(&r, `SELECT * FROM jobs where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrJobNotFound
 		}
@@ -642,7 +631,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 	      FROM tasks 
 		  where job_id = $1 
 		  ORDER BY position asc,created_at asc`
-	if err := ds.db.Select(&rs, q, id); err != nil {
+	if err := ds.select_(&rs, q, id); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
 	exec := make([]*task.Task, len(rs))
@@ -665,7 +654,7 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 		  AND 
 		    (state = $2 OR state = $3 OR state = $4)
 		  ORDER BY position,created_at ASC`
-	if err := ds.db.Select(&rs, q, jobID, task.Pending, task.Scheduled, task.Running); err != nil {
+	if err := ds.select_(&rs, q, jobID, task.Pending, task.Scheduled, task.Running); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
 	actives := make([]*task.Task, len(rs))
@@ -690,7 +679,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	    case when $1 != '' then ts @@ plainto_tsquery('english', $1) else true end
 	  ORDER BY created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.db.Select(&rs, qry, q); err != nil {
+	if err := ds.select_(&rs, qry, q); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
 	result := make([]*job.Job, len(rs))
@@ -703,7 +692,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	}
 
 	var count *int
-	if err := ds.db.Get(&count, `
+	if err := ds.get(&count, `
 	  select count(*) 
 	  from jobs
 	  where case when $1 != '' 
@@ -730,21 +719,81 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 func (ds *PostgresDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
 	s := &stats.Stats{}
 
-	if err := ds.db.Get(&s.Jobs.Running, "select count(*) from jobs where state = 'RUNNING'"); err != nil {
+	if err := ds.get(&s.Jobs.Running, "select count(*) from jobs where state = 'RUNNING'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running jobs count")
 	}
 
-	if err := ds.db.Get(&s.Tasks.Running, "select count(*) from tasks where state = 'RUNNING'"); err != nil {
+	if err := ds.get(&s.Tasks.Running, "select count(*) from tasks where state = 'RUNNING'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running tasks count")
 	}
 
-	if err := ds.db.Get(&s.Nodes.Running, "select count(*) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
+	if err := ds.get(&s.Nodes.Running, "select count(*) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running tasks count")
 	}
 
-	if err := ds.db.Get(&s.Nodes.CPUPercent, "select coalesce(avg(cpu_percent),0) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
+	if err := ds.get(&s.Nodes.CPUPercent, "select coalesce(avg(cpu_percent),0) from nodes where last_heartbeat_at > current_timestamp - interval '5 minutes'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running tasks count")
 	}
 
 	return s, nil
+}
+
+func (ds *PostgresDatastore) get(dest interface{}, query string, args ...interface{}) error {
+	if ds.tx != nil {
+		return ds.tx.Get(dest, query, args...)
+	} else {
+		return ds.db.Get(dest, query, args...)
+	}
+}
+
+func (ds *PostgresDatastore) select_(dest interface{}, query string, args ...interface{}) error {
+	if ds.tx != nil {
+		return ds.tx.Select(dest, query, args...)
+	} else {
+		return ds.db.Select(dest, query, args...)
+	}
+}
+
+func (ds *PostgresDatastore) exec(query string, args ...any) (sql.Result, error) {
+	if ds.tx != nil {
+		return ds.tx.Exec(query, args...)
+	} else {
+		return ds.db.Exec(query, args...)
+	}
+}
+
+func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx Datastore) error) error {
+	var tx *sqlx.Tx
+	var err error
+	var owner bool
+	if ds.tx != nil {
+		tx = ds.tx
+	} else {
+		owner = true
+		tx, err = ds.db.BeginTxx(ctx, &sql.TxOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "unable to begin tx")
+		}
+	}
+	if owner {
+		defer func() {
+			if err := tx.Rollback(); err != nil {
+				log.Error().
+					Err(err).
+					Msgf("error rolling back tx")
+			}
+		}()
+	}
+	dsx := &PostgresDatastore{
+		tx: tx,
+	}
+	if err := f(dsx); err != nil {
+		return err
+	}
+	if owner {
+		if err := tx.Commit(); err != nil {
+			return errors.Wrapf(err, "error committing transaction")
+		}
+	}
+	return nil
 }
