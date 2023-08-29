@@ -775,19 +775,17 @@ func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx Datastore) er
 			return errors.Wrapf(err, "unable to begin tx")
 		}
 	}
-	if owner {
-		defer func() {
+	dsx := &PostgresDatastore{
+		tx: tx,
+	}
+	if err := f(dsx); err != nil {
+		if owner {
 			if err := tx.Rollback(); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error rolling back tx")
 			}
-		}()
-	}
-	dsx := &PostgresDatastore{
-		tx: tx,
-	}
-	if err := f(dsx); err != nil {
+		}
 		return err
 	}
 	if owner {
