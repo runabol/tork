@@ -173,20 +173,17 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 				}
 			}
 		}
-		if !b.shuttingDown {
-			maxAttempts := 20
-			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				log.Info().Msgf("%s channel closed. reconnecting", qname)
-				if err := b.subscribe(qname, handler); err != nil {
-					log.Error().
-						Err(err).
-						Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
-					time.Sleep(time.Second * time.Duration(attempt))
-				} else {
-					return
-				}
+		maxAttempts := 20
+		for attempt := 1; !b.shuttingDown && attempt <= maxAttempts; attempt++ {
+			log.Info().Msgf("%s channel closed. reconnecting", qname)
+			if err := b.subscribe(qname, handler); err != nil {
+				log.Error().
+					Err(err).
+					Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
+				time.Sleep(time.Second * time.Duration(attempt))
+			} else {
+				return
 			}
-			log.Error().Err(err).Msgf("error reconnecting to %s. giving up", qname)
 		}
 		sub.done <- 1
 	}()
