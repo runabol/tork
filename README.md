@@ -686,6 +686,7 @@ Failure:
 6. WASM integration.
 7. Worker to send periodic updates of tasks it's working on
 8. Ability to assign tags to jobs in order to group them and for FTS.
+9. Config files
 
 ## License
 
