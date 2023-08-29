@@ -331,7 +331,8 @@ func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 }
 
 func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error {
-	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
+	var isLast bool
+	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update actual task
 		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			if u.State != task.Running && u.State != task.Scheduled {
@@ -345,10 +346,9 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 			return errors.Wrapf(err, "error updating task in datastore")
 		}
 		// update parent task
-		var completed bool
 		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
 			u.Each.Completions = u.Each.Completions + 1
-			completed = u.Each.Completions >= u.Each.Size
+			isLast = u.Each.Completions >= u.Each.Size
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error updating task in datastore")
@@ -365,24 +365,29 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 				return errors.Wrapf(err, "error updating job in datastore")
 			}
 		}
-		// complete the parent task
-		if completed {
-			parent, err := tx.GetTaskByID(ctx, t.ParentID)
-			if err != nil {
-				return errors.New("error fetching the parent task")
-			}
-			now := time.Now().UTC()
-			parent.State = task.Completed
-			parent.CompletedAt = &now
-			return c.completeTask(ctx, parent)
-		}
 		return nil
 	})
+	if err != nil {
+		return errors.Wrapf(err, "error complating each task: %s", t.ID)
+	}
+	// complete the parent task
+	if isLast {
+		parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
+		if err != nil {
+			return errors.New("error fetching the parent task")
+		}
+		now := time.Now().UTC()
+		parent.State = task.Completed
+		parent.CompletedAt = &now
+		return c.completeTask(ctx, parent)
+	}
+	return nil
 }
 
 func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
-	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
-		// update actual task
+	// complete actual task
+	var isLast bool
+	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			if u.State != task.Running && u.State != task.Scheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
@@ -395,10 +400,9 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 			return errors.Wrapf(err, "error updating task in datastore")
 		}
 		// update parent task
-		var completed bool
 		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
 			u.Parallel.Completions = u.Parallel.Completions + 1
-			completed = u.Parallel.Completions >= len(u.Parallel.Tasks)
+			isLast = u.Parallel.Completions >= len(u.Parallel.Tasks)
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error updating task in datastore")
@@ -415,24 +419,28 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 				return errors.Wrapf(err, "error updating job in datastore")
 			}
 		}
-		// complete the parent task
-		if completed {
-			parent, err := tx.GetTaskByID(ctx, t.ParentID)
-			if err != nil {
-				return errors.New("error fetching the parent task")
-			}
-			now := time.Now().UTC()
-			parent.State = task.Completed
-			parent.CompletedAt = &now
-			return c.completeTask(ctx, parent)
-		}
 		return nil
 	})
+	if err != nil {
+		return errors.Wrapf(err, "error completing task %s", t.ID)
+	}
+	// complete the parent task
+	if isLast {
+		parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
+		if err != nil {
+			return errors.New("error fetching the parent task")
+		}
+		now := time.Now().UTC()
+		parent.State = task.Completed
+		parent.CompletedAt = &now
+		return c.completeTask(ctx, parent)
+	}
+	return nil
 }
 
 func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
-	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
+	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update task in DB
 		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
 			if u.State != task.Running && u.State != task.Scheduled {
@@ -458,33 +466,37 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 		}); err != nil {
 			return errors.Wrapf(err, "error updating job in datastore")
 		}
-		// fire the next task
-		j, err := tx.GetJobByID(ctx, t.JobID)
-		if err != nil {
-			return errors.Wrapf(err, "error getting job from datatstore")
-		}
-		if j.Position <= len(j.Tasks) {
-			now := time.Now().UTC()
-			next := j.Tasks[j.Position-1]
-			next.ID = uuid.NewUUID()
-			next.JobID = j.ID
-			next.State = task.Pending
-			next.Position = j.Position
-			next.CreatedAt = &now
-			if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
-				next.Error = err.Error()
-				next.State = task.Failed
-				next.FailedAt = &now
-			}
-			if err := tx.CreateTask(ctx, next); err != nil {
-				return err
-			}
-			return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
-		} else {
-			j.State = job.Completed
-			return c.broker.PublishJob(ctx, j)
-		}
+		return nil
 	})
+	if err != nil {
+		return errors.Wrapf(err, "error completing task: %s", t.ID)
+	}
+	// fire the next task
+	j, err := c.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return errors.Wrapf(err, "error getting job from datatstore")
+	}
+	if j.Position <= len(j.Tasks) {
+		now := time.Now().UTC()
+		next := j.Tasks[j.Position-1]
+		next.ID = uuid.NewUUID()
+		next.JobID = j.ID
+		next.State = task.Pending
+		next.Position = j.Position
+		next.CreatedAt = &now
+		if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
+			next.Error = err.Error()
+			next.State = task.Failed
+			next.FailedAt = &now
+		}
+		if err := c.ds.CreateTask(ctx, next); err != nil {
+			return err
+		}
+		return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
+	} else {
+		j.State = job.Completed
+		return c.broker.PublishJob(ctx, j)
+	}
 
 }
 

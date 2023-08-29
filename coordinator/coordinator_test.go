@@ -1228,18 +1228,20 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	assert.Equal(t, job.Failed, j2.State)
 }
 
-func Test_completeTopLevelTaskWithTx(t *testing.T) {
+func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := datastore.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
 	c, err := NewCoordinator(Config{
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    b,
 		DataStore: ds,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
-
 	j1 := &job.Job{
 		ID:        uuid.NewUUID(),
 		State:     job.Running,
@@ -1248,6 +1250,9 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 		Tasks: []*task.Task{
 			{
 				Name: "task-1",
+			},
+			{
+				Name: "task-2",
 			},
 		},
 	}
@@ -1275,6 +1280,65 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, task.Running, t11.State)
+}
+
+func Test_completeTopLevelTaskWithTx(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+
+	err = b.SubscribeForTasks(mq.QUEUE_PENDING, func(t1 *task.Task) error {
+		err := c.handlePendingTask(t1)
+		assert.NoError(t, err)
+		return err
+	})
+	assert.NoError(t, err)
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		Position:  1,
+		CreatedAt: time.Now().UTC(),
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+			{
+				Name: "task-2",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	t1 := &task.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     j1.ID,
+		State:     task.Running,
+		Position:  1,
+		CreatedAt: &now,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = c.completeTopLevelTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Completed, t11.State)
 }
 
 func Test_completeParallelTaskWithTx(t *testing.T) {
