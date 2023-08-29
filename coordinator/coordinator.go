@@ -331,154 +331,161 @@ func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 }
 
 func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error {
-	// update actual task
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		if u.State != task.Running && u.State != task.Scheduled {
-			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
-		}
-		u.State = task.Completed
-		u.CompletedAt = t.CompletedAt
-		u.Result = t.Result
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// update parent task
-	var completed bool
-	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
-		u.Each.Completions = u.Each.Completions + 1
-		completed = u.Each.Completions >= u.Each.Size
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// update job context
-	if t.Result != "" && t.Var != "" {
-		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-			if u.Context.Tasks == nil {
-				u.Context.Tasks = make(map[string]string)
+	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		// update actual task
+		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+			if u.State != task.Running && u.State != task.Scheduled {
+				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.Context.Tasks[t.Var] = t.Result
+			u.State = task.Completed
+			u.CompletedAt = t.CompletedAt
+			u.Result = t.Result
 			return nil
 		}); err != nil {
-			return errors.Wrapf(err, "error updating job in datastore")
+			return errors.Wrapf(err, "error updating task in datastore")
 		}
-	}
-	// complete the parent task
-	if completed {
-		parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
-		if err != nil {
-			return errors.New("error fetching the parent task")
+		// update parent task
+		var completed bool
+		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
+			u.Each.Completions = u.Each.Completions + 1
+			completed = u.Each.Completions >= u.Each.Size
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error updating task in datastore")
 		}
-		now := time.Now().UTC()
-		parent.State = task.Completed
-		parent.CompletedAt = &now
-		return c.completeTask(ctx, parent)
-	}
-	return nil
+		// update job context
+		if t.Result != "" && t.Var != "" {
+			if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+				if u.Context.Tasks == nil {
+					u.Context.Tasks = make(map[string]string)
+				}
+				u.Context.Tasks[t.Var] = t.Result
+				return nil
+			}); err != nil {
+				return errors.Wrapf(err, "error updating job in datastore")
+			}
+		}
+		// complete the parent task
+		if completed {
+			parent, err := tx.GetTaskByID(ctx, t.ParentID)
+			if err != nil {
+				return errors.New("error fetching the parent task")
+			}
+			now := time.Now().UTC()
+			parent.State = task.Completed
+			parent.CompletedAt = &now
+			return c.completeTask(ctx, parent)
+		}
+		return nil
+	})
 }
 
 func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
-	// update actual task
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		if u.State != task.Running && u.State != task.Scheduled {
-			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
-		}
-		u.State = task.Completed
-		u.CompletedAt = t.CompletedAt
-		u.Result = t.Result
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// update parent task
-	var completed bool
-	if err := c.ds.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
-		u.Parallel.Completions = u.Parallel.Completions + 1
-		completed = u.Parallel.Completions >= len(u.Parallel.Tasks)
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// update job context
-	if t.Result != "" && t.Var != "" {
-		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-			if u.Context.Tasks == nil {
-				u.Context.Tasks = make(map[string]string)
+	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		// update actual task
+		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+			if u.State != task.Running && u.State != task.Scheduled {
+				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.Context.Tasks[t.Var] = t.Result
+			u.State = task.Completed
+			u.CompletedAt = t.CompletedAt
+			u.Result = t.Result
 			return nil
 		}); err != nil {
-			return errors.Wrapf(err, "error updating job in datastore")
+			return errors.Wrapf(err, "error updating task in datastore")
 		}
-	}
-	// complete the parent task
-	if completed {
-		parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
-		if err != nil {
-			return errors.New("error fetching the parent task")
+		// update parent task
+		var completed bool
+		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
+			u.Parallel.Completions = u.Parallel.Completions + 1
+			completed = u.Parallel.Completions >= len(u.Parallel.Tasks)
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error updating task in datastore")
 		}
-		now := time.Now().UTC()
-		parent.State = task.Completed
-		parent.CompletedAt = &now
-		return c.completeTask(ctx, parent)
-	}
-	return nil
+		// update job context
+		if t.Result != "" && t.Var != "" {
+			if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+				if u.Context.Tasks == nil {
+					u.Context.Tasks = make(map[string]string)
+				}
+				u.Context.Tasks[t.Var] = t.Result
+				return nil
+			}); err != nil {
+				return errors.Wrapf(err, "error updating job in datastore")
+			}
+		}
+		// complete the parent task
+		if completed {
+			parent, err := tx.GetTaskByID(ctx, t.ParentID)
+			if err != nil {
+				return errors.New("error fetching the parent task")
+			}
+			now := time.Now().UTC()
+			parent.State = task.Completed
+			parent.CompletedAt = &now
+			return c.completeTask(ctx, parent)
+		}
+		return nil
+	})
 }
 
 func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
-	// update task in DB
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		if u.State != task.Running && u.State != task.Scheduled {
-			return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
-		}
-		u.State = task.Completed
-		u.CompletedAt = t.CompletedAt
-		u.Result = t.Result
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// update job in DB
-	if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
-		u.Position = u.Position + 1
-		if t.Result != "" && t.Var != "" {
-			if u.Context.Tasks == nil {
-				u.Context.Tasks = make(map[string]string)
+	return c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		// update task in DB
+		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+			if u.State != task.Running && u.State != task.Scheduled {
+				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.Context.Tasks[t.Var] = t.Result
+			u.State = task.Completed
+			u.CompletedAt = t.CompletedAt
+			u.Result = t.Result
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error updating task in datastore")
 		}
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating job in datastore")
-	}
-	// fire the next task
-	j, err := c.ds.GetJobByID(ctx, t.JobID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting job from datatstore")
-	}
-	if j.Position <= len(j.Tasks) {
-		now := time.Now().UTC()
-		next := j.Tasks[j.Position-1]
-		next.ID = uuid.NewUUID()
-		next.JobID = j.ID
-		next.State = task.Pending
-		next.Position = j.Position
-		next.CreatedAt = &now
-		if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
-			next.Error = err.Error()
-			next.State = task.Failed
-			next.FailedAt = &now
+		// update job in DB
+		if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+			u.Position = u.Position + 1
+			if t.Result != "" && t.Var != "" {
+				if u.Context.Tasks == nil {
+					u.Context.Tasks = make(map[string]string)
+				}
+				u.Context.Tasks[t.Var] = t.Result
+			}
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "error updating job in datastore")
 		}
-		if err := c.ds.CreateTask(ctx, next); err != nil {
-			return err
+		// fire the next task
+		j, err := tx.GetJobByID(ctx, t.JobID)
+		if err != nil {
+			return errors.Wrapf(err, "error getting job from datatstore")
 		}
-		return c.handleTask(next)
-	} else {
-		j.State = job.Completed
-		return c.broker.PublishJob(ctx, j)
-	}
+		if j.Position <= len(j.Tasks) {
+			now := time.Now().UTC()
+			next := j.Tasks[j.Position-1]
+			next.ID = uuid.NewUUID()
+			next.JobID = j.ID
+			next.State = task.Pending
+			next.Position = j.Position
+			next.CreatedAt = &now
+			if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
+				next.Error = err.Error()
+				next.State = task.Failed
+				next.FailedAt = &now
+			}
+			if err := tx.CreateTask(ctx, next); err != nil {
+				return err
+			}
+			return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
+		} else {
+			j.State = job.Completed
+			return c.broker.PublishJob(ctx, j)
+		}
+	})
+
 }
 
 func (c *Coordinator) handleFailedTask(t *task.Task) error {

@@ -408,7 +408,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 		}
 		tr := taskRecord{}
 		if err := ptx.get(&tr, `SELECT * FROM tasks where id = $1 for update`, id); err != nil {
-			return errors.Wrapf(err, "error fetching task from db")
+			return errors.Wrapf(err, "error fetching task %s from db", id)
 		}
 		t, err := tr.toTask()
 		if err != nil {
