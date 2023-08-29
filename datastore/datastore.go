@@ -31,6 +31,8 @@ type Datastore interface {
 	GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error)
 
 	GetStats(ctx context.Context) (*stats.Stats, error)
+
+	WithTx(ctx context.Context, f func(tx Datastore) error) error
 }
 
 type Page[T any] struct {

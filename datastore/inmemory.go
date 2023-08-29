@@ -268,3 +268,7 @@ func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error)
 
 	return s, nil
 }
+
+func (ds *InMemoryDatastore) WithTx(ctx context.Context, f func(tx Datastore) error) error {
+	return f(ds)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -637,4 +638,58 @@ func TestPostgresGetStats(t *testing.T) {
 	assert.Equal(t, 50, s.Tasks.Running)
 	assert.Equal(t, float64(20), s.Nodes.CPUPercent)
 	assert.Equal(t, 5, s.Nodes.Running)
+}
+
+func TestPostgresWithTxCreateTask(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.WithTx(ctx, func(tx Datastore) error {
+		err = tx.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+		t1 := task.Task{}
+		err = tx.CreateTask(ctx, &t1)
+		return err
+	})
+	assert.Error(t, err)
+
+	// job was created in a bad tx. should not exist
+	_, err = ds.GetJobByID(ctx, j1.ID)
+	assert.Error(t, err)
+}
+
+func TestPostgresWithTxUpdateTask(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	j1 := job.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	t1 := task.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		State:     task.Running,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+	err = ds.WithTx(ctx, func(tx Datastore) error {
+		return tx.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
+			u.State = task.Failed
+			u.State = task.State(strings.Repeat("x", 100)) // invalid state
+			return nil
+		})
+	})
+	assert.Error(t, err)
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Running, t11.State)
 }
