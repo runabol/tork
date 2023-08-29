@@ -918,6 +918,8 @@ func Test_handleHeartbeat(t *testing.T) {
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 5),
 		CPUPercent:      75,
+		Hostname:        "host-1",
+		Status:          node.UP,
 	}
 
 	err = c.handleHeartbeats(n1)
@@ -927,11 +929,13 @@ func Test_handleHeartbeat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, n1.LastHeartbeatAt, n11.LastHeartbeatAt)
 	assert.Equal(t, n1.CPUPercent, n11.CPUPercent)
+	assert.Equal(t, n1.Status, n11.Status)
 
 	n2 := node.Node{
 		ID:              n1.ID,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 2),
 		CPUPercent:      75,
+		Status:          node.Down,
 	}
 
 	err = c.handleHeartbeats(n2)
@@ -941,6 +945,7 @@ func Test_handleHeartbeat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, n2.LastHeartbeatAt, n22.LastHeartbeatAt)
 	assert.Equal(t, n2.CPUPercent, n22.CPUPercent)
+	assert.Equal(t, n2.Status, n22.Status)
 
 	n3 := node.Node{
 		ID:              n1.ID,

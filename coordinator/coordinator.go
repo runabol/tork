@@ -583,6 +583,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 			Msg("received heartbeat")
 		u.LastHeartbeatAt = n.LastHeartbeatAt
 		u.CPUPercent = n.CPUPercent
+		u.Status = n.Status
 		return nil
 	})
 
