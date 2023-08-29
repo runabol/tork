@@ -61,7 +61,7 @@ func main() {
 			},
 			{
 				Name:  "standalone",
-				Usage: "start the coordinator and a worker",
+				Usage: "run the coordinator and a worker",
 				Flags: []cli.Flag{
 					queueFlag(),
 					brokerFlag(),
