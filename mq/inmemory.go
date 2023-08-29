@@ -2,6 +2,7 @@ package mq
 
 import (
 	"context"
+	"sync/atomic"
 
 	"sync"
 
@@ -12,25 +13,88 @@ import (
 	"github.com/runabol/tork/task"
 )
 
-const defaultQueueSize = 10
+const defaultQueueSize = 1000
 
 // InMemoryBroker a very simple implementation of the Broker interface
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	queues      map[string]chan any
-	subscribers map[string][]func(m any) error
-	unacked     map[string]int
-	nextSub     map[string]int
-	mu          sync.RWMutex
+	queues       map[string]*queue
+	mu           sync.RWMutex
+	shuttingDown bool
+}
+
+type queue struct {
+	name    string
+	ch      chan any
+	subs    []*subscriber
+	unacked int32
+	mu      sync.Mutex
+}
+
+func newQueue(name string) *queue {
+	return &queue{
+		name:    name,
+		ch:      make(chan any, defaultQueueSize),
+		subs:    make([]*subscriber, 0),
+		unacked: 0,
+	}
+}
+
+type subscriber struct {
+	terminate  chan any
+	terminated chan any
+}
+
+func (q *queue) send(m any) {
+	q.ch <- m
+}
+
+func (q *queue) size() int {
+	return len(q.ch)
+}
+
+func (q *queue) close() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, sub := range q.subs {
+		close(sub.terminate)
+		<-sub.terminated
+	}
+}
+
+func (q *queue) subscribe(sub func(m any) error) {
+	terminate := make(chan any)
+	terminated := make(chan any)
+	q.mu.Lock()
+	q.subs = append(q.subs, &subscriber{
+		terminate:  terminate,
+		terminated: terminated,
+	})
+	q.mu.Unlock()
+	go func() {
+		for {
+			select {
+			case <-terminate:
+				close(terminated)
+				return
+			case m := <-q.ch:
+				atomic.AddInt32(&q.unacked, 1)
+				if err := sub(m); err != nil {
+					log.Error().
+						Err(err).
+						Msg("unexpcted error occurred while processing task")
+				}
+				atomic.AddInt32(&q.unacked, -1)
+			}
+		}
+
+	}()
 }
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		queues:      make(map[string]chan any),
-		subscribers: make(map[string][]func(m any) error),
-		nextSub:     make(map[string]int),
-		unacked:     make(map[string]int),
+		queues: make(map[string]*queue),
 	}
 }
 
@@ -50,41 +114,15 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 }
 
 func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) error {
-	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	q, ok := b.queues[qname]
 	if !ok {
-		q = make(chan any, defaultQueueSize)
+		q = newQueue(qname)
 		b.queues[qname] = q
 	}
-	subs, ok := b.subscribers[qname]
-	subs = append(subs, handler)
-	b.subscribers[qname] = subs
-	if !ok {
-		go func() {
-			for m := range q {
-				b.mu.Lock()
-				// round-robin to next subscriber
-				subs := b.subscribers[qname]
-				nextSub := b.nextSub[qname]
-				sub := subs[nextSub]
-				nextSub = nextSub + 1
-				if nextSub >= len(subs) {
-					nextSub = 0
-				}
-				b.nextSub[qname] = nextSub
-				b.unacked[qname] = b.unacked[qname] + 1
-				b.mu.Unlock()
-				if err := sub(m); err != nil {
-					log.Error().Err(err).Msg("unexpcted error occurred while processing task")
-				}
-				b.mu.Lock()
-				b.unacked[qname] = b.unacked[qname] - 1
-				b.mu.Unlock()
-			}
-		}()
-	}
+	q.subscribe(handler)
 	return nil
 }
 
@@ -93,13 +131,13 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	defer b.mu.RUnlock()
 	qi := make([]QueueInfo, 0)
 	for k := range b.queues {
+		q := b.queues[k]
 		qi = append(qi, QueueInfo{
 			Name:        k,
-			Size:        len(b.queues[k]),
-			Subscribers: len(b.subscribers[k]),
-			Unacked:     b.unacked[k],
+			Size:        q.size(),
+			Subscribers: len(q.subs),
+			Unacked:     int(atomic.LoadInt32(&q.unacked)),
 		})
-
 	}
 	return qi, nil
 }
@@ -137,23 +175,39 @@ func (b *InMemoryBroker) publish(qname string, m any) error {
 	q, ok := b.queues[qname]
 	b.mu.RUnlock()
 	if !ok {
+		q = newQueue(qname)
 		b.mu.Lock()
-		q = make(chan any, defaultQueueSize)
 		b.queues[qname] = q
 		b.mu.Unlock()
 	}
-	q <- m
+	q.send(m)
 	return nil
 }
 
+func (b *InMemoryBroker) isShuttingDown() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.shuttingDown
+}
+
 func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
+	if b.isShuttingDown() {
+		return nil
+	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	for qname, q := range b.queues {
-		close(q)
-		delete(b.subscribers, qname)
-		delete(b.unacked, qname)
-		delete(b.queues, qname)
+	b.shuttingDown = true
+	b.mu.Unlock()
+	done := make(chan int)
+	go func() {
+		for _, q := range b.queues {
+			log.Debug().Msgf("closing %s", q.name)
+			q.close()
+		}
+		done <- 1
+	}()
+	select {
+	case <-ctx.Done():
+	case <-done:
 	}
 	return nil
 }

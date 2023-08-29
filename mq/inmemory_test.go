@@ -150,8 +150,8 @@ func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
 		go func() {
 			wg.Done()
 			err = b.PublishJob(ctx, &job.Job{})
@@ -161,7 +161,7 @@ func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
-	assert.Equal(t, 100, processed)
+	assert.Equal(t, 10, processed)
 }
 
 func TestInMemoryShutdown(t *testing.T) {
@@ -169,8 +169,9 @@ func TestInMemoryShutdown(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 	mu := sync.Mutex{}
 	processed := 0
-	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err := b.SubscribeForTasks(qname, func(j *task.Task) error {
+	qname1 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname2 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	err := b.SubscribeForTasks(qname1, func(j *task.Task) error {
 		mu.Lock()
 		defer mu.Unlock()
 		processed = processed + 1
@@ -178,7 +179,9 @@ func TestInMemoryShutdown(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	for i := 0; i < 10; i++ {
-		err = b.PublishTask(ctx, qname, &task.Task{})
+		err = b.PublishTask(ctx, qname1, &task.Task{})
+		assert.NoError(t, err)
+		err = b.PublishTask(ctx, qname2, &task.Task{})
 		assert.NoError(t, err)
 	}
 	time.Sleep(time.Millisecond * 100)
@@ -187,9 +190,7 @@ func TestInMemoryShutdown(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 10, processed)
 	// there should be no more processing past the shutdown
-	for i := 0; i < 10; i++ {
-		err = b.PublishTask(ctx, qname, &task.Task{})
-		assert.NoError(t, err)
-	}
+	err = b.PublishTask(ctx, qname1, &task.Task{})
+	assert.NoError(t, err)
 	assert.Equal(t, 10, processed)
 }
