@@ -1228,6 +1228,161 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	assert.Equal(t, job.Failed, j2.State)
 }
 
+func Test_completeTopLevelTaskWithTx(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		Position:  1,
+		CreatedAt: time.Now().UTC(),
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	t1 := &task.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     j1.ID,
+		State:     task.Running,
+		Position:  1,
+		CreatedAt: &now,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t1.JobID = "bad_job_id"
+
+	err = c.completeTopLevelTask(ctx, t1)
+	assert.Error(t, err)
+
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Running, t11.State)
+}
+
+func Test_completeParallelTaskWithTx(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		Position:  1,
+		CreatedAt: time.Now().UTC(),
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	t1 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		CreatedAt:   &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    "no_such_parent_id",
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t1.JobID = "bad_job_id"
+
+	err = c.completeParallelTask(ctx, t1)
+	assert.Error(t, err)
+
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Running, t11.State)
+}
+
+func Test_completeEachTaskWithTx(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := datastore.NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: ds,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j1 := &job.Job{
+		ID:        uuid.NewUUID(),
+		State:     job.Running,
+		Position:  1,
+		CreatedAt: time.Now().UTC(),
+		Tasks: []*task.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	t1 := &task.Task{
+		ID:          uuid.NewUUID(),
+		State:       task.Running,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		CreatedAt:   &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    "no_such_parent_id",
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t1.JobID = "bad_job_id"
+
+	err = c.completeEachTask(ctx, t1)
+	assert.Error(t, err)
+
+	t11, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, task.Running, t11.State)
+}
+
 func TestRunHelloWorldJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/hello.yaml")
 	assert.Equal(t, job.Completed, j1.State)
