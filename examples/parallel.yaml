@@ -7,15 +7,15 @@ tasks:
   - name: a parallel task
     parallel:
       tasks:
-        - name: sleep for 2 seconds
+        - name: sleep for .1 seconds
           image: ubuntu:mantic
-          run: sleep 1
-        - name: sleep for 1 second
+          run: sleep 0.1
+        - name: sleep for .5 second
           image: ubuntu:mantic
           run: sleep 0.5
-        - name: sleep for 3 seconds
+        - name: sleep for .15 seconds
           image: ubuntu:mantic
-          run: sleep 1.5
+          run: sleep 0.15
         - name: fast task 1
           image: ubuntu:mantic
           run: echo fast
