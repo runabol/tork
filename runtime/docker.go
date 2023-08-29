@@ -112,6 +112,9 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
 }
 
 func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
+	if t.ID == "" {
+		return errors.New("task id is required")
+	}
 	if err := d.imagePull(ctx, t); err != nil {
 		return errors.Wrapf(err, "error pulling image")
 	}

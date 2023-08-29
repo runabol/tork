@@ -2,6 +2,9 @@ package runtime
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -54,6 +57,7 @@ func TestRunTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 	err = rt.Run(context.Background(), &task.Task{
+		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
 	})
@@ -67,6 +71,7 @@ func TestRunTaskWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	err = rt.Run(ctx, &task.Task{
+		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
 	})
@@ -115,6 +120,7 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 	err = rt.Run(context.Background(), &task.Task{
+		ID:       uuid.NewUUID(),
 		Image:    "ubuntu:mantic",
 		CMD:      []string{"ls"},
 		Networks: []string{"default"},
@@ -125,6 +131,7 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 	err = rt.Run(context.Background(), &task.Task{
+		ID:       uuid.NewUUID(),
 		Image:    "ubuntu:mantic",
 		CMD:      []string{"ls"},
 		Networks: []string{"no-such-network"},
@@ -160,4 +167,46 @@ func TestCreateVolume(t *testing.T) {
 	for _, v := range ls.Volumes {
 		assert.NotEqual(t, "testvol", v.Name)
 	}
+}
+
+func TestRunTaskWithVolume(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	vname := uuid.NewUUID()
+
+	ctx := context.Background()
+	err = rt.CreateVolume(ctx, vname)
+	assert.NoError(t, err)
+
+	defer func() {
+		err = rt.DeleteVolume(ctx, vname)
+		assert.NoError(t, err)
+	}()
+
+	rundir, err := os.MkdirTemp("/tmp", "tork-")
+	assert.NoError(t, err)
+
+	defer func() {
+		err := os.RemoveAll(rundir)
+		assert.NoError(t, err)
+	}()
+
+	script := `echo hello world > /xyz/thing`
+
+	err = os.WriteFile(path.Join(rundir, "run"), []byte(script), os.ModePerm)
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "-",
+		Volumes: []string{
+			fmt.Sprintf("volume:%s:%s", vname, "/xyz"),
+			fmt.Sprintf("bind:%s:%s", rundir, "/tork"),
+		},
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
 }

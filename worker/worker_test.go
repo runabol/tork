@@ -88,6 +88,59 @@ func Test_handleTaskRun(t *testing.T) {
 
 }
 
+func Test_handleTaskRunWithPrePost(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	completions := 0
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
+		completions = completions + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+	err = w.Start()
+	assert.NoError(t, err)
+
+	t1 := &task.Task{
+		ID:      uuid.NewUUID(),
+		State:   task.Scheduled,
+		Image:   "ubuntu:mantic",
+		CMD:     []string{"ls"},
+		Volumes: []string{"/somevolume"},
+		Pre: []*task.Task{
+			{
+				Image: "ubuntu:mantic",
+				CMD:   []string{"echo", "do work"},
+			},
+		},
+		Post: []*task.Task{
+			{
+				Image: "ubuntu:mantic",
+				CMD:   []string{"echo", "do work"},
+			},
+		},
+	}
+
+	err = w.handleTask(t1)
+
+	// give the task some time to "process"
+	time.Sleep(time.Millisecond * 100)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, completions)
+	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
+}
+
 func Test_handleTaskCancel(t *testing.T) {
 	rt, err := runtime.NewDockerRuntime()
 	assert.NoError(t, err)

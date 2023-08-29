@@ -187,6 +187,7 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 	t.Volumes = vols
 	// excute pre-tasks
 	for _, pre := range t.Pre {
+		pre.ID = uuid.NewUUID()
 		pre.Volumes = t.Volumes
 		pre.Networks = t.Networks
 		pre.Limits = t.Limits
@@ -203,7 +204,6 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 			t.FailedAt = &finished
 			return nil
 		}
-		//pre.Result = result
 	}
 	// run the actual task
 	if err := w.doExecuteTask(ctx, t); err != nil {
@@ -219,6 +219,7 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 	}
 	// execute post tasks
 	for _, post := range t.Post {
+		post.ID = uuid.NewUUID()
 		post.Volumes = t.Volumes
 		post.Networks = t.Networks
 		post.Limits = t.Limits
@@ -235,11 +236,8 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 			t.FailedAt = &finished
 			return nil
 		}
-		//post.Result = result
 	}
 	finished := time.Now().UTC()
-	// send completion to the coordinator
-	//t.Result = result
 	t.CompletedAt = &finished
 	t.State = task.Completed
 	return nil
