@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"os"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -29,11 +28,16 @@ type DockerRuntime struct {
 	client *client.Client
 	tasks  *syncx.Map[string, string]
 	images *syncx.Map[string, bool]
-	mu     sync.Mutex
+	pullq  chan *pullRequest
 }
 
 type printableReader struct {
 	reader io.Reader
+}
+
+type pullRequest struct {
+	image string
+	done  chan error
 }
 
 func (r printableReader) Read(p []byte) (int, error) {
@@ -60,11 +64,14 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DockerRuntime{
+	rt := &DockerRuntime{
 		client: dc,
 		tasks:  new(syncx.Map[string, string]),
 		images: new(syncx.Map[string, bool]),
-	}, nil
+		pullq:  make(chan *pullRequest, 1),
+	}
+	go rt.puller(context.Background())
+	return rt, nil
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
@@ -89,22 +96,31 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
 			}
 		}
 	}
-	// this is intended. we don't want to pull
-	// more than one image at a time to prevent
-	// from saturating the nw inteface and to play
-	// nice with the docker registry.
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	reader, err := d.client.ImagePull(
-		ctx, t.Image, types.ImagePullOptions{})
-	if err != nil {
-		return err
+	pr := &pullRequest{
+		image: t.Image,
+		done:  make(chan error),
 	}
-	_, err = io.Copy(os.Stdout, reader)
-	if err != nil {
-		return err
+	d.pullq <- pr
+	return <-pr.done
+}
+
+// puller is a goroutine that serializes all requests
+// to pull images from the docker repo
+func (d *DockerRuntime) puller(ctx context.Context) {
+	for pr := range d.pullq {
+		reader, err := d.client.ImagePull(
+			ctx, pr.image, types.ImagePullOptions{})
+		if err != nil {
+			pr.done <- err
+			return
+		}
+		_, err = io.Copy(os.Stdout, reader)
+		if err != nil {
+			pr.done <- err
+			return
+		}
+		pr.done <- nil
 	}
-	return nil
 }
 
 func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
