@@ -67,6 +67,7 @@ func TestIterate(t *testing.T) {
 		keys = append(keys, k)
 	})
 	slices.Sort(vals)
+	slices.Sort(keys)
 	assert.Equal(t, []int{100, 200}, vals)
 	assert.Equal(t, []string{"k1", "k2"}, keys)
 }
