@@ -21,14 +21,15 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 )
 
 type DockerRuntime struct {
 	client *client.Client
-	tasks  map[string]string
-	images map[string]bool
-	mu     sync.RWMutex
+	tasks  *syncx.Map[string, string]
+	images *syncx.Map[string, bool]
+	mu     sync.Mutex
 }
 
 type printableReader struct {
@@ -61,16 +62,13 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	}
 	return &DockerRuntime{
 		client: dc,
-		tasks:  make(map[string]string),
-		images: make(map[string]bool),
-		mu:     sync.RWMutex{},
+		tasks:  new(syncx.Map[string, string]),
+		images: new(syncx.Map[string, bool]),
 	}, nil
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
-	d.mu.RLock()
-	_, ok := d.images[t.Image]
-	d.mu.RUnlock()
+	_, ok := d.images.Get(t.Image)
 	if ok {
 		return nil
 	}
@@ -86,9 +84,7 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
 	for _, img := range images {
 		for _, tag := range img.RepoTags {
 			if tag == t.Image {
-				d.mu.Lock()
-				d.images[tag] = true
-				d.mu.Unlock()
+				d.images.Set(tag, true)
 				return nil
 			}
 		}
@@ -199,9 +195,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 		return err
 	}
 
-	d.mu.Lock()
-	d.tasks[t.ID] = resp.ID
-	d.mu.Unlock()
+	d.tasks.Set(t.ID, resp.ID)
 
 	// remove the container
 	defer func() {
@@ -277,15 +271,11 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
-	d.mu.RLock()
-	containerID, ok := d.tasks[t.ID]
-	d.mu.RUnlock()
+	containerID, ok := d.tasks.Get(t.ID)
 	if !ok {
 		return nil
 	}
-	d.mu.Lock()
-	delete(d.tasks, t.ID)
-	d.mu.Unlock()
+	d.tasks.Delete(t.ID)
 	log.Printf("Attempting to stop and remove container %v", containerID)
 	return d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
 		RemoveVolumes: false,

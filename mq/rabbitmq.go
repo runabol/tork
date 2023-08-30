@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
 )
@@ -22,7 +23,7 @@ import (
 type RabbitMQBroker struct {
 	connPool      []*amqp.Connection
 	nextConn      int
-	queues        map[string]string
+	queues        *syncx.Map[string, string]
 	subscriptions []*subscription
 	mu            sync.RWMutex
 	url           string
@@ -46,7 +47,7 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 		connPool[i] = conn
 	}
 	return &RabbitMQBroker{
-		queues:        make(map[string]string),
+		queues:        new(syncx.Map[string, string]),
 		url:           url,
 		connPool:      connPool,
 		subscriptions: make([]*subscription, 0),
@@ -191,14 +192,10 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 }
 
 func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
-	b.mu.RLock()
-	_, ok := b.queues[qname]
-	b.mu.RUnlock()
+	_, ok := b.queues.Get(qname)
 	if ok {
 		return nil
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	// get a list of existing queues
 	qs, err := b.Queues(context.Background())
 	if err != nil {
@@ -224,7 +221,7 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 			return err
 		}
 	}
-	b.queues[qname] = qname
+	b.queues.Set(qname, qname)
 	return nil
 }
 
@@ -306,7 +303,7 @@ func (b *RabbitMQBroker) getConnection() (*amqp.Connection, error) {
 		// clearing the known queues because rabbitmq
 		// might have crashed and we would need to
 		// re-declare them
-		b.queues = make(map[string]string)
+		b.queues = new(syncx.Map[string, string])
 		log.Warn().Msg("connection is closed. reconnecting to RabbitMQ")
 		conn, err = amqp.Dial(b.url)
 		if err != nil {

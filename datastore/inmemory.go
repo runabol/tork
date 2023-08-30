@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/stats"
+	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 )
 
@@ -21,19 +21,16 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
-	tasks map[string]*task.Task
-	nodes map[string]node.Node
-	jobs  map[string]*job.Job
-	tmu   sync.RWMutex
-	nmu   sync.RWMutex
-	jmu   sync.RWMutex
+	tasks *syncx.Map[string, *task.Task]
+	nodes *syncx.Map[string, node.Node]
+	jobs  *syncx.Map[string, *job.Job]
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
 	return &InMemoryDatastore{
-		tasks: make(map[string]*task.Task),
-		nodes: make(map[string]node.Node),
-		jobs:  make(map[string]*job.Job),
+		tasks: new(syncx.Map[string, *task.Task]),
+		nodes: new(syncx.Map[string, node.Node]),
+		jobs:  new(syncx.Map[string, *job.Job]),
 	}
 }
 
@@ -41,16 +38,12 @@ func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error
 	if t.ID == "" {
 		return errors.New("must provide ID")
 	}
-	ds.tmu.Lock()
-	defer ds.tmu.Unlock()
-	ds.tasks[t.ID] = t.Clone()
+	ds.tasks.Set(t.ID, t.Clone())
 	return nil
 }
 
 func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
-	ds.tmu.RLock()
-	defer ds.tmu.RUnlock()
-	t, ok := ds.tasks[id]
+	t, ok := ds.tasks.Get(id)
 	if !ok {
 		return nil, ErrTaskNotFound
 	}
@@ -58,9 +51,7 @@ func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 }
 
 func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *task.Task) error) error {
-	ds.tmu.Lock()
-	defer ds.tmu.Unlock()
-	t, ok := ds.tasks[id]
+	t, ok := ds.tasks.Get(id)
 	if !ok {
 		return ErrTaskNotFound
 	}
@@ -71,34 +62,28 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 }
 
 func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n node.Node) error {
-	ds.nmu.Lock()
-	defer ds.nmu.Unlock()
-	_, ok := ds.nodes[n.ID]
+	_, ok := ds.nodes.Get(n.ID)
 	if ok {
 		return errors.Errorf("node %s already exists", n.ID)
 	}
-	ds.nodes[n.ID] = n
+	ds.nodes.Set(n.ID, n)
 	return nil
 }
 
 func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
-	ds.nmu.Lock()
-	defer ds.nmu.Unlock()
-	n, ok := ds.nodes[id]
+	n, ok := ds.nodes.Get(id)
 	if !ok {
 		return ErrNodeNotFound
 	}
 	if err := modify(&n); err != nil {
 		return err
 	}
-	ds.nodes[n.ID] = n
+	ds.nodes.Set(n.ID, n)
 	return nil
 }
 
 func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.Node, error) {
-	ds.nmu.RLock()
-	defer ds.nmu.RUnlock()
-	n, ok := ds.nodes[id]
+	n, ok := ds.nodes.Get(id)
 	if !ok {
 		return node.Node{}, ErrNodeNotFound
 	}
@@ -106,11 +91,9 @@ func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.N
 }
 
 func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, error) {
-	ds.nmu.RLock()
-	defer ds.nmu.RUnlock()
 	nodes := make([]node.Node, 0)
 	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
-	for _, n := range ds.nodes {
+	for _, n := range ds.nodes.Values() {
 		if n.LastHeartbeatAt.After(timeout) {
 			// if we hadn't seen an heartbeat for two or more
 			// consecutive periods we consider the node as offline
@@ -127,31 +110,25 @@ func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, e
 }
 
 func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
-	ds.jmu.Lock()
-	defer ds.jmu.Unlock()
-	ds.jobs[j.ID] = j.Clone()
+	ds.jobs.Set(j.ID, j.Clone())
 	return nil
 }
 
 func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error {
-	ds.jmu.Lock()
-	defer ds.jmu.Unlock()
-	j, ok := ds.jobs[id]
+	j, ok := ds.jobs.Get(id)
 	if !ok {
 		return ErrJobNotFound
 	}
 	if err := modify(j); err != nil {
 		return err
 	}
-	ds.jobs[j.ID] = j
+	ds.jobs.Set(j.ID, j)
 	return nil
 }
 
 func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
-	ds.tmu.RLock()
-	defer ds.tmu.RUnlock()
 	execution := make([]*task.Task, 0)
-	for _, t := range ds.tasks {
+	for _, t := range ds.tasks.Values() {
 		if t.JobID == id {
 			execution = append(execution, t.Clone())
 		}
@@ -160,9 +137,7 @@ func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
 }
 
 func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
-	ds.jmu.RLock()
-	defer ds.jmu.RUnlock()
-	j, ok := ds.jobs[id]
+	j, ok := ds.jobs.Get(id)
 	if !ok {
 		return nil, ErrJobNotFound
 	}
@@ -188,10 +163,8 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 }
 
 func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*task.Task, error) {
-	ds.tmu.RLock()
-	defer ds.tmu.RUnlock()
 	result := make([]*task.Task, 0)
-	for _, t := range ds.tasks {
+	for _, t := range ds.tasks.Values() {
 		if t.JobID == jobID && t.State.IsActive() {
 			result = append(result, t.Clone())
 		}
@@ -200,11 +173,9 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
-	ds.jmu.RLock()
-	defer ds.jmu.RUnlock()
 	offset := (page - 1) * size
 	filtered := make([]*job.Job, 0)
-	for _, j := range ds.jobs {
+	for _, j := range ds.jobs.Values() {
 		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(q)) ||
 			strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(q)) {
 			filtered = append(filtered, j)
@@ -237,24 +208,19 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
 	s := &stats.Stats{}
 
-	ds.jmu.RLock()
-	for _, j := range ds.jobs {
+	for _, j := range ds.jobs.Values() {
 		if j.State == job.Running {
 			s.Jobs.Running = s.Jobs.Running + 1
 		}
 	}
-	ds.jmu.RUnlock()
 
-	ds.tmu.RLock()
-	for _, t := range ds.tasks {
+	for _, t := range ds.tasks.Values() {
 		if t.State == task.Running {
 			s.Tasks.Running = s.Tasks.Running + 1
 		}
 	}
-	ds.tmu.RUnlock()
 
-	ds.nmu.RLock()
-	for _, n := range ds.nodes {
+	for _, n := range ds.nodes.Values() {
 		if n.LastHeartbeatAt.After(time.Now().UTC().Add(-(time.Minute * 5))) {
 			s.Nodes.Running = s.Nodes.Running + 1
 			s.Nodes.CPUPercent = s.Nodes.CPUPercent + n.CPUPercent
@@ -264,7 +230,6 @@ func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error)
 	if s.Nodes.Running > 0 {
 		s.Nodes.CPUPercent = s.Nodes.CPUPercent / float64(s.Nodes.Running)
 	}
-	ds.nmu.RUnlock()
 
 	return s, nil
 }
