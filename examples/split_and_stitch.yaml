@@ -35,25 +35,21 @@ tasks:
 
   - var: duration
     name: extract the duration of the video
-    image: ubuntu:mantic
+    image: badouralix/curl-jq
     env:
       FFPROBE: "{{ tasks.ffprobe }}" 
     cmd: 
     run: |
-      set -e
-      apt-get update && apt-get install -y jq
       DURATION=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .duration')
       echo -n $DURATION >> $TORK_OUTPUT
 
   - var: framerate
     name: extract the framerate of the video
-    image: ubuntu:mantic
+    image: badouralix/curl-jq
     env:
       FFPROBE: "{{ tasks.ffprobe }}" 
     cmd: 
     run: |
-      set -e
-      apt-get update && apt-get install -y jq
       FRAMERATE=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .r_frame_rate')
       echo -n $FRAMERATE >> $TORK_OUTPUT
 
