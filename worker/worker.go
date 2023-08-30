@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -31,6 +32,7 @@ type Worker struct {
 	limits    Limits
 	tempdir   string
 	api       *api
+	taskCount int32
 }
 
 type Limits struct {
@@ -102,6 +104,10 @@ func (w *Worker) cancelTask(t *task.Task) error {
 }
 
 func (w *Worker) runTask(t *task.Task) error {
+	atomic.AddInt32(&w.taskCount, 1)
+	defer func() {
+		atomic.AddInt32(&w.taskCount, -1)
+	}()
 	// create a cancellation context in case
 	// the coordinator wants to cancel the
 	// task later on
@@ -313,6 +319,7 @@ func (w *Worker) sendHeartbeats() {
 				Status:          status,
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
+				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
 			},
 		)
 		if err != nil {

@@ -270,6 +270,7 @@ func TestPostgresUpdateNode(t *testing.T) {
 
 	err = ds.UpdateNode(ctx, n1.ID, func(u *node.Node) error {
 		u.LastHeartbeatAt = now
+		u.TaskCount = 2
 		return nil
 	})
 	assert.NoError(t, err)
@@ -279,6 +280,7 @@ func TestPostgresUpdateNode(t *testing.T) {
 	assert.Equal(t, now.Hour(), n2.LastHeartbeatAt.Hour())
 	assert.Equal(t, now.Minute(), n2.LastHeartbeatAt.Minute())
 	assert.Equal(t, now.Second(), n2.LastHeartbeatAt.Second())
+	assert.Equal(t, 2, n2.TaskCount)
 }
 
 func TestPostgresUpdateNodeConcurrently(t *testing.T) {
