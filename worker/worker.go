@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -14,6 +13,7 @@ import (
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
 )
@@ -27,8 +27,7 @@ type Worker struct {
 	broker    mq.Broker
 	stop      bool
 	queues    map[string]int
-	tasks     map[string]runningTask
-	mu        sync.RWMutex
+	tasks     *syncx.Map[string, runningTask]
 	limits    Limits
 	tempdir   string
 	api       *api
@@ -68,7 +67,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		broker:    cfg.Broker,
 		runtime:   cfg.Runtime,
 		queues:    cfg.Queues,
-		tasks:     make(map[string]runningTask),
+		tasks:     new(syncx.Map[string, runningTask]),
 		limits:    cfg.Limits,
 		tempdir:   cfg.TempDir,
 		api:       newAPI(cfg),
@@ -91,16 +90,14 @@ func (w *Worker) handleTask(t *task.Task) error {
 }
 
 func (w *Worker) cancelTask(t *task.Task) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	rt, ok := w.tasks[t.ID]
+	rt, ok := w.tasks.Get(t.ID)
 	if !ok {
 		log.Debug().Msgf("unknown task %s. nothing to cancel", t.ID)
 		return nil
 	}
 	log.Debug().Msgf("cancelling task %s", t.ID)
 	rt.cancel()
-	delete(w.tasks, t.ID)
+	w.tasks.Delete(t.ID)
 	return nil
 }
 
@@ -110,16 +107,10 @@ func (w *Worker) runTask(t *task.Task) error {
 	// task later on
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w.mu.Lock()
-	w.tasks[t.ID] = runningTask{
+	w.tasks.Set(t.ID, runningTask{
 		cancel: cancel,
-	}
-	w.mu.Unlock()
-	defer func() {
-		w.mu.Lock()
-		defer w.mu.Unlock()
-		delete(w.tasks, t.ID)
-	}()
+	})
+	defer w.tasks.Delete(t.ID)
 	// let the coordinator know that the task started executing
 	started := time.Now().UTC()
 	t.StartedAt = &started

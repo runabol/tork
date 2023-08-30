@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
+	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 )
 
@@ -19,9 +20,8 @@ const defaultQueueSize = 1000
 // which uses in-memory channels to exchange messages. Meant for local
 // development, tests etc.
 type InMemoryBroker struct {
-	queues       map[string]*queue
-	mu           sync.RWMutex
-	shuttingDown bool
+	queues    *syncx.Map[string, *queue]
+	terminate *atomic.Bool
 }
 
 type queue struct {
@@ -94,7 +94,8 @@ func (q *queue) subscribe(sub func(m any) error) {
 
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
-		queues: make(map[string]*queue),
+		queues:    new(syncx.Map[string, *queue]),
+		terminate: new(atomic.Bool),
 	}
 }
 
@@ -114,26 +115,21 @@ func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Ta
 }
 
 func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
-	q, ok := b.queues[qname]
+	q, ok := b.queues.Get(qname)
 	if !ok {
 		q = newQueue(qname)
-		b.queues[qname] = q
+		b.queues.Set(qname, q)
 	}
 	q.subscribe(handler)
 	return nil
 }
 
 func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 	qi := make([]QueueInfo, 0)
-	for k := range b.queues {
-		q := b.queues[k]
+	for _, q := range b.queues.Values() {
 		qi = append(qi, QueueInfo{
-			Name:        k,
+			Name:        q.name,
 			Size:        q.size(),
 			Subscribers: len(q.subs),
 			Unacked:     int(atomic.LoadInt32(&q.unacked)),
@@ -171,36 +167,23 @@ func (b *InMemoryBroker) SubscribeForJobs(handler func(j *job.Job) error) error 
 }
 
 func (b *InMemoryBroker) publish(qname string, m any) error {
-	b.mu.RLock()
-	q, ok := b.queues[qname]
-	b.mu.RUnlock()
+	q, ok := b.queues.Get(qname)
 	if !ok {
 		q = newQueue(qname)
-		b.mu.Lock()
-		b.queues[qname] = q
-		b.mu.Unlock()
+		b.queues.Set(qname, q)
 	}
 	q.send(m)
 	return nil
 }
 
-func (b *InMemoryBroker) isShuttingDown() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.shuttingDown
-}
-
 func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
-	if b.isShuttingDown() {
+	if !b.terminate.CompareAndSwap(false, true) {
 		return nil
 	}
-	b.mu.Lock()
-	b.shuttingDown = true
-	b.mu.Unlock()
 	done := make(chan int)
 	go func() {
-		for _, q := range b.queues {
-			log.Debug().Msgf("closing %s", q.name)
+		for _, q := range b.queues.Values() {
+			log.Debug().Msgf("shutting down channel %s", q.name)
 			q.close()
 		}
 		done <- 1
