@@ -603,6 +603,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 		u.LastHeartbeatAt = n.LastHeartbeatAt
 		u.CPUPercent = n.CPUPercent
 		u.Status = n.Status
+		u.TaskCount = n.TaskCount
 		return nil
 	})
 
