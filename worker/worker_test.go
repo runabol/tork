@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -52,13 +53,6 @@ func Test_handleTaskRun(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
-		completions = completions + 1
-		return nil
-	})
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
@@ -66,6 +60,23 @@ func Test_handleTaskRun(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
+
+	completions := 0
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
+		assert.Equal(t, int32(0), atomic.LoadInt32(&w.taskCount))
+		completions = completions + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	starts := 0
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *task.Task) error {
+		assert.Equal(t, int32(1), w.taskCount)
+		starts = starts + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
 	err = w.Start()
 	assert.NoError(t, err)
 
@@ -84,6 +95,7 @@ func Test_handleTaskRun(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, completions)
+	assert.Equal(t, 1, starts)
 	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 
 }
