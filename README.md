@@ -688,6 +688,7 @@ Failure:
 8. Ability to assign tags to jobs in order to group them and for FTS.
 9. Config files
 10. Node to expose number of tasks it's currently working on
+11. Plugins
 
 ## License
 
