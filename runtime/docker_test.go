@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
@@ -209,4 +211,34 @@ func TestRunTaskWithVolume(t *testing.T) {
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
+}
+
+func Test_imagePull(t *testing.T) {
+	ctx := context.Background()
+
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	images, err := rt.client.ImageList(ctx, types.ImageListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:*")),
+	})
+	assert.NoError(t, err)
+
+	for _, img := range images {
+		_, err = rt.client.ImageRemove(ctx, img.ID, types.ImageRemoveOptions{Force: true})
+		assert.NoError(t, err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	for i := 0; i < 3; i++ {
+		go func() {
+			defer wg.Done()
+			err = rt.imagePull(ctx, &task.Task{Image: "alpine:3.18.3"})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
 }
