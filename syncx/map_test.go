@@ -56,13 +56,19 @@ func TestConcurrentSetAndGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestVals(t *testing.T) {
+func TestIterate(t *testing.T) {
 	m := syncx.Map[string, int]{}
 	m.Set("k1", 100)
 	m.Set("k2", 200)
-	vals := m.Values()
+	vals := make([]int, 0)
+	keys := make([]string, 0)
+	m.Iterate(func(k string, v int) {
+		vals = append(vals, v)
+		keys = append(keys, k)
+	})
 	slices.Sort(vals)
 	assert.Equal(t, []int{100, 200}, vals)
+	assert.Equal(t, []string{"k1", "k2"}, keys)
 }
 
 func BenchmarkSetAndGet(b *testing.B) {

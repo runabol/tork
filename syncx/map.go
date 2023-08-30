@@ -22,11 +22,9 @@ func (m *Map[K, V]) Set(key K, value V) {
 	m.m.Store(key, value)
 }
 
-func (m *Map[K, V]) Values() []V {
-	vals := make([]V, 0)
+func (m *Map[K, V]) Iterate(f func(key K, value V)) {
 	m.m.Range(func(key, value any) bool {
-		vals = append(vals, value.(V))
+		f(key.(K), value.(V))
 		return true
 	})
-	return vals
 }

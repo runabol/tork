@@ -93,7 +93,7 @@ func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.N
 func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, error) {
 	nodes := make([]node.Node, 0)
 	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
-	for _, n := range ds.nodes.Values() {
+	ds.nodes.Iterate(func(_ string, n node.Node) {
 		if n.LastHeartbeatAt.After(timeout) {
 			// if we hadn't seen an heartbeat for two or more
 			// consecutive periods we consider the node as offline
@@ -102,7 +102,7 @@ func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, e
 			}
 			nodes = append(nodes, n)
 		}
-	}
+	})
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].LastHeartbeatAt.After(nodes[j].LastHeartbeatAt)
 	})
@@ -128,11 +128,11 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 
 func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
 	execution := make([]*task.Task, 0)
-	for _, t := range ds.tasks.Values() {
+	ds.tasks.Iterate(func(_ string, t *task.Task) {
 		if t.JobID == id {
 			execution = append(execution, t.Clone())
 		}
-	}
+	})
 	return execution
 }
 
@@ -164,23 +164,23 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 
 func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*task.Task, error) {
 	result := make([]*task.Task, 0)
-	for _, t := range ds.tasks.Values() {
+	ds.tasks.Iterate(func(_ string, t *task.Task) {
 		if t.JobID == jobID && t.State.IsActive() {
 			result = append(result, t.Clone())
 		}
-	}
+	})
 	return result, nil
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
 	offset := (page - 1) * size
 	filtered := make([]*job.Job, 0)
-	for _, j := range ds.jobs.Values() {
+	ds.jobs.Iterate(func(_ string, j *job.Job) {
 		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(q)) ||
 			strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(q)) {
 			filtered = append(filtered, j)
 		}
-	}
+	})
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
 	})
@@ -208,24 +208,24 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
 	s := &stats.Stats{}
 
-	for _, j := range ds.jobs.Values() {
+	ds.jobs.Iterate(func(_ string, j *job.Job) {
 		if j.State == job.Running {
 			s.Jobs.Running = s.Jobs.Running + 1
 		}
-	}
+	})
 
-	for _, t := range ds.tasks.Values() {
+	ds.tasks.Iterate(func(_ string, t *task.Task) {
 		if t.State == task.Running {
 			s.Tasks.Running = s.Tasks.Running + 1
 		}
-	}
+	})
 
-	for _, n := range ds.nodes.Values() {
+	ds.nodes.Iterate(func(_ string, n node.Node) {
 		if n.LastHeartbeatAt.After(time.Now().UTC().Add(-(time.Minute * 5))) {
 			s.Nodes.Running = s.Nodes.Running + 1
 			s.Nodes.CPUPercent = s.Nodes.CPUPercent + n.CPUPercent
 		}
-	}
+	})
 	// calculate average
 	if s.Nodes.Running > 0 {
 		s.Nodes.CPUPercent = s.Nodes.CPUPercent / float64(s.Nodes.Running)

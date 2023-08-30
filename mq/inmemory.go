@@ -127,14 +127,14 @@ func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) erro
 
 func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	qi := make([]QueueInfo, 0)
-	for _, q := range b.queues.Values() {
+	b.queues.Iterate(func(_ string, q *queue) {
 		qi = append(qi, QueueInfo{
 			Name:        q.name,
 			Size:        q.size(),
 			Subscribers: len(q.subs),
 			Unacked:     int(atomic.LoadInt32(&q.unacked)),
 		})
-	}
+	})
 	return qi, nil
 }
 
@@ -182,10 +182,10 @@ func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
 	}
 	done := make(chan int)
 	go func() {
-		for _, q := range b.queues.Values() {
+		b.queues.Iterate(func(_ string, q *queue) {
 			log.Debug().Msgf("shutting down channel %s", q.name)
 			q.close()
-		}
+		})
 		done <- 1
 	}()
 	select {
