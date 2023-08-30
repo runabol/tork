@@ -689,6 +689,7 @@ Failure:
 9. Config files
 10. Node to expose number of tasks it's currently working on
 11. Plugins
+12. Support for private docker repos
 
 ## License
 
