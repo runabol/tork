@@ -39,8 +39,9 @@ func main() {
 					defaultCPUsLimit(),
 					defaultMemoryLimit(),
 					tempDirFlag(),
-					debugFlag(),
 					coordinatorAddressFlag(),
+					logLevel(),
+					logFormat(),
 				},
 				Action: runCoordinator,
 			},
@@ -55,7 +56,8 @@ func main() {
 					defaultMemoryLimit(),
 					tempDirFlag(),
 					workerAddressFlag(),
-					debugFlag(),
+					logLevel(),
+					logFormat(),
 				},
 				Action: runWorker,
 			},
@@ -71,7 +73,8 @@ func main() {
 					defaultCPUsLimit(),
 					defaultMemoryLimit(),
 					tempDirFlag(),
-					debugFlag(),
+					logLevel(),
+					logFormat(),
 				},
 				Action: runStandalone,
 			},
@@ -81,7 +84,7 @@ func main() {
 				Flags: []cli.Flag{
 					datastoreFlag(),
 					postgresDSNFlag(),
-					debugFlag(),
+					logLevel(),
 				},
 				Action: runMigration,
 			},
@@ -94,7 +97,9 @@ func main() {
 }
 
 func runCoordinator(ctx *cli.Context) error {
-	initLogging(ctx)
+	if err := setupLogging(ctx); err != nil {
+		return err
+	}
 
 	broker, err := createBroker(ctx)
 	if err != nil {
@@ -126,7 +131,9 @@ func runCoordinator(ctx *cli.Context) error {
 }
 
 func runWorker(ctx *cli.Context) error {
-	initLogging(ctx)
+	if err := setupLogging(ctx); err != nil {
+		return err
+	}
 
 	broker, err := createBroker(ctx)
 	if err != nil {
@@ -154,7 +161,9 @@ func runWorker(ctx *cli.Context) error {
 }
 
 func runStandalone(ctx *cli.Context) error {
-	initLogging(ctx)
+	if err := setupLogging(ctx); err != nil {
+		return err
+	}
 
 	broker, err := createBroker(ctx)
 	if err != nil {
@@ -196,7 +205,9 @@ func runStandalone(ctx *cli.Context) error {
 }
 
 func runMigration(ctx *cli.Context) error {
-	initLogging(ctx)
+	if err := setupLogging(ctx); err != nil {
+		return err
+	}
 
 	ds, err := createDatastore(ctx)
 	if err != nil {
@@ -261,7 +272,6 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Contex
 		DataStore: ds,
 		Queues:    queues,
 		Address:   ctx.String("address"),
-		Debug:     ctx.Bool("debug"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -316,13 +326,33 @@ func parseQueueConfig(ctx *cli.Context) (map[string]int, error) {
 	return queues, nil
 }
 
-func initLogging(ctx *cli.Context) {
+func setupLogging(ctx *cli.Context) error {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if ctx.Bool("debug") {
+	logLevel := strings.ToLower(ctx.String("log-level"))
+	// setup log level
+	switch logLevel {
+	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
+	case "info":
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case "warn", "warning":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "error":
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	default:
+		return errors.Errorf("invalid logging level: %s", logLevel)
 	}
+	// setup log format (pretty / json)
+	logFormat := strings.ToLower(ctx.String("log-format"))
+	switch logFormat {
+	case "pretty":
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	case "json":
+		// default
+	default:
+		return errors.Errorf("invalid logging format: %s", logFormat)
+	}
+	return nil
 }
 
 func queueFlag() cli.Flag {
@@ -411,11 +441,19 @@ func coordinatorAddressFlag() cli.Flag {
 	}
 }
 
-func debugFlag() cli.Flag {
+func logLevel() cli.Flag {
 	return &cli.StringFlag{
-		Name:  "debug",
-		Usage: "Enbale debug mode",
-		Value: "false",
+		Name:  "log-level",
+		Usage: "Configure the logging level (debug|info|warn|error)",
+		Value: "info",
+	}
+}
+
+func logFormat() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "log-format",
+		Usage: "Configure the logging format (pretty|json)",
+		Value: "pretty",
 	}
 }
 
