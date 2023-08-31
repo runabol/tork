@@ -17,7 +17,8 @@ func TestAwaitTerm(t *testing.T) {
 	}()
 	// wait for the hook
 	time.Sleep(time.Millisecond * 100)
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	assert.NoError(t, err)
 	// wait for termination to be caught
 	time.Sleep(time.Millisecond * 100)
 	assert.True(t, terminated)

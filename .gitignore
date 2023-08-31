@@ -19,3 +19,7 @@
 
 # Go workspace file
 go.work
+
+# build and files
+.build/
+.release/

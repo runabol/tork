@@ -1,0 +1,87 @@
+# Makefile for releasing Tork
+#
+# The release is controlled from version/version.go. The version found there is
+# used to tag the git repo and to build the assets that are uploaded to GitHub.
+#
+# Steps to release: 
+# 1. make -f Makefile.release release
+# 2. make -f Makefile.release github-push
+
+ifeq (, $(shell which curl))
+    $(error "No curl in $$PATH, please install")
+endif
+
+NAME:=tork
+VERSION:=$(shell grep 'Version' version/version.go | awk '{ print $$3 }' | tr -d '"')
+GITHUB:=runabol
+LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x mips riscv64
+
+all:
+	@echo Use the 'release' target to build a release
+
+release: build tar
+
+.PHONY: build
+build:
+	@go version
+	@echo Cleaning old builds
+	@rm -rf .build && mkdir .build
+	@echo Building: darwin/amd64 - $(VERSION)
+	mkdir -p .build/darwin/amd64 && $(MAKE) tork BINARY=.build/darwin/amd64/$(NAME) SYSTEM="GOOS=darwin GOARCH=amd64" BUILDOPTS=""
+	@echo Building: darwin/arm64 - $(VERSION)
+	mkdir -p .build/darwin/arm64 && $(MAKE) tork BINARY=.build/darwin/arm64/$(NAME) SYSTEM="GOOS=darwin GOARCH=arm64" BUILDOPTS=""
+	@echo Building: windows/amd64 - $(VERSION)
+	mkdir -p .build/windows/amd64 && $(MAKE) tork BINARY=.build/windows/amd64/$(NAME).exe SYSTEM="GOOS=windows GOARCH=amd64" BUILDOPTS=""
+	@echo Building: linux/$(LINUX_ARCH) - $(VERSION) ;\
+	for arch in $(LINUX_ARCH); do \
+	    mkdir -p .build/linux/$$arch  && $(MAKE) tork BINARY=.build/linux/$$arch/$(NAME) SYSTEM="GOOS=linux GOARCH=$$arch" BUILDOPTS="" ;\
+	done
+
+.PHONY: tar
+tar:
+	@echo Cleaning old releases
+	@rm -rf .release && mkdir .release
+	tar -zcf .release/$(NAME)_$(VERSION)_darwin_amd64.tgz -C .build/darwin/amd64 $(NAME)
+	tar -zcf .release/$(NAME)_$(VERSION)_darwin_arm64.tgz -C .build/darwin/arm64 $(NAME)
+	tar -zcf .release/$(NAME)_$(VERSION)_windows_amd64.tgz -C .build/windows/amd64 $(NAME).exe
+	for arch in $(LINUX_ARCH); do \
+	    tar -zcf .release/$(NAME)_$(VERSION)_linux_$$arch.tgz -C .build/linux/$$arch $(NAME) ;\
+	done
+
+.PHONY: github-push
+github-push:
+ifeq ($(GITHUB_ACCESS_TOKEN),)
+	$(error "Please set the GITHUB_ACCESS_TOKEN environment variable")
+else
+	@echo Releasing: $(VERSION)
+	@$(eval RELEASE:=$(shell curl -s -d '{"tag_name": "v$(VERSION)", "name": "v$(VERSION)"}' -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" "https://api.github.com/repos/$(GITHUB)/$(NAME)/releases" | grep -m 1 '"id"' | tr -cd '[[:digit:]]'))
+	@echo ReleaseID: $(RELEASE)
+	@( cd release; for asset in `ls -A .release/*tgz`; do \
+	    echo $$asset; \
+	    curl -o /dev/null -X POST \
+	      -H "Content-Type: application/gzip" \
+	      -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" \
+	      --data-binary "@$$asset" \
+	      "https://uploads.github.com/repos/$(GITHUB)/$(NAME)/releases/$(RELEASE)/assets?name=$${asset}" ; \
+	done )
+	@( cd release; for asset in `ls -A .release/*tgz`; do \
+	    sha256sum $$asset > $$asset.sha256; \
+	done )
+	@( cd release; for asset in `ls -A *sha256`; do \
+	    echo $$asset; \
+	    curl -o /dev/null -X POST \
+	      -H "Content-Type: text/plain" \
+	      -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" \
+	      --data-binary "@$$asset" \
+	      "https://uploads.github.com/repos/$(GITHUB)/$(NAME)/releases/$(RELEASE)/assets?name=$${asset}" ; \
+	done )
+endif
+
+.PHONY: version
+version:
+	@echo $(VERSION)
+
+.PHONY: clean
+clean:
+	rm -rf release
+	rm -rf build
