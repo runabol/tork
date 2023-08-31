@@ -3,10 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -16,6 +14,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/signals"
 	"github.com/runabol/tork/worker"
 	"github.com/urfave/cli/v2"
 )
@@ -116,11 +115,8 @@ func runCoordinator(ctx *cli.Context) error {
 		return err
 	}
 
-	// wait for the termination signal
-	// so we can do a clean shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	signals.AwaitTerm()
+
 	log.Debug().Msg("shutting down")
 	if c != nil {
 		if err := c.Stop(); err != nil {
@@ -145,11 +141,8 @@ func runWorker(ctx *cli.Context) error {
 		return err
 	}
 
-	// wait for the termination signal
-	// so we can do a clean shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	signals.AwaitTerm()
+
 	log.Debug().Msg("shutting down")
 	if w != nil {
 		if err := w.Stop(); err != nil {
@@ -184,11 +177,8 @@ func runStandalone(ctx *cli.Context) error {
 		return err
 	}
 
-	// wait for the termination signal
-	// so we can do a clean shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	signals.AwaitTerm()
+
 	log.Debug().Msg("shutting down")
 	if w != nil {
 		if err := w.Stop(); err != nil {
@@ -445,7 +435,7 @@ func logLevel() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "log-level",
 		Usage: "Configure the logging level (debug|info|warn|error)",
-		Value: "info",
+		Value: "debug",
 	}
 }
 
