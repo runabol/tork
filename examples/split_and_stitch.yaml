@@ -8,7 +8,7 @@ description: |
 
   You can get a running instance of minio using the following command: 
 
-  docker run --name=minio --network=minio -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+  docker run --name=minio -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
 
   You'll like have to change the endpointURL below to the IP address of your minio server
 
