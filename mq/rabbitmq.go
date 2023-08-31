@@ -336,7 +336,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	// close channels cleanly
 	for _, sub := range b.subscriptions {
 		log.Debug().
-			Msgf("shutting down subscription %s for %s", sub.name, sub.qname)
+			Msgf("shutting down subscription on %s", sub.qname)
 		if err := sub.ch.Cancel(sub.name, false); err != nil {
 			log.Error().
 				Err(err).
@@ -346,6 +346,12 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	// let's give the subscribers a grace
 	// period to allow them to cleanly exit
 	for _, sub := range b.subscriptions {
+		// skip non-coordinator queue
+		if !IsCoordinatorQueue(sub.qname) {
+			continue
+		}
+		log.Debug().
+			Msgf("waiting for subscription %s to terminate", sub.qname)
 		select {
 		case <-ctx.Done():
 		case <-sub.done:

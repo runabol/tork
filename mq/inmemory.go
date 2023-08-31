@@ -59,7 +59,9 @@ func (q *queue) close() {
 	defer q.mu.Unlock()
 	for _, sub := range q.subs {
 		close(sub.terminate)
-		<-sub.terminated
+		if IsCoordinatorQueue(q.name) {
+			<-sub.terminated
+		}
 	}
 }
 

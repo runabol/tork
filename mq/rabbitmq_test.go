@@ -124,8 +124,9 @@ func TestRabbitMQShutdown(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		processed = processed + 1
-		err := b.PublishTask(ctx, qname, t1)
-		assert.NoError(t, err)
+		// should not be able to block
+		// the termination process
+		time.Sleep(time.Hour)
 		return nil
 	})
 	assert.NoError(t, err)

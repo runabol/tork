@@ -175,6 +175,9 @@ func TestInMemoryShutdown(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		processed = processed + 1
+		// should not be able to block
+		// the termination process
+		time.Sleep(time.Hour)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -188,9 +191,9 @@ func TestInMemoryShutdown(t *testing.T) {
 	// cleanly shutdown
 	err = b.Shutdown(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 10, processed)
+	assert.Equal(t, 1, processed)
 	// there should be no more processing past the shutdown
 	err = b.PublishTask(ctx, qname1, &task.Task{})
 	assert.NoError(t, err)
-	assert.Equal(t, 10, processed)
+	assert.Equal(t, 1, processed)
 }
