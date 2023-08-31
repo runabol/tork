@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -243,11 +242,7 @@ func NewPostgresDataStore(dsn string) (*PostgresDatastore, error) {
 }
 
 func (ds *PostgresDatastore) ExecScript(script string) error {
-	schema, err := os.ReadFile(script)
-	if err != nil {
-		return errors.Wrapf(err, "erroring reading postgres schema file")
-	}
-	_, err = ds.exec(string(schema))
+	_, err := ds.exec(string(script))
 	return err
 }
 

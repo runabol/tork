@@ -1,3 +1,6 @@
+package postgres
+
+const SCHEMA = `
 CREATE TABLE nodes (
     id                 varchar(32)  not null primary key,
     queue              varchar(64)  not null,
@@ -81,3 +84,4 @@ CREATE TABLE tasks (
 
 CREATE INDEX idx_tasks_state ON tasks (state);
 CREATE INDEX idx_tasks_job_id ON tasks (job_id);
+`
