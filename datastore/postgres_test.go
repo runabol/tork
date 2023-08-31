@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/task"
@@ -333,7 +334,7 @@ func TestPostgresGetActiveNodes(t *testing.T) {
 		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
 		assert.NoError(t, err)
 	}()
-	err = ds.ExecScript("../db/postgres/schema.sql")
+	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	n1 := node.Node{
 		ID:              uuid.NewUUID(),
@@ -467,7 +468,7 @@ func TestPostgresGetJobs(t *testing.T) {
 		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
 		assert.NoError(t, err)
 	}()
-	err = ds.ExecScript("../db/postgres/schema.sql")
+	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	for i := 0; i < 101; i++ {
 		j1 := job.Job{
@@ -526,7 +527,7 @@ func TestPostgresSearchJobs(t *testing.T) {
 		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
 		assert.NoError(t, err)
 	}()
-	err = ds.ExecScript("../db/postgres/schema.sql")
+	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	for i := 0; i < 101; i++ {
 		j1 := job.Job{
@@ -579,7 +580,7 @@ func TestPostgresGetStats(t *testing.T) {
 		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
 		assert.NoError(t, err)
 	}()
-	err = ds.ExecScript("../db/postgres/schema.sql")
+	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	s, err := ds.GetStats(ctx)
 	assert.NoError(t, err)

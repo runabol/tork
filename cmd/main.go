@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/coordinator"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/signals"
@@ -208,7 +209,7 @@ func runMigration(ctx *cli.Context) error {
 	dstype := ctx.String("datastore")
 	switch dstype {
 	case datastore.DATASTORE_POSTGRES:
-		if err := ds.(*datastore.PostgresDatastore).ExecScript("db/postgres/schema.sql"); err != nil {
+		if err := ds.(*datastore.PostgresDatastore).ExecScript(postgres.SCHEMA); err != nil {
 			return errors.Wrapf(err, "error when trying to create db schema")
 		}
 	default:
