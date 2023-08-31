@@ -67,7 +67,7 @@ else
 	@( cd release; for asset in `ls -A .release/*tgz`; do \
 	    sha256sum $$asset > $$asset.sha256; \
 	done )
-	@( cd release; for asset in `ls -A *sha256`; do \
+	@( cd release; for asset in `ls -A .release/*sha256`; do \
 	    echo $$asset; \
 	    curl -o /dev/null -X POST \
 	      -H "Content-Type: text/plain" \
