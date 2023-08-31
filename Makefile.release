@@ -4,8 +4,9 @@
 # used to tag the git repo and to build the assets that are uploaded to GitHub.
 #
 # Steps to release: 
-# 1. make -f Makefile.release release
-# 2. make -f Makefile.release github-push
+# 1. Update version/version.go.
+# 2. make -f Makefile.release release
+# 3. make -f Makefile.release github-push
 
 ifeq (, $(shell which curl))
     $(error "No curl in $$PATH, please install")
