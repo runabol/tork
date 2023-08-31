@@ -41,19 +41,16 @@ A Golang based high-performance, scalable and distributed workflow engine.
 
 ## Getting started
 
-### Prerequisites
+1. Ensure you have [Docker](https://docs.docker.com/get-docker/) with API Version >= 1.42 (use `docker version | grep API` to check).
 
-Before running the examples, ensure you have the following software installed:
-
-- [Go](https://golang.org/doc/install) 1.19 or later
-- [Docker](https://docs.docker.com/get-docker/) with API Version >= 1.42 (use `docker version | grep API` to check)
+2. Download the binary for your system from the [releases](https://github.com/runabol/tork/releases/latest) page.
 
 ### Hello World
 
 Start in `standalone` mode:
 
 ```
-go run cmd/main.go standalone
+tork standalone
 ```
 
 Submit a job in another terminal:
@@ -139,6 +136,17 @@ tasks:
           https://devnull-as-a-service.com/dev/null
 ```
 
+Submit the job in another terminal:
+
+```
+JOB_ID=$(curl \
+  -s \
+  -X POST \
+  --data-binary @convert.yaml \
+  -H "Content-type: text/yaml" \
+  http://localhost:8000/jobs | jq -r .id)
+```
+
 ### More examples
 
 Check out the [examples](examples/) folder.
@@ -154,7 +162,7 @@ It is often desirable to route tasks to different queues in order to create spec
 For example, one pool of workers, specially configured to handle video transcoding can listen to video processing related tasks:
 
 ```
-go run cmd/main.go worker -queue transcoding:3 -queue default:10
+tork worker -queue transcoding:3 -queue default:10
 ```
 
 In this example the worker would handle up to 3 transcoding-related tasks and up to 10 "regular" tasks concurrently.
@@ -223,19 +231,19 @@ You can specify which type of datastore to use using the `-datastore` flag.
 Start Postgres DB:
 
 ```bash
-docker compose up postgres -d
+docker run -d --name tork-postgres -p 5432:5432 -e POSTGRES_PASSWORD=tork -e POSTGRES_USER=tork -e POSTGRES_DB=tork postgres:15.3
 ```
 
 Run a migration to create the database schema
 
 ```bash
-docker compose up migration
+tork migration -datastore postgres
 ```
 
 Start Tork
 
 ```bash
-go run cmd/main.go \
+tork \
   standalone \
   -datastore postgres \
   -postgres-dsn "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
@@ -248,13 +256,13 @@ To run in distributed mode we need to use an external message broker.
 Start RabbitMQ:
 
 ```bash
-docker compose up rabbitmq -d
+docker run -d --name=tork-rabbit -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 ```
 
 Start the Coordinator:
 
 ```bash
-go run cmd/main.go \
+tork \
  coordinator \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
@@ -263,7 +271,7 @@ go run cmd/main.go \
 Start the worker(s):
 
 ```bash
-go run cmd/main.go \
+tork \
  worker \
  -broker rabbitmq \
  -rabbitmq-url amqp://guest:guest@localhost:5672
