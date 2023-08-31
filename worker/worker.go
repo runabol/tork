@@ -292,12 +292,6 @@ func deleteTempDir(dirname string) {
 
 func (w *Worker) sendHeartbeats() {
 	for !w.stop {
-		s, err := getStats()
-		if err != nil {
-			log.Error().Msgf("error collecting stats for %s", w.id)
-		} else {
-			log.Debug().Float64("cpu-percent", s.CPUPercent).Msgf("collecting stats for %s", w.id)
-		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		status := node.UP
@@ -309,12 +303,13 @@ func (w *Worker) sendHeartbeats() {
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to get hostname for worker %s", w.id)
 		}
+		cpuPercent := getCPUPercent()
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
 			node.Node{
 				ID:              w.id,
 				StartedAt:       w.startTime,
-				CPUPercent:      s.CPUPercent,
+				CPUPercent:      cpuPercent,
 				Queue:           fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
 				Status:          status,
 				LastHeartbeatAt: time.Now().UTC(),

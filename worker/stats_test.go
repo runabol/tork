@@ -7,7 +7,6 @@ import (
 )
 
 func TestGetStats(t *testing.T) {
-	stats, err := getStats()
-	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, stats.CPUPercent, float64(0))
+	cpuPercent := getCPUPercent()
+	assert.GreaterOrEqual(t, cpuPercent, float64(0))
 }
