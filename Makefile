@@ -6,7 +6,7 @@ CHECKS:=check
 BUILDOPTS:=-v
 GOPATH?=$(HOME)/go
 MAKEPWD:=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-CGO_ENABLED?=0
+CGO_ENABLED?=1
 
 .PHONY: all
 all: tork
