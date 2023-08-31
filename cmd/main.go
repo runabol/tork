@@ -15,6 +15,7 @@ import (
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/signals"
+	"github.com/runabol/tork/version"
 	"github.com/runabol/tork/worker"
 	"github.com/urfave/cli/v2"
 )
@@ -84,6 +85,7 @@ func main() {
 					datastoreFlag(),
 					postgresDSNFlag(),
 					logLevel(),
+					logFormat(),
 				},
 				Action: runMigration,
 			},
@@ -448,13 +450,15 @@ func logFormat() cli.Flag {
 }
 
 func getBanner() string {
-	return color.WhiteString(`
-_______  _______  ______    ___   _ 
+	return color.WhiteString(fmt.Sprintf(`
+ _______  _______  ______    ___   _ 
 |       ||       ||    _ |  |   | | |
 |_     _||   _   ||   | ||  |   |_| |
   |   |  |  | |  ||   |_||_ |      _|
   |   |  |  |_|  ||    __  ||     |_ 
   |   |  |       ||   |  | ||    _  |
   |___|  |_______||___|  |_||___| |_|
-`)
+
+ %s (%s)
+`, version.Version, version.GitCommit))
 }
