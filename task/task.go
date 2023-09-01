@@ -39,6 +39,7 @@ type Task struct {
 	Run         string            `json:"run,omitempty"`
 	Image       string            `json:"image,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
+	Files       map[string]string `json:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Pre         []*Task           `json:"pre,omitempty"`
@@ -132,6 +133,7 @@ func (t *Task) Clone() *Task {
 		Run:         t.Run,
 		Image:       t.Image,
 		Env:         clone.CloneStringMap(t.Env),
+		Files:       clone.CloneStringMap(t.Files),
 		Queue:       t.Queue,
 		Error:       t.Error,
 		Pre:         CloneTasks(t.Pre),

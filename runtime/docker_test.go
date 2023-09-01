@@ -197,7 +197,7 @@ func TestRunTaskWithVolume(t *testing.T) {
 
 	script := `echo hello world > /xyz/thing`
 
-	err = os.WriteFile(path.Join(rundir, "run"), []byte(script), os.ModePerm)
+	err = os.WriteFile(path.Join(rundir, "entrypoint"), []byte(script), os.ModePerm)
 	assert.NoError(t, err)
 
 	t1 := &task.Task{

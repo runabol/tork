@@ -568,6 +568,14 @@ task properties:
     limit: 5 # will retry up to 5 times
   ```
 - `timeout` - the amount of time (specified as `300ms` or `1h` or `45m` etc.) that a task may execute before it is cancelled.
+- `files` - allows setting up arbitrary files in the container's work dir:
+  ```yaml
+  - name: my python task
+    image: python:3
+    run: python script.py
+    files:
+      script.py: print("hello world")
+  ```
 
 **Examples:**
 
