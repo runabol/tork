@@ -58,17 +58,16 @@ tasks:
     image: python:3-slim
     env:
       FRAMERATE: "{{ tasks.framerate }}" 
-    cmd: 
+    files:
+      script.py: |
+        import re
+        import sys
+        cfrate = re.sub(r"[^0-9/\\.]", "", sys.argv[1])
+        pfrate = cfrate.split("/")
+        frate = float(pfrate[0])/float(pfrate[1])
+        print(frate,end="")
     run: |
-      cat > script.py << SCRIPT
-      import re
-      # parse and clean the framerate
-      cfrate = re.sub(r"[^0-9/\\.]", "", "$FRAMERATE")
-      pfrate = cfrate.split("/")
-      frate = float(pfrate[0])/float(pfrate[1])
-      print(frate,end="")
-      SCRIPT
-      python script.py > $TORK_OUTPUT
+      python script.py $FRAMERATE > $TORK_OUTPUT
 
   - var: chunks
     name: calculate chunks times 
@@ -76,38 +75,39 @@ tasks:
     env:
       DURATION: "{{ tasks.duration }}"
       FRAMERATE: "{{ tasks.framerate }}" 
-    cmd: 
+    cmd:
+    files:
+      script.py: |
+        import math
+        import json
+        import sys
+
+        duration = float(sys.argv[1])
+        frate = float(sys.argv[2])
+
+        frate_ceil = math.ceil(frate)
+        time_unit = frate_ceil/frate
+        chunk_size = 10*time_unit
+
+        chunks = []
+        start = 0
+        length = 0
+        while(start<duration):
+          if(duration-start<chunk_size):
+            length=duration-start
+          else:
+            length=chunk_size
+
+          if duration-(start+length) < 5:
+            length=duration-start
+
+          chunks.append({"start":start,"length":length})
+          
+          start = start+length;
+        
+        print(json.dumps(chunks))
     run: |
-      cat > script.py << SCRIPT
-      import math
-      import json
-
-      duration = float("$DURATION")
-      frate = float("$FRAMERATE")
-
-      frate_ceil = math.ceil(frate)
-      time_unit = frate_ceil/frate
-      chunk_size = 10*time_unit
-
-      chunks = []
-      start = 0
-      length = 0
-      while(start<duration):
-        if(duration-start<chunk_size):
-          length=duration-start
-        else:
-          length=chunk_size
-
-        if duration-(start+length) < 5:
-          length=duration-start
-
-        chunks.append({"start":start,"length":length})
-
-        start = start+length;
-      
-      print(json.dumps(chunks))
-      SCRIPT
-      python script.py > $TORK_OUTPUT
+      python script.py $DURATION $FRAMERATE > $TORK_OUTPUT
 
   - var: bucketName
     name: generate a random bucket name to store the results
