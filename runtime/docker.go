@@ -178,9 +178,11 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 			Memory:   mem,
 		},
 	}
+	var workdir string
 	cmd := t.CMD
 	if len(cmd) == 0 {
-		cmd = []string{"/tork/run"}
+		cmd = []string{"./entrypoint"}
+		workdir = "/tork"
 	}
 	entrypoint := t.Entrypoint
 	if len(entrypoint) == 0 && t.Run != "" {
@@ -191,6 +193,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 		Env:        env,
 		Cmd:        cmd,
 		Entrypoint: entrypoint,
+		WorkingDir: workdir,
 	}
 
 	nc := network.NetworkingConfig{

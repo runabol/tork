@@ -63,6 +63,7 @@ CREATE TABLE tasks (
     run_script    text,
     image         varchar(256),
     env           jsonb,
+    files_        jsonb,
     queue         varchar(256),
     error_        text,
     pre_tasks     jsonb,

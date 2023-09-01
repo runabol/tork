@@ -40,6 +40,7 @@ type taskRecord struct {
 	Run         string         `db:"run_script"`
 	Image       string         `db:"image"`
 	Env         []byte         `db:"env"`
+	Files       []byte         `db:"files_"`
 	Queue       string         `db:"queue"`
 	Error       string         `db:"error_"`
 	Pre         []byte         `db:"pre_tasks"`
@@ -96,6 +97,12 @@ func (r taskRecord) toTask() (*task.Task, error) {
 	if r.Env != nil {
 		if err := json.Unmarshal(r.Env, &env); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.env")
+		}
+	}
+	var files map[string]string
+	if r.Files != nil {
+		if err := json.Unmarshal(r.Files, &files); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.files")
 		}
 	}
 	var pre []*task.Task
@@ -161,6 +168,7 @@ func (r taskRecord) toTask() (*task.Task, error) {
 		Run:         r.Run,
 		Image:       r.Image,
 		Env:         env,
+		Files:       files,
 		Queue:       r.Queue,
 		Error:       r.Error,
 		Pre:         pre,
@@ -256,6 +264,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		s := string(b)
 		env = &s
 	}
+	var files *string
+	if t.Files != nil {
+		b, err := json.Marshal(t.Files)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.files")
+		}
+		s := string(b)
+		files = &s
+	}
 	pre, err := json.Marshal(t.Pre)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize task.pre")
@@ -336,12 +353,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 			each_, -- $29
 			description, -- $30
 			subjob, -- $31
-			networks -- $32
+			networks, -- $32
+			files_ -- $33
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32)`
+			$27,$28,$29,$30,$31,$32,$33)`
 	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -375,6 +393,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *task.Task) error
 		t.Description,                // $30
 		subjob,                       // $31
 		pq.StringArray(t.Networks),   // $32
+		files,                        // $33
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")

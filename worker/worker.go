@@ -19,8 +19,6 @@ import (
 	"github.com/runabol/tork/uuid"
 )
 
-const defaultOutputPath = "/tork/output"
-
 type Worker struct {
 	id        string
 	startTime time.Time
@@ -244,20 +242,32 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *task.Task) error {
 	t := o.Clone()
 	// create a temporary mount point
 	// we can use to write the run script to
-	rundir, err := os.MkdirTemp(w.tempdir, "tork-")
+	workdir, err := os.MkdirTemp(w.tempdir, "tork-")
 	if err != nil {
 		return errors.Wrapf(err, "error creating temp dir")
 	}
-	defer deleteTempDir(rundir)
-	if err := os.WriteFile(path.Join(rundir, "run"), []byte(t.Run), os.ModePerm); err != nil {
+	defer deleteTempDir(workdir)
+	if err := os.WriteFile(path.Join(workdir, "entrypoint"), []byte(t.Run), os.ModePerm); err != nil {
 		return err
 	}
-	t.Volumes = append(t.Volumes, fmt.Sprintf("bind:%s:%s", rundir, "/tork"))
+	stdoutFile := "stdout"
+	if err := os.WriteFile(path.Join(workdir, stdoutFile), []byte{}, os.ModePerm); err != nil {
+		return err
+	}
+	for filename, contents := range t.Files {
+		if err := os.WriteFile(path.Join(workdir, filename), []byte(contents), os.ModePerm); err != nil {
+			return err
+		}
+		if err := os.Chmod(path.Join(workdir, filename), 0444); err != nil {
+			return errors.Wrapf(err, "error making file %s read only", filename)
+		}
+	}
+	t.Volumes = append(t.Volumes, fmt.Sprintf("bind:%s:%s", workdir, "/tork"))
 	// set the path for task outputs
 	if t.Env == nil {
 		t.Env = make(map[string]string)
 	}
-	t.Env["TORK_OUTPUT"] = defaultOutputPath
+	t.Env["TORK_OUTPUT"] = fmt.Sprintf("/tork/%s", stdoutFile)
 	// create timeout context -- if timeout is defined
 	rctx := ctx
 	if t.Timeout != "" {
@@ -272,8 +282,8 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *task.Task) error {
 	if err := w.runtime.Run(rctx, t); err != nil {
 		return err
 	}
-	if _, err := os.Stat(path.Join(rundir, "output")); err == nil {
-		contents, err := os.ReadFile(path.Join(rundir, "output"))
+	if _, err := os.Stat(path.Join(workdir, stdoutFile)); err == nil {
+		contents, err := os.ReadFile(path.Join(workdir, stdoutFile))
 		if err != nil {
 			return errors.Wrapf(err, "error reading output file")
 		}

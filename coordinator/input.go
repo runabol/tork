@@ -29,6 +29,7 @@ type taskInput struct {
 	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
 	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	Files       map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Pre         []auxTaskInput    `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
 	Post        []auxTaskInput    `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
@@ -261,6 +262,7 @@ func (i taskInput) toTask() *task.Task {
 		Run:         i.Run,
 		Image:       i.Image,
 		Env:         i.Env,
+		Files:       i.Files,
 		Queue:       i.Queue,
 		Pre:         pre,
 		Post:        post,

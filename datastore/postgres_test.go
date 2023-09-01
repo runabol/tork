@@ -34,6 +34,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 		JobID:       j1.ID,
 		Description: "some description",
 		Networks:    []string{"some-network"},
+		Files:       map[string]string{"myfile": "hello world"},
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
@@ -42,6 +43,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.ID, t2.ID)
 	assert.Equal(t, t1.Description, t2.Description)
 	assert.Equal(t, []string([]string{"some-network"}), t2.Networks)
+	assert.Equal(t, map[string]string{"myfile": "hello world"}, t2.Files)
 }
 
 func TestPostgresCreateTaskBadOutput(t *testing.T) {
