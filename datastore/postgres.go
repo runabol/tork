@@ -90,6 +90,7 @@ type nodeRecord struct {
 	Status          string    `db:"status"`
 	Hostname        string    `db:"hostname"`
 	TaskCount       int       `db:"task_count"`
+	Version         string    `db:"version_"`
 }
 
 func (r taskRecord) toTask() (*task.Task, error) {
@@ -199,6 +200,7 @@ func (r nodeRecord) toNode() node.Node {
 		Status:          node.Status(r.Status),
 		Hostname:        r.Hostname,
 		TaskCount:       r.TaskCount,
+		Version:         r.Version,
 	}
 	// if we hadn't seen an heartbeat for two or more
 	// consecutive periods we consider the node as offline
@@ -498,10 +500,10 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n node.Node) error {
 	q := `insert into nodes 
-	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count) 
+	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8)`
-	_, err := ds.exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
+	_, err := ds.exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount, n.Version)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}
