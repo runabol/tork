@@ -28,6 +28,18 @@ func main() {
 	app := &cli.App{
 		Name:  "tork",
 		Usage: "a distributed workflow engine",
+		Flags: []cli.Flag{
+			bannerMode(),
+			logLevel(),
+			logFormat(),
+		},
+		Before: func(ctx *cli.Context) error {
+			if err := setupLogging(ctx); err != nil {
+				return err
+			}
+			printBanner(ctx)
+			return nil
+		},
 		Commands: []*cli.Command{
 			{
 				Name:  "run",
@@ -46,8 +58,6 @@ func main() {
 							defaultMemoryLimit(),
 							tempDirFlag(),
 							coordinatorAddressFlag(),
-							logLevel(),
-							logFormat(),
 						},
 						Action: runCoordinator,
 					},
@@ -62,8 +72,6 @@ func main() {
 							defaultMemoryLimit(),
 							tempDirFlag(),
 							workerAddressFlag(),
-							logLevel(),
-							logFormat(),
 						},
 						Action: runWorker,
 					},
@@ -79,8 +87,6 @@ func main() {
 							defaultCPUsLimit(),
 							defaultMemoryLimit(),
 							tempDirFlag(),
-							logLevel(),
-							logFormat(),
 						},
 						Action: runStandalone,
 					},
@@ -92,8 +98,6 @@ func main() {
 				Flags: []cli.Flag{
 					datastoreFlag(),
 					postgresDSNFlag(),
-					logLevel(),
-					logFormat(),
 				},
 				Action: runMigration,
 			},
@@ -101,6 +105,7 @@ func main() {
 				Name:  "health",
 				Usage: "Perform a health check",
 				Flags: []cli.Flag{
+					bannerMode(),
 					endpoint(),
 				},
 				Action: health,
@@ -114,12 +119,6 @@ func main() {
 }
 
 func runCoordinator(ctx *cli.Context) error {
-	printBanner(ctx)
-
-	if err := setupLogging(ctx); err != nil {
-		return err
-	}
-
 	broker, err := createBroker(ctx)
 	if err != nil {
 		return err
@@ -147,12 +146,6 @@ func runCoordinator(ctx *cli.Context) error {
 }
 
 func runWorker(ctx *cli.Context) error {
-	printBanner(ctx)
-
-	if err := setupLogging(ctx); err != nil {
-		return err
-	}
-
 	broker, err := createBroker(ctx)
 	if err != nil {
 		return err
@@ -176,12 +169,6 @@ func runWorker(ctx *cli.Context) error {
 }
 
 func runStandalone(ctx *cli.Context) error {
-	printBanner(ctx)
-
-	if err := setupLogging(ctx); err != nil {
-		return err
-	}
-
 	broker, err := createBroker(ctx)
 	if err != nil {
 		return err
@@ -240,16 +227,12 @@ func health(ctx *cli.Context) error {
 		return errors.Wrapf(err, "error unmarshalling body")
 	}
 
-	fmt.Println(r.Status)
+	fmt.Printf("Status: %s\n", r.Status)
 
 	return nil
 }
 
 func runMigration(ctx *cli.Context) error {
-	if err := setupLogging(ctx); err != nil {
-		return err
-	}
-
 	ds, err := createDatastore(ctx)
 	if err != nil {
 		return err
@@ -396,7 +379,11 @@ func setupLogging(ctx *cli.Context) error {
 	return nil
 }
 
-func printBanner(_ *cli.Context) {
+func printBanner(c *cli.Context) {
+	mode := c.String("banner-mode")
+	if mode == "off" {
+		return
+	}
 	banner := color.WhiteString(fmt.Sprintf(`
  _______  _______  ______    ___   _ 
 |       ||       ||    _ |  |   | | |
@@ -409,7 +396,11 @@ func printBanner(_ *cli.Context) {
  %s (%s)
 `, version.Version, version.GitCommit))
 
-	fmt.Println(banner)
+	if mode == "console" {
+		fmt.Println(banner)
+	} else {
+		log.Info().Msg(banner)
+	}
 }
 
 func queueFlag() cli.Flag {
@@ -519,5 +510,13 @@ func logFormat() cli.Flag {
 		Name:  "log-format",
 		Usage: "Configure the logging format (pretty|json)",
 		Value: "pretty",
+	}
+}
+
+func bannerMode() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "banner-mode",
+		Usage: "Set the banner mode (off|console|log)",
+		Value: "console",
 	}
 }
