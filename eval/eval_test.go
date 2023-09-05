@@ -203,13 +203,13 @@ func TestEvalExpr(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []any{1, 2, 3}, v)
 
-	v, err = eval.EvaluateExpr("{{ parseJSON( inputs.json ) }}", map[string]any{"inputs": map[string]string{
+	v, err = eval.EvaluateExpr("{{ fromJSON( inputs.json ) }}", map[string]any{"inputs": map[string]string{
 		"json": "[1,2,3]",
 	}})
 	assert.NoError(t, err)
 	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, v)
 
-	v, err = eval.EvaluateExpr("{{ parseJSON( inputs.json ) }}", map[string]any{"inputs": map[string]string{
+	v, err = eval.EvaluateExpr("{{ fromJSON( inputs.json ) }}", map[string]any{"inputs": map[string]string{
 		"json": `{"hello":"world"}`,
 	}})
 	assert.NoError(t, err)

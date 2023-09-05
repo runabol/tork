@@ -1,7 +1,6 @@
 package eval
 
 import (
-	"encoding/json"
 	"math/rand"
 	"reflect"
 
@@ -39,13 +38,4 @@ func range_(start, stop int) []int {
 		start = start + 1
 	}
 	return result
-}
-
-func parseJSON(data string) (any, error) {
-	var object any
-	err := json.Unmarshal([]byte(data), &object)
-	if err != nil {
-		return nil, err
-	}
-	return object, nil
 }

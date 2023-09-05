@@ -127,7 +127,7 @@ tasks:
 
   - name: transcode the chunks in parallel
     each:
-      list: "{{ parseJSON(tasks.chunks) }}"
+      list: "{{ fromJSON(tasks.chunks) }}"
       task:
         name: encode the chunk
         retry: 
