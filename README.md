@@ -40,7 +40,7 @@ See [https://www.tork.run](https://tork.run)
 Start in `standalone` mode:
 
 ```
-./tork standalone
+./tork run standalone
 ```
 
 Submit a job in another terminal:

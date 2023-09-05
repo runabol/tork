@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -22,66 +25,70 @@ import (
 )
 
 func main() {
-	fmt.Println(getBanner())
-
 	app := &cli.App{
 		Name:  "tork",
 		Usage: "a distributed workflow engine",
 		Commands: []*cli.Command{
 			{
-				Name:  "coordinator",
-				Usage: "run the coordinator",
-				Flags: []cli.Flag{
-					queueFlag(),
-					brokerFlag(),
-					rabbitmqURLFlag(),
-					datastoreFlag(),
-					postgresDSNFlag(),
-					defaultCPUsLimit(),
-					defaultMemoryLimit(),
-					tempDirFlag(),
-					coordinatorAddressFlag(),
-					logLevel(),
-					logFormat(),
+				Name:  "run",
+				Usage: "Run Tork",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "coordinator",
+						Usage: "Run the coordinator",
+						Flags: []cli.Flag{
+							queueFlag(),
+							brokerFlag(),
+							rabbitmqURLFlag(),
+							datastoreFlag(),
+							postgresDSNFlag(),
+							defaultCPUsLimit(),
+							defaultMemoryLimit(),
+							tempDirFlag(),
+							coordinatorAddressFlag(),
+							logLevel(),
+							logFormat(),
+						},
+						Action: runCoordinator,
+					},
+					{
+						Name:  "worker",
+						Usage: "Run a worker",
+						Flags: []cli.Flag{
+							queueFlag(),
+							brokerFlag(),
+							rabbitmqURLFlag(),
+							defaultCPUsLimit(),
+							defaultMemoryLimit(),
+							tempDirFlag(),
+							workerAddressFlag(),
+							logLevel(),
+							logFormat(),
+						},
+						Action: runWorker,
+					},
+					{
+						Name:  "standalone",
+						Usage: "Run the coordinator and a worker",
+						Flags: []cli.Flag{
+							queueFlag(),
+							brokerFlag(),
+							rabbitmqURLFlag(),
+							datastoreFlag(),
+							postgresDSNFlag(),
+							defaultCPUsLimit(),
+							defaultMemoryLimit(),
+							tempDirFlag(),
+							logLevel(),
+							logFormat(),
+						},
+						Action: runStandalone,
+					},
 				},
-				Action: runCoordinator,
-			},
-			{
-				Name:  "worker",
-				Usage: "run a worker",
-				Flags: []cli.Flag{
-					queueFlag(),
-					brokerFlag(),
-					rabbitmqURLFlag(),
-					defaultCPUsLimit(),
-					defaultMemoryLimit(),
-					tempDirFlag(),
-					workerAddressFlag(),
-					logLevel(),
-					logFormat(),
-				},
-				Action: runWorker,
-			},
-			{
-				Name:  "standalone",
-				Usage: "run the coordinator and a worker",
-				Flags: []cli.Flag{
-					queueFlag(),
-					brokerFlag(),
-					rabbitmqURLFlag(),
-					datastoreFlag(),
-					postgresDSNFlag(),
-					defaultCPUsLimit(),
-					defaultMemoryLimit(),
-					tempDirFlag(),
-					logLevel(),
-					logFormat(),
-				},
-				Action: runStandalone,
 			},
 			{
 				Name:  "migration",
-				Usage: "run the db migration script",
+				Usage: "Run the db migration script",
 				Flags: []cli.Flag{
 					datastoreFlag(),
 					postgresDSNFlag(),
@@ -89,6 +96,14 @@ func main() {
 					logFormat(),
 				},
 				Action: runMigration,
+			},
+			{
+				Name:  "health",
+				Usage: "Perform a health check",
+				Flags: []cli.Flag{
+					endpoint(),
+				},
+				Action: health,
 			},
 		},
 	}
@@ -99,6 +114,8 @@ func main() {
 }
 
 func runCoordinator(ctx *cli.Context) error {
+	printBanner(ctx)
+
 	if err := setupLogging(ctx); err != nil {
 		return err
 	}
@@ -130,6 +147,8 @@ func runCoordinator(ctx *cli.Context) error {
 }
 
 func runWorker(ctx *cli.Context) error {
+	printBanner(ctx)
+
 	if err := setupLogging(ctx); err != nil {
 		return err
 	}
@@ -157,6 +176,8 @@ func runWorker(ctx *cli.Context) error {
 }
 
 func runStandalone(ctx *cli.Context) error {
+	printBanner(ctx)
+
 	if err := setupLogging(ctx); err != nil {
 		return err
 	}
@@ -193,6 +214,33 @@ func runStandalone(ctx *cli.Context) error {
 			log.Error().Err(err).Msg("error stopping coordinator")
 		}
 	}
+
+	return nil
+}
+
+func health(ctx *cli.Context) error {
+	chk, err := http.Get(fmt.Sprintf("%s/health", ctx.String("endpoint")))
+	if err != nil {
+		return err
+	}
+	if chk.StatusCode != http.StatusOK {
+		return errors.Errorf("Health check failed. Status Code: %d", chk.StatusCode)
+	}
+	body, err := io.ReadAll(chk.Body)
+	if err != nil {
+		return errors.Wrapf(err, "error reading body")
+	}
+
+	type resp struct {
+		Status string `json:"status"`
+	}
+	r := resp{}
+
+	if err := json.Unmarshal(body, &r); err != nil {
+		return errors.Wrapf(err, "error unmarshalling body")
+	}
+
+	fmt.Println(r.Status)
 
 	return nil
 }
@@ -348,6 +396,22 @@ func setupLogging(ctx *cli.Context) error {
 	return nil
 }
 
+func printBanner(_ *cli.Context) {
+	banner := color.WhiteString(fmt.Sprintf(`
+ _______  _______  ______    ___   _ 
+|       ||       ||    _ |  |   | | |
+|_     _||   _   ||   | ||  |   |_| |
+  |   |  |  | |  ||   |_||_ |      _|
+  |   |  |  |_|  ||    __  ||     |_ 
+  |   |  |       ||   |  | ||    _  |
+  |___|  |_______||___|  |_||___| |_|
+
+ %s (%s)
+`, version.Version, version.GitCommit))
+
+	fmt.Println(banner)
+}
+
 func queueFlag() cli.Flag {
 	return &cli.StringSliceFlag{
 		Name:  "queue",
@@ -411,6 +475,14 @@ func postgresDSNFlag() cli.Flag {
 	}
 }
 
+func endpoint() cli.Flag {
+	return &cli.StringFlag{
+		Name:  "endpoint",
+		Usage: "Endpoint URL (default: http://localhost:8000)",
+		Value: "http://localhost:8000",
+	}
+}
+
 func tempDirFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "temp-dir",
@@ -448,18 +520,4 @@ func logFormat() cli.Flag {
 		Usage: "Configure the logging format (pretty|json)",
 		Value: "pretty",
 	}
-}
-
-func getBanner() string {
-	return color.WhiteString(fmt.Sprintf(`
- _______  _______  ______    ___   _ 
-|       ||       ||    _ |  |   | | |
-|_     _||   _   ||   | ||  |   |_| |
-  |   |  |  | |  ||   |_||_ |      _|
-  |   |  |  |_|  ||    __  ||     |_ 
-  |   |  |       ||   |  | ||    _  |
-  |___|  |_______||___|  |_||___| |_|
-
- %s (%s)
-`, version.Version, version.GitCommit))
 }
