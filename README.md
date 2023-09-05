@@ -154,7 +154,3 @@ See the [REST API](https://www.tork.run/rest) documentation.
 ## License
 
 Copyright (c) 2023-present Arik Cohen. Tork is free and open-source software licensed under the MIT License.
-
-```
-
-```
