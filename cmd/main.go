@@ -105,7 +105,6 @@ func main() {
 				Name:  "health",
 				Usage: "Perform a health check",
 				Flags: []cli.Flag{
-					bannerMode(),
 					endpoint(),
 				},
 				Action: health,
