@@ -3,7 +3,7 @@ module github.com/runabol/tork
 go 1.19
 
 require (
-	github.com/antonmedv/expr v1.13.0
+	github.com/antonmedv/expr v1.15.0
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/fatih/color v1.15.0

@@ -20,20 +20,6 @@ func TestRange(t *testing.T) {
 	assert.Equal(t, []int{}, result)
 }
 
-func Test_parseJSON(t *testing.T) {
-	result, err := parseJSON(`{"hello":"world"}`)
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]any{"hello": "world"}, result)
-
-	result, err = parseJSON(`{"somenumber":5}`)
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]any{"somenumber": float64(5)}, result)
-
-	result, err = parseJSON(`[{"hello":"world"}]`)
-	assert.NoError(t, err)
-	assert.Equal(t, []interface{}{map[string]interface{}{"hello": "world"}}, result)
-}
-
 func TestRandomInt(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		result, err := randomInt(5)

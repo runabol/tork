@@ -128,7 +128,6 @@ func EvaluateExpr(ex string, c map[string]any) (any, error) {
 		"randomInt": randomInt,
 		"coinflip":  coinflip,
 		"range":     range_,
-		"parseJSON": parseJSON,
 	}
 	for k, v := range c {
 		env[k] = v
