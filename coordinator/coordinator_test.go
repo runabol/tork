@@ -239,7 +239,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -305,7 +305,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -408,7 +408,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -478,7 +478,7 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -1055,7 +1055,7 @@ func Test_handleCancelJob(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -1482,7 +1482,7 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
-		Address:   fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address:   fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 	})
 	assert.NoError(t, err)
 
@@ -1495,7 +1495,7 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
-		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+		Address: fmt.Sprintf(":%d", rand.Int31n(60000)+5000),
 		Queues: map[string]int{
 			"default": 2,
 		},
