@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRange(t *testing.T) {
-	result := range_(1, 3)
+func TestSequence(t *testing.T) {
+	result := sequence(1, 3)
 	assert.Equal(t, []int{1, 2}, result)
 
-	result = range_(-5, -2)
+	result = sequence(-5, -2)
 	assert.Equal(t, []int{-5, -4, -3}, result)
 
-	result = range_(5, 2)
+	result = sequence(5, 2)
 	assert.Equal(t, []int{}, result)
 
-	result = range_(2, 2)
+	result = sequence(2, 2)
 	assert.Equal(t, []int{}, result)
 }
 

@@ -6,7 +6,7 @@ tasks:
 
   - name: each
     each:
-      list: "{{range(1,5)}}"
+      list: "{{sequence(1,5)}}"
       task: 
         name: sleep a little
         image: ubuntu:mantic
