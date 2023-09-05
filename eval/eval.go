@@ -126,8 +126,7 @@ func EvaluateExpr(ex string, c map[string]any) (any, error) {
 	ex = sanitizeExpr(ex)
 	env := map[string]any{
 		"randomInt": randomInt,
-		"coinflip":  coinflip,
-		"range":     range_,
+		"sequence":  sequence,
 	}
 	for k, v := range c {
 		env[k] = v

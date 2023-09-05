@@ -24,11 +24,7 @@ func randomInt(args ...any) (int, error) {
 	}
 }
 
-func coinflip() bool {
-	return rand.Int()%2 == 0
-}
-
-func range_(start, stop int) []int {
+func sequence(start, stop int) []int {
 	if start > stop {
 		return []int{}
 	}
