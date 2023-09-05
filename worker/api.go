@@ -3,14 +3,22 @@ package worker
 import (
 	"context"
 	"fmt"
+	"syscall"
 
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/httpx"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/version"
+)
+
+const (
+	MIN_PORT = 8001
+	MAX_PORT = 8100
 )
 
 type api struct {
@@ -20,9 +28,6 @@ type api struct {
 }
 
 func newAPI(cfg Config) *api {
-	if cfg.Address == "" {
-		cfg.Address = ":8001"
-	}
 	r := echo.New()
 
 	s := &api{
@@ -49,13 +54,24 @@ func (s *api) health(c echo.Context) error {
 }
 
 func (s *api) start() error {
-	go func() {
-		log.Info().Msgf("worker listening on %s", s.server.Addr)
-		// service connections
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msgf("error starting up server")
+	if s.server.Addr != "" {
+		if err := httpx.StartAsync(s.server); err != nil {
+			return err
 		}
-	}()
+	} else {
+		// attempting to dynamically assign port
+		for port := MIN_PORT; port <= MAX_PORT; port++ {
+			s.server.Addr = fmt.Sprintf("localhost:%d", port)
+			if err := httpx.StartAsync(s.server); err != nil {
+				if errors.Is(err, syscall.EADDRINUSE) {
+					continue
+				}
+				log.Fatal().Err(err).Msgf("error starting up server")
+			}
+			break
+		}
+	}
+	log.Info().Msgf("Worker listening on http://%s", s.server.Addr)
 	return nil
 }
 

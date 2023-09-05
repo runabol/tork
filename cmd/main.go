@@ -483,16 +483,14 @@ func tempDirFlag() cli.Flag {
 func workerAddressFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "address",
-		Usage: "API Address",
-		Value: ":8001",
+		Usage: "API Address (default: localhost:8001)",
 	}
 }
 
 func coordinatorAddressFlag() cli.Flag {
 	return &cli.StringFlag{
 		Name:  "address",
-		Usage: "REST API Address",
-		Value: ":8000",
+		Usage: "REST API Address (default: localhost:8000)",
 	}
 }
 
