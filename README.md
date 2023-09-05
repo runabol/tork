@@ -25,7 +25,9 @@ A Golang based high-performance, scalable and distributed workflow engine.
 - [Subjob Task](https://www.tork.run/tasks#sub-job-task)
 - [Web UI](#web-ui)
 
-See [https://tork.run](https://tork.run) for documentation.
+## Documentation
+
+See [tork.run](https://tork.run).
 
 ## Quick Start
 
