@@ -333,7 +333,6 @@ func Test_cancelRunningJob(t *testing.T) {
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
-
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/cancel", j1.ID), nil)
 	assert.NoError(t, err)
@@ -382,7 +381,6 @@ func Test_restartJob(t *testing.T) {
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
-
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
 	assert.NoError(t, err)
@@ -431,7 +429,6 @@ func Test_restartRunningJob(t *testing.T) {
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
-
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
 	assert.NoError(t, err)
