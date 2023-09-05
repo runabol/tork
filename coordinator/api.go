@@ -15,6 +15,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,7 +53,10 @@ func newAPI(cfg Config) *api {
 }
 
 func (s *api) health(c echo.Context) error {
-	return c.JSON(http.StatusOK, map[string]string{"status": "UP"})
+	return c.JSON(http.StatusOK, map[string]string{
+		"status":  "UP",
+		"version": fmt.Sprintf("%s (%s)", version.Version, version.GitCommit),
+	})
 }
 
 func (s *api) listQueues(c echo.Context) error {
