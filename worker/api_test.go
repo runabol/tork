@@ -26,6 +26,6 @@ func Test_getStatus(t *testing.T) {
 	body, err := io.ReadAll(w.Body)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "{\"status\":\"UP\"}\n", string(body))
+	assert.Contains(t, string(body), "\"status\":\"UP\"")
 	assert.Equal(t, http.StatusOK, w.Code)
 }

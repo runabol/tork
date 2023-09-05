@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/version"
 )
 
 type api struct {
@@ -36,10 +38,14 @@ func newAPI(cfg Config) *api {
 }
 
 func (s *api) health(c echo.Context) error {
+	var status = "UP"
 	if err := s.runtime.HealthCheck(c.Request().Context()); err != nil {
-		return c.JSON(http.StatusOK, map[string]string{"status": "DOWN"})
+		status = "DOWN"
 	}
-	return c.JSON(http.StatusOK, map[string]string{"status": "UP"})
+	return c.JSON(http.StatusOK, map[string]string{
+		"status":  status,
+		"version": fmt.Sprintf("%s (%s)", version.Version, version.GitCommit),
+	})
 }
 
 func (s *api) start() error {

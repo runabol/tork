@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/version"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -309,4 +311,34 @@ func Test_handleTaskOutput(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, completions)
+}
+
+func Test_sendHeartbeat(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	heartbeats := 0
+	err = b.SubscribeForHeartbeats(func(n node.Node) error {
+		assert.Contains(t, n.Version, version.Version)
+		heartbeats = heartbeats + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		Address: fmt.Sprintf(":%d", rand.Int31n(50000)+10000),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+	err = w.Start()
+	assert.NoError(t, err)
+
+	time.Sleep(time.Second)
+	assert.NoError(t, w.Stop())
+
+	assert.Equal(t, 1, heartbeats)
 }

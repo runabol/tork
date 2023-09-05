@@ -17,6 +17,7 @@ import (
 	"github.com/runabol/tork/syncx"
 	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/version"
 )
 
 type Worker struct {
@@ -24,7 +25,7 @@ type Worker struct {
 	startTime time.Time
 	runtime   runtime.Runtime
 	broker    mq.Broker
-	stop      bool
+	stop      chan any
 	queues    map[string]int
 	tasks     *syncx.Map[string, runningTask]
 	limits    Limits
@@ -71,6 +72,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		limits:    cfg.Limits,
 		tempdir:   cfg.TempDir,
 		api:       newAPI(cfg),
+		stop:      make(chan any),
 	}
 	return w, nil
 }
@@ -301,7 +303,7 @@ func deleteTempDir(dirname string) {
 }
 
 func (w *Worker) sendHeartbeats() {
-	for !w.stop {
+	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		status := node.UP
@@ -325,6 +327,7 @@ func (w *Worker) sendHeartbeats() {
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
 				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
+				Version:         fmt.Sprintf("%s (%s)", version.Version, version.GitCommit),
 			},
 		)
 		if err != nil {
@@ -332,7 +335,11 @@ func (w *Worker) sendHeartbeats() {
 				Err(err).
 				Msgf("error publishing heartbeat for %s", w.id)
 		}
-		time.Sleep(node.HEARTBEAT_RATE)
+		select {
+		case <-w.stop:
+			return
+		case <-time.After(node.HEARTBEAT_RATE):
+		}
 	}
 }
 
@@ -363,7 +370,7 @@ func (w *Worker) Start() error {
 
 func (w *Worker) Stop() error {
 	log.Debug().Msgf("shutting down worker %s", w.id)
-	w.stop = true
+	w.stop <- 1
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := w.broker.Shutdown(ctx); err != nil {

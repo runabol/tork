@@ -22,4 +22,5 @@ type Node struct {
 	Status          Status    `json:"status,omitempty"`
 	Hostname        string    `json:"hostname,omitempty"`
 	TaskCount       int       `json:"taskCount"`
+	Version         string    `json:"version"`
 }
