@@ -9,7 +9,8 @@ CREATE TABLE nodes (
     cpu_percent        float        not null,
     status             varchar(10)  not null,
     hostname           varchar(128) not null,
-    task_count         int          not null
+    task_count         int          not null,
+    version_           varchar(32)  not null
 );
 
 CREATE INDEX idx_nodes_heartbeat ON nodes (last_heartbeat_at);
