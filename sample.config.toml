@@ -1,0 +1,40 @@
+[cli]
+banner_mode = "console" # off | console | log
+
+[client]
+endpoint = "http://localhost:8000"
+
+[logging]
+level = "debug"   # debug | info | warn | error
+format = "pretty" # pretty | json
+
+[broker]
+type = "inmemory" # inmemory | rabbitmq
+
+[broker.rabbitmq]
+url = "amqp://guest:guest@localhost:5672/"
+
+[datastore]
+type = "inmemory" # inmemory | postgres
+
+[datastore.postgres]
+dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+
+[coordinator]
+address = "localhost:8000"
+
+[coordinator.queues]
+completed = 1 # completed queue consumers (default: 1)
+error = 1     # error queue consumers (default: 1)
+pending = 1   # pending queue consumers (default: 1)
+started = 1   # started queue consumers (default: 1)
+hearbeat = 1  # heartbeat queue consumers (default: 1)
+jobs = 1      # jobs queue consumers (default: 1)
+
+[worker]
+address = "localhost:8001"
+temp_dir = "/tmp"
+
+[worker.limits]
+cpus = "1"
+memory = "100"

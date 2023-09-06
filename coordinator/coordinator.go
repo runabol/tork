@@ -45,7 +45,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		return nil, errors.New("most provide a datastore")
 	}
 	name := fmt.Sprintf("coordinator-%s", uuid.NewUUID())
-	if len(cfg.Queues) == 0 {
+	if cfg.Queues == nil {
 		cfg.Queues = make(map[string]int)
 	}
 	if cfg.Queues[mq.QUEUE_COMPLETED] < 1 {
