@@ -19,7 +19,7 @@ services:
     image: golang:1.19
     working_dir: /code
     command: |
-      go run cmd/main.go migration -datastore postgres -postgres-dsn "host=postgres user=tork password=tork dbname=tork port=5432 sslmode=disable"
+      go run cmd/main.go --config config.compose.toml migration
     volumes:
       - .:/code
     depends_on:

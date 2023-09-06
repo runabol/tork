@@ -6,13 +6,13 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/coordinator"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
@@ -29,15 +29,19 @@ func main() {
 		Name:  "tork",
 		Usage: "a distributed workflow engine",
 		Flags: []cli.Flag{
-			bannerMode(),
-			logLevel(),
-			logFormat(),
+			config(),
 		},
 		Before: func(ctx *cli.Context) error {
+			if err := loadConfig(ctx); err != nil {
+				return err
+			}
+
 			if err := setupLogging(ctx); err != nil {
 				return err
 			}
-			printBanner(ctx)
+
+			displayBanner(ctx)
+
 			return nil
 		},
 		Commands: []*cli.Command{
@@ -46,67 +50,35 @@ func main() {
 				Usage: "Run Tork",
 				Subcommands: []*cli.Command{
 					{
-						Name:  "coordinator",
-						Usage: "Run the coordinator",
-						Flags: []cli.Flag{
-							queueFlag(),
-							brokerFlag(),
-							rabbitmqURLFlag(),
-							datastoreFlag(),
-							postgresDSNFlag(),
-							defaultCPUsLimit(),
-							defaultMemoryLimit(),
-							tempDirFlag(),
-							coordinatorAddressFlag(),
-						},
+						Name:   "coordinator",
+						Usage:  "Run the coordinator",
+						Flags:  []cli.Flag{},
 						Action: runCoordinator,
 					},
 					{
-						Name:  "worker",
-						Usage: "Run a worker",
-						Flags: []cli.Flag{
-							queueFlag(),
-							brokerFlag(),
-							rabbitmqURLFlag(),
-							defaultCPUsLimit(),
-							defaultMemoryLimit(),
-							tempDirFlag(),
-							workerAddressFlag(),
-						},
+						Name:   "worker",
+						Usage:  "Run a worker",
+						Flags:  []cli.Flag{},
 						Action: runWorker,
 					},
 					{
-						Name:  "standalone",
-						Usage: "Run the coordinator and a worker",
-						Flags: []cli.Flag{
-							queueFlag(),
-							brokerFlag(),
-							rabbitmqURLFlag(),
-							datastoreFlag(),
-							postgresDSNFlag(),
-							defaultCPUsLimit(),
-							defaultMemoryLimit(),
-							tempDirFlag(),
-						},
+						Name:   "standalone",
+						Usage:  "Run the coordinator and a worker",
+						Flags:  []cli.Flag{},
 						Action: runStandalone,
 					},
 				},
 			},
 			{
-				Name:  "migration",
-				Usage: "Run the db migration script",
-				Flags: []cli.Flag{
-					datastoreFlag(),
-					postgresDSNFlag(),
-				},
+				Name:   "migration",
+				Usage:  "Run the db migration script",
+				Flags:  []cli.Flag{},
 				Action: runMigration,
 			},
 			{
-				Name:  "health",
-				Usage: "Perform a health check",
-				Flags: []cli.Flag{
-					endpoint(),
-				},
+				Name:   "health",
+				Usage:  "Perform a health check",
+				Flags:  []cli.Flag{},
 				Action: health,
 			},
 		},
@@ -117,18 +89,18 @@ func main() {
 	}
 }
 
-func runCoordinator(ctx *cli.Context) error {
-	broker, err := createBroker(ctx)
+func runCoordinator(_ *cli.Context) error {
+	broker, err := createBroker()
 	if err != nil {
 		return err
 	}
 
-	ds, err := createDatastore(ctx)
+	ds, err := createDatastore()
 	if err != nil {
 		return err
 	}
 
-	c, err := createCoordinator(broker, ds, ctx)
+	c, err := createCoordinator(broker, ds)
 	if err != nil {
 		return err
 	}
@@ -144,13 +116,13 @@ func runCoordinator(ctx *cli.Context) error {
 	return nil
 }
 
-func runWorker(ctx *cli.Context) error {
-	broker, err := createBroker(ctx)
+func runWorker(_ *cli.Context) error {
+	broker, err := createBroker()
 	if err != nil {
 		return err
 	}
 
-	w, err := createWorker(broker, ctx)
+	w, err := createWorker(broker)
 	if err != nil {
 		return err
 	}
@@ -167,22 +139,22 @@ func runWorker(ctx *cli.Context) error {
 	return nil
 }
 
-func runStandalone(ctx *cli.Context) error {
-	broker, err := createBroker(ctx)
+func runStandalone(_ *cli.Context) error {
+	broker, err := createBroker()
 	if err != nil {
 		return err
 	}
 
-	ds, err := createDatastore(ctx)
+	ds, err := createDatastore()
 	if err != nil {
 		return err
 	}
 
-	w, err := createWorker(broker, ctx)
+	w, err := createWorker(broker)
 	if err != nil {
 		return err
 	}
-	c, err := createCoordinator(broker, ds, ctx)
+	c, err := createCoordinator(broker, ds)
 	if err != nil {
 		return err
 	}
@@ -204,8 +176,8 @@ func runStandalone(ctx *cli.Context) error {
 	return nil
 }
 
-func health(ctx *cli.Context) error {
-	chk, err := http.Get(fmt.Sprintf("%s/health", ctx.String("endpoint")))
+func health(_ *cli.Context) error {
+	chk, err := http.Get(fmt.Sprintf("%s/health", conf.StringDefault("endpoint", "http://localhost:8000")))
 	if err != nil {
 		return err
 	}
@@ -231,12 +203,12 @@ func health(ctx *cli.Context) error {
 	return nil
 }
 
-func runMigration(ctx *cli.Context) error {
-	ds, err := createDatastore(ctx)
+func runMigration(_ *cli.Context) error {
+	ds, err := createDatastore()
 	if err != nil {
 		return err
 	}
-	dstype := ctx.String("datastore")
+	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
 	switch dstype {
 	case datastore.DATASTORE_POSTGRES:
 		if err := ds.(*datastore.PostgresDatastore).ExecScript(postgres.SCHEMA); err != nil {
@@ -249,32 +221,36 @@ func runMigration(ctx *cli.Context) error {
 	return nil
 }
 
-func createDatastore(ctx *cli.Context) (datastore.Datastore, error) {
-	dsname := ctx.String("datastore")
+func createDatastore() (datastore.Datastore, error) {
+	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
 	var ds datastore.Datastore
-	switch dsname {
+	switch dstype {
 	case datastore.DATASTORE_INMEMORY:
 		ds = datastore.NewInMemoryDatastore()
 	case datastore.DATASTORE_POSTGRES:
-		pg, err := datastore.NewPostgresDataStore(ctx.String("postgres-dsn"))
+		dsn := conf.StringDefault(
+			"datastore.postgres.dsn",
+			"host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
+		)
+		pg, err := datastore.NewPostgresDataStore(dsn)
 		if err != nil {
 			return nil, err
 		}
 		ds = pg
 	default:
-		return nil, errors.Errorf("unknown datastore type: %s", dsname)
+		return nil, errors.Errorf("unknown datastore type: %s", dstype)
 	}
 	return ds, nil
 }
 
-func createBroker(ctx *cli.Context) (mq.Broker, error) {
+func createBroker() (mq.Broker, error) {
 	var b mq.Broker
-	bt := ctx.String("broker")
+	bt := conf.StringDefault("broker.type", mq.BROKER_INMEMORY)
 	switch bt {
 	case "inmemory":
 		b = mq.NewInMemoryBroker()
 	case "rabbitmq":
-		rb, err := mq.NewRabbitMQBroker(ctx.String("rabbitmq-url"))
+		rb, err := mq.NewRabbitMQBroker(conf.StringDefault("broker.rabbitmq.url", "amqp://guest:guest@localhost:5672/"))
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
 		}
@@ -285,16 +261,13 @@ func createBroker(ctx *cli.Context) (mq.Broker, error) {
 	return b, nil
 }
 
-func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Context) (*coordinator.Coordinator, error) {
-	queues, err := parseQueueConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
+func createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
+	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
 		Broker:    broker,
 		DataStore: ds,
 		Queues:    queues,
-		Address:   ctx.String("address"),
+		Address:   conf.String("coordinator.address"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -305,11 +278,8 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore, ctx *cli.Contex
 	return c, nil
 }
 
-func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
-	queues, err := parseQueueConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
+func createWorker(b mq.Broker) (*worker.Worker, error) {
+	queues := conf.IntMap("worker.queues")
 	rt, err := runtime.NewDockerRuntime()
 	if err != nil {
 		return nil, err
@@ -319,11 +289,11 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 		Runtime: rt,
 		Queues:  queues,
 		Limits: worker.Limits{
-			DefaultCPUsLimit:   ctx.String("default-cpus-limit"),
-			DefaultMemoryLimit: ctx.String("default-memory-limit"),
+			DefaultCPUsLimit:   conf.String("worker.limits.cpus"),
+			DefaultMemoryLimit: conf.String("worker.limits.memory"),
 		},
-		TempDir: ctx.String("temp-dir"),
-		Address: ctx.String("address"),
+		TempDir: conf.String("worker.temp_dir"),
+		Address: conf.String("worker.address"),
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating worker")
@@ -334,24 +304,16 @@ func createWorker(b mq.Broker, ctx *cli.Context) (*worker.Worker, error) {
 	return w, nil
 }
 
-func parseQueueConfig(ctx *cli.Context) (map[string]int, error) {
-	qs := ctx.StringSlice("queue")
-	queues := make(map[string]int)
-	for _, q := range qs {
-		def := strings.Split(q, ":")
-		qname := def[0]
-		conc, err := strconv.Atoi(def[1])
-		if err != nil {
-			return nil, errors.Errorf("invalid queue definition: %s", q)
-		}
-		queues[qname] = conc
+func loadConfig(ctx *cli.Context) error {
+	if ctx.String("config") == "" {
+		return conf.LoadConfig()
 	}
-	return queues, nil
+	return conf.LoadConfig(ctx.String("config"))
 }
 
 func setupLogging(ctx *cli.Context) error {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	logLevel := strings.ToLower(ctx.String("log-level"))
+	logLevel := strings.ToLower(conf.StringDefault("logging.level", "debug"))
 	// setup log level
 	switch logLevel {
 	case "debug":
@@ -366,20 +328,20 @@ func setupLogging(ctx *cli.Context) error {
 		return errors.Errorf("invalid logging level: %s", logLevel)
 	}
 	// setup log format (pretty / json)
-	logFormat := strings.ToLower(ctx.String("log-format"))
+	logFormat := strings.ToLower(conf.StringDefault("logging.format", "pretty"))
 	switch logFormat {
 	case "pretty":
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	case "json":
-		// default
+		log.Logger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 	default:
 		return errors.Errorf("invalid logging format: %s", logFormat)
 	}
 	return nil
 }
 
-func printBanner(c *cli.Context) {
-	mode := c.String("banner-mode")
+func displayBanner(c *cli.Context) {
+	mode := conf.StringDefault("cli.banner_mode", "console")
 	if mode == "off" {
 		return
 	}
@@ -402,118 +364,9 @@ func printBanner(c *cli.Context) {
 	}
 }
 
-func queueFlag() cli.Flag {
-	return &cli.StringSliceFlag{
-		Name:  "queue",
-		Usage: "Specify a task queue configuration: <queuename>:<concurrency>",
-	}
-}
-
-func brokerFlag() cli.Flag {
-	allBrokerTypes := []string{
-		mq.BROKER_INMEMORY,
-		mq.BROKER_RABBITMQ,
-	}
+func config() cli.Flag {
 	return &cli.StringFlag{
-		Name:  "broker",
-		Usage: strings.Join(allBrokerTypes, "|"),
-		Value: mq.BROKER_INMEMORY,
-	}
-}
-
-func rabbitmqURLFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "rabbitmq-url",
-		Usage: "amqp://<username>:<password>@<hostname>:<port>/",
-		Value: "amqp://guest:guest@localhost:5672/",
-	}
-}
-
-func defaultCPUsLimit() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "default-cpus-limit",
-		Usage: "The default CPUs limit for an executing task (e.g. 1). Default is no limit.",
-		Value: "",
-	}
-}
-
-func defaultMemoryLimit() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "default-memory-limit",
-		Usage: "The default RAM limit for an executing task (e.g. 6MB). Default is no limit.",
-		Value: "",
-	}
-}
-
-func datastoreFlag() cli.Flag {
-	allDSTypes := []string{
-		datastore.DATASTORE_INMEMORY,
-		datastore.DATASTORE_POSTGRES,
-	}
-	return &cli.StringFlag{
-		Name:  "datastore",
-		Usage: strings.Join(allDSTypes, "|"),
-		Value: datastore.DATASTORE_INMEMORY,
-	}
-}
-
-func postgresDSNFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "postgres-dsn",
-		Usage: "host=<hostname> user=<username> password=<username> dbname=<username> port=<port> sslmode=<disable|enable>",
-		Value: "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
-	}
-}
-
-func endpoint() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "endpoint",
-		Usage: "Endpoint URL (default: http://localhost:8000)",
-		Value: "http://localhost:8000",
-	}
-}
-
-func tempDirFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "temp-dir",
-		Usage: "The temporary dir to use by the worker: (e.g. /tmp)",
-	}
-}
-
-func workerAddressFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "address",
-		Usage: "API Address (default: localhost:8001)",
-	}
-}
-
-func coordinatorAddressFlag() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "address",
-		Usage: "REST API Address (default: localhost:8000)",
-	}
-}
-
-func logLevel() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "log-level",
-		Usage: "Configure the logging level (debug|info|warn|error)",
-		Value: "debug",
-	}
-}
-
-func logFormat() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "log-format",
-		Usage: "Configure the logging format (pretty|json)",
-		Value: "pretty",
-	}
-}
-
-func bannerMode() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "banner-mode",
-		Usage: "Set the banner mode (off|console|log)",
-		Value: "console",
+		Name:  "config",
+		Usage: "Set the location of the config file",
 	}
 }
