@@ -13,7 +13,7 @@ all: tork
 
 .PHONY: tork
 tork: 
-	CGO_ENABLED=$(CGO_ENABLED) $(SYSTEM) go build $(BUILDOPTS) -ldflags="-s -w -X github.com/runabol/tork/version.GitCommit=$(GITCOMMIT)" -o $(BINARY) ./cmd/main.go 
+	CGO_ENABLED=$(CGO_ENABLED) $(SYSTEM) go build $(BUILDOPTS) -ldflags="-s -w -X github.com/runabol/tork/version.GitCommit=$(GITCOMMIT)" -o $(BINARY) main.go 
 
 .PHONY: clean
 clean:
