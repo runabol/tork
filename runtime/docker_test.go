@@ -11,39 +11,40 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseCPUs(t *testing.T) {
-	parsed, err := parseCPUs(&task.Limits{CPUs: ".25"})
+	parsed, err := parseCPUs(&tork.TaskLimits{CPUs: ".25"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(250000000), parsed)
 
-	parsed, err = parseCPUs(&task.Limits{CPUs: "1"})
+	parsed, err = parseCPUs(&tork.TaskLimits{CPUs: "1"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1000000000), parsed)
 
-	parsed, err = parseCPUs(&task.Limits{CPUs: "0.5"})
+	parsed, err = parseCPUs(&tork.TaskLimits{CPUs: "0.5"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(500000000), parsed)
 }
 
 func TestParseMemory(t *testing.T) {
-	parsed, err := parseMemory(&task.Limits{Memory: "1MB"})
+	parsed, err := parseMemory(&tork.TaskLimits{Memory: "1MB"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1048576), parsed)
 
-	parsed, err = parseMemory(&task.Limits{Memory: "10MB"})
+	parsed, err = parseMemory(&tork.TaskLimits{Memory: "10MB"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10485760), parsed)
 
-	parsed, err = parseMemory(&task.Limits{Memory: "500KB"})
+	parsed, err = parseMemory(&tork.TaskLimits{Memory: "500KB"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(512000), parsed)
 
-	parsed, err = parseMemory(&task.Limits{Memory: "1B"})
+	parsed, err = parseMemory(&tork.TaskLimits{Memory: "1B"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), parsed)
 }
@@ -58,7 +59,7 @@ func TestRunTask(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
-	err = rt.Run(context.Background(), &task.Task{
+	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
@@ -72,7 +73,7 @@ func TestRunTaskWithTimeout(t *testing.T) {
 	assert.NotNil(t, rt)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	err = rt.Run(ctx, &task.Task{
+	err = rt.Run(ctx, &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
@@ -84,7 +85,7 @@ func TestRunAndStopTask(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
@@ -121,7 +122,7 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
-	err = rt.Run(context.Background(), &task.Task{
+	err = rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
 		Image:    "ubuntu:mantic",
 		CMD:      []string{"ls"},
@@ -132,7 +133,7 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	rt, err = NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
-	err = rt.Run(context.Background(), &task.Task{
+	err = rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
 		Image:    "ubuntu:mantic",
 		CMD:      []string{"ls"},
@@ -200,7 +201,7 @@ func TestRunTaskWithVolume(t *testing.T) {
 	err = os.WriteFile(path.Join(rundir, "entrypoint"), []byte(script), os.ModePerm)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		Run:   "-",
@@ -236,7 +237,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err = rt.imagePull(ctx, &task.Task{Image: "alpine:3.18.3"})
+			err = rt.imagePull(ctx, &tork.Task{Image: "alpine:3.18.3"})
 			assert.NoError(t, err)
 		}()
 	}

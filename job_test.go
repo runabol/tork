@@ -1,28 +1,27 @@
-package job_test
+package tork_test
 
 import (
 	"testing"
 
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestClone(t *testing.T) {
-	j1 := &job.Job{
-		Context: job.Context{
+	j1 := &tork.Job{
+		Context: tork.JobContext{
 			Inputs: map[string]string{
 				"INPUT1": "VAL1",
 			},
 		},
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Env: map[string]string{
 					"VAR1": "VAL1",
 				},
 			},
 		},
-		Execution: []*task.Task{
+		Execution: []*tork.Task{
 			{
 				Env: map[string]string{
 					"EVAR1": "EVAL1",

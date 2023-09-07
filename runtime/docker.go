@@ -20,8 +20,8 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
 )
 
 type DockerRuntime struct {
@@ -74,7 +74,7 @@ func NewDockerRuntime() (*DockerRuntime, error) {
 	return rt, nil
 }
 
-func (d *DockerRuntime) imagePull(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 	_, ok := d.images.Get(t.Image)
 	if ok {
 		return nil
@@ -123,7 +123,7 @@ func (d *DockerRuntime) puller(ctx context.Context) {
 	}
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if t.ID == "" {
 		return errors.New("task id is required")
 	}
@@ -289,7 +289,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *task.Task) error {
 	return nil
 }
 
-func (d *DockerRuntime) Stop(ctx context.Context, t *task.Task) error {
+func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
 	containerID, ok := d.tasks.Get(t.ID)
 	if !ok {
 		return nil
@@ -309,7 +309,7 @@ func (d *DockerRuntime) HealthCheck(ctx context.Context) error {
 }
 
 // take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403
-func parseCPUs(limits *task.Limits) (int64, error) {
+func parseCPUs(limits *tork.TaskLimits) (int64, error) {
 	if limits == nil || limits.CPUs == "" {
 		return 0, nil
 	}
@@ -324,7 +324,7 @@ func parseCPUs(limits *task.Limits) (int64, error) {
 	return nano.Num().Int64(), nil
 }
 
-func parseMemory(limits *task.Limits) (int64, error) {
+func parseMemory(limits *tork.TaskLimits) (int64, error) {
 	if limits == nil || limits.Memory == "" {
 		return 0, nil
 	}

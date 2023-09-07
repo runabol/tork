@@ -4,20 +4,20 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/eval"
-	"github.com/runabol/tork/task"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEvalNoop(t *testing.T) {
-	t1 := &task.Task{}
+	t1 := &tork.Task{}
 	err := eval.EvaluateTask(t1, map[string]any{})
 	assert.NoError(t, err)
 	assert.Empty(t, t1.Env)
 }
 
 func TestEvalLiteral(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Env: map[string]string{
 			"HELLO": "WORLD",
 		},
@@ -28,7 +28,7 @@ func TestEvalLiteral(t *testing.T) {
 }
 
 func TestEvalVar(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Env: map[string]string{
 			"HELLO": `{{inputs.SOMEVAR}}`,
 		},
@@ -43,7 +43,7 @@ func TestEvalVar(t *testing.T) {
 }
 
 func TestEvalName(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Name: "{{ inputs.SOMENAME }}y",
 	}
 	err := eval.EvaluateTask(t1, map[string]any{
@@ -56,7 +56,7 @@ func TestEvalName(t *testing.T) {
 }
 
 func TestEvalImage(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Image: "ubuntu:{{ inputs.TAG }}",
 	}
 	err := eval.EvaluateTask(t1, map[string]any{
@@ -69,7 +69,7 @@ func TestEvalImage(t *testing.T) {
 }
 
 func TestEvalQueue(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Queue: "{{ inputs.QUEUE }}",
 	}
 	err := eval.EvaluateTask(t1, map[string]any{
@@ -82,7 +82,7 @@ func TestEvalQueue(t *testing.T) {
 }
 
 func TestEvalFunc(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Env: map[string]string{
 			"RAND_NUM": "{{ randomInt() }}",
 		},
@@ -96,21 +96,21 @@ func TestEvalFunc(t *testing.T) {
 }
 
 func TestEvalIf(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		If: `{{ 1 == 1 }}`,
 	}
 	err := eval.EvaluateTask(t1, map[string]any{})
 	assert.NoError(t, err)
 	assert.Equal(t, "true", t1.If)
 
-	t1 = &task.Task{
+	t1 = &tork.Task{
 		If: `{{ 1 == 2 }}`,
 	}
 	err = eval.EvaluateTask(t1, map[string]any{})
 	assert.NoError(t, err)
 	assert.Equal(t, "false", t1.If)
 
-	t1 = &task.Task{
+	t1 = &tork.Task{
 		If: `{{ !(1 == 2) }}`,
 	}
 	err = eval.EvaluateTask(t1, map[string]any{})
@@ -119,7 +119,7 @@ func TestEvalIf(t *testing.T) {
 }
 
 func TestDontEvalRun(t *testing.T) {
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		Run: "Hello {{ inputs.NAME }}",
 	}
 	err := eval.EvaluateTask(t1, map[string]any{
@@ -132,8 +132,8 @@ func TestDontEvalRun(t *testing.T) {
 }
 
 func TestEvalPre(t *testing.T) {
-	t1 := &task.Task{
-		Pre: []*task.Task{
+	t1 := &tork.Task{
+		Pre: []*tork.Task{
 			{
 				Env: map[string]string{
 					"HELLO": "{{ inputs.SOMEVAR }}",
@@ -151,8 +151,8 @@ func TestEvalPre(t *testing.T) {
 }
 
 func TestEvalPost(t *testing.T) {
-	t1 := &task.Task{
-		Post: []*task.Task{
+	t1 := &tork.Task{
+		Post: []*tork.Task{
 			{
 				Env: map[string]string{
 					"HELLO": "{{ inputs.SOMEVAR }}",
@@ -170,9 +170,9 @@ func TestEvalPost(t *testing.T) {
 }
 
 func TestEvalParallel(t *testing.T) {
-	t1 := &task.Task{
-		Parallel: &task.Parallel{
-			Tasks: []*task.Task{
+	t1 := &tork.Task{
+		Parallel: &tork.ParallelTask{
+			Tasks: []*tork.Task{
 				{
 					Env: map[string]string{
 						"HELLO": "{{ inputs.SOMEVAR }}",
@@ -225,7 +225,7 @@ func TestValidExpr(t *testing.T) {
 
 func BenchmarkEval(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		t1 := &task.Task{
+		t1 := &tork.Task{
 			Env: map[string]string{
 				"HELLO": "{{ inputs.SOMEVAR }}",
 			},

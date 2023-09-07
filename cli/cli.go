@@ -1,4 +1,4 @@
-package cmd
+package cli
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"github.com/runabol/tork/bootstrap"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/version"
-	"github.com/urfave/cli/v2"
+	ucli "github.com/urfave/cli/v2"
 )
 
 // OnRunHandler is a hook interface allowing the
@@ -26,10 +26,10 @@ var (
 )
 
 func Run() error {
-	app := &cli.App{
+	app := &ucli.App{
 		Name:     "tork",
 		Usage:    "a distributed workflow engine",
-		Flags:    []cli.Flag{config()},
+		Flags:    []ucli.Flag{config()},
 		Before:   before,
 		Commands: commands(),
 	}
@@ -40,7 +40,7 @@ func OnRunCommand(h OnRunHandler) {
 	onRunHandler = h
 }
 
-func before(ctx *cli.Context) error {
+func before(ctx *ucli.Context) error {
 	if err := loadConfig(ctx); err != nil {
 		return err
 	}
@@ -48,23 +48,23 @@ func before(ctx *cli.Context) error {
 	return nil
 }
 
-func commands() []*cli.Command {
-	return []*cli.Command{
+func commands() []*ucli.Command {
+	return []*ucli.Command{
 		runCmd(),
 		migrationCmd(),
 		healthCmd(),
 	}
 }
 
-func runCmd() *cli.Command {
-	return &cli.Command{
+func runCmd() *ucli.Command {
+	return &ucli.Command{
 		Name:      "run",
 		Usage:     "Run Tork",
 		UsageText: "tork run mode (standalone|coordinator|worker)",
-		Action: func(ctx *cli.Context) error {
+		Action: func(ctx *ucli.Context) error {
 			mode := ctx.Args().First()
 			if mode == "" {
-				if err := cli.ShowSubcommandHelp(ctx); err != nil {
+				if err := ucli.ShowSubcommandHelp(ctx); err != nil {
 					return err
 				}
 				fmt.Println("missing required argument: mode")
@@ -80,35 +80,35 @@ func defaultOnRunCommandHandler(mode bootstrap.Mode) error {
 	return bootstrap.Start(mode)
 }
 
-func migrationCmd() *cli.Command {
-	return &cli.Command{
+func migrationCmd() *ucli.Command {
+	return &ucli.Command{
 		Name:  "migration",
 		Usage: "Run the db migration script",
-		Flags: []cli.Flag{},
-		Action: func(ctx *cli.Context) error {
+		Flags: []ucli.Flag{},
+		Action: func(ctx *ucli.Context) error {
 			return bootstrap.Start(bootstrap.ModeMigration)
 		},
 	}
 }
 
-func healthCmd() *cli.Command {
-	return &cli.Command{
+func healthCmd() *ucli.Command {
+	return &ucli.Command{
 		Name:   "health",
 		Usage:  "Perform a health check",
-		Flags:  []cli.Flag{},
+		Flags:  []ucli.Flag{},
 		Action: health,
 	}
 }
 
-func loadConfig(ctx *cli.Context) error {
+func loadConfig(ctx *ucli.Context) error {
 	if ctx.String("config") == "" {
 		return conf.LoadConfig()
 	}
 	return conf.LoadConfig(ctx.String("config"))
 }
 
-func config() cli.Flag {
-	return &cli.StringFlag{
+func config() ucli.Flag {
+	return &ucli.StringFlag{
 		Name:  "config",
 		Usage: "Set the location of the config file",
 	}
@@ -138,7 +138,7 @@ func displayBanner() {
 	}
 }
 
-func health(_ *cli.Context) error {
+func health(_ *ucli.Context) error {
 	chk, err := http.Get(fmt.Sprintf("%s/health", conf.StringDefault("endpoint", "http://localhost:8000")))
 	if err != nil {
 		return err

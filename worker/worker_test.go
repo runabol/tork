@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
 	"github.com/runabol/tork/version"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +56,7 @@ func Test_handleTaskRun(t *testing.T) {
 	assert.NotNil(t, w)
 
 	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(0), atomic.LoadInt32(&w.taskCount))
 		completions = completions + 1
 		return nil
@@ -65,7 +64,7 @@ func Test_handleTaskRun(t *testing.T) {
 	assert.NoError(t, err)
 
 	starts := 0
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(1), w.taskCount)
 		starts = starts + 1
 		return nil
@@ -75,9 +74,9 @@ func Test_handleTaskRun(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:      uuid.NewUUID(),
-		State:   task.Scheduled,
+		State:   tork.TaskStateScheduled,
 		Image:   "ubuntu:mantic",
 		CMD:     []string{"ls"},
 		Volumes: []string{"/somevolume"},
@@ -107,9 +106,9 @@ func Test_handleTaskRunOutput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
+		State: tork.TaskStateScheduled,
 		Image: "alpine:3.18.3",
 		Run:   "echo -n hello world > $TORK_OUTPUT",
 	}
@@ -130,7 +129,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		completions = completions + 1
 		return nil
 	})
@@ -145,19 +144,19 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:      uuid.NewUUID(),
-		State:   task.Scheduled,
+		State:   tork.TaskStateScheduled,
 		Image:   "ubuntu:mantic",
 		CMD:     []string{"ls"},
 		Volumes: []string{"/somevolume"},
-		Pre: []*task.Task{
+		Pre: []*tork.Task{
 			{
 				Image: "ubuntu:mantic",
 				CMD:   []string{"echo", "do work"},
 			},
 		},
-		Post: []*task.Task{
+		Post: []*tork.Task{
 			{
 				Image: "ubuntu:mantic",
 				CMD:   []string{"echo", "do work"},
@@ -190,7 +189,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	tid := uuid.NewUUID()
 
 	errs := 0
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
@@ -198,10 +197,10 @@ func Test_handleTaskCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	// cancel the task immediately upon start
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *task.Task) error {
-		err = w.handleTask(&task.Task{
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+		err = w.handleTask(&tork.Task{
 			ID:    tid,
-			State: task.Cancelled,
+			State: tork.TaskStateCancelled,
 		})
 		assert.NoError(t, err)
 		return nil
@@ -213,9 +212,9 @@ func Test_handleTaskCancel(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(&task.Task{
+	err = w.handleTask(&tork.Task{
 		ID:    tid,
-		State: task.Scheduled,
+		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
 	})
@@ -234,7 +233,7 @@ func Test_handleTaskError(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	errs := 0
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
 		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
 		return nil
@@ -250,9 +249,9 @@ func Test_handleTaskError(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(&task.Task{
+	err = w.handleTask(&tork.Task{
 		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
+		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"no_such_thing"},
 	})
@@ -271,7 +270,7 @@ func Test_handleTaskOutput(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completions := 0
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		completions = completions + 1
 		assert.NotEmpty(t, tk.Result)
 		return nil
@@ -287,9 +286,9 @@ func Test_handleTaskOutput(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(&task.Task{
+	err = w.handleTask(&tork.Task{
 		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
+		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		Run:   "echo -n 'hello world' >> $TORK_OUTPUT",
 	})
@@ -308,7 +307,7 @@ func Test_sendHeartbeat(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	heartbeats := 0
-	err = b.SubscribeForHeartbeats(func(n node.Node) error {
+	err = b.SubscribeForHeartbeats(func(n tork.Node) error {
 		assert.Contains(t, n.Version, version.Version)
 		heartbeats = heartbeats + 1
 		return nil

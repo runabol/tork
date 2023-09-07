@@ -11,18 +11,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/job"
+
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_getQueues(t *testing.T) {
 	b := mq.NewInMemoryBroker()
-	err := b.SubscribeForTasks("some-queue", func(t *task.Task) error {
+	err := b.SubscribeForTasks("some-queue", func(t *tork.Task) error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -57,7 +57,7 @@ func Test_listJobs(t *testing.T) {
 	assert.NotNil(t, api)
 
 	for i := 0; i < 101; i++ {
-		err := ds.CreateJob(context.Background(), &job.Job{
+		err := ds.CreateJob(context.Background(), &tork.Job{
 			ID: uuid.NewUUID(),
 		})
 		assert.NoError(t, err)
@@ -70,7 +70,7 @@ func Test_listJobs(t *testing.T) {
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
 
-	js := datastore.Page[*job.Job]{}
+	js := datastore.Page[*tork.Job]{}
 	err = json.Unmarshal(body, &js)
 	assert.NoError(t, err)
 
@@ -87,7 +87,7 @@ func Test_listJobs(t *testing.T) {
 	body, err = io.ReadAll(w.Body)
 	assert.NoError(t, err)
 
-	js = datastore.Page[*job.Job]{}
+	js = datastore.Page[*tork.Job]{}
 	err = json.Unmarshal(body, &js)
 	assert.NoError(t, err)
 
@@ -103,7 +103,7 @@ func Test_listJobs(t *testing.T) {
 	body, err = io.ReadAll(w.Body)
 	assert.NoError(t, err)
 
-	js = datastore.Page[*job.Job]{}
+	js = datastore.Page[*tork.Job]{}
 	err = json.Unmarshal(body, &js)
 	assert.NoError(t, err)
 
@@ -115,11 +115,11 @@ func Test_listJobs(t *testing.T) {
 
 func Test_getActiveNodes(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	active := node.Node{
+	active := tork.Node{
 		ID:              "1234",
 		LastHeartbeatAt: time.Now().UTC(),
 	}
-	inactive := node.Node{
+	inactive := tork.Node{
 		ID:              "2345",
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Hour),
 	}
@@ -139,7 +139,7 @@ func Test_getActiveNodes(t *testing.T) {
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
 
-	nrs := []node.Node{}
+	nrs := []tork.Node{}
 	err = json.Unmarshal(body, &nrs)
 	assert.NoError(t, err)
 
@@ -182,7 +182,7 @@ func Test_getUnknownTask(t *testing.T) {
 
 func Test_getTask(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	ta := task.Task{
+	ta := tork.Task{
 		ID:   "1234",
 		Name: "test task",
 	}
@@ -199,7 +199,7 @@ func Test_getTask(t *testing.T) {
 	api.server.Handler.ServeHTTP(w, req)
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
-	tr := task.Task{}
+	tr := tork.Task{}
 	err = json.Unmarshal(body, &tr)
 	assert.NoError(t, err)
 	assert.Equal(t, "1234", tr.ID)
@@ -226,10 +226,10 @@ func Test_createJob(t *testing.T) {
 	api.server.Handler.ServeHTTP(w, req)
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
-	j := job.Job{}
+	j := tork.Job{}
 	err = json.Unmarshal(body, &j)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Pending, j.State)
+	assert.Equal(t, tork.JobStatePending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -254,9 +254,9 @@ func Test_createJobInvalidProperty(t *testing.T) {
 
 func Test_getJob(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	err := ds.CreateJob(context.Background(), &job.Job{
+	err := ds.CreateJob(context.Background(), &tork.Job{
 		ID:    "1234",
-		State: job.Pending,
+		State: tork.JobStatePending,
 	})
 	assert.NoError(t, err)
 	api := newAPI(Config{
@@ -271,20 +271,20 @@ func Test_getJob(t *testing.T) {
 	api.server.Handler.ServeHTTP(w, req)
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
-	j := job.Job{}
+	j := tork.Job{}
 	err = json.Unmarshal(body, &j)
 	assert.NoError(t, err)
 	assert.Equal(t, "1234", j.ID)
-	assert.Equal(t, job.Pending, j.State)
+	assert.Equal(t, tork.JobStatePending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func Test_cancelRunningJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		CreatedAt: time.Now().UTC(),
 	}
 	err := ds.CreateJob(ctx, &j1)
@@ -292,34 +292,34 @@ func Test_cancelRunningJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	tasks := []task.Task{{
+	tasks := []tork.Task{{
 		ID:        uuid.NewUUID(),
-		State:     task.Pending,
+		State:     tork.TaskStatePending,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Scheduled,
+		State:     tork.TaskStateScheduled,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Cancelled,
+		State:     tork.TaskStateCancelled,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Completed,
+		State:     tork.TaskStateCompleted,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Failed,
+		State:     tork.TaskStateFailed,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}}
@@ -349,12 +349,12 @@ func Test_cancelRunningJob(t *testing.T) {
 func Test_restartJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Cancelled,
+		State:     tork.JobStateCancelled,
 		CreatedAt: time.Now().UTC(),
 		Position:  1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "some fake task",
 			},
@@ -365,9 +365,9 @@ func Test_restartJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	tasks := []task.Task{{
+	tasks := []tork.Task{{
 		ID:        uuid.NewUUID(),
-		State:     task.Pending,
+		State:     tork.TaskStatePending,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}}
@@ -397,12 +397,12 @@ func Test_restartJob(t *testing.T) {
 func Test_restartRunningJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		CreatedAt: time.Now().UTC(),
 		Position:  1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "some fake task",
 			},
@@ -413,9 +413,9 @@ func Test_restartRunningJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	tasks := []task.Task{{
+	tasks := []tork.Task{{
 		ID:        uuid.NewUUID(),
-		State:     task.Pending,
+		State:     tork.TaskStatePending,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}}
@@ -442,12 +442,12 @@ func Test_restartRunningJob(t *testing.T) {
 func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Failed,
+		State:     tork.JobStateFailed,
 		CreatedAt: time.Now().UTC(),
 		Position:  2,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "some fake task",
 			},
@@ -458,9 +458,9 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	tasks := []task.Task{{
+	tasks := []tork.Task{{
 		ID:        uuid.NewUUID(),
-		State:     task.Pending,
+		State:     tork.TaskStatePending,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}}

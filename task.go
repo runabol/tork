@@ -1,4 +1,4 @@
-package task
+package tork
 
 import (
 	"time"
@@ -8,16 +8,16 @@ import (
 
 // State defines the list of states that a
 // task can be in, at any given moment.
-type State string
+type TaskState string
 
 const (
-	Pending   State = "PENDING"
-	Scheduled State = "SCHEDULED"
-	Running   State = "RUNNING"
-	Cancelled State = "CANCELLED"
-	Stopped   State = "STOPPED"
-	Completed State = "COMPLETED"
-	Failed    State = "FAILED"
+	TaskStatePending   TaskState = "PENDING"
+	TaskStateScheduled TaskState = "SCHEDULED"
+	TaskStateRunning   TaskState = "RUNNING"
+	TaskStateCancelled TaskState = "CANCELLED"
+	TaskStateStopped   TaskState = "STOPPED"
+	TaskStateCompleted TaskState = "COMPLETED"
+	TaskStateFailed    TaskState = "FAILED"
 )
 
 // Task is the basic unit of work that a Worker can handle.
@@ -28,7 +28,7 @@ type Task struct {
 	Position    int               `json:"position,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
-	State       State             `json:"state,omitempty"`
+	State       TaskState         `json:"state,omitempty"`
 	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
 	ScheduledAt *time.Time        `json:"scheduledAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
@@ -47,18 +47,18 @@ type Task struct {
 	Volumes     []string          `json:"volumes,omitempty"`
 	Networks    []string          `json:"networks,omitempty"`
 	NodeID      string            `json:"nodeId,omitempty"`
-	Retry       *Retry            `json:"retry,omitempty"`
-	Limits      *Limits           `json:"limits,omitempty"`
+	Retry       *TaskRetry        `json:"retry,omitempty"`
+	Limits      *TaskLimits       `json:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty"`
 	Result      string            `json:"result,omitempty"`
 	Var         string            `json:"var,omitempty"`
 	If          string            `json:"if,omitempty"`
-	Parallel    *Parallel         `json:"parallel,omitempty"`
-	Each        *Each             `json:"each,omitempty"`
-	SubJob      *SubJob           `json:"subjob,omitempty"`
+	Parallel    *ParallelTask     `json:"parallel,omitempty"`
+	Each        *EachTask         `json:"each,omitempty"`
+	SubJob      *SubJobTask       `json:"subjob,omitempty"`
 }
 
-type SubJob struct {
+type SubJobTask struct {
 	ID          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
@@ -67,52 +67,52 @@ type SubJob struct {
 	Output      string            `json:"output,omitempty"`
 }
 
-type Parallel struct {
+type ParallelTask struct {
 	Tasks       []*Task `json:"tasks,omitempty"`
 	Completions int     `json:"completions,omitempty"`
 }
 
-type Each struct {
+type EachTask struct {
 	List        string `json:"list,omitempty"`
 	Task        *Task  `json:"task,omitempty"`
 	Size        int    `json:"size,omitempty"`
 	Completions int    `json:"completions,omitempty"`
 }
 
-type Retry struct {
+type TaskRetry struct {
 	Limit    int `json:"limit,omitempty"`
 	Attempts int `json:"attempts,omitempty"`
 }
 
-type Limits struct {
+type TaskLimits struct {
 	CPUs   string `json:"cpus,omitempty"`
 	Memory string `json:"memory,omitempty"`
 }
 
-func (s State) IsActive() bool {
-	return s == Pending ||
-		s == Scheduled ||
-		s == Running
+func (s TaskState) IsActive() bool {
+	return s == TaskStatePending ||
+		s == TaskStateScheduled ||
+		s == TaskStateRunning
 }
 
 func (t *Task) Clone() *Task {
-	var retry *Retry
+	var retry *TaskRetry
 	if t.Retry != nil {
 		retry = t.Retry.Clone()
 	}
-	var limits *Limits
+	var limits *TaskLimits
 	if t.Limits != nil {
 		limits = t.Limits.Clone()
 	}
-	var each *Each
+	var each *EachTask
 	if t.Each != nil {
 		each = t.Each.Clone()
 	}
-	var subjob *SubJob
+	var subjob *SubJobTask
 	if t.SubJob != nil {
 		subjob = t.SubJob.Clone()
 	}
-	var parallel *Parallel
+	var parallel *ParallelTask
 	if t.Parallel != nil {
 		parallel = t.Parallel.Clone()
 	}
@@ -162,22 +162,22 @@ func CloneTasks(tasks []*Task) []*Task {
 	return copy
 }
 
-func (r *Retry) Clone() *Retry {
-	return &Retry{
+func (r *TaskRetry) Clone() *TaskRetry {
+	return &TaskRetry{
 		Limit:    r.Limit,
 		Attempts: r.Attempts,
 	}
 }
 
-func (l *Limits) Clone() *Limits {
-	return &Limits{
+func (l *TaskLimits) Clone() *TaskLimits {
+	return &TaskLimits{
 		CPUs:   l.CPUs,
 		Memory: l.Memory,
 	}
 }
 
-func (e *Each) Clone() *Each {
-	return &Each{
+func (e *EachTask) Clone() *EachTask {
+	return &EachTask{
 		List:        e.List,
 		Task:        e.Task.Clone(),
 		Size:        e.Size,
@@ -185,8 +185,8 @@ func (e *Each) Clone() *Each {
 	}
 }
 
-func (s *SubJob) Clone() *SubJob {
-	return &SubJob{
+func (s *SubJobTask) Clone() *SubJobTask {
+	return &SubJobTask{
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,
@@ -196,8 +196,8 @@ func (s *SubJob) Clone() *SubJob {
 	}
 }
 
-func (p *Parallel) Clone() *Parallel {
-	return &Parallel{
+func (p *ParallelTask) Clone() *ParallelTask {
+	return &ParallelTask{
 		Tasks:       CloneTasks(p.Tasks),
 		Completions: p.Completions,
 	}

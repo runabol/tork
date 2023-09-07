@@ -1,22 +1,22 @@
-package task_test
+package tork_test
 
 import (
 	"testing"
 
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestClone(t *testing.T) {
-	t1 := &task.Task{
+func TestCloneTask(t *testing.T) {
+	t1 := &tork.Task{
 		Env: map[string]string{
 			"VAR1": "VAL1",
 		},
-		Limits: &task.Limits{
+		Limits: &tork.TaskLimits{
 			CPUs: "1",
 		},
-		Parallel: &task.Parallel{
-			Tasks: []*task.Task{
+		Parallel: &tork.ParallelTask{
+			Tasks: []*tork.Task{
 				{
 					Env: map[string]string{
 						"PVAR1": "PVAL1",

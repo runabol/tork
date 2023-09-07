@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/db/postgres"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,12 +22,12 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	now := time.Now().UTC()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := task.Task{
+	t1 := tork.Task{
 		ID:          uuid.NewUUID(),
 		CreatedAt:   &now,
 		JobID:       j1.ID,
@@ -52,12 +51,12 @@ func TestPostgresCreateTaskBadOutput(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 	now := time.Now().UTC()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := task.Task{
+	t1 := tork.Task{
 		ID:          uuid.NewUUID(),
 		CreatedAt:   &now,
 		JobID:       j1.ID,
@@ -79,7 +78,7 @@ func TestPostgresGetActiveTasks(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		CreatedAt: time.Now().UTC(),
 	}
@@ -88,34 +87,34 @@ func TestPostgresGetActiveTasks(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	tasks := []*task.Task{{
+	tasks := []*tork.Task{{
 		ID:        uuid.NewUUID(),
-		State:     task.Pending,
+		State:     tork.TaskStatePending,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Scheduled,
+		State:     tork.TaskStateScheduled,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Cancelled,
+		State:     tork.TaskStateCancelled,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Completed,
+		State:     tork.TaskStateCompleted,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}, {
 		ID:        uuid.NewUUID(),
-		State:     task.Failed,
+		State:     tork.TaskStateFailed,
 		CreatedAt: &now,
 		JobID:     j1.ID,
 	}}
@@ -136,12 +135,12 @@ func TestPostgresUpdateTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
 		JobID:     j1.ID,
@@ -149,8 +148,8 @@ func TestPostgresUpdateTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
-		u.State = task.Scheduled
+	err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateScheduled
 		u.Result = "my result"
 		return nil
 	})
@@ -158,7 +157,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 	assert.Equal(t, "my result", t2.Result)
 }
 
@@ -169,16 +168,16 @@ func TestPostgresUpdateTaskConcurrently(t *testing.T) {
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
 		JobID:     j1.ID,
-		Parallel:  &task.Parallel{},
+		Parallel:  &tork.ParallelTask{},
 	}
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
@@ -188,8 +187,8 @@ func TestPostgresUpdateTaskConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
-				u.State = task.Scheduled
+			err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+				u.State = tork.TaskStateScheduled
 				u.Result = "my result"
 				u.Parallel.Completions = u.Parallel.Completions + 1
 				return nil
@@ -201,7 +200,7 @@ func TestPostgresUpdateTaskConcurrently(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 	assert.Equal(t, "my result", t2.Result)
 	assert.Equal(t, 5, t2.Parallel.Completions)
 }
@@ -213,12 +212,12 @@ func TestPostgresUpdateTaskBadStrings(t *testing.T) {
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
 		JobID:     j1.ID,
@@ -226,8 +225,8 @@ func TestPostgresUpdateTaskBadStrings(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
-		u.State = task.Scheduled
+	err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateScheduled
 		u.Result = string([]byte{0})
 		u.Error = string([]byte{0})
 		return nil
@@ -236,7 +235,7 @@ func TestPostgresUpdateTaskBadStrings(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 }
 
 func TestPostgresCreateAndGetNode(t *testing.T) {
@@ -244,7 +243,7 @@ func TestPostgresCreateAndGetNode(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:       uuid.NewUUID(),
 		Hostname: "some-name",
 		Version:  "1.0.0",
@@ -264,7 +263,7 @@ func TestPostgresUpdateNode(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 	}
@@ -273,7 +272,7 @@ func TestPostgresUpdateNode(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	err = ds.UpdateNode(ctx, n1.ID, func(u *node.Node) error {
+	err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 		u.LastHeartbeatAt = now
 		u.TaskCount = 2
 		return nil
@@ -294,7 +293,7 @@ func TestPostgresUpdateNodeConcurrently(t *testing.T) {
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 	}
@@ -308,7 +307,7 @@ func TestPostgresUpdateNodeConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateNode(ctx, n1.ID, func(u *node.Node) error {
+			err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 				u.LastHeartbeatAt = now
 				u.CPUPercent = u.CPUPercent + 1
 				return nil
@@ -340,19 +339,19 @@ func TestPostgresGetActiveNodes(t *testing.T) {
 	}()
 	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Second * 20),
 	}
-	n2 := node.Node{
+	n2 := tork.Node{
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 4),
 	}
-	n3 := node.Node{ // inactive
+	n3 := tork.Node{ // inactive
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
 	}
 	err = ds.CreateNode(ctx, n1)
@@ -367,8 +366,8 @@ func TestPostgresGetActiveNodes(t *testing.T) {
 	ns, err := ds.GetActiveNodes(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(ns))
-	assert.Equal(t, node.UP, ns[0].Status)
-	assert.Equal(t, node.Offline, ns[1].Status)
+	assert.Equal(t, tork.NodeStatusUP, ns[0].Status)
+	assert.Equal(t, tork.NodeStatusOffline, ns[1].Status)
 }
 
 func TestPostgresCreateAndGetJob(t *testing.T) {
@@ -376,7 +375,7 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 		Inputs: map[string]string{
 			"var1": "val1",
@@ -395,10 +394,10 @@ func TestPostgresUpdateJob(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Context: job.Context{
+		State: tork.JobStatePending,
+		Context: tork.JobContext{
 			Inputs: map[string]string{
 				"var1": "val1",
 			},
@@ -406,15 +405,15 @@ func TestPostgresUpdateJob(t *testing.T) {
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
-		u.State = job.Completed
+	err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+		u.State = tork.JobStateCompleted
 		u.Context.Inputs["var2"] = "val2"
 		return nil
 	})
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 }
@@ -424,10 +423,10 @@ func TestPostgresUpdateJobConcurrently(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Context: job.Context{
+		State: tork.JobStatePending,
+		Context: tork.JobContext{
 			Inputs: map[string]string{
 				"var1": "val1",
 			},
@@ -441,8 +440,8 @@ func TestPostgresUpdateJobConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
-				u.State = job.Completed
+			err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+				u.State = tork.JobStateCompleted
 				u.Context.Inputs["var2"] = "val2"
 				u.Position = u.Position + 1
 				return nil
@@ -454,7 +453,7 @@ func TestPostgresUpdateJobConcurrently(t *testing.T) {
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 	assert.Equal(t, 5, j2.Position)
@@ -475,10 +474,10 @@ func TestPostgresGetJobs(t *testing.T) {
 	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	for i := 0; i < 101; i++ {
-		j1 := job.Job{
+		j1 := tork.Job{
 			ID:   uuid.NewUUID(),
 			Name: fmt.Sprintf("Job %d", (i + 1)),
-			Tasks: []*task.Task{
+			Tasks: []*tork.Task{
 				{
 					Name: "some task",
 				},
@@ -488,10 +487,10 @@ func TestPostgresGetJobs(t *testing.T) {
 		assert.NoError(t, err)
 
 		now := time.Now().UTC()
-		err = ds.CreateTask(ctx, &task.Task{
+		err = ds.CreateTask(ctx, &tork.Task{
 			ID:        uuid.NewUUID(),
 			JobID:     j1.ID,
-			State:     task.Running,
+			State:     tork.TaskStateRunning,
 			CreatedAt: &now,
 		})
 		assert.NoError(t, err)
@@ -534,11 +533,11 @@ func TestPostgresSearchJobs(t *testing.T) {
 	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
 	for i := 0; i < 101; i++ {
-		j1 := job.Job{
+		j1 := tork.Job{
 			ID:    uuid.NewUUID(),
 			Name:  fmt.Sprintf("Job %d", (i + 1)),
-			State: job.Running,
-			Tasks: []*task.Task{
+			State: tork.JobStateRunning,
+			Tasks: []*tork.Task{
 				{
 					Name: "some task",
 				},
@@ -548,10 +547,10 @@ func TestPostgresSearchJobs(t *testing.T) {
 		assert.NoError(t, err)
 
 		now := time.Now().UTC()
-		err = ds.CreateTask(ctx, &task.Task{
+		err = ds.CreateTask(ctx, &tork.Task{
 			ID:        uuid.NewUUID(),
 			JobID:     j1.ID,
-			State:     task.Running,
+			State:     tork.TaskStateRunning,
 			CreatedAt: &now,
 		})
 		assert.NoError(t, err)
@@ -598,14 +597,14 @@ func TestPostgresGetStats(t *testing.T) {
 	jobIDs := []string{}
 
 	for i := 0; i < 100; i++ {
-		var state job.State
+		var state tork.JobState
 		if i%2 == 0 {
-			state = job.Running
+			state = tork.JobStateRunning
 		} else {
-			state = job.Pending
+			state = tork.JobStatePending
 		}
 		jid := uuid.NewUUID()
-		err := ds.CreateJob(ctx, &job.Job{
+		err := ds.CreateJob(ctx, &tork.Job{
 			ID:        jid,
 			State:     state,
 			CreatedAt: now,
@@ -615,13 +614,13 @@ func TestPostgresGetStats(t *testing.T) {
 	}
 
 	for i := 0; i < 100; i++ {
-		var state task.State
+		var state tork.TaskState
 		if i%2 == 0 {
-			state = task.Running
+			state = tork.TaskStateRunning
 		} else {
-			state = task.Pending
+			state = tork.TaskStatePending
 		}
-		err := ds.CreateTask(ctx, &task.Task{
+		err := ds.CreateTask(ctx, &tork.Task{
 			ID:        uuid.NewUUID(),
 			JobID:     jobIDs[i],
 			State:     state,
@@ -631,7 +630,7 @@ func TestPostgresGetStats(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		err := ds.CreateNode(ctx, node.Node{
+		err := ds.CreateNode(ctx, tork.Node{
 			ID:              uuid.NewUUID(),
 			LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * time.Duration(i)),
 			CPUPercent:      float64(i * 10),
@@ -652,13 +651,13 @@ func TestPostgresWithTxCreateTask(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.WithTx(ctx, func(tx Datastore) error {
 		err = tx.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
-		t1 := task.Task{}
+		t1 := tork.Task{}
 		err = tx.CreateTask(ctx, &t1)
 		return err
 	})
@@ -674,29 +673,29 @@ func TestPostgresWithTxUpdateTask(t *testing.T) {
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 	now := time.Now().UTC()
-	t1 := task.Task{
+	t1 := tork.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		JobID:     j1.ID,
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 	err = ds.WithTx(ctx, func(tx Datastore) error {
-		return tx.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
-			u.State = task.Failed
-			u.State = task.State(strings.Repeat("x", 100)) // invalid state
+		return tx.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+			u.State = tork.TaskStateFailed
+			u.State = tork.TaskState(strings.Repeat("x", 100)) // invalid state
 			return nil
 		})
 	})
 	assert.Error(t, err)
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Running, t11.State)
+	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
