@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runabol/tork/signals"
+	"github.com/runabol/tork/internal/signals"
 	"github.com/stretchr/testify/assert"
 )
 

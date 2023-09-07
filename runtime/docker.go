@@ -21,7 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/syncx"
+	"github.com/runabol/tork/internal/syncx"
 )
 
 type DockerRuntime struct {

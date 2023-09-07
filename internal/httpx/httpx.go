@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/runabol/tork/netx"
+	"github.com/runabol/tork/internal/netx"
 )
 
 func StartAsync(s *http.Server) error {

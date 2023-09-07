@@ -9,7 +9,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -14,10 +14,10 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
 
+	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/syncx"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/version"
 )
 

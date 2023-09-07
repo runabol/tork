@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runabol/tork/syncx"
+	"github.com/runabol/tork/internal/syncx"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/slices"
 )

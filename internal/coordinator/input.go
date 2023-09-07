@@ -6,11 +6,11 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/clone"
-	"github.com/runabol/tork/eval"
+	"github.com/runabol/tork/internal/clone"
+	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/mq"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 type jobInput struct {

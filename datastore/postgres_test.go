@@ -12,7 +12,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/db/postgres"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/runabol/tork/netx"
+	"github.com/runabol/tork/internal/netx"
 	"github.com/stretchr/testify/assert"
 )
 

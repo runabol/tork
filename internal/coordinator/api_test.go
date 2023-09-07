@@ -16,7 +16,7 @@ import (
 
 	"github.com/runabol/tork/mq"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 

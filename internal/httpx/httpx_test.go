@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/runabol/tork/httpx"
+	"github.com/runabol/tork/internal/httpx"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/runabol/tork"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 

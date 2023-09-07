@@ -3,7 +3,7 @@ package uuid_test
 import (
 	"testing"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
