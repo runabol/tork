@@ -20,6 +20,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.8.1
 	github.com/rs/zerolog v1.29.1
 	github.com/shirou/gopsutil/v3 v3.23.6
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/exp v0.0.0-20230807204917-050eac23e9de
