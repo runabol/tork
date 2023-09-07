@@ -1,4 +1,4 @@
-package coordinator
+package input
 
 import (
 	"testing"
@@ -7,33 +7,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateMinJobInput(t *testing.T) {
-	j := jobInput{
+func TestValidateMinJob(t *testing.T) {
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 }
 
 func TestValidateJobNoTasks(t *testing.T) {
-	j := jobInput{
+	j := Job{
 		Name:  "test job",
-		Tasks: []taskInput{},
+		Tasks: []Task{},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.Error(t, err)
 }
 
 func TestValidateQueue(t *testing.T) {
-	j := jobInput{
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
@@ -41,12 +41,12 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
@@ -54,12 +54,12 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
@@ -67,72 +67,72 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 }
 
-func TestValidateJobInputNoName(t *testing.T) {
-	j := jobInput{
+func TestValidateJobNoName(t *testing.T) {
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Image: "some:image",
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.Error(t, err)
 }
 
-func TestValidateJobInputTaskNoName(t *testing.T) {
-	j := jobInput{
+func TestValidateJobTaskNoName(t *testing.T) {
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Image: "some:image",
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.Error(t, err)
 }
 
-func TestValidateJobInputTaskRetry(t *testing.T) {
-	j := jobInput{
+func TestValidateJobTaskRetry(t *testing.T) {
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
-				Retry: &retryInput{
+				Retry: &Retry{
 					Limit: 5,
 				},
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
-				Retry: &retryInput{
+				Retry: &Retry{
 					Limit: 50,
 				},
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 }
 
-func TestValidateJobInputTaskTimeout(t *testing.T) {
-	j := jobInput{
+func TestValidateJobTaskTimeout(t *testing.T) {
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:    "test task",
 				Image:   "some:image",
@@ -140,19 +140,19 @@ func TestValidateJobInputTaskTimeout(t *testing.T) {
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 }
 
 func TestValidateParallelOrEachTaskType(t *testing.T) {
-	j := jobInput{
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Each: &eachInput{
+				Each: &Each{
 					List: "5+5",
-					Task: taskInput{
+					Task: Task{
 						Name:  "test task",
 						Image: "some task",
 					},
@@ -160,16 +160,16 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Parallel: &parallelInput{
-					Tasks: []taskInput{
+				Parallel: &Parallel{
+					Tasks: []Task{
 						{
 							Name:  "test task",
 							Image: "some task",
@@ -179,25 +179,25 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:    "test task",
 				Image:   "some:image",
 				Timeout: "6h",
-				Each: &eachInput{
+				Each: &Each{
 					List: "some expression",
-					Task: taskInput{
+					Task: Task{
 						Name:  "test task",
 						Image: "some task",
 					},
 				},
-				Parallel: &parallelInput{
-					Tasks: []taskInput{
+				Parallel: &Parallel{
+					Tasks: []Task{
 						{
 							Name:  "test task",
 							Image: "some task",
@@ -207,18 +207,18 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 }
 
 func TestValidateParallelOrSubJobTaskType(t *testing.T) {
-	j := jobInput{
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Parallel: &parallelInput{
-					Tasks: []taskInput{
+				Parallel: &Parallel{
+					Tasks: []Task{
 						{
 							Name:  "test task",
 							Image: "some task",
@@ -228,26 +228,26 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name:  "test task",
 				Image: "some:image",
-				Parallel: &parallelInput{
-					Tasks: []taskInput{
+				Parallel: &Parallel{
+					Tasks: []Task{
 						{
 							Name:  "test task",
 							Image: "some task",
 						},
 					},
 				},
-				SubJob: &subJobInput{
+				SubJob: &SubJob{
 					Name: "test sub job",
-					Tasks: []taskInput{{
+					Tasks: []Task{{
 						Name:  "test task",
 						Image: "some task",
 					}},
@@ -255,19 +255,19 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 }
 
 func TestValidateExpr(t *testing.T) {
-	j := jobInput{
+	j := Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Each: &eachInput{
+				Each: &Each{
 					List: "1+1",
-					Task: taskInput{
+					Task: Task{
 						Name:  "test task",
 						Image: "some:image",
 					},
@@ -275,17 +275,17 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err := j.validate()
+	err := j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Each: &eachInput{
+				Each: &Each{
 					List: "{{1+1}}",
-					Task: taskInput{
+					Task: Task{
 						Name:  "test task",
 						Image: "some:image",
 					},
@@ -293,17 +293,17 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.NoError(t, err)
 
-	j = jobInput{
+	j = Job{
 		Name: "test job",
-		Tasks: []taskInput{
+		Tasks: []Task{
 			{
 				Name: "test task",
-				Each: &eachInput{
+				Each: &Each{
 					List: "{1+1",
-					Task: taskInput{
+					Task: Task{
 						Name:  "test task",
 						Image: "some:image",
 					},
@@ -311,6 +311,6 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.validate()
+	err = j.Validate()
 	assert.Error(t, err)
 }

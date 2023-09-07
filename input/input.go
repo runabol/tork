@@ -1,4 +1,4 @@
-package coordinator
+package input
 
 import (
 	"strings"
@@ -13,15 +13,15 @@ import (
 	"github.com/runabol/tork/internal/uuid"
 )
 
-type jobInput struct {
+type Job struct {
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
+	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 }
 
-type taskInput struct {
+type Task struct {
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
@@ -31,21 +31,21 @@ type taskInput struct {
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Files       map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
-	Pre         []auxTaskInput    `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
-	Post        []auxTaskInput    `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
+	Pre         []AuxTask         `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
+	Post        []AuxTask         `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
 	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	Networks    []string          `json:"networks,omitempty" yaml:"networks,omitempty"`
-	Retry       *retryInput       `json:"retry,omitempty" yaml:"retry,omitempty"`
-	Limits      *limitsInput      `json:"limits,omitempty" yaml:"limits,omitempty"`
+	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
+	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
 	If          string            `json:"if,omitempty" yaml:"if,omitempty" validate:"expr"`
-	Parallel    *parallelInput    `json:"parallel,omitempty" yaml:"parallel,omitempty"`
-	Each        *eachInput        `json:"each,omitempty" yaml:"each,omitempty"`
-	SubJob      *subJobInput      `json:"subjob,omitempty" yaml:"subjob,omitempty"`
+	Parallel    *Parallel         `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
+	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 }
 
-type auxTaskInput struct {
+type AuxTask struct {
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
@@ -56,7 +56,7 @@ type auxTaskInput struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
-func (ji jobInput) toJob() *tork.Job {
+func (ji Job) ToJob() *tork.Job {
 	n := time.Now().UTC()
 	j := &tork.Job{}
 	j.ID = uuid.NewUUID()
@@ -77,7 +77,7 @@ func (ji jobInput) toJob() *tork.Job {
 	return j
 }
 
-func (ji jobInput) validate() error {
+func (ji Job) Validate() error {
 	validate := validator.New()
 	if err := validate.RegisterValidation("duration", validateDuration); err != nil {
 		return err
@@ -88,7 +88,7 @@ func (ji jobInput) validate() error {
 	if err := validate.RegisterValidation("expr", validateExpr); err != nil {
 		return err
 	}
-	validate.RegisterStructValidation(taskInputValidation, taskInput{})
+	validate.RegisterStructValidation(taskInputValidation, Task{})
 	return validate.Struct(ji)
 }
 
@@ -99,7 +99,7 @@ func taskInputValidation(sl validator.StructLevel) {
 }
 
 func regularTaskValidation(sl validator.StructLevel) {
-	t := sl.Current().Interface().(taskInput)
+	t := sl.Current().Interface().(Task)
 	if t.Parallel != nil || t.Each != nil || t.SubJob != nil {
 		return
 	}
@@ -109,7 +109,7 @@ func regularTaskValidation(sl validator.StructLevel) {
 }
 
 func compositeTaskValidation(sl validator.StructLevel) {
-	t := sl.Current().Interface().(taskInput)
+	t := sl.Current().Interface().(Task)
 	if t.Parallel == nil && t.Each == nil && t.SubJob == nil {
 		return
 	}
@@ -152,7 +152,7 @@ func compositeTaskValidation(sl validator.StructLevel) {
 }
 
 func taskTypeValidation(sl validator.StructLevel) {
-	ti := sl.Current().Interface().(taskInput)
+	ti := sl.Current().Interface().(Task)
 
 	if ti.Parallel != nil && ti.Each != nil {
 		sl.ReportError(ti.Each, "each", "Each", "paralleloreach", "")
@@ -202,7 +202,7 @@ func validateDuration(fl validator.FieldLevel) bool {
 	return err == nil
 }
 
-func (i auxTaskInput) toTask() *tork.Task {
+func (i AuxTask) toTask() *tork.Task {
 	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
@@ -215,7 +215,7 @@ func (i auxTaskInput) toTask() *tork.Task {
 	}
 }
 
-func (i taskInput) toTask() *tork.Task {
+func (i Task) toTask() *tork.Task {
 	pre := toAuxTasks(i.Pre)
 	post := toAuxTasks(i.Post)
 	var retry *tork.TaskRetry
@@ -279,7 +279,7 @@ func (i taskInput) toTask() *tork.Task {
 	}
 }
 
-func toAuxTasks(tis []auxTaskInput) []*tork.Task {
+func toAuxTasks(tis []AuxTask) []*tork.Task {
 	result := make([]*tork.Task, len(tis))
 	for i, ti := range tis {
 		result[i] = ti.toTask()
@@ -287,7 +287,7 @@ func toAuxTasks(tis []auxTaskInput) []*tork.Task {
 	return result
 }
 
-func toTasks(tis []taskInput) []*tork.Task {
+func toTasks(tis []Task) []*tork.Task {
 	result := make([]*tork.Task, len(tis))
 	for i, ti := range tis {
 		result[i] = ti.toTask()
@@ -295,29 +295,29 @@ func toTasks(tis []taskInput) []*tork.Task {
 	return result
 }
 
-type subJobInput struct {
+type SubJob struct {
 	ID          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Tasks       []taskInput       `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
+	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
 }
 
-type eachInput struct {
-	List string    `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
-	Task taskInput `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
+type Each struct {
+	List string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
+	Task Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
 }
 
-type parallelInput struct {
-	Tasks []taskInput `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
+type Parallel struct {
+	Tasks []Task `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 }
 
-type retryInput struct {
+type Retry struct {
 	Limit int `json:"limit,omitempty" yaml:"limit,omitempty" validate:"required,min=1,max=10"`
 }
 
-type limitsInput struct {
+type Limits struct {
 	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
 }
