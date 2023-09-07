@@ -11,7 +11,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/task"
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )

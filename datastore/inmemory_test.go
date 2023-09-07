@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/job"
+	"github.com/runabol/tork/types/node"
+	"github.com/runabol/tork/types/task"
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )

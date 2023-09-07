@@ -13,10 +13,10 @@ import (
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/job"
+	"github.com/runabol/tork/types/node"
+	"github.com/runabol/tork/types/task"
 	"github.com/runabol/tork/uuid"
 )
 

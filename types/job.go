@@ -1,21 +1,21 @@
-package job
+package types
 
 import (
 	"time"
 
 	"github.com/runabol/tork/clone"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/task"
 )
 
 type State string
 
 const (
-	Pending   State = "PENDING"
-	Running   State = "RUNNING"
-	Cancelled State = "CANCELLED"
-	Completed State = "COMPLETED"
-	Failed    State = "FAILED"
-	Restart   State = "RESTART"
+	StatusPending   State = "PENDING"
+	StatusRunning   State = "RUNNING"
+	StatusCancelled State = "CANCELLED"
+	StatusCompleted State = "COMPLETED"
+	StatusFailed    State = "FAILED"
+	StatusRestart   State = "RESTART"
 )
 
 type Job struct {

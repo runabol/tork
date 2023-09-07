@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/runabol/tork/eval"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/task"
 	"github.com/stretchr/testify/assert"
 )
 

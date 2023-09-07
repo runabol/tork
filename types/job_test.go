@@ -1,16 +1,16 @@
-package job_test
+package types_test
 
 import (
 	"testing"
 
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types"
+	"github.com/runabol/tork/types/task"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestClone(t *testing.T) {
-	j1 := &job.Job{
-		Context: job.Context{
+	j1 := &types.Job{
+		Context: types.Context{
 			Inputs: map[string]string{
 				"INPUT1": "VAL1",
 			},

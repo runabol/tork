@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/stats"
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/job"
+	"github.com/runabol/tork/types/node"
+	"github.com/runabol/tork/types/stats"
+	"github.com/runabol/tork/types/task"
 )
 
 var ErrTaskNotFound = errors.New("task not found")

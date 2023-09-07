@@ -12,10 +12,10 @@ import (
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/stats"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/job"
+	"github.com/runabol/tork/types/node"
+	"github.com/runabol/tork/types/stats"
+	"github.com/runabol/tork/types/task"
 )
 
 type PostgresDatastore struct {

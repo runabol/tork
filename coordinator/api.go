@@ -16,8 +16,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/httpx"
-	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/types/job"
 	"github.com/runabol/tork/version"
 	"gopkg.in/yaml.v3"
 )

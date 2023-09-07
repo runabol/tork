@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/node"
+	"github.com/runabol/tork/types/task"
 	"github.com/runabol/tork/uuid"
 	"github.com/runabol/tork/version"
 	"github.com/stretchr/testify/assert"

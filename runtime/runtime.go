@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/task"
 )
 
 type RuntimeType string

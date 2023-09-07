@@ -3,8 +3,8 @@ package coordinator
 import (
 	"testing"
 
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork/types/job"
+	"github.com/runabol/tork/types/task"
 	"github.com/stretchr/testify/assert"
 )
 
