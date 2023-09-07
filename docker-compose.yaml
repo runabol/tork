@@ -19,7 +19,7 @@ services:
     image: golang:1.19
     working_dir: /code
     command: |
-      go run cmd/main.go --config config.compose.toml migration
+      go run cmd/main.go --config configs/config.compose.toml migration
     volumes:
       - .:/code
     depends_on:

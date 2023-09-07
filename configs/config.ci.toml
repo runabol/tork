@@ -1,0 +1,5 @@
+[datastore]
+type = "postgres"
+
+[datastore.postgres]
+dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
