@@ -23,6 +23,3 @@ go.work
 # build and files
 .build/
 .release/
-
-# local config
-config.local.toml

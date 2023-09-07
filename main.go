@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/runabol/tork/cmd"
+	"github.com/runabol/tork-core/cmd"
 )
 
 func main() {

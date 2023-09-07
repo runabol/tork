@@ -1,5 +1,0 @@
-name: hello world
-tasks:
-  - name: simple task
-    image: ubuntu:mantic
-    run: echo hello world

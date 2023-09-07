@@ -1,6 +1,0 @@
-name: sample timeout job
-tasks:
-  - name: a task that simulates a long running process that timeout
-    image: ubuntu:mantic
-    run: sleep 10
-    timeout: 5s
