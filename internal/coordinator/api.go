@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
 
 	"github.com/runabol/tork/middleware"
@@ -120,7 +121,7 @@ func (s *api) listActiveNodes(c echo.Context) error {
 }
 
 func (s *api) createJob(c echo.Context) error {
-	var ji *jobInput
+	var ji *input.Job
 	var err error
 	contentType := c.Request().Header.Get("content-type")
 	switch contentType {
@@ -137,10 +138,10 @@ func (s *api) createJob(c echo.Context) error {
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
-	if err := ji.validate(); err != nil {
+	if err := ji.Validate(); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	j := ji.toJob()
+	j := ji.ToJob()
 	if err := s.ds.CreateJob(c.Request().Context(), j); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -151,8 +152,8 @@ func (s *api) createJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, redactJob(j))
 }
 
-func bindJobInputJSON(r io.ReadCloser) (*jobInput, error) {
-	ji := jobInput{}
+func bindJobInputJSON(r io.ReadCloser) (*input.Job, error) {
+	ji := input.Job{}
 	body, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -165,8 +166,8 @@ func bindJobInputJSON(r io.ReadCloser) (*jobInput, error) {
 	return &ji, nil
 }
 
-func bindJobInputYAML(r io.ReadCloser) (*jobInput, error) {
-	ji := jobInput{}
+func bindJobInputYAML(r io.ReadCloser) (*input.Job, error) {
+	ji := input.Job{}
 	body, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
