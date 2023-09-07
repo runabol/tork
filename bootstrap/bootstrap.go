@@ -32,6 +32,7 @@ var (
 	terminate   = make(chan any, 1)
 	onStarted   = defaultOnStartedHander
 	dsProviders = map[string]datastore.Provider{}
+	mqProviders = map[string]mq.Provider{}
 )
 
 func Start(mode Mode) error {
@@ -191,6 +192,9 @@ func createDatastore() (datastore.Datastore, error) {
 func createBroker() (mq.Broker, error) {
 	var b mq.Broker
 	bt := conf.StringDefault("broker.type", mq.BROKER_INMEMORY)
+	if provider, ok := mqProviders[bt]; ok {
+		return provider()
+	}
 	switch bt {
 	case "inmemory":
 		b = mq.NewInMemoryBroker()
@@ -306,4 +310,8 @@ func awaitTerm() {
 
 func RegisterDatastoreProvider(dsType string, provider datastore.Provider) {
 	dsProviders[dsType] = provider
+}
+
+func RegisterBrokerProvider(mqType string, provider mq.Provider) {
+	mqProviders[mqType] = provider
 }
