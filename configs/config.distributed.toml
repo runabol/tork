@@ -1,0 +1,11 @@
+[broker]
+type = "rabbitmq"
+
+[broker.rabbitmq]
+url = "amqp://guest:guest@localhost:5672/"
+
+[datastore]
+type = "postgres"
+
+[datastore.postgres]
+dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
