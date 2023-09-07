@@ -2,7 +2,9 @@ package bootstrap
 
 import (
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -11,19 +13,24 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/internal/coordinator"
-	"github.com/runabol/tork/internal/signals"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
-
-type Mode string
 
 const (
 	ModeCoordinator Mode = "coordinator"
 	ModeWorker      Mode = "worker"
 	ModeStandalone  Mode = "standalone"
 	ModeMigration   Mode = "migration"
+)
+
+type Mode string
+
+var (
+	quit      = make(chan os.Signal, 1)
+	terminate = make(chan any, 1)
+	onStarted = defaultOnStartedHander
 )
 
 func Start(mode Mode) error {
@@ -45,6 +52,14 @@ func Start(mode Mode) error {
 	}
 }
 
+func Terminate() {
+	terminate <- 1
+}
+
+func OnStarted(h OnStartedHandler) {
+	onStarted = h
+}
+
 func runCoordinator() error {
 	broker, err := createBroker()
 	if err != nil {
@@ -61,7 +76,12 @@ func runCoordinator() error {
 		return err
 	}
 
-	signals.AwaitTerm()
+	// trigger the on-started hook
+	if err := onStarted(); err != nil {
+		return errors.Wrapf(err, "error on-started hook")
+	}
+
+	awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if c != nil {
@@ -83,7 +103,12 @@ func runWorker() error {
 		return err
 	}
 
-	signals.AwaitTerm()
+	// trigger the on-started hook
+	if err := onStarted(); err != nil {
+		return errors.Wrapf(err, "error on-started hook")
+	}
+
+	awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if w != nil {
@@ -115,7 +140,12 @@ func runStandalone() error {
 		return err
 	}
 
-	signals.AwaitTerm()
+	// trigger the on-started hook
+	if err := onStarted(); err != nil {
+		return errors.Wrapf(err, "error on-started hook")
+	}
+
+	awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if w != nil {
@@ -260,4 +290,12 @@ func runMigration() error {
 	}
 	log.Info().Msg("migration completed!")
 	return nil
+}
+
+func awaitTerm() {
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-quit:
+	case <-terminate:
+	}
 }
