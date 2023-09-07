@@ -1,10 +1,10 @@
 # Makefile for releasing Tork
 #
-# The release is controlled from version/version.go. The version found there is
+# The release is controlled from version.go. The version found there is
 # used to tag the git repo and to build the assets that are uploaded to GitHub.
 #
 # Steps to release: 
-# 1. Update version/version.go.
+# 1. Update version.go.
 # 2. make -f Makefile.release release
 # 3. make -f Makefile.release github-push
 
@@ -13,7 +13,7 @@ ifeq (, $(shell which curl))
 endif
 
 NAME:=tork
-VERSION:=$(shell grep 'Version' version/version.go | awk '{ print $$3 }' | tr -d '"')
+VERSION:=$(shell grep 'Version' version.go | awk '{ print $$3 }' | tr -d '"')
 GITHUB:=runabol
 LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x mips riscv64
 

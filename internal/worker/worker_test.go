@@ -9,7 +9,7 @@ import (
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/version"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -308,7 +308,7 @@ func Test_sendHeartbeat(t *testing.T) {
 
 	heartbeats := 0
 	err = b.SubscribeForHeartbeats(func(n tork.Node) error {
-		assert.Contains(t, n.Version, version.Version)
+		assert.Contains(t, n.Version, tork.Version)
 		heartbeats = heartbeats + 1
 		return nil
 	})

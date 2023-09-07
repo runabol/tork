@@ -1,4 +1,4 @@
-package version
+package tork
 
 const (
 	Version = "0.0.12"

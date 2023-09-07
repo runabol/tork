@@ -14,12 +14,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork"
+
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/httpx"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -61,7 +61,7 @@ func newAPI(cfg Config) *api {
 func (s *api) health(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "UP",
-		"version": fmt.Sprintf("%s (%s)", version.Version, version.GitCommit),
+		"version": fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
 	})
 }
 
