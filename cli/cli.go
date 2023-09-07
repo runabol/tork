@@ -16,10 +16,6 @@ import (
 	ucli "github.com/urfave/cli/v2"
 )
 
-var (
-	onRunHandler = defaultOnRunCommandHandler
-)
-
 func Run() error {
 	app := &ucli.App{
 		Name:     "tork",
@@ -28,10 +24,6 @@ func Run() error {
 		Commands: commands(),
 	}
 	return app.Run(os.Args)
-}
-
-func OnRunCommand(h OnRunHandler) {
-	onRunHandler = h
 }
 
 func before(ctx *ucli.Context) error {
@@ -62,13 +54,9 @@ func runCmd() *ucli.Command {
 				os.Exit(1)
 
 			}
-			return onRunHandler(bootstrap.Mode(ctx.Args().First()))
+			return bootstrap.Start(bootstrap.Mode(ctx.Args().First()))
 		},
 	}
-}
-
-func defaultOnRunCommandHandler(mode bootstrap.Mode) error {
-	return bootstrap.Start(mode)
 }
 
 func migrationCmd() *ucli.Command {
