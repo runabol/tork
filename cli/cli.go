@@ -10,9 +10,9 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/bootstrap"
 	"github.com/runabol/tork/conf"
-	"github.com/runabol/tork/version"
 	ucli "github.com/urfave/cli/v2"
 )
 
@@ -129,7 +129,7 @@ func displayBanner() {
   |___|  |_______||___|  |_||___| |_|
 
  %s (%s)
-`, version.Version, version.GitCommit))
+`, tork.Version, tork.GitCommit))
 
 	if mode == "console" {
 		fmt.Println(banner)

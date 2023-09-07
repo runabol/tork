@@ -18,7 +18,6 @@ import (
 	"github.com/runabol/tork/runtime"
 
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/version"
 )
 
 type Worker struct {
@@ -328,7 +327,7 @@ func (w *Worker) sendHeartbeats() {
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
 				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
-				Version:         fmt.Sprintf("%s (%s)", version.Version, version.GitCommit),
+				Version:         fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
 			},
 		)
 		if err != nil {
