@@ -2,6 +2,9 @@ package middleware
 
 import (
 	"net/http"
+
+	"github.com/runabol/tork"
+	"github.com/runabol/tork/input"
 )
 
 type MiddlewareFunc func(next HandlerFunc) HandlerFunc
@@ -17,4 +20,7 @@ type Context interface {
 
 	// JSON sends a JSON response with status code.
 	JSON(code int, data any) error
+
+	// SubmitJob submits a job input for processing
+	SubmitJob(j *input.Job) (*tork.Job, error)
 }
