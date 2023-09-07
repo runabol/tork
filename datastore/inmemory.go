@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 
-	"github.com/runabol/tork/syncx"
+	"github.com/runabol/tork/internal/syncx"
 )
 
 var ErrTaskNotFound = errors.New("task not found")

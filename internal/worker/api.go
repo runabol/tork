@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/httpx"
+	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/version"

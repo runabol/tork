@@ -3,7 +3,7 @@ package tork
 import (
 	"time"
 
-	"github.com/runabol/tork/clone"
+	"github.com/runabol/tork/internal/clone"
 )
 
 type JobState string

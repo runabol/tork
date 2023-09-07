@@ -12,11 +12,11 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/eval"
+	"github.com/runabol/tork/internal/eval"
 
 	"github.com/runabol/tork/mq"
 
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 // Coordinator is responsible for accepting tasks from

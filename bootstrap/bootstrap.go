@@ -8,13 +8,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/conf"
-	"github.com/runabol/tork/coordinator"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
+	"github.com/runabol/tork/internal/coordinator"
+	"github.com/runabol/tork/internal/signals"
+	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/signals"
-	"github.com/runabol/tork/worker"
 )
 
 type Mode string

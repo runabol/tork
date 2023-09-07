@@ -14,8 +14,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/uuid"
+	"github.com/runabol/tork/internal/syncx"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 type RabbitMQBroker struct {

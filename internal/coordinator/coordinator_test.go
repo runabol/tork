@@ -12,8 +12,8 @@ import (
 
 	"github.com/runabol/tork/runtime"
 
-	"github.com/runabol/tork/uuid"
-	"github.com/runabol/tork/worker"
+	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/internal/worker"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -1444,25 +1444,25 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 }
 
 func TestRunHelloWorldJob(t *testing.T) {
-	j1 := doRunJob(t, "../examples/hello.yaml")
+	j1 := doRunJob(t, "../../examples/hello.yaml")
 	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 1, len(j1.Execution))
 }
 
 func TestRunParallelJob(t *testing.T) {
-	j1 := doRunJob(t, "../examples/parallel.yaml")
+	j1 := doRunJob(t, "../../examples/parallel.yaml")
 	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 9, len(j1.Execution))
 }
 
 func TestRunEachJob(t *testing.T) {
-	j1 := doRunJob(t, "../examples/each.yaml")
+	j1 := doRunJob(t, "../../examples/each.yaml")
 	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 7, len(j1.Execution))
 }
 
 func TestRunSubjobJob(t *testing.T) {
-	j1 := doRunJob(t, "../examples/subjob.yaml")
+	j1 := doRunJob(t, "../../examples/subjob.yaml")
 	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 6, len(j1.Execution))
 }

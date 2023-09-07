@@ -3,7 +3,7 @@ package tork
 import (
 	"time"
 
-	"github.com/runabol/tork/clone"
+	"github.com/runabol/tork/internal/clone"
 )
 
 // State defines the list of states that a

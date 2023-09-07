@@ -3,7 +3,7 @@ package clone_test
 import (
 	"testing"
 
-	"github.com/runabol/tork/clone"
+	"github.com/runabol/tork/internal/clone"
 	"github.com/stretchr/testify/assert"
 )
 
