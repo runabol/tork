@@ -39,6 +39,7 @@ type api struct {
 
 type apiContext struct {
 	ctx echo.Context
+	api *api
 }
 
 func (c *apiContext) Request() *http.Request {
@@ -51,6 +52,14 @@ func (c *apiContext) String(code int, s string) error {
 
 func (c *apiContext) JSON(code int, data any) error {
 	return c.ctx.JSON(code, data)
+}
+
+func (c *apiContext) SubmitJob(j *input.Job) (*tork.Job, error) {
+	job, err := c.api.submitJob(c.ctx.Request().Context(), j)
+	if err != nil {
+		return nil, err
+	}
+	return job.Clone(), nil
 }
 
 func newAPI(cfg Config) *api {
@@ -66,7 +75,7 @@ func newAPI(cfg Config) *api {
 	}
 
 	for _, m := range cfg.Middlewares {
-		r.Use(middlewareAdapter(m))
+		r.Use(s.middlewareAdapter(m))
 	}
 
 	r.GET("/health", s.health)
@@ -82,7 +91,7 @@ func newAPI(cfg Config) *api {
 	return s
 }
 
-func middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
+func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
 	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) middleware.HandlerFunc {
 		return func(c middleware.Context) error {
 			return next(ec)
@@ -92,6 +101,7 @@ func middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
 		return func(ec echo.Context) error {
 			return m(nextAdapter(next, ec))(&apiContext{
 				ctx: ec,
+				api: s,
 			})
 		}
 	}
@@ -138,18 +148,26 @@ func (s *api) createJob(c echo.Context) error {
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
-	if err := ji.Validate(); err != nil {
+	if j, err := s.submitJob(c.Request().Context(), ji); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	} else {
+		return c.JSON(http.StatusOK, redactJob(j))
+	}
+}
+
+func (s *api) submitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
+	if err := ji.Validate(); err != nil {
+		return nil, err
 	}
 	j := ji.ToJob()
-	if err := s.ds.CreateJob(c.Request().Context(), j); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	if err := s.ds.CreateJob(ctx, j); err != nil {
+		return nil, err
 	}
 	log.Info().Str("job-id", j.ID).Msg("created job")
-	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	if err := s.broker.PublishJob(ctx, j); err != nil {
+		return nil, err
 	}
-	return c.JSON(http.StatusOK, redactJob(j))
+	return j, nil
 }
 
 func bindJobInputJSON(r io.ReadCloser) (*input.Job, error) {

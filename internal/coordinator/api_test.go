@@ -13,6 +13,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/middleware"
 
 	"github.com/runabol/tork/mq"
@@ -560,4 +561,42 @@ func Test_middlewareMultiple(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK2", string(body))
+}
+
+func Test_middlewareSubmitJob(t *testing.T) {
+	mw := func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			if !strings.HasPrefix(c.Request().URL.Path, "/create-special-job") {
+				return next(c)
+			}
+			_, err := c.SubmitJob(&input.Job{
+				Name: "Test Job",
+				Tasks: []input.Task{
+					{
+						Name:  "first task",
+						Image: "some:image",
+					},
+				},
+			})
+			assert.NoError(t, err)
+			return c.String(http.StatusOK, "OK")
+		}
+	}
+	b := mq.NewInMemoryBroker()
+	api := newAPI(Config{
+		DataStore:   datastore.NewInMemoryDatastore(),
+		Broker:      b,
+		Middlewares: []middleware.MiddlewareFunc{mw},
+	})
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/create-special-job", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK", string(body))
 }
