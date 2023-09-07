@@ -18,6 +18,8 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/httpx"
 
+	"github.com/runabol/tork/middleware"
+
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
 	"gopkg.in/yaml.v3"
@@ -34,6 +36,22 @@ type api struct {
 	ds     datastore.Datastore
 }
 
+type apiContext struct {
+	ctx echo.Context
+}
+
+func (c *apiContext) Request() *http.Request {
+	return c.ctx.Request()
+}
+
+func (c *apiContext) String(code int, s string) error {
+	return c.ctx.String(code, s)
+}
+
+func (c *apiContext) JSON(code int, data any) error {
+	return c.ctx.JSON(code, data)
+}
+
 func newAPI(cfg Config) *api {
 	r := echo.New()
 
@@ -45,6 +63,11 @@ func newAPI(cfg Config) *api {
 		},
 		ds: cfg.DataStore,
 	}
+
+	for _, m := range cfg.Middlewares {
+		r.Use(middlewareAdapter(m))
+	}
+
 	r.GET("/health", s.health)
 	r.GET("/tasks/:id", s.getTask)
 	r.GET("/queues", s.listQueues)
@@ -56,6 +79,21 @@ func newAPI(cfg Config) *api {
 	r.PUT("/jobs/:id/restart", s.restartJob)
 	r.GET("/stats", s.getStats)
 	return s
+}
+
+func middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
+	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			return next(ec)
+		}
+	}
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ec echo.Context) error {
+			return m(nextAdapter(next, ec))(&apiContext{
+				ctx: ec,
+			})
+		}
+	}
 }
 
 func (s *api) health(c echo.Context) error {

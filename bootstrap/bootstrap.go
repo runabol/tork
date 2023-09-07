@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/middleware"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
@@ -33,6 +34,7 @@ var (
 	onStarted   = defaultOnStartedHander
 	dsProviders = map[string]datastore.Provider{}
 	mqProviders = map[string]mq.Provider{}
+	middlewares = make([]middleware.MiddlewareFunc, 0)
 )
 
 func Start(mode Mode) error {
@@ -213,10 +215,11 @@ func createBroker() (mq.Broker, error) {
 func createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
-		Broker:    broker,
-		DataStore: ds,
-		Queues:    queues,
-		Address:   conf.String("coordinator.address"),
+		Broker:      broker,
+		DataStore:   ds,
+		Queues:      queues,
+		Address:     conf.String("coordinator.address"),
+		Middlewares: middlewares,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -314,4 +317,8 @@ func RegisterDatastoreProvider(dsType string, provider datastore.Provider) {
 
 func RegisterBrokerProvider(mqType string, provider mq.Provider) {
 	mqProviders[mqType] = provider
+}
+
+func RegisterMiddleware(mw middleware.MiddlewareFunc) {
+	middlewares = append(middlewares, mw)
 }
