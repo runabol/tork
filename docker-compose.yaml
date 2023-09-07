@@ -18,8 +18,10 @@ services:
   migration:
     image: golang:1.19
     working_dir: /code
+    environment:
+      - TORK_CONFIG=configs/config.compose.toml
     command: |
-      go run cmd/main.go --config configs/config.compose.toml migration
+      go run cmd/main.go migration
     volumes:
       - .:/code
     depends_on:

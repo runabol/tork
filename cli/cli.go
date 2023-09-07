@@ -24,7 +24,6 @@ func Run() error {
 	app := &ucli.App{
 		Name:     "tork",
 		Usage:    "a distributed workflow engine",
-		Flags:    []ucli.Flag{config()},
 		Before:   before,
 		Commands: commands(),
 	}
@@ -76,7 +75,6 @@ func migrationCmd() *ucli.Command {
 	return &ucli.Command{
 		Name:  "migration",
 		Usage: "Run the db migration script",
-		Flags: []ucli.Flag{},
 		Action: func(ctx *ucli.Context) error {
 			return bootstrap.Start(bootstrap.ModeMigration)
 		},
@@ -87,15 +85,7 @@ func healthCmd() *ucli.Command {
 	return &ucli.Command{
 		Name:   "health",
 		Usage:  "Perform a health check",
-		Flags:  []ucli.Flag{},
 		Action: health,
-	}
-}
-
-func config() ucli.Flag {
-	return &ucli.StringFlag{
-		Name:  "config",
-		Usage: "Set the location of the config file",
 	}
 }
 

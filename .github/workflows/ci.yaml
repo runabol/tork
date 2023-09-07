@@ -44,7 +44,7 @@ jobs:
 
       - name: Run DB migration
         run: |
-          go run cmd/main.go --config configs/config.ci.toml migration
+          TORK_CONFIG=configs/config.ci.toml  go run cmd/main.go migration
 
       - name: Run tests
         run: go test -v ./...

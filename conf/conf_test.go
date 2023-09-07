@@ -14,10 +14,9 @@ func TestLoadConfigNotExist(t *testing.T) {
 }
 
 func TestLoadConfigNotExistUserDefined(t *testing.T) {
-	old := os.Args
-	os.Args = append(os.Args, "--config", "no.such.thing")
+	os.Setenv("TORK_CONFIG", "no.such.thing")
 	defer func() {
-		os.Args = old
+		os.Unsetenv("TORK_CONFIG")
 	}()
 	err := conf.LoadConfig()
 	assert.Error(t, err)
@@ -96,10 +95,9 @@ func TestLoadConfigCustomPath(t *testing.T) {
 	defer func() {
 		assert.NoError(t, os.Remove("myconfig.toml"))
 	}()
-	old := os.Args
-	os.Args = append(os.Args, "--config", "myconfig.toml")
+	os.Setenv("TORK_CONFIG", "myconfig.toml")
 	defer func() {
-		os.Args = old
+		os.Unsetenv("TORK_CONFIG")
 	}()
 	err = conf.LoadConfig()
 	assert.Error(t, err)
