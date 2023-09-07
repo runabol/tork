@@ -94,3 +94,14 @@ func TestLoadConfigCustomPath(t *testing.T) {
 	err = conf.LoadConfig("myconfig.toml")
 	assert.Error(t, err)
 }
+
+func TestLoadConfigEnv(t *testing.T) {
+	assert.NoError(t, os.Setenv("TORK_HELLO", "world"))
+	defer func() {
+		assert.NoError(t, os.Unsetenv("TORK_HELLO"))
+	}()
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+
+	assert.Equal(t, "world", conf.String("hello"))
+}

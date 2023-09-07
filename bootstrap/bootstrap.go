@@ -28,9 +28,10 @@ const (
 type Mode string
 
 var (
-	quit      = make(chan os.Signal, 1)
-	terminate = make(chan any, 1)
-	onStarted = defaultOnStartedHander
+	quit        = make(chan os.Signal, 1)
+	terminate   = make(chan any, 1)
+	onStarted   = defaultOnStartedHander
+	dsProviders = map[string]datastore.Provider{}
 )
 
 func Start(mode Mode) error {
@@ -165,6 +166,9 @@ func runStandalone() error {
 func createDatastore() (datastore.Datastore, error) {
 	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
 	var ds datastore.Datastore
+	if provider, ok := dsProviders[dstype]; ok {
+		return provider()
+	}
 	switch dstype {
 	case datastore.DATASTORE_INMEMORY:
 		ds = datastore.NewInMemoryDatastore()
@@ -298,4 +302,8 @@ func awaitTerm() {
 	case <-quit:
 	case <-terminate:
 	}
+}
+
+func RegisterDatastoreProvider(dsType string, provider datastore.Provider) {
+	dsProviders[dsType] = provider
 }
