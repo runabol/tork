@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	flag "github.com/spf13/pflag"
 )
 
 var konf = koanf.New(".")
@@ -27,11 +26,9 @@ var defaultConfigPaths = []string{
 
 func LoadConfig() error {
 	var paths []string
-	f := flag.NewFlagSet("cmd", flag.ContinueOnError)
-	userConfig := f.String("config", "", "")
-	f.Parse(os.Args[1:])
-	if *userConfig != "" {
-		paths = []string{*userConfig}
+	userConfig := os.Getenv("TORK_CONFIG")
+	if userConfig != "" {
+		paths = []string{userConfig}
 	} else {
 		paths = defaultConfigPaths
 	}
@@ -55,7 +52,7 @@ func LoadConfig() error {
 		return errors.Wrapf(err, "error loading config from env")
 	}
 	errMsg := fmt.Sprintf("could not find config file in any of the following paths: %s", strings.Join(paths, ","))
-	if *userConfig != "" {
+	if userConfig != "" {
 		return errors.Errorf(errMsg)
 	} else {
 		logger.Warn().Msg(errMsg)
