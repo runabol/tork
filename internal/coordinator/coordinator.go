@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
+	"github.com/runabol/tork/middleware"
 
 	"github.com/runabol/tork/mq"
 
@@ -31,10 +32,11 @@ type Coordinator struct {
 }
 
 type Config struct {
-	Broker    mq.Broker
-	DataStore datastore.Datastore
-	Address   string
-	Queues    map[string]int
+	Broker      mq.Broker
+	DataStore   datastore.Datastore
+	Address     string
+	Queues      map[string]int
+	Middlewares []middleware.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {

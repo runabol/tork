@@ -13,6 +13,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/middleware"
 
 	"github.com/runabol/tork/mq"
 
@@ -483,4 +484,80 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func Test_middleware(t *testing.T) {
+	mw := func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/middleware") {
+				return c.String(http.StatusOK, "OK")
+			}
+			return next(c)
+		}
+	}
+	b := mq.NewInMemoryBroker()
+	api := newAPI(Config{
+		DataStore:   datastore.NewInMemoryDatastore(),
+		Broker:      b,
+		Middlewares: []middleware.MiddlewareFunc{mw},
+	})
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/middleware", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK", string(body))
+}
+
+func Test_middlewareMultiple(t *testing.T) {
+	mw1 := func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/middleware1") {
+				return c.String(http.StatusOK, "OK1")
+			}
+			return next(c)
+		}
+	}
+	mw2 := func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			if strings.HasPrefix(c.Request().URL.Path, "/middleware2") {
+				return c.String(http.StatusOK, "OK2")
+			}
+			return next(c)
+		}
+	}
+	b := mq.NewInMemoryBroker()
+	api := newAPI(Config{
+		DataStore:   datastore.NewInMemoryDatastore(),
+		Broker:      b,
+		Middlewares: []middleware.MiddlewareFunc{mw1, mw2},
+	})
+	assert.NotNil(t, api)
+
+	req, err := http.NewRequest("GET", "/middleware1", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK1", string(body))
+
+	req, err = http.NewRequest("GET", "/middleware2", nil)
+	assert.NoError(t, err)
+	w = httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err = io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK2", string(body))
 }
