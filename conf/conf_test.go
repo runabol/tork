@@ -14,7 +14,12 @@ func TestLoadConfigNotExist(t *testing.T) {
 }
 
 func TestLoadConfigNotExistUserDefined(t *testing.T) {
-	err := conf.LoadConfig("no.such.file.toml")
+	old := os.Args
+	os.Args = append(os.Args, "--config", "no.such.thing")
+	defer func() {
+		os.Args = old
+	}()
+	err := conf.LoadConfig()
 	assert.Error(t, err)
 }
 
@@ -91,7 +96,12 @@ func TestLoadConfigCustomPath(t *testing.T) {
 	defer func() {
 		assert.NoError(t, os.Remove("myconfig.toml"))
 	}()
-	err = conf.LoadConfig("myconfig.toml")
+	old := os.Args
+	os.Args = append(os.Args, "--config", "myconfig.toml")
+	defer func() {
+		os.Args = old
+	}()
+	err = conf.LoadConfig()
 	assert.Error(t, err)
 }
 

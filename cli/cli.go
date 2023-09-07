@@ -36,9 +36,6 @@ func OnRunCommand(h OnRunHandler) {
 }
 
 func before(ctx *ucli.Context) error {
-	if err := loadConfig(ctx); err != nil {
-		return err
-	}
 	displayBanner()
 	return nil
 }
@@ -93,13 +90,6 @@ func healthCmd() *ucli.Command {
 		Flags:  []ucli.Flag{},
 		Action: health,
 	}
-}
-
-func loadConfig(ctx *ucli.Context) error {
-	if ctx.String("config") == "" {
-		return conf.LoadConfig()
-	}
-	return conf.LoadConfig(ctx.String("config"))
 }
 
 func config() ucli.Flag {
