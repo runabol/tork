@@ -1,4 +1,4 @@
-package stats
+package tork
 
 type Stats struct {
 	Jobs  JobStats   `json:"jobs"`

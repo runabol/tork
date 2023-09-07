@@ -14,9 +14,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/httpx"
-	"github.com/runabol/tork/job"
+
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/version"
 	"gopkg.in/yaml.v3"
@@ -179,7 +180,7 @@ func (s *api) listJobs(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, datastore.Page[*job.Job]{
+	return c.JSON(http.StatusOK, datastore.Page[*tork.Job]{
 		Number:     res.Number,
 		Size:       res.Size,
 		TotalPages: res.TotalPages,
@@ -211,13 +212,13 @@ func (s *api) restartJob(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	if j.State != job.Failed && j.State != job.Cancelled {
+	if j.State != tork.JobStateFailed && j.State != tork.JobStateCancelled {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("job is %s and can not be restarted", j.State))
 	}
 	if j.Position > len(j.Tasks) {
 		return echo.NewHTTPError(http.StatusBadRequest, "job has no more tasks to run")
 	}
-	j.State = job.Restart
+	j.State = tork.JobStateRestart
 	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -231,10 +232,10 @@ func (s *api) cancelJob(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	if j.State != job.Running {
+	if j.State != tork.JobStateRunning {
 		return echo.NewHTTPError(http.StatusBadRequest, "job is not running")
 	}
-	j.State = job.Cancelled
+	j.State = tork.JobStateCancelled
 	if err := s.broker.PublishJob(c.Request().Context(), j); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}

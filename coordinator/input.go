@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/clone"
 	"github.com/runabol/tork/eval"
-	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 )
 
@@ -56,21 +56,21 @@ type auxTaskInput struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
-func (ji jobInput) toJob() *job.Job {
+func (ji jobInput) toJob() *tork.Job {
 	n := time.Now().UTC()
-	j := &job.Job{}
+	j := &tork.Job{}
 	j.ID = uuid.NewUUID()
 	j.Description = ji.Description
 	j.Inputs = ji.Inputs
 	j.Name = ji.Name
-	tasks := make([]*task.Task, len(ji.Tasks))
+	tasks := make([]*tork.Task, len(ji.Tasks))
 	for i, ti := range ji.Tasks {
 		tasks[i] = ti.toTask()
 	}
 	j.Tasks = tasks
-	j.State = job.Pending
+	j.State = tork.JobStatePending
 	j.CreatedAt = n
-	j.Context = job.Context{}
+	j.Context = tork.JobContext{}
 	j.Context.Inputs = ji.Inputs
 	j.TaskCount = len(tasks)
 	j.Output = ji.Output
@@ -202,8 +202,8 @@ func validateDuration(fl validator.FieldLevel) bool {
 	return err == nil
 }
 
-func (i auxTaskInput) toTask() *task.Task {
-	return &task.Task{
+func (i auxTaskInput) toTask() *tork.Task {
+	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
 		CMD:         i.CMD,
@@ -215,32 +215,32 @@ func (i auxTaskInput) toTask() *task.Task {
 	}
 }
 
-func (i taskInput) toTask() *task.Task {
+func (i taskInput) toTask() *tork.Task {
 	pre := toAuxTasks(i.Pre)
 	post := toAuxTasks(i.Post)
-	var retry *task.Retry
+	var retry *tork.TaskRetry
 	if i.Retry != nil {
-		retry = &task.Retry{
+		retry = &tork.TaskRetry{
 			Limit: i.Retry.Limit,
 		}
 	}
-	var limits *task.Limits
+	var limits *tork.TaskLimits
 	if i.Limits != nil {
-		limits = &task.Limits{
+		limits = &tork.TaskLimits{
 			CPUs:   i.Limits.CPUs,
 			Memory: i.Limits.Memory,
 		}
 	}
-	var each *task.Each
+	var each *tork.EachTask
 	if i.Each != nil {
-		each = &task.Each{
+		each = &tork.EachTask{
 			List: i.Each.List,
 			Task: i.Each.Task.toTask(),
 		}
 	}
-	var subjob *task.SubJob
+	var subjob *tork.SubJobTask
 	if i.SubJob != nil {
-		subjob = &task.SubJob{
+		subjob = &tork.SubJobTask{
 			Name:        i.SubJob.Name,
 			Description: i.SubJob.Description,
 			Tasks:       toTasks(i.SubJob.Tasks),
@@ -248,13 +248,13 @@ func (i taskInput) toTask() *task.Task {
 			Output:      i.SubJob.Output,
 		}
 	}
-	var parallel *task.Parallel
+	var parallel *tork.ParallelTask
 	if i.Parallel != nil {
-		parallel = &task.Parallel{
+		parallel = &tork.ParallelTask{
 			Tasks: toTasks(i.Parallel.Tasks),
 		}
 	}
-	return &task.Task{
+	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
 		CMD:         i.CMD,
@@ -279,16 +279,16 @@ func (i taskInput) toTask() *task.Task {
 	}
 }
 
-func toAuxTasks(tis []auxTaskInput) []*task.Task {
-	result := make([]*task.Task, len(tis))
+func toAuxTasks(tis []auxTaskInput) []*tork.Task {
+	result := make([]*tork.Task, len(tis))
 	for i, ti := range tis {
 		result[i] = ti.toTask()
 	}
 	return result
 }
 
-func toTasks(tis []taskInput) []*task.Task {
-	result := make([]*task.Task, len(tis))
+func toTasks(tis []taskInput) []*tork.Task {
+	result := make([]*tork.Task, len(tis))
 	for i, ti := range tis {
 		result[i] = ti.toTask()
 	}

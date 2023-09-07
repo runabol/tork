@@ -3,8 +3,7 @@ package coordinator
 import (
 	"strings"
 
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
 )
 
 type matcher func(string) bool
@@ -21,7 +20,7 @@ func contains(substr string) func(s string) bool {
 	}
 }
 
-func redactTask(t *task.Task) *task.Task {
+func redactTask(t *tork.Task) *tork.Task {
 	redacted := t.Clone()
 	// redact env vars
 	redacted.Env = redactVars(redacted.Env)
@@ -42,15 +41,15 @@ func redactTask(t *task.Task) *task.Task {
 	return redacted
 }
 
-func redactJobs(js []*job.Job) []*job.Job {
-	result := make([]*job.Job, len(js))
+func redactJobs(js []*tork.Job) []*tork.Job {
+	result := make([]*tork.Job, len(js))
 	for i, j := range js {
 		result[i] = redactJob(j)
 	}
 	return result
 }
 
-func redactJob(j *job.Job) *job.Job {
+func redactJob(j *tork.Job) *tork.Job {
 	redacted := j.Clone()
 	// redact inputs
 	redacted.Inputs = redactVars(redacted.Inputs)

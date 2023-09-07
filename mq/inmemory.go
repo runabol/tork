@@ -8,10 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
+	"github.com/runabol/tork"
+
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
 )
 
 const defaultQueueSize = 1000
@@ -101,14 +100,14 @@ func NewInMemoryBroker() *InMemoryBroker {
 	}
 }
 
-func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
+func (b *InMemoryBroker) PublishTask(ctx context.Context, qname string, t *tork.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	return b.publish(qname, t.Clone())
 }
 
-func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
+func (b *InMemoryBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
 	return b.subscribe(qname, func(m any) error {
-		t, ok := m.(*task.Task)
+		t, ok := m.(*tork.Task)
 		if !ok {
 			return errors.Errorf("can't cast message to task")
 		}
@@ -140,13 +139,13 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qi, nil
 }
 
-func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n node.Node) error {
+func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n tork.Node) error {
 	return b.publish(QUEUE_HEARBEAT, n)
 }
 
-func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error) error {
+func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n tork.Node) error) error {
 	return b.subscribe(QUEUE_HEARBEAT, func(m any) error {
-		n, ok := m.(node.Node)
+		n, ok := m.(tork.Node)
 		if !ok {
 			return errors.New("can't cast to node")
 		}
@@ -154,13 +153,13 @@ func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n node.Node) error)
 	})
 }
 
-func (b *InMemoryBroker) PublishJob(ctx context.Context, j *job.Job) error {
+func (b *InMemoryBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	return b.publish(QUEUE_JOBS, j.Clone())
 }
 
-func (b *InMemoryBroker) SubscribeForJobs(handler func(j *job.Job) error) error {
+func (b *InMemoryBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
 	return b.subscribe(QUEUE_JOBS, func(m any) error {
-		j, ok := m.(*job.Job)
+		j, ok := m.(*tork.Job)
 		if !ok {
 			return errors.New("can't cast to Job")
 		}

@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +16,7 @@ import (
 func TestInMemoryCreateAndGetTask(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	t1 := task.Task{
+	t1 := tork.Task{
 		ID: uuid.NewUUID(),
 	}
 	err := ds.CreateTask(ctx, &t1)
@@ -32,29 +31,29 @@ func TestInMemoryGetActiveTasks(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	jid := uuid.NewUUID()
 
-	tasks := []task.Task{{
+	tasks := []tork.Task{{
 		ID:    uuid.NewUUID(),
-		State: task.Pending,
+		State: tork.TaskStatePending,
 		JobID: jid,
 	}, {
 		ID:    uuid.NewUUID(),
-		State: task.Scheduled,
+		State: tork.TaskStateScheduled,
 		JobID: jid,
 	}, {
 		ID:    uuid.NewUUID(),
-		State: task.Running,
+		State: tork.TaskStateRunning,
 		JobID: jid,
 	}, {
 		ID:    uuid.NewUUID(),
-		State: task.Cancelled,
+		State: tork.TaskStateCancelled,
 		JobID: jid,
 	}, {
 		ID:    uuid.NewUUID(),
-		State: task.Completed,
+		State: tork.TaskStateCompleted,
 		JobID: jid,
 	}, {
 		ID:    uuid.NewUUID(),
-		State: task.Failed,
+		State: tork.TaskStateFailed,
 		JobID: jid,
 	}}
 
@@ -70,28 +69,28 @@ func TestInMemoryGetActiveTasks(t *testing.T) {
 func TestInMemoryUpdateTask(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	t1 := task.Task{
+	t1 := tork.Task{
 		ID:    uuid.NewUUID(),
-		State: task.Pending,
+		State: tork.TaskStatePending,
 	}
 	err := ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 
-	err = ds.UpdateTask(ctx, t1.ID, func(u *task.Task) error {
-		u.State = task.Scheduled
+	err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateScheduled
 		return nil
 	})
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 }
 
 func TestInMemoryCreateAndGetNode(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID: uuid.NewUUID(),
 	}
 	err := ds.CreateNode(ctx, n1)
@@ -104,7 +103,7 @@ func TestInMemoryCreateAndGetNode(t *testing.T) {
 func TestInMemoryUpdateNode(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 	}
@@ -113,7 +112,7 @@ func TestInMemoryUpdateNode(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	err = ds.UpdateNode(ctx, n1.ID, func(u *node.Node) error {
+	err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 		u.LastHeartbeatAt = now
 		return nil
 	})
@@ -127,19 +126,19 @@ func TestInMemoryUpdateNode(t *testing.T) {
 func TestInMemoryGetActiveNodes(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Second * 20),
 	}
-	n2 := node.Node{
+	n2 := tork.Node{
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 4),
 	}
-	n3 := node.Node{ // inactive
+	n3 := tork.Node{ // inactive
 		ID:              uuid.NewUUID(),
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
 	}
 	err := ds.CreateNode(ctx, n1)
@@ -154,14 +153,14 @@ func TestInMemoryGetActiveNodes(t *testing.T) {
 	ns, err := ds.GetActiveNodes(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(ns))
-	assert.Equal(t, node.UP, ns[0].Status)
-	assert.Equal(t, node.Offline, ns[1].Status)
+	assert.Equal(t, tork.NodeStatusUP, ns[0].Status)
+	assert.Equal(t, tork.NodeStatusOffline, ns[1].Status)
 }
 
 func TestInMemoryCreateAndGetJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
 	err := ds.CreateJob(ctx, &j1)
@@ -176,12 +175,12 @@ func TestInMemoryGetJobs(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
 	for i := 0; i < 101; i++ {
 		now := time.Now().UTC()
-		j1 := job.Job{
+		j1 := tork.Job{
 			ID:        uuid.NewUUID(),
 			Name:      fmt.Sprintf("Job %d", (i + 1)),
 			CreatedAt: now,
-			State:     job.Running,
-			Tasks: []*task.Task{
+			State:     tork.JobStateRunning,
+			Tasks: []*tork.Task{
 				{
 					Name: "some task",
 				},
@@ -190,10 +189,10 @@ func TestInMemoryGetJobs(t *testing.T) {
 		err := ds.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
 
-		err = ds.CreateTask(ctx, &task.Task{
+		err = ds.CreateTask(ctx, &tork.Task{
 			ID:    uuid.NewUUID(),
 			JobID: j1.ID,
-			State: task.Running,
+			State: tork.TaskStateRunning,
 		})
 		assert.NoError(t, err)
 		time.Sleep(time.Millisecond)
@@ -238,10 +237,10 @@ func TestInMemoryGetJobs(t *testing.T) {
 func TestInMemoryUpdateJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	j1 := job.Job{
+	j1 := tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Context: job.Context{
+		State: tork.JobStatePending,
+		Context: tork.JobContext{
 			Inputs: map[string]string{
 				"var1": "val1",
 			},
@@ -249,15 +248,15 @@ func TestInMemoryUpdateJob(t *testing.T) {
 	}
 	err := ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
-	err = ds.UpdateJob(ctx, j1.ID, func(u *job.Job) error {
-		u.State = job.Completed
+	err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+		u.State = tork.JobStateCompleted
 		u.Context.Inputs["var2"] = "val2"
 		return nil
 	})
 	assert.NoError(t, err)
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 }
@@ -274,13 +273,13 @@ func TestInMemoryGetStats(t *testing.T) {
 	assert.Equal(t, 0, s.Nodes.Running)
 
 	for i := 0; i < 100; i++ {
-		var state job.State
+		var state tork.JobState
 		if i%2 == 0 {
-			state = job.Running
+			state = tork.JobStateRunning
 		} else {
-			state = job.Pending
+			state = tork.JobStatePending
 		}
-		err := ds.CreateJob(ctx, &job.Job{
+		err := ds.CreateJob(ctx, &tork.Job{
 			ID:    uuid.NewUUID(),
 			State: state,
 		})
@@ -288,13 +287,13 @@ func TestInMemoryGetStats(t *testing.T) {
 	}
 
 	for i := 0; i < 100; i++ {
-		var state task.State
+		var state tork.TaskState
 		if i%2 == 0 {
-			state = task.Running
+			state = tork.TaskStateRunning
 		} else {
-			state = task.Pending
+			state = tork.TaskStatePending
 		}
-		err := ds.CreateTask(ctx, &task.Task{
+		err := ds.CreateTask(ctx, &tork.Task{
 			ID:    uuid.NewUUID(),
 			State: state,
 		})
@@ -302,7 +301,7 @@ func TestInMemoryGetStats(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		err := ds.CreateNode(ctx, node.Node{
+		err := ds.CreateNode(ctx, tork.Node{
 			ID:              uuid.NewUUID(),
 			LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * time.Duration(i)),
 			CPUPercent:      float64(i * 10),

@@ -7,13 +7,12 @@ import (
 
 	"github.com/antonmedv/expr"
 	"github.com/pkg/errors"
-
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
 )
 
 var exprMatcher = regexp.MustCompile(`{{\s*(.+?)\s*}}`)
 
-func EvaluateTask(t *task.Task, c map[string]any) error {
+func EvaluateTask(t *tork.Task, c map[string]any) error {
 	// evaluate name
 	name, err := EvaluateTemplate(t.Name, c)
 	if err != nil {
@@ -55,7 +54,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	}
 	t.If = ifExpr
 	// evaluate pre-tasks
-	pres := make([]*task.Task, len(t.Pre))
+	pres := make([]*tork.Task, len(t.Pre))
 	for i, pre := range t.Pre {
 		if err := EvaluateTask(pre, c); err != nil {
 			return err
@@ -64,7 +63,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	}
 	t.Pre = pres
 	// evaluate post-tasks
-	posts := make([]*task.Task, len(t.Post))
+	posts := make([]*tork.Task, len(t.Post))
 	for i, post := range t.Post {
 		if err := EvaluateTask(post, c); err != nil {
 			return err
@@ -74,7 +73,7 @@ func EvaluateTask(t *task.Task, c map[string]any) error {
 	t.Post = posts
 	// evaluate parallel tasks
 	if t.Parallel != nil {
-		parallel := make([]*task.Task, len(t.Parallel.Tasks))
+		parallel := make([]*tork.Task, len(t.Parallel.Tasks))
 		for i, par := range t.Parallel.Tasks {
 			if err := EvaluateTask(par, c); err != nil {
 				return err

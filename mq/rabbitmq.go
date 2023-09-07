@@ -13,10 +13,8 @@ import (
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
 	"github.com/runabol/tork/uuid"
 )
 
@@ -98,13 +96,13 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qis, nil
 }
 
-func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *task.Task) error {
+func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.Task) error {
 	return b.publish(ctx, qname, t)
 }
 
-func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *task.Task) error) error {
+func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
 	return b.subscribe(qname, func(body []byte) error {
-		t := &task.Task{}
+		t := &tork.Task{}
 		if err := json.Unmarshal(body, &t); err != nil {
 			log.Error().
 				Err(err).
@@ -225,7 +223,7 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 	return nil
 }
 
-func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n node.Node) error {
+func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n tork.Node) error {
 	return b.publish(ctx, QUEUE_HEARBEAT, n)
 }
 
@@ -261,9 +259,9 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n node.Node) error) error {
+func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n tork.Node) error) error {
 	return b.subscribe(QUEUE_HEARBEAT, func(body []byte) error {
-		n := node.Node{}
+		n := tork.Node{}
 		if err := json.Unmarshal(body, &n); err != nil {
 			log.Error().
 				Err(err).
@@ -274,12 +272,12 @@ func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n node.Node) error)
 	})
 }
 
-func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *job.Job) error {
+func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	return b.publish(ctx, QUEUE_JOBS, j)
 }
-func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *job.Job) error) error {
+func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
 	return b.subscribe(QUEUE_JOBS, func(body []byte) error {
-		j := &job.Job{}
+		j := &tork.Job{}
 		if err := json.Unmarshal(body, &j); err != nil {
 			log.Error().
 				Err(err).

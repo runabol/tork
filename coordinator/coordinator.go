@@ -10,12 +10,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/eval"
-	"github.com/runabol/tork/job"
+
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 )
 
@@ -75,18 +75,18 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}, nil
 }
 
-func (c *Coordinator) handleTask(t *task.Task) error {
+func (c *Coordinator) handleTask(t *tork.Task) error {
 	switch t.State {
-	case task.Pending:
+	case tork.TaskStatePending:
 		return c.handlePendingTask(t)
-	case task.Failed:
+	case tork.TaskStateFailed:
 		return c.handleFailedTask(t)
 	default:
 		return errors.Errorf("could not handle task %s. unknown state: %s", t.ID, t.State)
 	}
 }
 
-func (c *Coordinator) handlePendingTask(t *task.Task) error {
+func (c *Coordinator) handlePendingTask(t *tork.Task) error {
 	ctx := context.Background()
 	log.Debug().
 		Str("task-id", t.ID).
@@ -98,7 +98,7 @@ func (c *Coordinator) handlePendingTask(t *task.Task) error {
 	}
 }
 
-func (c *Coordinator) scheduleTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) scheduleTask(ctx context.Context, t *tork.Task) error {
 	if t.Parallel != nil {
 		return c.scheduleParallelTask(ctx, t)
 	} else if t.Each != nil {
@@ -109,14 +109,14 @@ func (c *Coordinator) scheduleTask(ctx context.Context, t *task.Task) error {
 	return c.scheduleRegularTask(ctx, t)
 }
 
-func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
 	}
-	t.State = task.Scheduled
+	t.State = tork.TaskStateScheduled
 	t.ScheduledAt = &now
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
 		u.Queue = t.Queue
@@ -127,23 +127,23 @@ func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *task.Task) err
 	return c.broker.PublishTask(ctx, t.Queue, t)
 }
 
-func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) scheduleSubJob(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
-	subjob := &job.Job{
+	subjob := &tork.Job{
 		ID:          uuid.NewUUID(),
 		CreatedAt:   now,
 		ParentID:    t.ID,
 		Name:        t.SubJob.Name,
 		Description: t.SubJob.Description,
-		State:       job.Pending,
+		State:       tork.JobStatePending,
 		Tasks:       t.SubJob.Tasks,
 		Inputs:      t.SubJob.Inputs,
-		Context:     job.Context{Inputs: t.SubJob.Inputs},
+		Context:     tork.JobContext{Inputs: t.SubJob.Inputs},
 		TaskCount:   len(t.SubJob.Tasks),
 		Output:      t.SubJob.Output,
 	}
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		u.State = task.Running
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateRunning
 		u.ScheduledAt = &now
 		u.StartedAt = &now
 		u.SubJob.ID = subjob.ID
@@ -157,7 +157,7 @@ func (c *Coordinator) scheduleSubJob(ctx context.Context, t *task.Task) error {
 	return c.handleJob(subjob)
 }
 
-func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
 	// get the job's context
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
@@ -179,8 +179,8 @@ func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error 
 		return errors.Wrapf(err, "each.list expression does not evaluate to a list: %s", t.Each.List)
 	}
 	// mark the task as running
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		u.State = task.Running
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateRunning
 		u.ScheduledAt = &now
 		u.StartedAt = &now
 		u.Each.Size = len(list)
@@ -198,13 +198,13 @@ func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error 
 		et := t.Each.Task.Clone()
 		et.ID = uuid.NewUUID()
 		et.JobID = j.ID
-		et.State = task.Pending
+		et.State = tork.TaskStatePending
 		et.Position = t.Position
 		et.CreatedAt = &now
 		et.ParentID = t.ID
 		if err := eval.EvaluateTask(et, cx); err != nil {
 			t.Error = err.Error()
-			t.State = task.Failed
+			t.State = tork.TaskStateFailed
 			return c.handleFailedTask(t)
 		}
 		if err := c.ds.CreateTask(ctx, et); err != nil {
@@ -217,11 +217,11 @@ func (c *Coordinator) scheduleEachTask(ctx context.Context, t *task.Task) error 
 	return nil
 }
 
-func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
 	// mark the task as running
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-		u.State = task.Running
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateRunning
 		u.ScheduledAt = &now
 		u.StartedAt = &now
 		return nil
@@ -237,13 +237,13 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 	for _, pt := range t.Parallel.Tasks {
 		pt.ID = uuid.NewUUID()
 		pt.JobID = j.ID
-		pt.State = task.Pending
+		pt.State = tork.TaskStatePending
 		pt.Position = t.Position
 		pt.CreatedAt = &now
 		pt.ParentID = t.ID
 		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
 			t.Error = err.Error()
-			t.State = task.Failed
+			t.State = tork.TaskStateFailed
 			return c.handleFailedTask(t)
 		}
 		if err := c.ds.CreateTask(ctx, pt); err != nil {
@@ -256,13 +256,13 @@ func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *task.Task) er
 	return nil
 }
 
-func (c *Coordinator) skipTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) skipTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
-	t.State = task.Scheduled
+	t.State = tork.TaskStateScheduled
 	t.ScheduledAt = &now
 	t.StartedAt = &now
 	t.CompletedAt = &now
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
 		u.StartedAt = t.StartedAt
@@ -273,7 +273,7 @@ func (c *Coordinator) skipTask(ctx context.Context, t *task.Task) error {
 	return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
-func (c *Coordinator) handleStartedTask(t *task.Task) error {
+func (c *Coordinator) handleStartedTask(t *tork.Task) error {
 	ctx := context.Background()
 	log.Debug().
 		Str("task-id", t.ID).
@@ -285,20 +285,20 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 	}
 	// if the job isn't running anymore we need
 	// to cancel the task
-	if j.State != job.Running {
-		t.State = task.Cancelled
+	if j.State != tork.JobStateRunning {
+		t.State = tork.TaskStateCancelled
 		node, err := c.ds.GetNodeByID(ctx, t.NodeID)
 		if err != nil {
 			return err
 		}
 		return c.broker.PublishTask(ctx, node.Queue, t)
 	}
-	return c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+	return c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		// we don't want to mark the task as RUNNING
 		// if an out-of-order task completion/failure
 		// arrived earlier
-		if u.State == task.Scheduled {
-			u.State = task.Running
+		if u.State == tork.TaskStateScheduled {
+			u.State = tork.TaskStateRunning
 			u.StartedAt = t.StartedAt
 			u.NodeID = t.NodeID
 		}
@@ -306,19 +306,19 @@ func (c *Coordinator) handleStartedTask(t *task.Task) error {
 	})
 }
 
-func (c *Coordinator) handleCompletedTask(t *task.Task) error {
+func (c *Coordinator) handleCompletedTask(t *tork.Task) error {
 	ctx := context.Background()
 	return c.completeTask(ctx, t)
 }
 
-func (c *Coordinator) completeTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeTask(ctx context.Context, t *tork.Task) error {
 	if t.ParentID != "" {
 		return c.completeSubTask(ctx, t)
 	}
 	return c.completeTopLevelTask(ctx, t)
 }
 
-func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeSubTask(ctx context.Context, t *tork.Task) error {
 	parent, err := c.ds.GetTaskByID(ctx, t.ParentID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting parent composite task: %s", t.ParentID)
@@ -329,15 +329,15 @@ func (c *Coordinator) completeSubTask(ctx context.Context, t *task.Task) error {
 	return c.completeEachTask(ctx, t)
 }
 
-func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeEachTask(ctx context.Context, t *tork.Task) error {
 	var isLast bool
 	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update actual task
-		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			if u.State != task.Running && u.State != task.Scheduled {
+		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = task.Completed
+			u.State = tork.TaskStateCompleted
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -345,7 +345,7 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 			return errors.Wrapf(err, "error updating task in datastore")
 		}
 		// update parent task
-		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
+		if err := tx.UpdateTask(ctx, t.ParentID, func(u *tork.Task) error {
 			u.Each.Completions = u.Each.Completions + 1
 			isLast = u.Each.Completions >= u.Each.Size
 			return nil
@@ -354,7 +354,7 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 		}
 		// update job context
 		if t.Result != "" && t.Var != "" {
-			if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+			if err := tx.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
 				if u.Context.Tasks == nil {
 					u.Context.Tasks = make(map[string]string)
 				}
@@ -376,22 +376,22 @@ func (c *Coordinator) completeEachTask(ctx context.Context, t *task.Task) error 
 			return errors.New("error fetching the parent task")
 		}
 		now := time.Now().UTC()
-		parent.State = task.Completed
+		parent.State = tork.TaskStateCompleted
 		parent.CompletedAt = &now
 		return c.completeTask(ctx, parent)
 	}
 	return nil
 }
 
-func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeParallelTask(ctx context.Context, t *tork.Task) error {
 	// complete actual task
 	var isLast bool
 	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
-		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			if u.State != task.Running && u.State != task.Scheduled {
+		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = task.Completed
+			u.State = tork.TaskStateCompleted
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -399,7 +399,7 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 			return errors.Wrapf(err, "error updating task in datastore")
 		}
 		// update parent task
-		if err := tx.UpdateTask(ctx, t.ParentID, func(u *task.Task) error {
+		if err := tx.UpdateTask(ctx, t.ParentID, func(u *tork.Task) error {
 			u.Parallel.Completions = u.Parallel.Completions + 1
 			isLast = u.Parallel.Completions >= len(u.Parallel.Tasks)
 			return nil
@@ -408,7 +408,7 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 		}
 		// update job context
 		if t.Result != "" && t.Var != "" {
-			if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+			if err := tx.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
 				if u.Context.Tasks == nil {
 					u.Context.Tasks = make(map[string]string)
 				}
@@ -430,22 +430,22 @@ func (c *Coordinator) completeParallelTask(ctx context.Context, t *task.Task) er
 			return errors.New("error fetching the parent task")
 		}
 		now := time.Now().UTC()
-		parent.State = task.Completed
+		parent.State = tork.TaskStateCompleted
 		parent.CompletedAt = &now
 		return c.completeTask(ctx, parent)
 	}
 	return nil
 }
 
-func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) error {
+func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *tork.Task) error {
 	log.Debug().Str("task-id", t.ID).Msg("received task completion")
 	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update task in DB
-		if err := tx.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			if u.State != task.Running && u.State != task.Scheduled {
+		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = task.Completed
+			u.State = tork.TaskStateCompleted
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -453,7 +453,7 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 			return errors.Wrapf(err, "error updating task in datastore")
 		}
 		// update job in DB
-		if err := tx.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+		if err := tx.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
 			u.Position = u.Position + 1
 			if t.Result != "" && t.Var != "" {
 				if u.Context.Tasks == nil {
@@ -480,12 +480,12 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 		next := j.Tasks[j.Position-1]
 		next.ID = uuid.NewUUID()
 		next.JobID = j.ID
-		next.State = task.Pending
+		next.State = tork.TaskStatePending
 		next.Position = j.Position
 		next.CreatedAt = &now
 		if err := eval.EvaluateTask(next, j.Context.AsMap()); err != nil {
 			next.Error = err.Error()
-			next.State = task.Failed
+			next.State = tork.TaskStateFailed
 			next.FailedAt = &now
 		}
 		if err := c.ds.CreateTask(ctx, next); err != nil {
@@ -493,13 +493,13 @@ func (c *Coordinator) completeTopLevelTask(ctx context.Context, t *task.Task) er
 		}
 		return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
 	} else {
-		j.State = job.Completed
+		j.State = tork.JobStateCompleted
 		return c.broker.PublishJob(ctx, j)
 	}
 
 }
 
-func (c *Coordinator) handleFailedTask(t *task.Task) error {
+func (c *Coordinator) handleFailedTask(t *tork.Task) error {
 	ctx := context.Background()
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
@@ -512,9 +512,9 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 		Msg("received task failure")
 
 	// mark the task as FAILED
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
+	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		if u.State.IsActive() {
-			u.State = task.Failed
+			u.State = tork.TaskStateFailed
 			u.FailedAt = t.FailedAt
 			u.Error = t.Error
 		}
@@ -523,7 +523,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 		return errors.Wrapf(err, "error marking task %s as FAILED", t.ID)
 	}
 	// eligible for retry?
-	if j.State == job.Running &&
+	if j.State == tork.JobStateRunning &&
 		t.Retry != nil &&
 		t.Retry.Attempts < t.Retry.Limit {
 		// create a new retry task
@@ -532,7 +532,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 		rt.ID = uuid.NewUUID()
 		rt.CreatedAt = &now
 		rt.Retry.Attempts = rt.Retry.Attempts + 1
-		rt.State = task.Pending
+		rt.State = tork.TaskStatePending
 		rt.Error = ""
 		if err := eval.EvaluateTask(rt, j.Context.AsMap()); err != nil {
 			return errors.Wrapf(err, "error evaluating task")
@@ -545,12 +545,12 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 		}
 	} else {
 		// mark the job as FAILED
-		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *job.Job) error {
+		if err := c.ds.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
 			// we only want to make the job as FAILED
 			// if it's actually running as opposed to
 			// possibly being CANCELLED
-			if u.State == job.Running {
-				u.State = job.Failed
+			if u.State == tork.JobStateRunning {
+				u.State = tork.JobStateFailed
 				u.FailedAt = t.FailedAt
 			}
 			return nil
@@ -564,7 +564,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 				return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
 			}
 			now := time.Now().UTC()
-			parent.State = task.Failed
+			parent.State = tork.TaskStateFailed
 			parent.FailedAt = &now
 			parent.Error = t.Error
 			return c.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
@@ -577,7 +577,7 @@ func (c *Coordinator) handleFailedTask(t *task.Task) error {
 	return nil
 }
 
-func (c *Coordinator) handleHeartbeats(n node.Node) error {
+func (c *Coordinator) handleHeartbeats(n tork.Node) error {
 	ctx := context.Background()
 	_, err := c.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
@@ -587,7 +587,7 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 			Msg("received first heartbeat")
 		return c.ds.CreateNode(ctx, n)
 	}
-	return c.ds.UpdateNode(ctx, n.ID, func(u *node.Node) error {
+	return c.ds.UpdateNode(ctx, n.ID, func(u *tork.Node) error {
 		// ignore "old" heartbeats
 		if u.LastHeartbeatAt.After(n.LastHeartbeatAt) {
 			return nil
@@ -608,28 +608,28 @@ func (c *Coordinator) handleHeartbeats(n node.Node) error {
 
 }
 
-func (c *Coordinator) handleJob(j *job.Job) error {
+func (c *Coordinator) handleJob(j *tork.Job) error {
 	ctx := context.Background()
 	switch j.State {
-	case job.Pending:
+	case tork.JobStatePending:
 		return c.startJob(ctx, j)
-	case job.Cancelled:
+	case tork.JobStateCancelled:
 		return c.cancelJob(ctx, j)
-	case job.Restart:
+	case tork.JobStateRestart:
 		return c.restartJob(ctx, j)
-	case job.Completed:
+	case tork.JobStateCompleted:
 		return c.completeJob(ctx, j)
 	default:
 		return errors.Errorf("invalud job state: %s", j.State)
 	}
 }
 
-func (c *Coordinator) completeJob(ctx context.Context, j *job.Job) error {
+func (c *Coordinator) completeJob(ctx context.Context, j *tork.Job) error {
 	var result string
 	var jobErr error
 	// mark the job as completed
-	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
-		if u.State != job.Running {
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
+		if u.State != tork.JobStateRunning {
 			return errors.Errorf("job %s is %s and can not be completed", u.ID, u.State)
 		}
 		now := time.Now().UTC()
@@ -637,11 +637,11 @@ func (c *Coordinator) completeJob(ctx context.Context, j *job.Job) error {
 		result, jobErr = eval.EvaluateTemplate(j.Output, j.Context.AsMap())
 		if jobErr != nil {
 			log.Error().Err(jobErr).Msgf("error evaluating job %s output", j.ID)
-			j.State = job.Failed
+			j.State = tork.JobStateFailed
 			u.FailedAt = &now
 			u.Error = jobErr.Error()
 		} else {
-			u.State = job.Completed
+			u.State = tork.JobStateCompleted
 			u.CompletedAt = &now
 			u.Result = result
 		}
@@ -657,11 +657,11 @@ func (c *Coordinator) completeJob(ctx context.Context, j *job.Job) error {
 		}
 		now := time.Now().UTC()
 		if jobErr != nil {
-			parent.State = task.Failed
+			parent.State = tork.TaskStateFailed
 			parent.FailedAt = &now
 			parent.Error = jobErr.Error()
 		} else {
-			parent.State = task.Completed
+			parent.State = tork.TaskStateCompleted
 			parent.CompletedAt = &now
 			parent.Result = result
 		}
@@ -670,13 +670,13 @@ func (c *Coordinator) completeJob(ctx context.Context, j *job.Job) error {
 	return nil
 }
 
-func (c *Coordinator) restartJob(ctx context.Context, j *job.Job) error {
+func (c *Coordinator) restartJob(ctx context.Context, j *tork.Job) error {
 	// mark the job as running
-	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
-		if u.State != job.Failed && u.State != job.Cancelled {
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
+		if u.State != tork.JobStateFailed && u.State != tork.JobStateCancelled {
 			return errors.Errorf("job %s is in %s state and can't be restarted", j.ID, j.State)
 		}
-		u.State = job.Running
+		u.State = tork.JobStateRunning
 		u.FailedAt = nil
 		return nil
 	}); err != nil {
@@ -687,12 +687,12 @@ func (c *Coordinator) restartJob(ctx context.Context, j *job.Job) error {
 	t := j.Tasks[j.Position-1]
 	t.ID = uuid.NewUUID()
 	t.JobID = j.ID
-	t.State = task.Pending
+	t.State = tork.TaskStatePending
 	t.Position = j.Position
 	t.CreatedAt = &now
 	if err := eval.EvaluateTask(t, j.Context.AsMap()); err != nil {
 		t.Error = err.Error()
-		t.State = task.Failed
+		t.State = tork.TaskStateFailed
 		t.FailedAt = &now
 	}
 	if err := c.ds.CreateTask(ctx, t); err != nil {
@@ -701,14 +701,14 @@ func (c *Coordinator) restartJob(ctx context.Context, j *job.Job) error {
 	return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, t)
 }
 
-func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
+func (c *Coordinator) cancelJob(ctx context.Context, j *tork.Job) error {
 	// mark the job as cancelled
-	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
-		if u.State != job.Running {
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
+		if u.State != tork.JobStateRunning {
 			// job is not running -- nothing to cancel
 			return nil
 		}
-		u.State = job.Cancelled
+		u.State = tork.JobStateCancelled
 		return nil
 	}); err != nil {
 		return err
@@ -723,7 +723,7 @@ func (c *Coordinator) cancelJob(ctx context.Context, j *job.Job) error {
 		if err != nil {
 			return errors.Wrapf(err, "error fetching parent job: %s", pj.ID)
 		}
-		pj.State = job.Cancelled
+		pj.State = tork.JobStateCancelled
 		if err := c.broker.PublishJob(ctx, pj); err != nil {
 			log.Error().Err(err).Msgf("error cancelling sub-job: %s", pj.ID)
 		}
@@ -743,10 +743,10 @@ func (c *Coordinator) cancelActiveTasks(ctx context.Context, jobID string) error
 		return errors.Wrapf(err, "error getting active tasks for job: %s", jobID)
 	}
 	for _, t := range tasks {
-		t.State = task.Cancelled
+		t.State = tork.TaskStateCancelled
 		// mark tasks as cancelled
-		if err := c.ds.UpdateTask(ctx, t.ID, func(u *task.Task) error {
-			u.State = task.Cancelled
+		if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+			u.State = tork.TaskStateCancelled
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error cancelling task: %s", t.ID)
@@ -758,7 +758,7 @@ func (c *Coordinator) cancelActiveTasks(ctx context.Context, jobID string) error
 			if err != nil {
 				return err
 			}
-			sj.State = job.Cancelled
+			sj.State = tork.JobStateCancelled
 			if err := c.broker.PublishJob(ctx, sj); err != nil {
 				return errors.Wrapf(err, "error publishing cancelllation for sub-job %s", sj.ID)
 			}
@@ -777,27 +777,27 @@ func (c *Coordinator) cancelActiveTasks(ctx context.Context, jobID string) error
 	return nil
 }
 
-func (c *Coordinator) startJob(ctx context.Context, j *job.Job) error {
+func (c *Coordinator) startJob(ctx context.Context, j *tork.Job) error {
 
 	log.Debug().Msgf("starting job %s", j.ID)
 	now := time.Now().UTC()
 	t := j.Tasks[0]
 	t.ID = uuid.NewUUID()
 	t.JobID = j.ID
-	t.State = task.Pending
+	t.State = tork.TaskStatePending
 	t.Position = 1
 	t.CreatedAt = &now
 	if err := eval.EvaluateTask(t, j.Context.AsMap()); err != nil {
 		t.Error = err.Error()
-		t.State = task.Failed
+		t.State = tork.TaskStateFailed
 		t.FailedAt = &now
 	}
 	if err := c.ds.CreateTask(ctx, t); err != nil {
 		return err
 	}
-	if err := c.ds.UpdateJob(ctx, j.ID, func(u *job.Job) error {
+	if err := c.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
 		n := time.Now().UTC()
-		u.State = job.Running
+		u.State = tork.JobStateRunning
 		u.StartedAt = &n
 		u.Position = 1
 		return nil

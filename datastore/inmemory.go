@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/node"
-	"github.com/runabol/tork/stats"
+	"github.com/runabol/tork"
+
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
 )
 
 var ErrTaskNotFound = errors.New("task not found")
@@ -21,20 +19,20 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
-	tasks *syncx.Map[string, *task.Task]
-	nodes *syncx.Map[string, node.Node]
-	jobs  *syncx.Map[string, *job.Job]
+	tasks *syncx.Map[string, *tork.Task]
+	nodes *syncx.Map[string, tork.Node]
+	jobs  *syncx.Map[string, *tork.Job]
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
 	return &InMemoryDatastore{
-		tasks: new(syncx.Map[string, *task.Task]),
-		nodes: new(syncx.Map[string, node.Node]),
-		jobs:  new(syncx.Map[string, *job.Job]),
+		tasks: new(syncx.Map[string, *tork.Task]),
+		nodes: new(syncx.Map[string, tork.Node]),
+		jobs:  new(syncx.Map[string, *tork.Job]),
 	}
 }
 
-func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error {
+func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *tork.Task) error {
 	if t.ID == "" {
 		return errors.New("must provide ID")
 	}
@@ -42,7 +40,7 @@ func (ds *InMemoryDatastore) CreateTask(ctx context.Context, t *task.Task) error
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.Task, error) {
+func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*tork.Task, error) {
 	t, ok := ds.tasks.Get(id)
 	if !ok {
 		return nil, ErrTaskNotFound
@@ -50,7 +48,7 @@ func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*task.
 	return t.Clone(), nil
 }
 
-func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *task.Task) error) error {
+func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *tork.Task) error) error {
 	t, ok := ds.tasks.Get(id)
 	if !ok {
 		return ErrTaskNotFound
@@ -61,7 +59,7 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n node.Node) error {
+func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n tork.Node) error {
 	_, ok := ds.nodes.Get(n.ID)
 	if ok {
 		return errors.Errorf("node %s already exists", n.ID)
@@ -70,7 +68,7 @@ func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n node.Node) error 
 	return nil
 }
 
-func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *node.Node) error) error {
+func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *tork.Node) error) error {
 	n, ok := ds.nodes.Get(id)
 	if !ok {
 		return ErrNodeNotFound
@@ -82,23 +80,23 @@ func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (node.Node, error) {
+func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (tork.Node, error) {
 	n, ok := ds.nodes.Get(id)
 	if !ok {
-		return node.Node{}, ErrNodeNotFound
+		return tork.Node{}, ErrNodeNotFound
 	}
 	return n, nil
 }
 
-func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, error) {
-	nodes := make([]node.Node, 0)
-	timeout := time.Now().UTC().Add(-node.LAST_HEARTBEAT_TIMEOUT)
-	ds.nodes.Iterate(func(_ string, n node.Node) {
+func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]tork.Node, error) {
+	nodes := make([]tork.Node, 0)
+	timeout := time.Now().UTC().Add(-tork.LAST_HEARTBEAT_TIMEOUT)
+	ds.nodes.Iterate(func(_ string, n tork.Node) {
 		if n.LastHeartbeatAt.After(timeout) {
 			// if we hadn't seen an heartbeat for two or more
 			// consecutive periods we consider the node as offline
-			if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-node.HEARTBEAT_RATE * 2)) {
-				n.Status = node.Offline
+			if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-tork.HEARTBEAT_RATE * 2)) {
+				n.Status = tork.NodeStatusOffline
 			}
 			nodes = append(nodes, n)
 		}
@@ -109,12 +107,12 @@ func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]node.Node, e
 	return nodes, nil
 }
 
-func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *job.Job) error {
+func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	ds.jobs.Set(j.ID, j.Clone())
 	return nil
 }
 
-func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify func(u *job.Job) error) error {
+func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error {
 	j, ok := ds.jobs.Get(id)
 	if !ok {
 		return ErrJobNotFound
@@ -126,9 +124,9 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	return nil
 }
 
-func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
-	execution := make([]*task.Task, 0)
-	ds.tasks.Iterate(func(_ string, t *task.Task) {
+func (ds *InMemoryDatastore) getExecution(id string) []*tork.Task {
+	execution := make([]*tork.Task, 0)
+	ds.tasks.Iterate(func(_ string, t *tork.Task) {
 		if t.JobID == id {
 			execution = append(execution, t.Clone())
 		}
@@ -136,7 +134,7 @@ func (ds *InMemoryDatastore) getExecution(id string) []*task.Task {
 	return execution
 }
 
-func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Job, error) {
+func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*tork.Job, error) {
 	j, ok := ds.jobs.Get(id)
 	if !ok {
 		return nil, ErrJobNotFound
@@ -162,9 +160,9 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*job.Jo
 	return j.Clone(), nil
 }
 
-func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*task.Task, error) {
-	result := make([]*task.Task, 0)
-	ds.tasks.Iterate(func(_ string, t *task.Task) {
+func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
+	result := make([]*tork.Task, 0)
+	ds.tasks.Iterate(func(_ string, t *tork.Task) {
 		if t.JobID == jobID && t.State.IsActive() {
 			result = append(result, t.Clone())
 		}
@@ -172,10 +170,10 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return result, nil
 }
 
-func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*job.Job], error) {
+func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.Job], error) {
 	offset := (page - 1) * size
-	filtered := make([]*job.Job, 0)
-	ds.jobs.Iterate(func(_ string, j *job.Job) {
+	filtered := make([]*tork.Job, 0)
+	ds.jobs.Iterate(func(_ string, j *tork.Job) {
 		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(q)) ||
 			strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(q)) {
 			filtered = append(filtered, j)
@@ -184,19 +182,19 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
 	})
-	result := make([]*job.Job, 0)
+	result := make([]*tork.Job, 0)
 	for i := offset; i < (offset+size) && i < len(filtered); i++ {
 		j := filtered[i]
 		jc := j.Clone()
-		jc.Tasks = make([]*task.Task, 0)
-		jc.Execution = make([]*task.Task, 0)
+		jc.Tasks = make([]*tork.Task, 0)
+		jc.Execution = make([]*tork.Task, 0)
 		result = append(result, jc)
 	}
 	totalPages := len(filtered) / size
 	if len(filtered)%size != 0 {
 		totalPages = totalPages + 1
 	}
-	return &Page[*job.Job]{
+	return &Page[*tork.Job]{
 		Items:      result,
 		Number:     page,
 		Size:       len(result),
@@ -205,22 +203,22 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 	}, nil
 }
 
-func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*stats.Stats, error) {
-	s := &stats.Stats{}
+func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*tork.Stats, error) {
+	s := &tork.Stats{}
 
-	ds.jobs.Iterate(func(_ string, j *job.Job) {
-		if j.State == job.Running {
+	ds.jobs.Iterate(func(_ string, j *tork.Job) {
+		if j.State == tork.JobStateRunning {
 			s.Jobs.Running = s.Jobs.Running + 1
 		}
 	})
 
-	ds.tasks.Iterate(func(_ string, t *task.Task) {
-		if t.State == task.Running {
+	ds.tasks.Iterate(func(_ string, t *tork.Task) {
+		if t.State == tork.TaskStateRunning {
 			s.Tasks.Running = s.Tasks.Running + 1
 		}
 	})
 
-	ds.nodes.Iterate(func(_ string, n node.Node) {
+	ds.nodes.Iterate(func(_ string, n tork.Node) {
 		if n.LastHeartbeatAt.After(time.Now().UTC().Add(-(time.Minute * 5))) {
 			s.Nodes.Running = s.Nodes.Running + 1
 			s.Nodes.CPUPercent = s.Nodes.CPUPercent + n.CPUPercent

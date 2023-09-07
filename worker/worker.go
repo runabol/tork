@@ -11,11 +11,12 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/pkg/errors"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
+
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/syncx"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/runabol/tork/version"
 )
@@ -77,21 +78,21 @@ func NewWorker(cfg Config) (*Worker, error) {
 	return w, nil
 }
 
-func (w *Worker) handleTask(t *task.Task) error {
+func (w *Worker) handleTask(t *tork.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task")
 	switch t.State {
-	case task.Scheduled:
+	case tork.TaskStateScheduled:
 		return w.runTask(t)
-	case task.Cancelled:
+	case tork.TaskStateCancelled:
 		return w.cancelTask(t)
 	default:
 		return errors.Errorf("invalid task state: %s", t.State)
 	}
 }
 
-func (w *Worker) cancelTask(t *task.Task) error {
+func (w *Worker) cancelTask(t *tork.Task) error {
 	rt, ok := w.tasks.Get(t.ID)
 	if !ok {
 		log.Debug().Msgf("unknown task %s. nothing to cancel", t.ID)
@@ -103,7 +104,7 @@ func (w *Worker) cancelTask(t *task.Task) error {
 	return nil
 }
 
-func (w *Worker) runTask(t *task.Task) error {
+func (w *Worker) runTask(t *tork.Task) error {
 	atomic.AddInt32(&w.taskCount, 1)
 	defer func() {
 		atomic.AddInt32(&w.taskCount, -1)
@@ -120,7 +121,7 @@ func (w *Worker) runTask(t *task.Task) error {
 	// let the coordinator know that the task started executing
 	started := time.Now().UTC()
 	t.StartedAt = &started
-	t.State = task.Running
+	t.State = tork.TaskStateRunning
 	t.NodeID = w.id
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
@@ -133,14 +134,14 @@ func (w *Worker) runTask(t *task.Task) error {
 		return err
 	}
 	switch rt.State {
-	case task.Completed:
+	case tork.TaskStateCompleted:
 		t.Result = rt.Result
 		t.CompletedAt = rt.CompletedAt
 		t.State = rt.State
 		if err := w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
 			return err
 		}
-	case task.Failed:
+	case tork.TaskStateFailed:
 		t.Error = rt.Error
 		t.FailedAt = rt.FailedAt
 		t.State = rt.State
@@ -153,10 +154,10 @@ func (w *Worker) runTask(t *task.Task) error {
 	return nil
 }
 
-func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
+func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	// prepare limits
 	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
-		t.Limits = &task.Limits{}
+		t.Limits = &tork.TaskLimits{}
 	}
 	if t.Limits != nil && t.Limits.CPUs == "" {
 		t.Limits.CPUs = w.limits.DefaultCPUsLimit
@@ -196,7 +197,7 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 			// we also want to mark the
 			// actual task as FAILED
 			finished := time.Now().UTC()
-			t.State = task.Failed
+			t.State = tork.TaskStateFailed
 			t.Error = err.Error()
 			t.FailedAt = &finished
 			return nil
@@ -209,7 +210,7 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 			Err(err).
 			Msg("error processing task")
 		finished := time.Now().UTC()
-		t.State = task.Failed
+		t.State = tork.TaskStateFailed
 		t.Error = err.Error()
 		t.FailedAt = &finished
 		return nil
@@ -228,7 +229,7 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 			// we also want to mark the
 			// actual task as FAILED
 			finished := time.Now().UTC()
-			t.State = task.Failed
+			t.State = tork.TaskStateFailed
 			t.Error = err.Error()
 			t.FailedAt = &finished
 			return nil
@@ -236,11 +237,11 @@ func (w *Worker) executeTask(ctx context.Context, t *task.Task) error {
 	}
 	finished := time.Now().UTC()
 	t.CompletedAt = &finished
-	t.State = task.Completed
+	t.State = tork.TaskStateCompleted
 	return nil
 }
 
-func (w *Worker) doExecuteTask(ctx context.Context, o *task.Task) error {
+func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 	t := o.Clone()
 	// create a temporary mount point
 	// we can use to write the run script to
@@ -306,10 +307,10 @@ func (w *Worker) sendHeartbeats() {
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		status := node.UP
+		status := tork.NodeStatusUP
 		if err := w.runtime.HealthCheck(ctx); err != nil {
 			log.Error().Err(err).Msgf("node %s failed health check", w.id)
-			status = node.Down
+			status = tork.NodeStatusDown
 		}
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -318,7 +319,7 @@ func (w *Worker) sendHeartbeats() {
 		cpuPercent := getCPUPercent()
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
-			node.Node{
+			tork.Node{
 				ID:              w.id,
 				StartedAt:       w.startTime,
 				CPUPercent:      cpuPercent,
@@ -338,7 +339,7 @@ func (w *Worker) sendHeartbeats() {
 		select {
 		case <-w.stop:
 			return
-		case <-time.After(node.HEARTBEAT_RATE):
+		case <-time.After(tork.HEARTBEAT_RATE):
 		}
 	}
 }

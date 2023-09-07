@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/job"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/node"
+
 	"github.com/runabol/tork/runtime"
-	"github.com/runabol/tork/task"
+
 	"github.com/runabol/tork/uuid"
 	"github.com/runabol/tork/worker"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +50,7 @@ func Test_handlePendingTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks("test-queue", func(t *task.Task) error {
+	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -64,7 +64,7 @@ func Test_handlePendingTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	tk := &task.Task{
+	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
 	}
@@ -80,7 +80,7 @@ func Test_handlePendingTask(t *testing.T) {
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, tk.State)
+	assert.Equal(t, tork.TaskStateScheduled, tk.State)
 	// task should only be processed once
 	assert.Equal(t, 1, processed)
 }
@@ -90,7 +90,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	completed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *task.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *tork.Task) error {
 		completed = completed + 1
 		return nil
 	})
@@ -104,7 +104,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	tk := &task.Task{
+	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
 		If:    "false",
@@ -121,7 +121,7 @@ func Test_handleConditionalTask(t *testing.T) {
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, tk.State)
+	assert.Equal(t, tork.TaskStateScheduled, tk.State)
 	// task should only be processed once
 	assert.Equal(t, 1, completed)
 }
@@ -140,16 +140,16 @@ func Test_handleStartedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Running,
+		State: tork.JobStateRunning,
 	}
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
-		State:     task.Scheduled,
+		State:     tork.TaskStateScheduled,
 		StartedAt: &now,
 		NodeID:    uuid.NewUUID(),
 		JobID:     j1.ID,
@@ -163,7 +163,7 @@ func Test_handleStartedTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Running, t2.State)
+	assert.Equal(t, tork.TaskStateRunning, t2.State)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
 	assert.Equal(t, t1.NodeID, t2.NodeID)
 }
@@ -175,7 +175,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	qname := uuid.NewUUID()
 
 	cancellations := 0
-	err := b.SubscribeForTasks(qname, func(t *task.Task) error {
+	err := b.SubscribeForTasks(qname, func(t *tork.Task) error {
 		cancellations = cancellations + 1
 		return nil
 	})
@@ -191,23 +191,23 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Failed,
+		State: tork.JobStateFailed,
 	}
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:    uuid.NewUUID(),
 		Queue: qname,
 	}
 	err = ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
-		State:     task.Scheduled,
+		State:     tork.TaskStateScheduled,
 		StartedAt: &now,
 		JobID:     j1.ID,
 		NodeID:    n1.ID,
@@ -223,7 +223,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Scheduled, t2.State)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 	assert.Equal(t, 1, cancellations)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
 	assert.Equal(t, t1.NodeID, t2.NodeID)
@@ -246,11 +246,11 @@ func Test_handleCompletedLastTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 2,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -262,9 +262,9 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -283,7 +283,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	// verify that the job was marked
@@ -291,7 +291,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 }
 
 func Test_handleCompletedLastSubJobTask(t *testing.T) {
@@ -315,11 +315,11 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	parentJob := &job.Job{
+	parentJob := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -328,9 +328,9 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateJob(ctx, parentJob)
 	assert.NoError(t, err)
 
-	parentTask := &task.Task{
+	parentTask := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -340,11 +340,11 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateTask(ctx, parentTask)
 	assert.NoError(t, err)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 				Run:  "echo hello",
@@ -355,9 +355,9 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -375,7 +375,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	// verify that the job was marked
@@ -383,17 +383,17 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 
 	// verify that parent task is COMPLETED
 	pt, err := ds.GetTaskByID(ctx, parentTask.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, pt.State)
+	assert.Equal(t, tork.TaskStateCompleted, pt.State)
 
 	// verify that parent job is COMPLETED
 	pj, err := ds.GetJobByID(ctx, parentJob.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Completed, pj.State)
+	assert.Equal(t, tork.JobStateCompleted, pj.State)
 }
 
 func Test_handleCompletedFirstTask(t *testing.T) {
@@ -418,11 +418,11 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -434,9 +434,9 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -454,7 +454,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	// verify that the job was NOT
@@ -462,7 +462,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func Test_handleCompletedScheduledTask(t *testing.T) {
@@ -487,11 +487,11 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -500,9 +500,9 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Scheduled,
+		State:       tork.TaskStateScheduled,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -520,13 +520,13 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Completed, j2.State)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
 }
 
 func Test_handleCompletedParallelTask(t *testing.T) {
@@ -543,15 +543,15 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
-				Parallel: &task.Parallel{
-					Tasks: []*task.Task{
+				Parallel: &tork.ParallelTask{
+					Tasks: []*tork.Task{
 						{
 							Name: "parallel-task-1",
 						},
@@ -569,11 +569,11 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	pt := &task.Task{
+	pt := &tork.Task{
 		ID:    uuid.NewUUID(),
 		JobID: j1.ID,
-		Parallel: &task.Parallel{
-			Tasks: []*task.Task{
+		Parallel: &tork.ParallelTask{
+			Tasks: []*tork.Task{
 				{
 					Name: "parallel-task-1",
 				},
@@ -582,15 +582,15 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 				},
 			},
 		},
-		State: task.Running,
+		State: tork.TaskStateRunning,
 	}
 
 	err = ds.CreateTask(ctx, pt)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -599,9 +599,9 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 		ParentID:    pt.ID,
 	}
 
-	t5 := &task.Task{
+	t5 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Scheduled,
+		State:       tork.TaskStateScheduled,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -624,19 +624,19 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	pt1, err := ds.GetTaskByID(ctx, t1.ParentID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, pt1.State)
+	assert.Equal(t, tork.TaskStateCompleted, pt1.State)
 
 	// verify that the job was NOT
 	// marked as COMPLETED
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func Test_handleCompletedEachTask(t *testing.T) {
@@ -653,17 +653,17 @@ func Test_handleCompletedEachTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
-				Each: &task.Each{
+				Each: &tork.EachTask{
 					Size: 2,
 					List: "some expression",
-					Task: &task.Task{
+					Task: &tork.Task{
 						Name: "some task",
 					},
 				},
@@ -676,27 +676,27 @@ func Test_handleCompletedEachTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	pt := &task.Task{
+	pt := &tork.Task{
 		ID:       uuid.NewUUID(),
 		JobID:    j1.ID,
 		Position: 1,
 		Name:     "parent task",
-		Each: &task.Each{
+		Each: &tork.EachTask{
 			Size: 2,
 			List: "some expression",
-			Task: &task.Task{
+			Task: &tork.Task{
 				Name: "some task",
 			},
 		},
-		State: task.Running,
+		State: tork.TaskStateRunning,
 	}
 
 	err = ds.CreateTask(ctx, pt)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -705,9 +705,9 @@ func Test_handleCompletedEachTask(t *testing.T) {
 		ParentID:    pt.ID,
 	}
 
-	t5 := &task.Task{
+	t5 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Scheduled,
+		State:       tork.TaskStateScheduled,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
@@ -730,19 +730,19 @@ func Test_handleCompletedEachTask(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t2.State)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	pt1, err := ds.GetTaskByID(ctx, t1.ParentID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, pt1.State)
+	assert.Equal(t, tork.TaskStateCompleted, pt1.State)
 
 	// verify that the job was NOT
 	// marked as COMPLETED
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func Test_handleFailedTask(t *testing.T) {
@@ -759,15 +759,15 @@ func Test_handleFailedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	node := node.Node{ID: uuid.NewUUID(), Queue: uuid.NewUUID()}
+	node := tork.Node{ID: uuid.NewUUID(), Queue: uuid.NewUUID()}
 	err = ds.CreateNode(ctx, node)
 	assert.NoError(t, err)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -776,9 +776,9 @@ func Test_handleFailedTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      node.ID,
@@ -786,9 +786,9 @@ func Test_handleFailedTask(t *testing.T) {
 		Position:    1,
 	}
 
-	t2 := &task.Task{
+	t2 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      node.ID,
@@ -811,7 +811,7 @@ func Test_handleFailedTask(t *testing.T) {
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Failed, t11.State)
+	assert.Equal(t, tork.TaskStateFailed, t11.State)
 	assert.Equal(t, t1.CompletedAt, t11.CompletedAt)
 
 	// verify that the job was
@@ -819,7 +819,7 @@ func Test_handleFailedTask(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Failed, j2.State)
+	assert.Equal(t, tork.JobStateFailed, j2.State)
 
 	actives, err = ds.GetActiveTasks(ctx, j1.ID)
 	assert.NoError(t, err)
@@ -831,7 +831,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t *task.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t *tork.Task) error {
 		processed = processed + 1
 		return nil
 	})
@@ -847,11 +847,11 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:       uuid.NewUUID(),
-		State:    job.Running,
+		State:    tork.JobStateRunning,
 		Position: 1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -860,15 +860,15 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
 		JobID:       j1.ID,
 		Position:    1,
-		Retry: &task.Retry{
+		Retry: &tork.TaskRetry{
 			Limit: 1,
 		},
 	}
@@ -884,7 +884,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Failed, t2.State)
+	assert.Equal(t, tork.TaskStateFailed, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 
 	// verify that the job was
@@ -892,7 +892,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 	assert.Equal(t, 1, processed)
 }
 
@@ -908,12 +908,12 @@ func Test_handleHeartbeat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	n1 := node.Node{
+	n1 := tork.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 5),
 		CPUPercent:      75,
 		Hostname:        "host-1",
-		Status:          node.UP,
+		Status:          tork.NodeStatusUP,
 	}
 
 	err = c.handleHeartbeats(n1)
@@ -926,11 +926,11 @@ func Test_handleHeartbeat(t *testing.T) {
 	assert.Equal(t, n1.Status, n11.Status)
 	assert.Equal(t, n1.TaskCount, n11.TaskCount)
 
-	n2 := node.Node{
+	n2 := tork.Node{
 		ID:              n1.ID,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 2),
 		CPUPercent:      75,
-		Status:          node.Down,
+		Status:          tork.NodeStatusDown,
 		TaskCount:       3,
 	}
 
@@ -944,7 +944,7 @@ func Test_handleHeartbeat(t *testing.T) {
 	assert.Equal(t, n2.Status, n22.Status)
 	assert.Equal(t, n2.TaskCount, n22.TaskCount)
 
-	n3 := node.Node{
+	n3 := tork.Node{
 		ID:              n1.ID,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 7),
 		CPUPercent:      75,
@@ -972,10 +972,10 @@ func Test_handleJobs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Tasks: []*task.Task{
+		State: tork.JobStatePending,
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -990,7 +990,7 @@ func Test_handleJobs(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func Test_cancelActiveTasks(t *testing.T) {
@@ -1005,10 +1005,10 @@ func Test_cancelActiveTasks(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Tasks: []*task.Task{
+		State: tork.JobStatePending,
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1020,10 +1020,10 @@ func Test_cancelActiveTasks(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	err = ds.CreateTask(ctx, &task.Task{
+	err = ds.CreateTask(ctx, &tork.Task{
 		ID:        uuid.NewUUID(),
 		JobID:     j1.ID,
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		Position:  1,
 		CreatedAt: &now,
 	})
@@ -1063,11 +1063,11 @@ func Test_handleCancelJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	pj := &job.Job{
+	pj := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		CreatedAt: now,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1076,22 +1076,22 @@ func Test_handleCancelJob(t *testing.T) {
 	err = ds.CreateJob(ctx, pj)
 	assert.NoError(t, err)
 
-	pt := &task.Task{
+	pt := &tork.Task{
 		ID:        uuid.NewUUID(),
 		JobID:     pj.ID,
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, pt)
 	assert.NoError(t, err)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Pending,
+		State:     tork.JobStatePending,
 		CreatedAt: now,
 		ParentID:  pt.ID,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1107,9 +1107,9 @@ func Test_handleCancelJob(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 
-	j1.State = job.Cancelled
+	j1.State = tork.JobStateCancelled
 	// cancel the job
 	err = c.handleJob(j1)
 	assert.NoError(t, err)
@@ -1120,11 +1120,11 @@ func Test_handleCancelJob(t *testing.T) {
 
 	j3, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Cancelled, j3.State)
+	assert.Equal(t, tork.JobStateCancelled, j3.State)
 
 	pj1, err := ds.GetJobByID(ctx, pj.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Cancelled, pj1.State)
+	assert.Equal(t, tork.JobStateCancelled, pj1.State)
 }
 
 func Test_handleRestartJob(t *testing.T) {
@@ -1141,12 +1141,12 @@ func Test_handleRestartJob(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Pending,
+		State:     tork.JobStatePending,
 		CreatedAt: now,
 		Position:  1,
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1162,28 +1162,28 @@ func Test_handleRestartJob(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 
 	// cancel the job
-	j1.State = job.Cancelled
+	j1.State = tork.JobStateCancelled
 	err = c.handleJob(j1)
 	assert.NoError(t, err)
 
 	j2, err = ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Cancelled, j2.State)
+	assert.Equal(t, tork.JobStateCancelled, j2.State)
 
 	// restart the job
-	j1.State = job.Restart
+	j1.State = tork.JobStateRestart
 	err = c.handleJob(j1)
 	assert.NoError(t, err)
 
 	j2, err = ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Running, j2.State)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 
 	// try to restart again
-	j1.State = job.Restart
+	j1.State = tork.JobStateRestart
 	err = c.handleJob(j1)
 	assert.Error(t, err)
 }
@@ -1200,10 +1200,10 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: job.Pending,
-		Tasks: []*task.Task{
+		State: tork.JobStatePending,
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 				Env: map[string]string{
@@ -1221,7 +1221,7 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, job.Failed, j2.State)
+	assert.Equal(t, tork.JobStateFailed, j2.State)
 }
 
 func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
@@ -1238,12 +1238,12 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		Position:  1,
 		CreatedAt: time.Now().UTC(),
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1257,10 +1257,10 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		JobID:     j1.ID,
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		Position:  1,
 		CreatedAt: &now,
 	}
@@ -1275,7 +1275,7 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Running, t11.State)
+	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
 
 func Test_completeTopLevelTaskWithTx(t *testing.T) {
@@ -1292,19 +1292,19 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = b.SubscribeForTasks(mq.QUEUE_PENDING, func(t1 *task.Task) error {
+	err = b.SubscribeForTasks(mq.QUEUE_PENDING, func(t1 *tork.Task) error {
 		err := c.handlePendingTask(t1)
 		assert.NoError(t, err)
 		return err
 	})
 	assert.NoError(t, err)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		Position:  1,
 		CreatedAt: time.Now().UTC(),
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1318,10 +1318,10 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		JobID:     j1.ID,
-		State:     task.Running,
+		State:     tork.TaskStateRunning,
 		Position:  1,
 		CreatedAt: &now,
 	}
@@ -1334,7 +1334,7 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Completed, t11.State)
+	assert.Equal(t, tork.TaskStateCompleted, t11.State)
 }
 
 func Test_completeParallelTaskWithTx(t *testing.T) {
@@ -1349,12 +1349,12 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		Position:  1,
 		CreatedAt: time.Now().UTC(),
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1365,9 +1365,9 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		CreatedAt:   &now,
@@ -1387,7 +1387,7 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Running, t11.State)
+	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
 
 func Test_completeEachTaskWithTx(t *testing.T) {
@@ -1402,12 +1402,12 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j1 := &job.Job{
+	j1 := &tork.Job{
 		ID:        uuid.NewUUID(),
-		State:     job.Running,
+		State:     tork.JobStateRunning,
 		Position:  1,
 		CreatedAt: time.Now().UTC(),
-		Tasks: []*task.Task{
+		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
 			},
@@ -1418,9 +1418,9 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	t1 := &task.Task{
+	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       task.Running,
+		State:       tork.TaskStateRunning,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		CreatedAt:   &now,
@@ -1440,34 +1440,34 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, task.Running, t11.State)
+	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
 
 func TestRunHelloWorldJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/hello.yaml")
-	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 1, len(j1.Execution))
 }
 
 func TestRunParallelJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/parallel.yaml")
-	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 9, len(j1.Execution))
 }
 
 func TestRunEachJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/each.yaml")
-	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 7, len(j1.Execution))
 }
 
 func TestRunSubjobJob(t *testing.T) {
 	j1 := doRunJob(t, "../examples/subjob.yaml")
-	assert.Equal(t, job.Completed, j1.State)
+	assert.Equal(t, tork.JobStateCompleted, j1.State)
 	assert.Equal(t, 6, len(j1.Execution))
 }
 
-func doRunJob(t *testing.T, filename string) *job.Job {
+func doRunJob(t *testing.T, filename string) *tork.Job {
 	ctx := context.Background()
 
 	b := mq.NewInMemoryBroker()
@@ -1499,12 +1499,12 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	contents, err := os.ReadFile(filename)
 	assert.NoError(t, err)
 
-	j1 := &job.Job{}
+	j1 := &tork.Job{}
 	err = yaml.Unmarshal(contents, j1)
 	assert.NoError(t, err)
 
 	j1.ID = uuid.NewUUID()
-	j1.State = job.Pending
+	j1.State = tork.JobStatePending
 
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
@@ -1516,7 +1516,7 @@ func doRunJob(t *testing.T, filename string) *job.Job {
 	assert.NoError(t, err)
 
 	iter := 0
-	for j2.State == job.Running && iter < 10 {
+	for j2.State == tork.JobStateRunning && iter < 10 {
 		time.Sleep(time.Second)
 		j2, err = ds.GetJobByID(ctx, j2.ID)
 		assert.NoError(t, err)

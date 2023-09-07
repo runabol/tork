@@ -3,13 +3,12 @@ package coordinator
 import (
 	"testing"
 
-	"github.com/runabol/tork/job"
-	"github.com/runabol/tork/task"
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedactTask(t *testing.T) {
-	ta := task.Task{
+	ta := tork.Task{
 		Env: map[string]string{
 			"secret_1":          "secret",
 			"SecrET_2":          "secret",
@@ -17,7 +16,7 @@ func TestRedactTask(t *testing.T) {
 			"AWS_ACCESS_KEY_ID": "some-key",
 			"harmless":          "hello world",
 		},
-		Pre: []*task.Task{
+		Pre: []*tork.Task{
 			{
 				Env: map[string]string{
 					"secret_1": "secret",
@@ -25,7 +24,7 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
-		Post: []*task.Task{
+		Post: []*tork.Task{
 			{
 				Env: map[string]string{
 					"secret_1": "secret",
@@ -33,8 +32,8 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
-		Parallel: &task.Parallel{
-			Tasks: []*task.Task{
+		Parallel: &tork.ParallelTask{
+			Tasks: []*tork.Task{
 				{
 					Env: map[string]string{
 						"secret_1": "secret",
@@ -61,8 +60,8 @@ func TestRedactTask(t *testing.T) {
 }
 
 func TestRedactJob(t *testing.T) {
-	j := redactJob(&job.Job{
-		Tasks: []*task.Task{
+	j := redactJob(&tork.Job{
+		Tasks: []*tork.Task{
 			{
 				Env: map[string]string{
 					"secret_1":          "secret",
@@ -73,7 +72,7 @@ func TestRedactJob(t *testing.T) {
 				},
 			},
 		},
-		Execution: []*task.Task{
+		Execution: []*tork.Task{
 			{
 				Env: map[string]string{
 					"secret_1":          "secret",
@@ -88,7 +87,7 @@ func TestRedactJob(t *testing.T) {
 			"secret": "password",
 			"plain":  "helloworld",
 		},
-		Context: job.Context{
+		Context: tork.JobContext{
 			Inputs: map[string]string{
 				"secret": "password",
 				"plain":  "helloworld",
