@@ -46,7 +46,7 @@ jobs:
         run: |
           set -e
           printf "[datastore]\ntype = \"postgres\"\n[datastore.postgres]\ndsn = \"host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable\"" > config.toml
-          go run cmd/main.go migration
+          go run main.go migration
 
       - name: Run tests
         run: go test -v ./...

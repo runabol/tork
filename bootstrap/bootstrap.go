@@ -1,14 +1,9 @@
-package main
+package bootstrap
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -19,205 +14,121 @@ import (
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/signals"
-	"github.com/runabol/tork/version"
 	"github.com/runabol/tork/worker"
-	"github.com/urfave/cli/v2"
 )
 
-func main() {
-	app := &cli.App{
-		Name:  "tork",
-		Usage: "a distributed workflow engine",
-		Flags: []cli.Flag{
-			config(),
-		},
-		Before: func(ctx *cli.Context) error {
-			if err := loadConfig(ctx); err != nil {
-				return err
-			}
+type Mode string
 
-			if err := setupLogging(ctx); err != nil {
-				return err
-			}
+const (
+	ModeCoordinator Mode = "coordinator"
+	ModeWorker      Mode = "worker"
+	ModeStandalone  Mode = "standalone"
+	ModeMigration   Mode = "migration"
+)
 
-			displayBanner(ctx)
-
-			return nil
-		},
-		Commands: []*cli.Command{
-			{
-				Name:  "run",
-				Usage: "Run Tork",
-				Subcommands: []*cli.Command{
-					{
-						Name:   "coordinator",
-						Usage:  "Run the coordinator",
-						Flags:  []cli.Flag{},
-						Action: runCoordinator,
-					},
-					{
-						Name:   "worker",
-						Usage:  "Run a worker",
-						Flags:  []cli.Flag{},
-						Action: runWorker,
-					},
-					{
-						Name:   "standalone",
-						Usage:  "Run the coordinator and a worker",
-						Flags:  []cli.Flag{},
-						Action: runStandalone,
-					},
-				},
-			},
-			{
-				Name:   "migration",
-				Usage:  "Run the db migration script",
-				Flags:  []cli.Flag{},
-				Action: runMigration,
-			},
-			{
-				Name:   "health",
-				Usage:  "Perform a health check",
-				Flags:  []cli.Flag{},
-				Action: health,
-			},
-		},
-	}
-	if err := app.Run(os.Args); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-func runCoordinator(_ *cli.Context) error {
-	broker, err := createBroker()
-	if err != nil {
+func Start(mode Mode) error {
+	if err := setupLogging(); err != nil {
 		return err
 	}
 
-	ds, err := createDatastore()
-	if err != nil {
-		return err
-	}
-
-	c, err := createCoordinator(broker, ds)
-	if err != nil {
-		return err
-	}
-
-	signals.AwaitTerm()
-
-	log.Debug().Msg("shutting down")
-	if c != nil {
-		if err := c.Stop(); err != nil {
-			log.Error().Err(err).Msg("error stopping coordinator")
-		}
-	}
-	return nil
-}
-
-func runWorker(_ *cli.Context) error {
-	broker, err := createBroker()
-	if err != nil {
-		return err
-	}
-
-	w, err := createWorker(broker)
-	if err != nil {
-		return err
-	}
-
-	signals.AwaitTerm()
-
-	log.Debug().Msg("shutting down")
-	if w != nil {
-		if err := w.Stop(); err != nil {
-			log.Error().Err(err).Msg("error stopping worker")
-		}
-	}
-
-	return nil
-}
-
-func runStandalone(_ *cli.Context) error {
-	broker, err := createBroker()
-	if err != nil {
-		return err
-	}
-
-	ds, err := createDatastore()
-	if err != nil {
-		return err
-	}
-
-	w, err := createWorker(broker)
-	if err != nil {
-		return err
-	}
-	c, err := createCoordinator(broker, ds)
-	if err != nil {
-		return err
-	}
-
-	signals.AwaitTerm()
-
-	log.Debug().Msg("shutting down")
-	if w != nil {
-		if err := w.Stop(); err != nil {
-			log.Error().Err(err).Msg("error stopping worker")
-		}
-	}
-	if c != nil {
-		if err := c.Stop(); err != nil {
-			log.Error().Err(err).Msg("error stopping coordinator")
-		}
-	}
-
-	return nil
-}
-
-func health(_ *cli.Context) error {
-	chk, err := http.Get(fmt.Sprintf("%s/health", conf.StringDefault("endpoint", "http://localhost:8000")))
-	if err != nil {
-		return err
-	}
-	if chk.StatusCode != http.StatusOK {
-		return errors.Errorf("Health check failed. Status Code: %d", chk.StatusCode)
-	}
-	body, err := io.ReadAll(chk.Body)
-	if err != nil {
-		return errors.Wrapf(err, "error reading body")
-	}
-
-	type resp struct {
-		Status string `json:"status"`
-	}
-	r := resp{}
-
-	if err := json.Unmarshal(body, &r); err != nil {
-		return errors.Wrapf(err, "error unmarshalling body")
-	}
-
-	fmt.Printf("Status: %s\n", r.Status)
-
-	return nil
-}
-
-func runMigration(_ *cli.Context) error {
-	ds, err := createDatastore()
-	if err != nil {
-		return err
-	}
-	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
-	switch dstype {
-	case datastore.DATASTORE_POSTGRES:
-		if err := ds.(*datastore.PostgresDatastore).ExecScript(postgres.SCHEMA); err != nil {
-			return errors.Wrapf(err, "error when trying to create db schema")
-		}
+	switch mode {
+	case ModeCoordinator:
+		return runCoordinator()
+	case ModeWorker:
+		return runWorker()
+	case ModeStandalone:
+		return runStandalone()
+	case ModeMigration:
+		return runMigration()
 	default:
-		return errors.Errorf("can't perform db migration on: %s", dstype)
+		return errors.Errorf("Unknown mode: %s", mode)
 	}
-	log.Info().Msg("migration completed!")
+}
+
+func runCoordinator() error {
+	broker, err := createBroker()
+	if err != nil {
+		return err
+	}
+
+	ds, err := createDatastore()
+	if err != nil {
+		return err
+	}
+
+	c, err := createCoordinator(broker, ds)
+	if err != nil {
+		return err
+	}
+
+	signals.AwaitTerm()
+
+	log.Debug().Msg("shutting down")
+	if c != nil {
+		if err := c.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping coordinator")
+		}
+	}
+	return nil
+}
+
+func runWorker() error {
+	broker, err := createBroker()
+	if err != nil {
+		return err
+	}
+
+	w, err := createWorker(broker)
+	if err != nil {
+		return err
+	}
+
+	signals.AwaitTerm()
+
+	log.Debug().Msg("shutting down")
+	if w != nil {
+		if err := w.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping worker")
+		}
+	}
+
+	return nil
+}
+
+func runStandalone() error {
+	broker, err := createBroker()
+	if err != nil {
+		return err
+	}
+
+	ds, err := createDatastore()
+	if err != nil {
+		return err
+	}
+
+	w, err := createWorker(broker)
+	if err != nil {
+		return err
+	}
+	c, err := createCoordinator(broker, ds)
+	if err != nil {
+		return err
+	}
+
+	signals.AwaitTerm()
+
+	log.Debug().Msg("shutting down")
+	if w != nil {
+		if err := w.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping worker")
+		}
+	}
+	if c != nil {
+		if err := c.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping coordinator")
+		}
+	}
+
 	return nil
 }
 
@@ -304,14 +215,7 @@ func createWorker(b mq.Broker) (*worker.Worker, error) {
 	return w, nil
 }
 
-func loadConfig(ctx *cli.Context) error {
-	if ctx.String("config") == "" {
-		return conf.LoadConfig()
-	}
-	return conf.LoadConfig(ctx.String("config"))
-}
-
-func setupLogging(ctx *cli.Context) error {
+func setupLogging() error {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logLevel := strings.ToLower(conf.StringDefault("logging.level", "debug"))
 	// setup log level
@@ -340,33 +244,20 @@ func setupLogging(ctx *cli.Context) error {
 	return nil
 }
 
-func displayBanner(c *cli.Context) {
-	mode := conf.StringDefault("cli.banner_mode", "console")
-	if mode == "off" {
-		return
+func runMigration() error {
+	ds, err := createDatastore()
+	if err != nil {
+		return err
 	}
-	banner := color.WhiteString(fmt.Sprintf(`
- _______  _______  ______    ___   _ 
-|       ||       ||    _ |  |   | | |
-|_     _||   _   ||   | ||  |   |_| |
-  |   |  |  | |  ||   |_||_ |      _|
-  |   |  |  |_|  ||    __  ||     |_ 
-  |   |  |       ||   |  | ||    _  |
-  |___|  |_______||___|  |_||___| |_|
-
- %s (%s)
-`, version.Version, version.GitCommit))
-
-	if mode == "console" {
-		fmt.Println(banner)
-	} else {
-		log.Info().Msg(banner)
+	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
+	switch dstype {
+	case datastore.DATASTORE_POSTGRES:
+		if err := ds.(*datastore.PostgresDatastore).ExecScript(postgres.SCHEMA); err != nil {
+			return errors.Wrapf(err, "error when trying to create db schema")
+		}
+	default:
+		return errors.Errorf("can't perform db migration on: %s", dstype)
 	}
-}
-
-func config() cli.Flag {
-	return &cli.StringFlag{
-		Name:  "config",
-		Usage: "Set the location of the config file",
-	}
+	log.Info().Msg("migration completed!")
+	return nil
 }
