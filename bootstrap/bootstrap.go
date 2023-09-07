@@ -31,7 +31,7 @@ type Mode string
 var (
 	quit        = make(chan os.Signal, 1)
 	terminate   = make(chan any, 1)
-	onStarted   = defaultOnStartedHander
+	onStarted   = func() error { return nil }
 	dsProviders = map[string]datastore.Provider{}
 	mqProviders = map[string]mq.Provider{}
 	middlewares = make([]middleware.MiddlewareFunc, 0)

@@ -5,5 +5,3 @@ package bootstrap
 // If a non-nil error is returned it will
 // terminate the bootstrap process.
 type OnStartedHandler func() error
-
-func defaultOnStartedHander() error { return nil }
