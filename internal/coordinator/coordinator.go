@@ -37,6 +37,7 @@ type Config struct {
 	Address     string
 	Queues      map[string]int
 	Middlewares []middleware.MiddlewareFunc
+	Endpoints   map[string]middleware.HandlerFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -49,6 +50,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	name := fmt.Sprintf("coordinator-%s", uuid.NewUUID())
 	if cfg.Queues == nil {
 		cfg.Queues = make(map[string]int)
+	}
+	if cfg.Endpoints == nil {
+		cfg.Endpoints = make(map[string]middleware.HandlerFunc)
 	}
 	if cfg.Queues[mq.QUEUE_COMPLETED] < 1 {
 		cfg.Queues[mq.QUEUE_COMPLETED] = 1
@@ -68,9 +72,13 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
 	}
+	api, err := newAPI(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &Coordinator{
 		Name:   name,
-		api:    newAPI(cfg),
+		api:    api,
 		broker: cfg.Broker,
 		ds:     cfg.DataStore,
 		queues: cfg.Queues,

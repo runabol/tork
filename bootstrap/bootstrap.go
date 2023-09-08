@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -35,6 +36,7 @@ var (
 	dsProviders = map[string]datastore.Provider{}
 	mqProviders = map[string]mq.Provider{}
 	middlewares = make([]middleware.MiddlewareFunc, 0)
+	endpoints   = make(map[string]middleware.HandlerFunc)
 )
 
 func Start(mode Mode) error {
@@ -220,6 +222,7 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.C
 		Queues:      queues,
 		Address:     conf.String("coordinator.address"),
 		Middlewares: middlewares,
+		Endpoints:   endpoints,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -321,4 +324,8 @@ func RegisterBrokerProvider(mqType string, provider mq.Provider) {
 
 func RegisterMiddleware(mw middleware.MiddlewareFunc) {
 	middlewares = append(middlewares, mw)
+}
+
+func RegisterEndpoint(method, path string, handler middleware.HandlerFunc) {
+	endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }
