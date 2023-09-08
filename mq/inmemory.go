@@ -61,8 +61,8 @@ func newTopic(name string) *topic {
 
 func (t *topic) subscribe(handler func(ev any)) {
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.subs = append(t.subs, handler)
-	t.mu.Unlock()
 }
 
 func (t *topic) publish(ev any) {
@@ -70,8 +70,6 @@ func (t *topic) publish(ev any) {
 }
 
 func (t *topic) close() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.terminate <- 1
 	<-t.terminated
 }
