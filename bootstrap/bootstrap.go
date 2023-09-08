@@ -223,6 +223,7 @@ func createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.C
 		Address:     conf.String("coordinator.address"),
 		Middlewares: middlewares,
 		Endpoints:   endpoints,
+		Enabled:     conf.BoolMap("coordinator.api.endpoints"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")

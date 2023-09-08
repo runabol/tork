@@ -154,7 +154,7 @@ func Test_getActiveNodes(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func Test_getStatus(t *testing.T) {
+func Test_health(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
@@ -717,4 +717,22 @@ func Test_customEndpointBind(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "Me", string(body))
+}
+
+func Test_disableEndpoint(t *testing.T) {
+	api, err := NewAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    mq.NewInMemoryBroker(),
+		Enabled:   map[string]bool{"health": false},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/health", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	_, err = io.ReadAll(w.Body)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

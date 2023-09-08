@@ -39,6 +39,7 @@ type Config struct {
 	Queues      map[string]int
 	Middlewares []middleware.MiddlewareFunc
 	Endpoints   map[string]middleware.HandlerFunc
+	Enabled     map[string]bool
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -54,6 +55,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}
 	if cfg.Endpoints == nil {
 		cfg.Endpoints = make(map[string]middleware.HandlerFunc)
+	}
+	if cfg.Enabled == nil {
+		cfg.Enabled = make(map[string]bool)
 	}
 	if cfg.Queues[mq.QUEUE_COMPLETED] < 1 {
 		cfg.Queues[mq.QUEUE_COMPLETED] = 1
