@@ -20,13 +20,65 @@ const defaultQueueSize = 1000
 // development, tests etc.
 type InMemoryBroker struct {
 	queues    *syncx.Map[string, *queue]
+	topics    *syncx.Map[string, *topic]
 	terminate *atomic.Bool
+}
+type topic struct {
+	name       string
+	ch         chan any
+	subs       []func(event any)
+	terminate  chan any
+	terminated chan any
+	mu         sync.RWMutex
+}
+
+func newTopic(name string) *topic {
+	t := &topic{
+		name:       name,
+		ch:         make(chan any),
+		terminate:  make(chan any),
+		terminated: make(chan any),
+	}
+	go func() {
+		for {
+			select {
+			case <-t.terminate:
+				close(t.terminated)
+				return
+			case m := <-t.ch:
+				t.mu.RLock()
+				for _, sub := range t.subs {
+					sub(m)
+				}
+				t.mu.RUnlock()
+			}
+		}
+	}()
+
+	return t
+}
+
+func (t *topic) subscribe(handler func(ev any)) {
+	t.mu.Lock()
+	t.subs = append(t.subs, handler)
+	t.mu.Unlock()
+}
+
+func (t *topic) publish(ev any) {
+	t.ch <- ev
+}
+
+func (t *topic) close() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.terminate <- 1
+	<-t.terminated
 }
 
 type queue struct {
 	name    string
 	ch      chan any
-	subs    []*subscriber
+	subs    []*qsub
 	unacked int32
 	mu      sync.Mutex
 }
@@ -35,12 +87,12 @@ func newQueue(name string) *queue {
 	return &queue{
 		name:    name,
 		ch:      make(chan any, defaultQueueSize),
-		subs:    make([]*subscriber, 0),
+		subs:    make([]*qsub, 0),
 		unacked: 0,
 	}
 }
 
-type subscriber struct {
+type qsub struct {
 	terminate  chan any
 	terminated chan any
 }
@@ -68,7 +120,7 @@ func (q *queue) subscribe(sub func(m any) error) {
 	terminate := make(chan any)
 	terminated := make(chan any)
 	q.mu.Lock()
-	q.subs = append(q.subs, &subscriber{
+	q.subs = append(q.subs, &qsub{
 		terminate:  terminate,
 		terminated: terminated,
 	})
@@ -96,6 +148,7 @@ func (q *queue) subscribe(sub func(m any) error) {
 func NewInMemoryBroker() *InMemoryBroker {
 	return &InMemoryBroker{
 		queues:    new(syncx.Map[string, *queue]),
+		topics:    new(syncx.Map[string, *topic]),
 		terminate: new(atomic.Bool),
 	}
 }
@@ -174,7 +227,15 @@ func (b *InMemoryBroker) publish(qname string, m any) error {
 		b.queues.Set(qname, q)
 	}
 	q.send(m)
+	b.publishEvent(qname, m)
 	return nil
+}
+
+func (b *InMemoryBroker) publishEvent(qname string, m any) {
+	topic, ok := b.topics.Get(qname)
+	if ok {
+		topic.publish(m)
+	}
 }
 
 func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
@@ -187,11 +248,26 @@ func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
 			log.Debug().Msgf("shutting down channel %s", q.name)
 			q.close()
 		})
+		b.topics.Iterate(func(_ string, t *topic) {
+			log.Debug().Msgf("shutting down topic %s", t.name)
+			t.close()
+		})
 		done <- 1
 	}()
 	select {
 	case <-ctx.Done():
 	case <-done:
 	}
+	return nil
+}
+
+func (b *InMemoryBroker) SubscribeForEvent(ctx context.Context, topic string, handler func(event any)) error {
+	log.Debug().Msgf("subscribing for events on %s", topic)
+	t, ok := b.topics.Get(topic)
+	if !ok {
+		t = newTopic(topic)
+		b.topics.Set(topic, t)
+	}
+	t.subscribe(handler)
 	return nil
 }

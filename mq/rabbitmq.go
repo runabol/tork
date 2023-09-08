@@ -381,3 +381,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.mu.Unlock()
 	return nil
 }
+
+func (b *RabbitMQBroker) SubscribeForEvent(ctx context.Context, topic string, handler func(event any)) error {
+	panic("not implemented")
+}
