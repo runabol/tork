@@ -64,6 +64,10 @@ func IntMap(key string) map[string]int {
 	return konf.IntMap(key)
 }
 
+func BoolMap(key string) map[string]bool {
+	return konf.BoolMap(key)
+}
+
 func String(key string) string {
 	return konf.String(key)
 }
@@ -72,6 +76,18 @@ func StringDefault(key, dv string) string {
 	v := String(key)
 	if v != "" {
 		return v
+	}
+	return dv
+}
+
+func Bool(key string) bool {
+	return konf.Bool(key)
+}
+
+func BoolDefault(key string, dv bool) bool {
+	v := konf.String(key)
+	if v != "" {
+		return Bool(key)
 	}
 	return dv
 }

@@ -113,3 +113,68 @@ func TestLoadConfigEnv(t *testing.T) {
 
 	assert.Equal(t, "world", conf.String("hello"))
 }
+
+func TestBoolTrue(t *testing.T) {
+	konf := `
+	[main]
+	enabled = true
+	`
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+	err = conf.LoadConfig()
+	assert.NoError(t, err)
+	assert.True(t, conf.Bool("main.enabled"))
+}
+
+func TestBoolFalse(t *testing.T) {
+	konf := `
+	[main]
+	enabled = false
+	`
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+	err = conf.LoadConfig()
+	assert.NoError(t, err)
+	assert.False(t, conf.Bool("main.enabled"))
+}
+
+func TestBoolDefault(t *testing.T) {
+	konf := `
+	[main]
+	enabled = false
+	`
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+	err = conf.LoadConfig()
+
+	assert.NoError(t, err)
+	assert.False(t, conf.BoolDefault("main.enabled", true))
+	assert.False(t, conf.BoolDefault("main.enabled", false))
+	assert.True(t, conf.BoolDefault("main.other", true))
+}
+
+func TestBoolMap(t *testing.T) {
+	os.Setenv("TORK_BOOLMAP_KEY1", "false")
+	os.Setenv("TORK_BOOLMAP_KEY2", "true")
+	defer func() {
+		os.Unsetenv("TORK_BOOLMAP_KEY1")
+		os.Unsetenv("TORK_BOOLMAP_KEY2")
+	}()
+
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+
+	m := conf.BoolMap("boolmap")
+
+	assert.False(t, m["key1"])
+	assert.True(t, m["key2"])
+}

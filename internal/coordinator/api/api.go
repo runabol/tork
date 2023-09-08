@@ -44,6 +44,7 @@ type Config struct {
 	Address     string
 	Middlewares []middleware.MiddlewareFunc
 	Endpoints   map[string]middleware.HandlerFunc
+	Enabled     map[string]bool
 }
 
 func NewAPI(cfg Config) (*API, error) {
@@ -64,16 +65,28 @@ func NewAPI(cfg Config) (*API, error) {
 	}
 
 	// built-in endpoints
-	r.GET("/health", s.health)
-	r.GET("/tasks/:id", s.getTask)
-	r.GET("/queues", s.listQueues)
-	r.GET("/nodes", s.listActiveNodes)
-	r.POST("/jobs", s.createJob)
-	r.GET("/jobs/:id", s.getJob)
-	r.GET("/jobs", s.listJobs)
-	r.PUT("/jobs/:id/cancel", s.cancelJob)
-	r.PUT("/jobs/:id/restart", s.restartJob)
-	r.GET("/stats", s.getStats)
+	if v, ok := cfg.Enabled["health"]; !ok || v {
+		r.GET("/health", s.health)
+	}
+	if v, ok := cfg.Enabled["tasks"]; !ok || v {
+		r.GET("/tasks/:id", s.getTask)
+	}
+	if v, ok := cfg.Enabled["queues"]; !ok || v {
+		r.GET("/queues", s.listQueues)
+	}
+	if v, ok := cfg.Enabled["nodes"]; !ok || v {
+		r.GET("/nodes", s.listActiveNodes)
+	}
+	if v, ok := cfg.Enabled["jobs"]; !ok || v {
+		r.POST("/jobs", s.createJob)
+		r.GET("/jobs/:id", s.getJob)
+		r.GET("/jobs", s.listJobs)
+		r.PUT("/jobs/:id/cancel", s.cancelJob)
+		r.PUT("/jobs/:id/restart", s.restartJob)
+	}
+	if v, ok := cfg.Enabled["stats"]; !ok || v {
+		r.GET("/stats", s.getStats)
+	}
 
 	// register additional custom endpoints
 	for spec, h := range cfg.Endpoints {
