@@ -11,6 +11,7 @@ import (
 	"github.com/runabol/tork"
 
 	"github.com/runabol/tork/internal/syncx"
+	"github.com/runabol/tork/internal/wildcard"
 )
 
 const defaultQueueSize = 1000
@@ -264,11 +265,11 @@ func (b *InMemoryBroker) SubscribeForEvents(ctx context.Context, topic string, h
 	return nil
 }
 
-func (b *InMemoryBroker) PublishEvent(ctx context.Context, topic string, event any) error {
-	t, ok := b.topics.Get(topic)
-	if !ok {
-		return nil
-	}
-	t.publish(event)
+func (b *InMemoryBroker) PublishEvent(ctx context.Context, topicName string, event any) error {
+	b.topics.Iterate(func(name string, topic *topic) {
+		if wildcard.Match(name, topicName) {
+			topic.publish(event)
+		}
+	})
 	return nil
 }

@@ -205,7 +205,7 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateCompleted,
 	}
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
 		processed1 = processed1 + 1
@@ -221,9 +221,11 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j1)
 		assert.NoError(t, err)
+		err = b.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j1)
+		assert.NoError(t, err)
 	}
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 500)
-	assert.Equal(t, 10, processed1)
+	assert.Equal(t, 20, processed1)
 	assert.Equal(t, 10, processed2)
 }

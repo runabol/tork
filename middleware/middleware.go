@@ -11,6 +11,8 @@ type MiddlewareFunc func(next HandlerFunc) HandlerFunc
 
 type HandlerFunc func(c Context) error
 
+type JobListener func(j *tork.Job)
+
 type Context interface {
 	// Request returns `*http.Request`.
 	Request() *http.Request
@@ -29,5 +31,5 @@ type Context interface {
 	Error(code int, err error)
 
 	// SubmitJob submits a job input for processing
-	SubmitJob(j *input.Job) (*tork.Job, error)
+	SubmitJob(j *input.Job, listeners ...JobListener) (*tork.Job, error)
 }
