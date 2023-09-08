@@ -124,19 +124,16 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 }
 
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, func(body []byte) error {
-		t := &tork.Task{}
-		if err := json.Unmarshal(body, &t); err != nil {
-			log.Error().
-				Err(err).
-				Str("body", string(body)).
-				Msg("unable to deserialize task")
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, func(msg any) error {
+		t, ok := msg.(*tork.Task)
+		if !ok {
+			return errors.Errorf("expecting a task but got %T", t)
 		}
 		return handler(t)
 	})
 }
 
-func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(body []byte) error) error {
+func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(msg any) error) error {
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -176,22 +173,31 @@ func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(bod
 	b.mu.Unlock()
 	go func() {
 		for d := range msgs {
-			if err := handler(d.Body); err != nil {
+			if msg, err := deserialize(d.Type, d.Body); err != nil {
 				log.Error().
 					Err(err).
 					Str("queue", qname).
 					Str("body", (string(d.Body))).
-					Msg("failed to handle message")
-				if err := d.Reject(false); err != nil {
-					log.Error().
-						Err(err).
-						Msg("failed to ack message")
-				}
+					Str("type", (string(d.Type))).
+					Msg("failed to deserialized message")
 			} else {
-				if err := d.Ack(false); err != nil {
+				if err := handler(msg); err != nil {
 					log.Error().
 						Err(err).
-						Msg("failed to ack message")
+						Str("queue", qname).
+						Str("body", (string(d.Body))).
+						Msg("failed to handle message")
+					if err := d.Reject(false); err != nil {
+						log.Error().
+							Err(err).
+							Msg("failed to ack message")
+					}
+				} else {
+					if err := d.Ack(false); err != nil {
+						log.Error().
+							Err(err).
+							Msg("failed to ack message")
+					}
 				}
 			}
 		}
@@ -210,6 +216,42 @@ func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(bod
 		sub.done <- 1
 	}()
 	return nil
+}
+
+func serialize(msg any) ([]byte, error) {
+	mtype := fmt.Sprintf("%T", msg)
+	if mtype != "*tork.Task" && mtype != "*tork.Job" && mtype != "tork.Node" {
+		return nil, errors.Errorf("unnknown type: %T", msg)
+	}
+	body, err := json.Marshal(msg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to serialize the message")
+	}
+	return body, nil
+}
+
+func deserialize(tname string, body []byte) (any, error) {
+	switch tname {
+	case "*tork.Task":
+		t := tork.Task{}
+		if err := json.Unmarshal(body, &t); err != nil {
+			return nil, err
+		}
+		return &t, nil
+	case "*tork.Job":
+		j := tork.Job{}
+		if err := json.Unmarshal(body, &j); err != nil {
+			return nil, err
+		}
+		return &j, nil
+	case "tork.Node":
+		n := tork.Node{}
+		if err := json.Unmarshal(body, &n); err != nil {
+			return nil, err
+		}
+		return n, nil
+	}
+	return nil, errors.Errorf("unknown message type: %s", tname)
 }
 
 func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Channel) error {
@@ -265,9 +307,9 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 		return errors.Wrapf(err, "error creating channel")
 	}
 	defer ch.Close()
-	body, err := json.Marshal(msg)
+	body, err := serialize(msg)
 	if err != nil {
-		return errors.Wrapf(err, "unable to serialize the message")
+		return err
 	}
 	err = ch.PublishWithContext(ctx,
 		exchange, // exchange
@@ -275,6 +317,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 		false,    // mandatory
 		false,    // immediate
 		amqp.Publishing{
+			Type:        fmt.Sprintf("%T", msg),
 			ContentType: "application/json",
 			Body:        []byte(body),
 		})
@@ -285,13 +328,10 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 }
 
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n tork.Node) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_HEARBEAT, func(body []byte) error {
-		n := tork.Node{}
-		if err := json.Unmarshal(body, &n); err != nil {
-			log.Error().
-				Err(err).
-				Str("body", string(body)).
-				Msg("unable to deserialize node")
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_HEARBEAT, func(msg any) error {
+		n, ok := msg.(tork.Node)
+		if !ok {
+			return errors.Errorf("expecting a node but got %T", msg)
 		}
 		return handler(n)
 	})
@@ -301,13 +341,10 @@ func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	return b.publish(ctx, RMQ_EXCHANGE_DEFAULT, QUEUE_JOBS, j)
 }
 func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_JOBS, func(body []byte) error {
-		j := &tork.Job{}
-		if err := json.Unmarshal(body, &j); err != nil {
-			log.Error().
-				Err(err).
-				Str("body", string(body)).
-				Msg("unable to deserialize job")
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_JOBS, func(msg any) error {
+		j, ok := msg.(*tork.Job)
+		if !ok {
+			return errors.Errorf("expecting a job but got %T", msg)
 		}
 		return handler(j)
 	})
@@ -407,22 +444,11 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error {
-	qname := fmt.Sprintf("%s%s-%s", QUEUE_EXCLUSIVE_PREFIX, topic, uuid.NewUUID())
-	return b.subscribe(RMQ_EXCHANGE_TOPIC, topic, qname, func(body []byte) error {
-		switch topic {
-		case TOPIC_JOB_COMPLETED, TOPIC_JOB_FAILED:
-			j := tork.Job{}
-			if err := json.Unmarshal(body, &j); err != nil {
-				log.Error().
-					Err(err).
-					Str("body", string(body)).
-					Msg("unable to deserialize event")
-			}
-			handler(&j)
-		default:
-			log.Warn().Msgf("unknown topic: %s", topic)
-		}
+func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, pattern string, handler func(event any)) error {
+	key := strings.ReplaceAll(pattern, "*", "#")
+	qname := fmt.Sprintf("%s-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	return b.subscribe(RMQ_EXCHANGE_TOPIC, key, qname, func(msg any) error {
+		handler(msg)
 		return nil
 	})
 }

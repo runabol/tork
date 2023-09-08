@@ -8,6 +8,7 @@ import (
 )
 
 type Job struct {
+	id          string
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
@@ -15,10 +16,17 @@ type Job struct {
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 }
 
-func (ji Job) ToJob() *tork.Job {
+func (ji *Job) ID() string {
+	if ji.id == "" {
+		ji.id = uuid.NewUUID()
+	}
+	return ji.id
+}
+
+func (ji *Job) ToJob() *tork.Job {
 	n := time.Now().UTC()
 	j := &tork.Job{}
-	j.ID = uuid.NewUUID()
+	j.ID = ji.ID()
 	j.Description = ji.Description
 	j.Inputs = ji.Inputs
 	j.Name = ji.Name

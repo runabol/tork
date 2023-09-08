@@ -9,6 +9,7 @@ import (
 const (
 	BROKER_INMEMORY     = "inmemory"
 	BROKER_RABBITMQ     = "rabbitmq"
+	TOPIC_JOB           = "job.*"
 	TOPIC_JOB_COMPLETED = "job.completed"
 	TOPIC_JOB_FAILED    = "job.failed"
 )
@@ -24,5 +25,5 @@ type Broker interface {
 	SubscribeForJobs(handler func(j *tork.Job) error) error
 	Shutdown(ctx context.Context) error
 	PublishEvent(ctx context.Context, topic string, event any) error
-	SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error
+	SubscribeForEvents(ctx context.Context, pattern string, handler func(event any)) error
 }
