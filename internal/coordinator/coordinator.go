@@ -83,6 +83,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		Address:     cfg.Address,
 		Middlewares: cfg.Middlewares,
 		Endpoints:   cfg.Endpoints,
+		Enabled:     cfg.Enabled,
 	})
 	if err != nil {
 		return nil, err
