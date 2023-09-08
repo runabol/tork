@@ -21,5 +21,5 @@ type Broker interface {
 	PublishJob(ctx context.Context, j *tork.Job) error
 	SubscribeForJobs(handler func(j *tork.Job) error) error
 	Shutdown(ctx context.Context) error
-	SubscribeForEvent(ctx context.Context, topic string, handler func(ev any)) error
+	SubscribeForEvents(ctx context.Context, topic string, handler func(ev any)) error
 }
