@@ -195,3 +195,24 @@ func TestInMemoryShutdown(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, processed)
 }
+
+func TestInMemorSubsribeForEvent(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := 0
+	err := b.SubscribeForEvent(ctx, mq.QUEUE_COMPLETED, func(event any) {
+		processed = processed + 1
+	})
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateCancelled,
+	}
+	for i := 0; i < 10; i++ {
+		err = b.PublishTask(ctx, mq.QUEUE_COMPLETED, t1)
+		assert.NoError(t, err)
+	}
+	// wait for task to be processed
+	time.Sleep(time.Millisecond * 500)
+	assert.Equal(t, 10, processed)
+}
