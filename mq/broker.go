@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	BROKER_INMEMORY = "inmemory"
-	BROKER_RABBITMQ = "rabbitmq"
+	BROKER_INMEMORY     = "inmemory"
+	BROKER_RABBITMQ     = "rabbitmq"
+	TOPIC_JOB_COMPLETED = "job.completed"
+	TOPIC_JOB_FAILED    = "job.failed"
 )
 
 // Broker is the message-queue, pub/sub mechanism used for delivering tasks.
@@ -21,5 +23,6 @@ type Broker interface {
 	PublishJob(ctx context.Context, j *tork.Job) error
 	SubscribeForJobs(handler func(j *tork.Job) error) error
 	Shutdown(ctx context.Context) error
-	SubscribeForEvents(ctx context.Context, topic string, handler func(ev any)) error
+	PublishEvent(ctx context.Context, topic string, event any) error
+	SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error
 }

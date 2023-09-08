@@ -590,6 +590,13 @@ func (c *Coordinator) handleFailedTask(t *tork.Task) error {
 		if err := c.cancelActiveTasks(ctx, j.ID); err != nil {
 			return err
 		}
+		j, err := c.ds.GetJobByID(ctx, t.JobID)
+		if err != nil {
+			return errors.Wrapf(err, "unknown job: %s", t.JobID)
+		}
+		if j.State == tork.JobStateFailed {
+			return c.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
+		}
 	}
 	return nil
 }
@@ -684,7 +691,12 @@ func (c *Coordinator) completeJob(ctx context.Context, j *tork.Job) error {
 		}
 		return c.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
 	}
-	return nil
+	// publish job completd/failed event
+	if jobErr != nil {
+		return c.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
+	} else {
+		return c.broker.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j)
+	}
 }
 
 func (c *Coordinator) restartJob(ctx context.Context, j *tork.Job) error {

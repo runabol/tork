@@ -201,25 +201,25 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 	processed1 := 0
 	processed2 := 0
-	t1 := &tork.Task{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateCancelled,
+		State: tork.JobStateCompleted,
 	}
-	err := b.SubscribeForEvents(ctx, mq.QUEUE_COMPLETED, func(event any) {
-		t2 := event.(*tork.Task)
-		assert.Equal(t, t1.ID, t2.ID)
+	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j2 := event.(*tork.Job)
+		assert.Equal(t, j1.ID, j2.ID)
 		processed1 = processed1 + 1
 	})
 	assert.NoError(t, err)
-	err = b.SubscribeForEvents(ctx, mq.QUEUE_COMPLETED, func(event any) {
-		t2 := event.(*tork.Task)
-		assert.Equal(t, t1.ID, t2.ID)
+	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j2 := event.(*tork.Job)
+		assert.Equal(t, j1.ID, j2.ID)
 		processed2 = processed2 + 1
 	})
 	assert.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		err = b.PublishTask(ctx, mq.QUEUE_COMPLETED, t1)
+		err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j1)
 		assert.NoError(t, err)
 	}
 	// wait for task to be processed
