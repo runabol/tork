@@ -32,4 +32,8 @@ type Context interface {
 
 	// SubmitJob submits a job input for processing
 	SubmitJob(j *input.Job, listeners ...JobListener) (*tork.Job, error)
+
+	// Done returns a channel that's closed when work done on behalf of this
+	// context should be canceled.
+	Done() <-chan any
 }

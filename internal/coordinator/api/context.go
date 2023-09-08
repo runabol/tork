@@ -60,3 +60,15 @@ func (c *Context) Error(code int, err error) {
 	c.err = err
 	c.code = code
 }
+
+func (c *Context) Done() <-chan any {
+	ch := make(chan any)
+	go func() {
+		select {
+		case <-c.api.terminate:
+		case <-c.Request().Context().Done():
+		}
+		ch <- 1
+	}()
+	return ch
+}
