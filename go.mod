@@ -2,6 +2,10 @@ module github.com/runabol/tork
 
 go 1.19
 
+retract (
+	v0.1.0
+)
+
 require (
 	github.com/antonmedv/expr v1.15.0
 	github.com/docker/docker v23.0.6+incompatible
