@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
@@ -28,10 +29,11 @@ func Test_getQueues(t *testing.T) {
 		return nil
 	})
 	assert.NoError(t, err)
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    b,
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/queues", nil)
 	assert.NoError(t, err)
@@ -52,10 +54,11 @@ func Test_getQueues(t *testing.T) {
 func Test_listJobs(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 	ds := datastore.NewInMemoryDatastore()
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    b,
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 
 	for i := 0; i < 101; i++ {
@@ -129,10 +132,11 @@ func Test_getActiveNodes(t *testing.T) {
 	assert.NoError(t, err)
 	err = ds.CreateNode(context.Background(), inactive)
 	assert.NoError(t, err)
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/nodes", nil)
 	assert.NoError(t, err)
@@ -151,10 +155,11 @@ func Test_getActiveNodes(t *testing.T) {
 }
 
 func Test_getStatus(t *testing.T) {
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)
@@ -168,10 +173,11 @@ func Test_getStatus(t *testing.T) {
 }
 
 func Test_getUnknownTask(t *testing.T) {
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/task/1", nil)
 	assert.NoError(t, err)
@@ -190,10 +196,11 @@ func Test_getTask(t *testing.T) {
 	}
 	err := ds.CreateTask(context.Background(), &ta)
 	assert.NoError(t, err)
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/tasks/1234", nil)
 	assert.NoError(t, err)
@@ -210,10 +217,11 @@ func Test_getTask(t *testing.T) {
 }
 
 func Test_createJob(t *testing.T) {
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("POST", "/jobs", strings.NewReader(`{
 		"name":"test job",
@@ -236,10 +244,11 @@ func Test_createJob(t *testing.T) {
 }
 
 func Test_createJobInvalidProperty(t *testing.T) {
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("POST", "/jobs", strings.NewReader(`{
 		"tasks":[{
@@ -261,10 +270,11 @@ func Test_getJob(t *testing.T) {
 		State: tork.JobStatePending,
 	})
 	assert.NoError(t, err)
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/jobs/1234", nil)
 	req.Header.Add("Content-Type", "application/json")
@@ -331,10 +341,11 @@ func Test_cancelRunningJob(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/cancel", j1.ID), nil)
 	assert.NoError(t, err)
@@ -379,10 +390,11 @@ func Test_restartJob(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
 	assert.NoError(t, err)
@@ -427,10 +439,11 @@ func Test_restartRunningJob(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
 	assert.NoError(t, err)
@@ -472,11 +485,11 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore: ds,
 		Broker:    mq.NewInMemoryBroker(),
 	})
-
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/restart", j1.ID), nil)
 	assert.NoError(t, err)
@@ -497,11 +510,12 @@ func Test_middleware(t *testing.T) {
 		}
 	}
 	b := mq.NewInMemoryBroker()
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore:   datastore.NewInMemoryDatastore(),
 		Broker:      b,
 		Middlewares: []middleware.MiddlewareFunc{mw},
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/middleware", nil)
 	assert.NoError(t, err)
@@ -533,11 +547,12 @@ func Test_middlewareMultiple(t *testing.T) {
 		}
 	}
 	b := mq.NewInMemoryBroker()
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore:   datastore.NewInMemoryDatastore(),
 		Broker:      b,
 		Middlewares: []middleware.MiddlewareFunc{mw1, mw2},
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 
 	req, err := http.NewRequest("GET", "/middleware1", nil)
@@ -583,11 +598,12 @@ func Test_middlewareSubmitJob(t *testing.T) {
 		}
 	}
 	b := mq.NewInMemoryBroker()
-	api := newAPI(Config{
+	api, err := newAPI(Config{
 		DataStore:   datastore.NewInMemoryDatastore(),
 		Broker:      b,
 		Middlewares: []middleware.MiddlewareFunc{mw},
 	})
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/create-special-job", nil)
 	assert.NoError(t, err)
@@ -599,4 +615,72 @@ func Test_middlewareSubmitJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK", string(body))
+}
+
+func Test_customEndpoint(t *testing.T) {
+	h := func(c middleware.Context) error {
+		return c.String(http.StatusOK, "OK")
+	}
+	b := mq.NewInMemoryBroker()
+	api, err := newAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Endpoints: map[string]middleware.HandlerFunc{
+			"GET /myendpoint": h,
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/myendpoint", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK", string(body))
+}
+
+func Test_customEndpointInvalidSpec(t *testing.T) {
+	h := func(c middleware.Context) error {
+		return c.String(http.StatusOK, "OK")
+	}
+	b := mq.NewInMemoryBroker()
+	_, err := newAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Endpoints: map[string]middleware.HandlerFunc{
+			"xyz": h,
+		},
+	})
+	assert.Error(t, err)
+}
+
+func Test_customEndpointError(t *testing.T) {
+	h := func(c middleware.Context) error {
+		c.Error(http.StatusBadRequest, errors.Errorf("bad stuff happened"))
+		return nil
+	}
+	b := mq.NewInMemoryBroker()
+	api, err := newAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Endpoints: map[string]middleware.HandlerFunc{
+			"GET /myendpoint": h,
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/myendpoint", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, `{"message":"bad stuff happened"}`, strings.TrimSpace(string(body)))
 }

@@ -38,8 +38,10 @@ type api struct {
 }
 
 type apiContext struct {
-	ctx echo.Context
-	api *api
+	ctx  echo.Context
+	api  *api
+	err  error
+	code int
 }
 
 func (c *apiContext) Request() *http.Request {
@@ -62,7 +64,12 @@ func (c *apiContext) SubmitJob(j *input.Job) (*tork.Job, error) {
 	return job.Clone(), nil
 }
 
-func newAPI(cfg Config) *api {
+func (c *apiContext) Error(code int, err error) {
+	c.err = err
+	c.code = code
+}
+
+func newAPI(cfg Config) (*api, error) {
 	r := echo.New()
 
 	s := &api{
@@ -74,10 +81,12 @@ func newAPI(cfg Config) *api {
 		ds: cfg.DataStore,
 	}
 
+	// registering custom middlewares
 	for _, m := range cfg.Middlewares {
 		r.Use(s.middlewareAdapter(m))
 	}
 
+	// built-in endpoints
 	r.GET("/health", s.health)
 	r.GET("/tasks/:id", s.getTask)
 	r.GET("/queues", s.listQueues)
@@ -88,7 +97,27 @@ func newAPI(cfg Config) *api {
 	r.PUT("/jobs/:id/cancel", s.cancelJob)
 	r.PUT("/jobs/:id/restart", s.restartJob)
 	r.GET("/stats", s.getStats)
-	return s
+
+	// register additional custom endpoints
+	for spec, h := range cfg.Endpoints {
+		parsed := strings.Split(spec, " ")
+		if len(parsed) != 2 {
+			return nil, errors.Errorf("invalid endpoint spec: %s. Expecting: METHOD /path", spec)
+		}
+		r.Add(parsed[0], parsed[1], func(c echo.Context) error {
+			ctx := &apiContext{ctx: c, api: s}
+			err := h(ctx)
+			if err != nil {
+				return err
+			}
+			if ctx.err != nil {
+				return echo.NewHTTPError(ctx.code, ctx.err.Error())
+			}
+			return nil
+		})
+	}
+
+	return s, nil
 }
 
 func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
@@ -99,10 +128,18 @@ func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc
 	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ec echo.Context) error {
-			return m(nextAdapter(next, ec))(&apiContext{
+			ctx := &apiContext{
 				ctx: ec,
 				api: s,
-			})
+			}
+			err := m(nextAdapter(next, ec))(ctx)
+			if err != nil {
+				return err
+			}
+			if ctx.err != nil {
+				return echo.NewHTTPError(ctx.code, ctx.err.Error())
+			}
+			return nil
 		}
 	}
 }

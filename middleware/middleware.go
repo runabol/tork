@@ -21,6 +21,9 @@ type Context interface {
 	// JSON sends a JSON response with status code.
 	JSON(code int, data any) error
 
+	// Error sends an error back to the client.
+	Error(code int, err error)
+
 	// SubmitJob submits a job input for processing
 	SubmitJob(j *input.Job) (*tork.Job, error)
 }
