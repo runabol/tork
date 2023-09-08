@@ -21,6 +21,10 @@ type Context interface {
 	// JSON sends a JSON response with status code.
 	JSON(code int, data any) error
 
+	// Bind binds path params, query params and the request body into provided type `i`. The default binder
+	// binds body based on Content-Type header.
+	Bind(i any) error
+
 	// Error sends an error back to the client.
 	Error(code int, err error)
 

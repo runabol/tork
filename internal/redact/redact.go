@@ -1,4 +1,4 @@
-package coordinator
+package redact
 
 import (
 	"strings"
@@ -20,36 +20,36 @@ func contains(substr string) func(s string) bool {
 	}
 }
 
-func redactTask(t *tork.Task) *tork.Task {
+func Task(t *tork.Task) *tork.Task {
 	redacted := t.Clone()
 	// redact env vars
 	redacted.Env = redactVars(redacted.Env)
 	// redact pre tasks
 	for i, p := range redacted.Pre {
-		redacted.Pre[i] = redactTask(p)
+		redacted.Pre[i] = Task(p)
 	}
 	// redact post tasks
 	for i, p := range redacted.Post {
-		redacted.Post[i] = redactTask(p)
+		redacted.Post[i] = Task(p)
 	}
 	// redact parallel tasks
 	if redacted.Parallel != nil {
 		for i, p := range redacted.Parallel.Tasks {
-			redacted.Parallel.Tasks[i] = redactTask(p)
+			redacted.Parallel.Tasks[i] = Task(p)
 		}
 	}
 	return redacted
 }
 
-func redactJobs(js []*tork.Job) []*tork.Job {
+func Jobs(js []*tork.Job) []*tork.Job {
 	result := make([]*tork.Job, len(js))
 	for i, j := range js {
-		result[i] = redactJob(j)
+		result[i] = Job(j)
 	}
 	return result
 }
 
-func redactJob(j *tork.Job) *tork.Job {
+func Job(j *tork.Job) *tork.Job {
 	redacted := j.Clone()
 	// redact inputs
 	redacted.Inputs = redactVars(redacted.Inputs)
@@ -58,11 +58,11 @@ func redactJob(j *tork.Job) *tork.Job {
 	redacted.Context.Tasks = redactVars(redacted.Context.Tasks)
 	// redact tasks
 	for i, t := range redacted.Tasks {
-		redacted.Tasks[i] = redactTask(t)
+		redacted.Tasks[i] = Task(t)
 	}
 	// redact execution
 	for i, t := range redacted.Execution {
-		redacted.Execution[i] = redactTask(t)
+		redacted.Execution[i] = Task(t)
 	}
 	return redacted
 }
