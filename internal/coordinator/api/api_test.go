@@ -736,3 +736,34 @@ func Test_disableEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+func TestShutdown(t *testing.T) {
+	mw := func(next middleware.HandlerFunc) middleware.HandlerFunc {
+		return func(c middleware.Context) error {
+			select {
+			case <-time.After(time.Hour):
+			case <-c.Done():
+			}
+			return next(c)
+		}
+	}
+
+	api, err := NewAPI(Config{
+		DataStore:   datastore.NewInMemoryDatastore(),
+		Broker:      mq.NewInMemoryBroker(),
+		Middlewares: []middleware.MiddlewareFunc{mw},
+	})
+	assert.NoError(t, err)
+
+	go func() {
+		time.Sleep(time.Second)
+		assert.NoError(t, api.Shutdown(context.Background()))
+	}()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/middleware", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+}

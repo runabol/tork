@@ -33,9 +33,10 @@ const (
 )
 
 type API struct {
-	server *http.Server
-	broker mq.Broker
-	ds     datastore.Datastore
+	server    *http.Server
+	broker    mq.Broker
+	ds        datastore.Datastore
+	terminate chan any
 }
 
 type Config struct {
@@ -56,7 +57,8 @@ func NewAPI(cfg Config) (*API, error) {
 			Addr:    cfg.Address,
 			Handler: r,
 		},
-		ds: cfg.DataStore,
+		ds:        cfg.DataStore,
+		terminate: make(chan any),
 	}
 
 	// registering custom middlewares
@@ -350,5 +352,6 @@ func (s *API) Start() error {
 }
 
 func (s *API) Shutdown(ctx context.Context) error {
+	close(s.terminate)
 	return s.server.Shutdown(ctx)
 }
