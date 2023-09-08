@@ -261,7 +261,7 @@ func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (b *InMemoryBroker) SubscribeForEvent(ctx context.Context, topic string, handler func(event any)) error {
+func (b *InMemoryBroker) SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error {
 	log.Debug().Msgf("subscribing for events on %s", topic)
 	t, ok := b.topics.Get(topic)
 	if !ok {

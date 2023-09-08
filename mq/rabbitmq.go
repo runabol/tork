@@ -18,10 +18,17 @@ import (
 	"github.com/runabol/tork/internal/uuid"
 )
 
+const (
+	RMQ_EXCHANGE_TOPIC   = "amq.topic"
+	RMQ_EXCHANGE_DEFAULT = ""
+	RMQ_KEY_DEFAULT      = ""
+)
+
 type RabbitMQBroker struct {
 	connPool      []*amqp.Connection
 	nextConn      int
 	queues        *syncx.Map[string, string]
+	topics        *syncx.Map[string, string]
 	subscriptions []*subscription
 	mu            sync.RWMutex
 	url           string
@@ -46,6 +53,7 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 	}
 	return &RabbitMQBroker{
 		queues:        new(syncx.Map[string, string]),
+		topics:        new(syncx.Map[string, string]),
 		url:           url,
 		connPool:      connPool,
 		subscriptions: make([]*subscription, 0),
@@ -101,7 +109,7 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 }
 
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
-	return b.subscribe(qname, func(body []byte) error {
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, func(body []byte) error {
 		t := &tork.Task{}
 		if err := json.Unmarshal(body, &t); err != nil {
 			log.Error().
@@ -113,7 +121,7 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Ta
 	})
 }
 
-func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error) error {
+func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(body []byte) error) error {
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -122,7 +130,7 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
-	if err := b.declareQueue(qname, ch); err != nil {
+	if err := b.declareQueue(exchange, key, qname, ch); err != nil {
 		return errors.Wrapf(err, "error (re)declaring queue")
 	}
 	if err := ch.Qos(1, 0, false); err != nil {
@@ -175,7 +183,7 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 		maxAttempts := 20
 		for attempt := 1; !b.shuttingDown && attempt <= maxAttempts; attempt++ {
 			log.Info().Msgf("%s channel closed. reconnecting", qname)
-			if err := b.subscribe(qname, handler); err != nil {
+			if err := b.subscribe(exchange, key, qname, handler); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
@@ -189,7 +197,7 @@ func (b *RabbitMQBroker) subscribe(qname string, handler func(body []byte) error
 	return nil
 }
 
-func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
+func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Channel) error {
 	_, ok := b.queues.Get(qname)
 	if ok {
 		return nil
@@ -218,6 +226,11 @@ func (b *RabbitMQBroker) declareQueue(qname string, ch *amqp.Channel) error {
 		if err != nil {
 			return err
 		}
+		if exchange != RMQ_EXCHANGE_DEFAULT {
+			if err := ch.QueueBind(qname, key, exchange, false, nil); err != nil {
+				return err
+			}
+		}
 	}
 	b.queues.Set(qname, qname)
 	return nil
@@ -237,7 +250,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 		return errors.Wrapf(err, "error creating channel")
 	}
 	defer ch.Close()
-	if err := b.declareQueue(qname, ch); err != nil {
+	if err := b.declareQueue(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, ch); err != nil {
 		return errors.Wrapf(err, "error (re)declaring queue")
 	}
 	body, err := json.Marshal(msg)
@@ -245,10 +258,10 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 		return errors.Wrapf(err, "unable to serialize the message")
 	}
 	err = ch.PublishWithContext(ctx,
-		"",    // exchange
-		qname, // routing key
-		false, // mandatory
-		false, // immediate
+		RMQ_EXCHANGE_DEFAULT, // exchange
+		qname,                // routing key
+		false,                // mandatory
+		false,                // immediate
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        []byte(body),
@@ -256,11 +269,24 @@ func (b *RabbitMQBroker) publish(ctx context.Context, qname string, msg any) err
 	if err != nil {
 		return errors.Wrapf(err, "unable to publish message")
 	}
+	// publish as event
+	err = ch.PublishWithContext(ctx,
+		RMQ_EXCHANGE_TOPIC, // exchange
+		qname,              // routing key
+		false,              // mandatory
+		false,              // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        []byte(body),
+		})
+	if err != nil {
+		return errors.Wrapf(err, "unable to publish event")
+	}
 	return nil
 }
 
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n tork.Node) error) error {
-	return b.subscribe(QUEUE_HEARBEAT, func(body []byte) error {
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_HEARBEAT, func(body []byte) error {
 		n := tork.Node{}
 		if err := json.Unmarshal(body, &n); err != nil {
 			log.Error().
@@ -276,7 +302,7 @@ func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	return b.publish(ctx, QUEUE_JOBS, j)
 }
 func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
-	return b.subscribe(QUEUE_JOBS, func(body []byte) error {
+	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_JOBS, func(body []byte) error {
 		j := &tork.Job{}
 		if err := json.Unmarshal(body, &j); err != nil {
 			log.Error().
@@ -382,6 +408,38 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForEvent(ctx context.Context, topic string, handler func(event any)) error {
-	panic("not implemented")
+func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error {
+	qname := fmt.Sprintf("%s%s-%s", QUEUE_EXCLUSIVE_PREFIX, topic, uuid.NewUUID())
+	return b.subscribe(RMQ_EXCHANGE_TOPIC, topic, qname, func(body []byte) error {
+		switch topic {
+		case QUEUE_JOBS:
+			j := tork.Job{}
+			if err := json.Unmarshal(body, &j); err != nil {
+				log.Error().
+					Err(err).
+					Str("body", string(body)).
+					Msg("unable to deserialize event")
+			}
+			handler(&j)
+		case QUEUE_HEARBEAT:
+			n := tork.Node{}
+			if err := json.Unmarshal(body, &n); err != nil {
+				log.Error().
+					Err(err).
+					Str("body", string(body)).
+					Msg("unable to deserialize event")
+			}
+			handler(&n)
+		default: // assuming task
+			t := tork.Task{}
+			if err := json.Unmarshal(body, &t); err != nil {
+				log.Error().
+					Err(err).
+					Str("body", string(body)).
+					Msg("unable to deserialize event")
+			}
+			handler(&t)
+		}
+		return nil
+	})
 }

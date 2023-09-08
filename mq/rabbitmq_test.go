@@ -140,3 +140,41 @@ func TestRabbitMQShutdown(t *testing.T) {
 	err = b.PublishTask(ctx, qname, &tork.Task{})
 	assert.Error(t, err)
 }
+
+func TestRabbitMQSubsribeForEvent(t *testing.T) {
+	ctx := context.Background()
+	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	defer func() {
+		// cleanly shutdown
+		err = b.Shutdown(ctx)
+		assert.NoError(t, err)
+	}()
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateCancelled,
+	}
+	processed1 := 0
+	processed2 := 0
+	testq := fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, "test")
+	err = b.SubscribeForEvents(ctx, testq, func(event any) {
+		t2 := event.(*tork.Task)
+		assert.Equal(t, t1.ID, t2.ID)
+		processed1 = processed1 + 1
+	})
+	err = b.SubscribeForEvents(ctx, testq, func(event any) {
+		t2 := event.(*tork.Task)
+		assert.Equal(t, t1.ID, t2.ID)
+		processed2 = processed2 + 1
+	})
+	assert.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		err = b.PublishTask(ctx, testq, t1)
+		assert.NoError(t, err)
+	}
+	// wait for task to be processed
+	time.Sleep(time.Millisecond * 500)
+	assert.Equal(t, 10, processed1)
+	assert.Equal(t, 10, processed2)
+}
