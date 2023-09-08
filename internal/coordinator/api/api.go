@@ -42,7 +42,6 @@ type Config struct {
 	Broker      mq.Broker
 	DataStore   datastore.Datastore
 	Address     string
-	Queues      map[string]int
 	Middlewares []middleware.MiddlewareFunc
 	Endpoints   map[string]middleware.HandlerFunc
 }

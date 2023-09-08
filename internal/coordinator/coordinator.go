@@ -73,7 +73,13 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
 	}
-	api, err := api.NewAPI(api.Config{})
+	api, err := api.NewAPI(api.Config{
+		Broker:      cfg.Broker,
+		DataStore:   cfg.DataStore,
+		Address:     cfg.Address,
+		Middlewares: cfg.Middlewares,
+		Endpoints:   cfg.Endpoints,
+	})
 	if err != nil {
 		return nil, err
 	}
