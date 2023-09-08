@@ -150,27 +150,28 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 		err = b.Shutdown(ctx)
 		assert.NoError(t, err)
 	}()
-	t1 := &tork.Task{
+	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateCancelled,
+		State: tork.JobStateCompleted,
 	}
 	processed1 := 0
 	processed2 := 0
-	testq := fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, "test")
-	err = b.SubscribeForEvents(ctx, testq, func(event any) {
-		t2 := event.(*tork.Task)
-		assert.Equal(t, t1.ID, t2.ID)
+	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j2 := event.(*tork.Job)
+		assert.Equal(t, j1.ID, j2.ID)
 		processed1 = processed1 + 1
 	})
-	err = b.SubscribeForEvents(ctx, testq, func(event any) {
-		t2 := event.(*tork.Task)
-		assert.Equal(t, t1.ID, t2.ID)
+	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j2 := event.(*tork.Job)
+		assert.Equal(t, j1.ID, j2.ID)
 		processed2 = processed2 + 1
 	})
 	assert.NoError(t, err)
 
+	time.Sleep(time.Second * 5)
+
 	for i := 0; i < 10; i++ {
-		err = b.PublishTask(ctx, testq, t1)
+		err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j1)
 		assert.NoError(t, err)
 	}
 	// wait for task to be processed

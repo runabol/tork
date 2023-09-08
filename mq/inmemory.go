@@ -227,15 +227,7 @@ func (b *InMemoryBroker) publish(qname string, m any) error {
 		b.queues.Set(qname, q)
 	}
 	q.send(m)
-	b.publishEvent(qname, m)
 	return nil
-}
-
-func (b *InMemoryBroker) publishEvent(qname string, m any) {
-	topic, ok := b.topics.Get(qname)
-	if ok {
-		topic.publish(m)
-	}
 }
 
 func (b *InMemoryBroker) Shutdown(ctx context.Context) error {
@@ -269,5 +261,14 @@ func (b *InMemoryBroker) SubscribeForEvents(ctx context.Context, topic string, h
 		b.topics.Set(topic, t)
 	}
 	t.subscribe(handler)
+	return nil
+}
+
+func (b *InMemoryBroker) PublishEvent(ctx context.Context, topic string, event any) error {
+	t, ok := b.topics.Get(topic)
+	if !ok {
+		return nil
+	}
+	t.publish(event)
 	return nil
 }

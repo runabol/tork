@@ -233,6 +233,15 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
+	events := 0
+	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j, ok := event.(*tork.Job)
+		assert.True(t, ok)
+		assert.Equal(t, tork.JobStateCompleted, j.State)
+		events = events + 1
+	})
+	assert.NoError(t, err)
+
 	ds := datastore.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    b,
@@ -292,6 +301,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, tork.JobStateCompleted, j2.State)
+	assert.Equal(t, 1, events)
 }
 
 func Test_handleCompletedLastSubJobTask(t *testing.T) {
@@ -749,6 +759,15 @@ func Test_handleFailedTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
+	events := 0
+	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_FAILED, func(event any) {
+		j, ok := event.(*tork.Job)
+		assert.True(t, ok)
+		assert.Equal(t, tork.JobStateFailed, j.State)
+		events = events + 1
+	})
+	assert.NoError(t, err)
+
 	ds := datastore.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    b,
@@ -756,6 +775,11 @@ func Test_handleFailedTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
+
+	assert.NoError(t, c.Start())
+	defer func() {
+		assert.NoError(t, c.Stop())
+	}()
 
 	now := time.Now().UTC()
 
@@ -809,6 +833,8 @@ func Test_handleFailedTask(t *testing.T) {
 	err = c.handleFailedTask(t1)
 	assert.NoError(t, err)
 
+	time.Sleep(time.Millisecond * 500)
+
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateFailed, t11.State)
@@ -824,6 +850,7 @@ func Test_handleFailedTask(t *testing.T) {
 	actives, err = ds.GetActiveTasks(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, actives, 0)
+	assert.Equal(t, 1, events)
 }
 
 func Test_handleFailedTaskRetry(t *testing.T) {
