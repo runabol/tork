@@ -12,6 +12,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/middleware"
 
@@ -26,7 +27,7 @@ import (
 type Coordinator struct {
 	Name   string
 	broker mq.Broker
-	api    *api
+	api    *api.API
 	ds     datastore.Datastore
 	queues map[string]int
 }
@@ -72,7 +73,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
 	}
-	api, err := newAPI(cfg)
+	api, err := api.NewAPI(api.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -820,7 +821,7 @@ func (c *Coordinator) startJob(ctx context.Context, j *tork.Job) error {
 func (c *Coordinator) Start() error {
 	log.Info().Msgf("starting %s", c.Name)
 	// start the coordinator API
-	if err := c.api.start(); err != nil {
+	if err := c.api.Start(); err != nil {
 		return err
 	}
 	// subscribe to task queues
@@ -859,7 +860,7 @@ func (c *Coordinator) Stop() error {
 	if err := c.broker.Shutdown(ctx); err != nil {
 		return errors.Wrapf(err, "error shutting down broker")
 	}
-	if err := c.api.shutdown(ctx); err != nil {
+	if err := c.api.Shutdown(ctx); err != nil {
 		return errors.Wrapf(err, "error shutting down API")
 	}
 	return nil

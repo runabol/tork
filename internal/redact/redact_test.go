@@ -1,4 +1,4 @@
-package coordinator
+package redact
 
 import (
 	"testing"
@@ -43,7 +43,7 @@ func TestRedactTask(t *testing.T) {
 			},
 		},
 	}
-	tr := redactTask(&ta)
+	tr := Task(&ta)
 
 	assert.Equal(t, "[REDACTED]", tr.Env["secret_1"])
 	assert.Equal(t, "[REDACTED]", tr.Env["SecrET_2"])
@@ -60,7 +60,7 @@ func TestRedactTask(t *testing.T) {
 }
 
 func TestRedactJob(t *testing.T) {
-	j := redactJob(&tork.Job{
+	j := Job(&tork.Job{
 		Tasks: []*tork.Task{
 			{
 				Env: map[string]string{

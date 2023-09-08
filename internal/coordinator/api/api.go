@@ -1,4 +1,4 @@
-package coordinator
+package api
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
+	"github.com/runabol/tork/internal/redact"
 
 	"github.com/runabol/tork/middleware"
 
@@ -31,48 +32,25 @@ const (
 	MAX_PORT = 8100
 )
 
-type api struct {
+type API struct {
 	server *http.Server
 	broker mq.Broker
 	ds     datastore.Datastore
 }
 
-type apiContext struct {
-	ctx  echo.Context
-	api  *api
-	err  error
-	code int
+type Config struct {
+	Broker      mq.Broker
+	DataStore   datastore.Datastore
+	Address     string
+	Queues      map[string]int
+	Middlewares []middleware.MiddlewareFunc
+	Endpoints   map[string]middleware.HandlerFunc
 }
 
-func (c *apiContext) Request() *http.Request {
-	return c.ctx.Request()
-}
-
-func (c *apiContext) String(code int, s string) error {
-	return c.ctx.String(code, s)
-}
-
-func (c *apiContext) JSON(code int, data any) error {
-	return c.ctx.JSON(code, data)
-}
-
-func (c *apiContext) SubmitJob(j *input.Job) (*tork.Job, error) {
-	job, err := c.api.submitJob(c.ctx.Request().Context(), j)
-	if err != nil {
-		return nil, err
-	}
-	return job.Clone(), nil
-}
-
-func (c *apiContext) Error(code int, err error) {
-	c.err = err
-	c.code = code
-}
-
-func newAPI(cfg Config) (*api, error) {
+func NewAPI(cfg Config) (*API, error) {
 	r := echo.New()
 
-	s := &api{
+	s := &API{
 		broker: cfg.Broker,
 		server: &http.Server{
 			Addr:    cfg.Address,
@@ -105,7 +83,7 @@ func newAPI(cfg Config) (*api, error) {
 			return nil, errors.Errorf("invalid endpoint spec: %s. Expecting: METHOD /path", spec)
 		}
 		r.Add(parsed[0], parsed[1], func(c echo.Context) error {
-			ctx := &apiContext{ctx: c, api: s}
+			ctx := &Context{ctx: c, api: s}
 			err := h(ctx)
 			if err != nil {
 				return err
@@ -120,7 +98,7 @@ func newAPI(cfg Config) (*api, error) {
 	return s, nil
 }
 
-func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
+func (s *API) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
 	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) middleware.HandlerFunc {
 		return func(c middleware.Context) error {
 			return next(ec)
@@ -128,7 +106,7 @@ func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc
 	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ec echo.Context) error {
-			ctx := &apiContext{
+			ctx := &Context{
 				ctx: ec,
 				api: s,
 			}
@@ -144,14 +122,14 @@ func (s *api) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc
 	}
 }
 
-func (s *api) health(c echo.Context) error {
+func (s *API) health(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "UP",
 		"version": fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
 	})
 }
 
-func (s *api) listQueues(c echo.Context) error {
+func (s *API) listQueues(c echo.Context) error {
 	qs, err := s.broker.Queues(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -159,7 +137,7 @@ func (s *api) listQueues(c echo.Context) error {
 	return c.JSON(http.StatusOK, qs)
 }
 
-func (s *api) listActiveNodes(c echo.Context) error {
+func (s *API) listActiveNodes(c echo.Context) error {
 	nodes, err := s.ds.GetActiveNodes(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -167,7 +145,7 @@ func (s *api) listActiveNodes(c echo.Context) error {
 	return c.JSON(http.StatusOK, nodes)
 }
 
-func (s *api) createJob(c echo.Context) error {
+func (s *API) createJob(c echo.Context) error {
 	var ji *input.Job
 	var err error
 	contentType := c.Request().Header.Get("content-type")
@@ -188,11 +166,11 @@ func (s *api) createJob(c echo.Context) error {
 	if j, err := s.submitJob(c.Request().Context(), ji); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	} else {
-		return c.JSON(http.StatusOK, redactJob(j))
+		return c.JSON(http.StatusOK, redact.Job(j))
 	}
 }
 
-func (s *api) submitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
+func (s *API) submitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
 	if err := ji.Validate(); err != nil {
 		return nil, err
 	}
@@ -235,16 +213,16 @@ func bindJobInputYAML(r io.ReadCloser) (*input.Job, error) {
 	return &ji, nil
 }
 
-func (s *api) getJob(c echo.Context) error {
+func (s *API) getJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	return c.JSON(http.StatusOK, redactJob(j))
+	return c.JSON(http.StatusOK, redact.Job(j))
 }
 
-func (s *api) listJobs(c echo.Context) error {
+func (s *API) listJobs(c echo.Context) error {
 	ps := c.QueryParam("page")
 	if ps == "" {
 		ps = "1"
@@ -278,21 +256,21 @@ func (s *api) listJobs(c echo.Context) error {
 		Number:     res.Number,
 		Size:       res.Size,
 		TotalPages: res.TotalPages,
-		Items:      redactJobs(res.Items),
+		Items:      redact.Jobs(res.Items),
 		TotalItems: res.TotalItems,
 	})
 }
 
-func (s *api) getTask(c echo.Context) error {
+func (s *API) getTask(c echo.Context) error {
 	id := c.Param("id")
 	t, err := s.ds.GetTaskByID(c.Request().Context(), id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	return c.JSON(http.StatusOK, redactTask(t))
+	return c.JSON(http.StatusOK, redact.Task(t))
 }
 
-func (s *api) getStats(c echo.Context) error {
+func (s *API) getStats(c echo.Context) error {
 	stats, err := s.ds.GetStats(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -300,7 +278,7 @@ func (s *api) getStats(c echo.Context) error {
 	return c.JSON(http.StatusOK, stats)
 }
 
-func (s *api) restartJob(c echo.Context) error {
+func (s *API) restartJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
@@ -320,7 +298,7 @@ func (s *api) restartJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
-func (s *api) cancelJob(c echo.Context) error {
+func (s *API) cancelJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
@@ -337,7 +315,7 @@ func (s *api) cancelJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
-func (s *api) start() error {
+func (s *API) Start() error {
 	if s.server.Addr != "" {
 		if err := httpx.StartAsync(s.server); err != nil {
 			return err
@@ -359,6 +337,6 @@ func (s *api) start() error {
 	return nil
 }
 
-func (s *api) shutdown(ctx context.Context) error {
+func (s *API) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
