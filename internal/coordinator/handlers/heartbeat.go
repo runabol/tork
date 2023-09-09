@@ -1,0 +1,49 @@
+package handlers
+
+import (
+	"context"
+
+	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
+)
+
+type heartbeatHandler struct {
+	ds datastore.Datastore
+}
+
+func NewHeartbeatHandler(ds datastore.Datastore) func(context.Context, tork.Node) error {
+	h := &heartbeatHandler{
+		ds: ds,
+	}
+	return h.handle
+}
+
+func (h *heartbeatHandler) handle(ctx context.Context, n tork.Node) error {
+	_, err := h.ds.GetNodeByID(ctx, n.ID)
+	if err == datastore.ErrNodeNotFound {
+		log.Info().
+			Str("node-id", n.ID).
+			Str("hostname", n.Hostname).
+			Msg("received first heartbeat")
+		return h.ds.CreateNode(ctx, n)
+	}
+	return h.ds.UpdateNode(ctx, n.ID, func(u *tork.Node) error {
+		// ignore "old" heartbeats
+		if u.LastHeartbeatAt.After(n.LastHeartbeatAt) {
+			return nil
+		}
+		log.Debug().
+			Str("node-id", n.ID).
+			Float64("cpu-percent", n.CPUPercent).
+			Str("hostname", n.Hostname).
+			Str("status", string(n.Status)).
+			Time("heartbeat-time", n.LastHeartbeatAt).
+			Msg("received heartbeat")
+		u.LastHeartbeatAt = n.LastHeartbeatAt
+		u.CPUPercent = n.CPUPercent
+		u.Status = n.Status
+		u.TaskCount = n.TaskCount
+		return nil
+	})
+}
