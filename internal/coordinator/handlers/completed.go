@@ -11,6 +11,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 )
@@ -21,11 +22,11 @@ type completedHandler struct {
 	onJob  func(context.Context, *tork.Job) error
 }
 
-func NewCompletedHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
+func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
 	h := &completedHandler{
 		ds:     ds,
 		broker: b,
-		onJob:  NewJobHandler(ds, b),
+		onJob:  job.ApplyMiddleware(NewJobHandler(ds, b), mw),
 	}
 	return h.handle
 }

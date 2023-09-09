@@ -9,6 +9,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 
@@ -108,6 +109,86 @@ func TestTaskMiddlewareNoOp(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
+}
+
+func TestJobMiddlewareWithOutput(t *testing.T) {
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: datastore.NewInMemoryDatastore(),
+		JobMiddlewares: []job.MiddlewareFunc{
+			func(next job.HandlerFunc) job.HandlerFunc {
+				return func(ctx context.Context, j *tork.Job) error {
+					j.Output = "some output"
+					return nil
+				}
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j := &tork.Job{}
+	assert.NoError(t, c.onJob(context.Background(), j))
+	assert.Equal(t, "some output", j.Output)
+}
+
+func TestJobMiddlewareWithError(t *testing.T) {
+	Err := errors.New("some error")
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: datastore.NewInMemoryDatastore(),
+		JobMiddlewares: []job.MiddlewareFunc{
+			func(next job.HandlerFunc) job.HandlerFunc {
+				return func(ctx context.Context, j *tork.Job) error {
+					return Err
+				}
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j := &tork.Job{}
+	assert.ErrorIs(t, c.onJob(context.Background(), j), Err)
+}
+
+func TestJobMiddlewareNoOp(t *testing.T) {
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: ds,
+		JobMiddlewares: []job.MiddlewareFunc{
+			func(next job.HandlerFunc) job.HandlerFunc {
+				return func(ctx context.Context, j *tork.Job) error {
+					return next(ctx, j)
+				}
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	j := &tork.Job{
+		ID:    uuid.NewUUID(),
+		Name:  "my job",
+		State: tork.JobStatePending,
+		Tasks: []*tork.Task{
+			{
+				Name: "mt task",
+			},
+		},
+	}
+
+	err = ds.CreateJob(context.Background(), j)
+	assert.NoError(t, err)
+
+	err = c.onJob(context.Background(), j)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(context.Background(), j.ID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func TestStartCoordinator(t *testing.T) {

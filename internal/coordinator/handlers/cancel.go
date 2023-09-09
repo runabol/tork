@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/mq"
 )
 
@@ -15,7 +16,7 @@ type cancelHandler struct {
 	broker mq.Broker
 }
 
-func NewCancelHandler(ds datastore.Datastore, b mq.Broker) tork.JobHandler {
+func NewCancelHandler(ds datastore.Datastore, b mq.Broker) job.HandlerFunc {
 	h := &cancelHandler{
 		ds:     ds,
 		broker: b,

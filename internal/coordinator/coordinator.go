@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/coordinator/handlers"
 
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/request"
 	"github.com/runabol/tork/middleware/task"
 
@@ -33,7 +34,7 @@ type Coordinator struct {
 	onPending   task.HandlerFunc
 	onStarted   task.HandlerFunc
 	onError     task.HandlerFunc
-	onJob       tork.JobHandler
+	onJob       job.HandlerFunc
 	onHeartbeat tork.NodeHandler
 	onCompleted task.HandlerFunc
 }
@@ -47,6 +48,7 @@ type Config struct {
 	Endpoints       map[string]request.HandlerFunc
 	Enabled         map[string]bool
 	TaskMiddlewares []task.MiddlewareFunc
+	JobMiddlewares  []job.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -112,8 +114,21 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	)
 
 	onCompleted := task.ApplyMiddleware(
-		handlers.NewCompletedHandler(cfg.DataStore, cfg.Broker),
+		handlers.NewCompletedHandler(
+			cfg.DataStore,
+			cfg.Broker,
+			cfg.JobMiddlewares...,
+		),
 		cfg.TaskMiddlewares,
+	)
+
+	onJob := job.ApplyMiddleware(
+		handlers.NewJobHandler(
+			cfg.DataStore,
+			cfg.Broker,
+			cfg.TaskMiddlewares...,
+		),
+		cfg.JobMiddlewares,
 	)
 
 	return &Coordinator{
@@ -125,11 +140,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		onPending: onPending,
 		onStarted: onStarted,
 		onError:   onError,
-		onJob: handlers.NewJobHandler(
-			cfg.DataStore,
-			cfg.Broker,
-			cfg.TaskMiddlewares...,
-		),
+		onJob:     onJob,
 		onHeartbeat: handlers.NewHeartbeatHandler(
 			cfg.DataStore,
 		),
