@@ -19,7 +19,7 @@ type pendingHandler struct {
 	broker mq.Broker
 }
 
-func NewPendingHandler(ds datastore.Datastore, b mq.Broker) func(context.Context, *tork.Task) error {
+func NewPendingHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
 	h := &pendingHandler{
 		ds:     ds,
 		broker: b,

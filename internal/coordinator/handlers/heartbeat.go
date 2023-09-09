@@ -12,7 +12,7 @@ type heartbeatHandler struct {
 	ds datastore.Datastore
 }
 
-func NewHeartbeatHandler(ds datastore.Datastore) func(context.Context, tork.Node) error {
+func NewHeartbeatHandler(ds datastore.Datastore) tork.NodeHandler {
 	h := &heartbeatHandler{
 		ds: ds,
 	}

@@ -20,7 +20,7 @@ type completedHandler struct {
 	onJob  func(context.Context, *tork.Job) error
 }
 
-func NewCompletedHandler(ds datastore.Datastore, b mq.Broker) func(context.Context, *tork.Task) error {
+func NewCompletedHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
 	h := &completedHandler{
 		ds:     ds,
 		broker: b,

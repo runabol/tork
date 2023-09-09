@@ -18,7 +18,7 @@ type errorHandler struct {
 	broker mq.Broker
 }
 
-func NewErrorHandler(ds datastore.Datastore, b mq.Broker) func(context.Context, *tork.Task) error {
+func NewErrorHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
 	h := &errorHandler{
 		ds:     ds,
 		broker: b,

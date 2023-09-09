@@ -1,6 +1,9 @@
 package tork
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 var LAST_HEARTBEAT_TIMEOUT = time.Minute * 5
 var HEARTBEAT_RATE = time.Second * 30
@@ -12,6 +15,8 @@ const (
 	NodeStatusDown    NodeStatus = "DOWN"
 	NodeStatusOffline NodeStatus = "OFFLINE"
 )
+
+type NodeHandler func(context.Context, Node) error
 
 type Node struct {
 	ID              string     `json:"id,omitempty"`

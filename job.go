@@ -1,6 +1,7 @@
 package tork
 
 import (
+	"context"
 	"time"
 
 	"github.com/runabol/tork/internal/clone"
@@ -16,6 +17,8 @@ const (
 	JobStateFailed    JobState = "FAILED"
 	JobStateRestart   JobState = "RESTART"
 )
+
+type JobHandler func(context.Context, *Job) error
 
 type Job struct {
 	ID          string            `json:"id,omitempty"`

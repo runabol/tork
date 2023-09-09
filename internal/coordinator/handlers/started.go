@@ -14,7 +14,7 @@ type startedHandler struct {
 	broker mq.Broker
 }
 
-func NewStartedHandler(ds datastore.Datastore, b mq.Broker) func(t *tork.Task) error {
+func NewStartedHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
 	h := &startedHandler{
 		ds:     ds,
 		broker: b,
@@ -22,8 +22,7 @@ func NewStartedHandler(ds datastore.Datastore, b mq.Broker) func(t *tork.Task) e
 	return h.handle
 }
 
-func (h *startedHandler) handle(t *tork.Task) error {
-	ctx := context.Background()
+func (h *startedHandler) handle(ctx context.Context, t *tork.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task start")

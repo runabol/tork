@@ -15,7 +15,7 @@ type cancelHandler struct {
 	broker mq.Broker
 }
 
-func NewCancelHandler(ds datastore.Datastore, b mq.Broker) func(context.Context, *tork.Job) error {
+func NewCancelHandler(ds datastore.Datastore, b mq.Broker) tork.JobHandler {
 	h := &cancelHandler{
 		ds:     ds,
 		broker: b,

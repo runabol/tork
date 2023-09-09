@@ -28,12 +28,12 @@ type Coordinator struct {
 	api         *api.API
 	ds          datastore.Datastore
 	queues      map[string]int
-	onPending   func(context.Context, *tork.Task) error
-	onStarted   func(*tork.Task) error
-	onError     func(context.Context, *tork.Task) error
-	onJob       func(context.Context, *tork.Job) error
-	onHeartbeat func(context.Context, tork.Node) error
-	onCompleted func(context.Context, *tork.Task) error
+	onPending   tork.TaskHandler
+	onStarted   tork.TaskHandler
+	onError     tork.TaskHandler
+	onJob       tork.JobHandler
+	onHeartbeat tork.NodeHandler
+	onCompleted tork.TaskHandler
 }
 
 type Config struct {
@@ -150,7 +150,10 @@ func (c *Coordinator) Start() error {
 					return c.onCompleted(ctx, t)
 				})
 			case mq.QUEUE_STARTED:
-				err = c.broker.SubscribeForTasks(qname, c.onStarted)
+				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
+					ctx := context.Background()
+					return c.onStarted(ctx, t)
+				})
 			case mq.QUEUE_ERROR:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					ctx := context.Background()

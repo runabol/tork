@@ -21,7 +21,7 @@ type jobHandler struct {
 	onCancel  func(context.Context, *tork.Job) error
 }
 
-func NewJobHandler(ds datastore.Datastore, b mq.Broker) func(context.Context, *tork.Job) error {
+func NewJobHandler(ds datastore.Datastore, b mq.Broker) tork.JobHandler {
 	h := &jobHandler{
 		ds:        ds,
 		broker:    b,

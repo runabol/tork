@@ -40,7 +40,7 @@ func Test_handleStartedTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(t1)
+	err = handler(ctx, t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -94,7 +94,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(t1)
+	err = handler(ctx, t1)
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 100)
