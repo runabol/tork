@@ -19,3 +19,7 @@ tork:
 clean:
 	go clean
 	rm -f tork
+
+.PHONY: generate-swagger
+generate-swagger: 
+	 swag init  --parseDependency -g internal/coordinator/api/api.go --output docs/swagger

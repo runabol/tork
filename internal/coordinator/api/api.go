@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork/datastore"
+	_ "github.com/runabol/tork/docs/swagger"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/pkg/input"
@@ -30,6 +31,10 @@ const (
 	MIN_PORT = 8000
 	MAX_PORT = 8100
 )
+
+type HealthResponse struct {
+	Status string `json:"status"`
+}
 
 type API struct {
 	server    *http.Server
@@ -52,6 +57,19 @@ type Middleware struct {
 	Echo []echo.MiddlewareFunc
 }
 
+// @title Tork API
+// @version 1.0
+
+// @contact.name Arik Cohen
+// @contact.url https://tork.run
+// @contact.email contact@tork.run
+
+// @license.name MIT
+// @license.url https://github.com/runabol/tork/blob/main/LICENSE
+
+// @host localhost:8000
+// @BasePath /
+// @schemes http
 func NewAPI(cfg Config) (*API, error) {
 	r := echo.New()
 
@@ -99,6 +117,8 @@ func NewAPI(cfg Config) (*API, error) {
 		r.GET("/metrics", s.getMetrics)
 	}
 
+	r.GET("/swagger/*", echoSwagger.WrapHandler)
+
 	// register additional custom endpoints
 	for spec, h := range cfg.Endpoints {
 		parsed := strings.Split(spec, " ")
@@ -145,6 +165,13 @@ func (s *API) middlewareAdapter(m web.MiddlewareFunc) echo.MiddlewareFunc {
 	}
 }
 
+// health
+// @Summary Shows application health information.
+// @Description get the status of server.
+// @Tags management
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Router /health [get]
 func (s *API) health(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "UP",
@@ -152,6 +179,12 @@ func (s *API) health(c echo.Context) error {
 	})
 }
 
+// listQueues
+// @Summary get a list of queues
+// @Tags queues
+// @Produce application/json
+// @Success 200 {object} []mq.QueueInfo
+// @Router /queues [get]
 func (s *API) listQueues(c echo.Context) error {
 	qs, err := s.broker.Queues(c.Request().Context())
 	if err != nil {
@@ -160,6 +193,12 @@ func (s *API) listQueues(c echo.Context) error {
 	return c.JSON(http.StatusOK, qs)
 }
 
+// listActiveNodes
+// @Summary Get a list of active worker nodes
+// @Tags nodes
+// @Produce application/json
+// @Success 200 {object} []tork.Node
+// @Router /nodes [get]
 func (s *API) listActiveNodes(c echo.Context) error {
 	nodes, err := s.ds.GetActiveNodes(c.Request().Context())
 	if err != nil {
@@ -168,6 +207,14 @@ func (s *API) listActiveNodes(c echo.Context) error {
 	return c.JSON(http.StatusOK, nodes)
 }
 
+// createJob
+// @Summary Create a new job
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Success 200 {object} tork.JobSummary
+// @Router /jobs [post]
+// @Param request body input.Job true "body"
 func (s *API) createJob(c echo.Context) error {
 	var ji *input.Job
 	var err error
@@ -236,15 +283,32 @@ func bindJobInputYAML(r io.ReadCloser) (*input.Job, error) {
 	return &ji, nil
 }
 
+// getJob
+// @Summary Get a job by id
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {object} tork.Job
+// @Failure 404 {object} echo.HTTPError
+// @Router /jobs/{id} [get]
+// @Param id path string true "Job ID"
 func (s *API) getJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		return echo.NewHTTPError(http.StatusNotFound, err)
 	}
 	return c.JSON(http.StatusOK, redact.Job(j))
 }
 
+// listJobs
+// @Summary Show a list of jobs
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {object} []tork.JobSummary
+// @Router /jobs [get]
+// @Param q query string false "search string"
+// @Param page query int false "page number"
+// @Param size query int false "page size"
 func (s *API) listJobs(c echo.Context) error {
 	ps := c.QueryParam("page")
 	if ps == "" {
@@ -284,6 +348,13 @@ func (s *API) listJobs(c echo.Context) error {
 	})
 }
 
+// getTask
+// @Summary Get a task by id
+// @Tags tasks
+// @Produce application/json
+// @Success 200 {object} tork.Task
+// @Router /tasks/{id} [get]
+// @Param id path string true "Task ID"
 func (s *API) getTask(c echo.Context) error {
 	id := c.Param("id")
 	t, err := s.ds.GetTaskByID(c.Request().Context(), id)
@@ -301,11 +372,20 @@ func (s *API) getMetrics(c echo.Context) error {
 	return c.JSON(http.StatusOK, metrics)
 }
 
+// Job
+// @Summary Restart a cancelled/failed job
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {string} string "OK"
+// @Failure 404 {object} echo.HTTPError
+// @Failure 400 {object} echo.HTTPError
+// @Router /jobs/{id}/restart [put]
+// @Param id path string true "Job ID"
 func (s *API) restartJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
 	if j.State != tork.JobStateFailed && j.State != tork.JobStateCancelled {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("job is %s and can not be restarted", j.State))
@@ -321,11 +401,20 @@ func (s *API) restartJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
+// Job
+// @Summary Cancel a running job
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {string} string "OK"
+// @Router /jobs/{id}/cancel [put]
+// @Param id path string true "Job ID"
+// @Failure 404 {object} echo.HTTPError
+// @Failure 400 {object} echo.HTTPError
 func (s *API) cancelJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
 	if j.State != tork.JobStateRunning {
 		return echo.NewHTTPError(http.StatusBadRequest, "job is not running")
