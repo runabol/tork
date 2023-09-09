@@ -147,11 +147,19 @@ Check out the [examples](examples/) folder.
 
 See the [REST API](https://www.tork.run/rest) documentation.
 
+### Swagger Docs
+
+Start Tork in `standalone` or `coordinator` mode.
+
+```shell
+go run cmd/main.go run standalone
+```
+
+Visit [http://localhost:8000/swagger](http://localhost:8000/swagger)
+
 ## Web UI
 
-[Tork Web](https://github.com/runabol/tork-web) is a web based tool for interacting with Tork.
-
-!["Tork Web"](docs/tork-web-v2.png)
+[Tork Web](https://www.tork.run/web-ui) is a web based tool for interacting with Tork.
 
 ## License
 
