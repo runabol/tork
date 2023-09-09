@@ -3,7 +3,6 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator/api"
+	"github.com/runabol/tork/internal/coordinator/scheduler"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/middleware"
 
@@ -30,6 +30,7 @@ type Coordinator struct {
 	api    *api.API
 	ds     datastore.Datastore
 	queues map[string]int
+	sched  *scheduler.Scheduler
 }
 
 type Config struct {
@@ -94,6 +95,10 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		broker: cfg.Broker,
 		ds:     cfg.DataStore,
 		queues: cfg.Queues,
+		sched: scheduler.NewScheduler(
+			cfg.DataStore,
+			cfg.Broker,
+		),
 	}, nil
 }
 
@@ -116,166 +121,8 @@ func (c *Coordinator) handlePendingTask(t *tork.Task) error {
 	if strings.TrimSpace(t.If) == "false" {
 		return c.skipTask(ctx, t)
 	} else {
-		return c.scheduleTask(ctx, t)
+		return c.sched.ScheduleTask(ctx, t)
 	}
-}
-
-func (c *Coordinator) scheduleTask(ctx context.Context, t *tork.Task) error {
-	if t.Parallel != nil {
-		return c.scheduleParallelTask(ctx, t)
-	} else if t.Each != nil {
-		return c.scheduleEachTask(ctx, t)
-	} else if t.SubJob != nil {
-		return c.scheduleSubJob(ctx, t)
-	}
-	return c.scheduleRegularTask(ctx, t)
-}
-
-func (c *Coordinator) scheduleRegularTask(ctx context.Context, t *tork.Task) error {
-	now := time.Now().UTC()
-	if t.Queue == "" {
-		t.Queue = mq.QUEUE_DEFAULT
-	}
-	t.State = tork.TaskStateScheduled
-	t.ScheduledAt = &now
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-		u.State = t.State
-		u.ScheduledAt = t.ScheduledAt
-		u.Queue = t.Queue
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	return c.broker.PublishTask(ctx, t.Queue, t)
-}
-
-func (c *Coordinator) scheduleSubJob(ctx context.Context, t *tork.Task) error {
-	now := time.Now().UTC()
-	subjob := &tork.Job{
-		ID:          uuid.NewUUID(),
-		CreatedAt:   now,
-		ParentID:    t.ID,
-		Name:        t.SubJob.Name,
-		Description: t.SubJob.Description,
-		State:       tork.JobStatePending,
-		Tasks:       t.SubJob.Tasks,
-		Inputs:      t.SubJob.Inputs,
-		Context:     tork.JobContext{Inputs: t.SubJob.Inputs},
-		TaskCount:   len(t.SubJob.Tasks),
-		Output:      t.SubJob.Output,
-	}
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-		u.State = tork.TaskStateRunning
-		u.ScheduledAt = &now
-		u.StartedAt = &now
-		u.SubJob.ID = subjob.ID
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	if err := c.ds.CreateJob(ctx, subjob); err != nil {
-		return errors.Wrapf(err, "error creating subjob")
-	}
-	return c.handleJob(subjob)
-}
-
-func (c *Coordinator) scheduleEachTask(ctx context.Context, t *tork.Task) error {
-	now := time.Now().UTC()
-	// get the job's context
-	j, err := c.ds.GetJobByID(ctx, t.JobID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting job: %s", t.JobID)
-	}
-	// evaluate the list expression
-	lraw, err := eval.EvaluateExpr(t.Each.List, j.Context.AsMap())
-	if err != nil {
-		return errors.Wrapf(err, "error evaluating each.list expression: %s", t.Each.List)
-	}
-	var list []any
-	rlist := reflect.ValueOf(lraw)
-	if rlist.Kind() == reflect.Slice {
-		for i := 0; i < rlist.Len(); i++ {
-			list = append(list, rlist.Index(i).Interface())
-		}
-	} else {
-		return errors.Wrapf(err, "each.list expression does not evaluate to a list: %s", t.Each.List)
-	}
-	// mark the task as running
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-		u.State = tork.TaskStateRunning
-		u.ScheduledAt = &now
-		u.StartedAt = &now
-		u.Each.Size = len(list)
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// schedule a task for each elements in the list
-	for ix, item := range list {
-		cx := j.Context.Clone().AsMap()
-		cx["item"] = map[string]any{
-			"index": fmt.Sprintf("%d", ix),
-			"value": item,
-		}
-		et := t.Each.Task.Clone()
-		et.ID = uuid.NewUUID()
-		et.JobID = j.ID
-		et.State = tork.TaskStatePending
-		et.Position = t.Position
-		et.CreatedAt = &now
-		et.ParentID = t.ID
-		if err := eval.EvaluateTask(et, cx); err != nil {
-			t.Error = err.Error()
-			t.State = tork.TaskStateFailed
-			return c.handleFailedTask(t)
-		}
-		if err := c.ds.CreateTask(ctx, et); err != nil {
-			return err
-		}
-		if err := c.handlePendingTask(et); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Coordinator) scheduleParallelTask(ctx context.Context, t *tork.Task) error {
-	now := time.Now().UTC()
-	// mark the task as running
-	if err := c.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-		u.State = tork.TaskStateRunning
-		u.ScheduledAt = &now
-		u.StartedAt = &now
-		return nil
-	}); err != nil {
-		return errors.Wrapf(err, "error updating task in datastore")
-	}
-	// get the job's context
-	j, err := c.ds.GetJobByID(ctx, t.JobID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting job: %s", t.JobID)
-	}
-	// fire all parallel tasks
-	for _, pt := range t.Parallel.Tasks {
-		pt.ID = uuid.NewUUID()
-		pt.JobID = j.ID
-		pt.State = tork.TaskStatePending
-		pt.Position = t.Position
-		pt.CreatedAt = &now
-		pt.ParentID = t.ID
-		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
-			t.Error = err.Error()
-			t.State = tork.TaskStateFailed
-			return c.handleFailedTask(t)
-		}
-		if err := c.ds.CreateTask(ctx, pt); err != nil {
-			return err
-		}
-		if err := c.handlePendingTask(pt); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (c *Coordinator) skipTask(ctx context.Context, t *tork.Task) error {
