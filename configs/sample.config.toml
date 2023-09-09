@@ -1,5 +1,5 @@
 [cli]
-banner_mode = "console" # off | console | log
+banner.mode = "console" # off | console | log
 
 [client]
 endpoint = "http://localhost:8000"
@@ -41,7 +41,7 @@ jobs = 1      # jobs queue consumers (default: 1)
 
 [worker]
 address = "localhost:8001"
-temp_dir = "/tmp"
+tempdir = "/tmp"
 
 [worker.limits]
 cpus = "1"

@@ -78,7 +78,7 @@ func healthCmd() *ucli.Command {
 }
 
 func displayBanner() {
-	mode := conf.StringDefault("cli.banner_mode", "console")
+	mode := conf.StringDefault("cli.banner.mode", "console")
 	if mode == "off" {
 		return
 	}

@@ -248,7 +248,7 @@ func createWorker(b mq.Broker) (*worker.Worker, error) {
 			DefaultCPUsLimit:   conf.String("worker.limits.cpus"),
 			DefaultMemoryLimit: conf.String("worker.limits.memory"),
 		},
-		TempDir: conf.String("worker.temp_dir"),
+		TempDir: conf.String("worker.tempdir"),
 		Address: conf.String("worker.address"),
 	})
 	if err != nil {
