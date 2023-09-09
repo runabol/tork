@@ -9,6 +9,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 ## Features:
 
 - [REST API](https://www.tork.run/rest)
+- [Extensible](https://www.tork.run/customize)
 - Horizontally scalable
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](#limits)
 - Automatic recovery of tasks in the event of a worker crash
