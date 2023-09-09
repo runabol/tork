@@ -1,18 +1,15 @@
-package bootstrap
+package engine
 
 import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/middleware"
@@ -24,49 +21,53 @@ const (
 	ModeCoordinator Mode = "coordinator"
 	ModeWorker      Mode = "worker"
 	ModeStandalone  Mode = "standalone"
-	ModeMigration   Mode = "migration"
 )
 
 type Mode string
 
-var (
-	quit        = make(chan os.Signal, 1)
-	terminate   = make(chan any, 1)
-	onStarted   = func() error { return nil }
-	dsProviders = map[string]datastore.Provider{}
-	mqProviders = map[string]mq.Provider{}
-	middlewares = make([]middleware.MiddlewareFunc, 0)
-	endpoints   = make(map[string]middleware.HandlerFunc)
-)
+type Engine struct {
+	quit        chan os.Signal
+	terminate   chan any
+	onStarted   func() error
+	middlewares []middleware.MiddlewareFunc
+	endpoints   map[string]middleware.HandlerFunc
+	mode        Mode
+}
 
-func Start(mode Mode) error {
-	if err := setupLogging(); err != nil {
-		return err
+func New(mode Mode) *Engine {
+	return &Engine{
+		quit:        make(chan os.Signal, 1),
+		terminate:   make(chan any, 1),
+		onStarted:   func() error { return nil },
+		middlewares: make([]middleware.MiddlewareFunc, 0),
+		endpoints:   make(map[string]middleware.HandlerFunc, 0),
+		mode:        mode,
 	}
+}
 
-	switch mode {
+func (e *Engine) Start() error {
+	switch e.mode {
 	case ModeCoordinator:
-		return runCoordinator()
+		return e.runCoordinator()
 	case ModeWorker:
-		return runWorker()
+		return e.runWorker()
 	case ModeStandalone:
-		return runStandalone()
-	case ModeMigration:
-		return runMigration()
+		return e.runStandalone()
+
 	default:
-		return errors.Errorf("Unknown mode: %s", mode)
+		return errors.Errorf("Unknown mode: %s", e.mode)
 	}
 }
 
-func Terminate() {
-	terminate <- 1
+func (e *Engine) Terminate() {
+	e.terminate <- 1
 }
 
-func OnStarted(h OnStartedHandler) {
-	onStarted = h
+func (e *Engine) OnStarted(h OnStartedHandler) {
+	e.onStarted = h
 }
 
-func runCoordinator() error {
+func (e *Engine) runCoordinator() error {
 	broker, err := createBroker()
 	if err != nil {
 		return err
@@ -77,17 +78,17 @@ func runCoordinator() error {
 		return err
 	}
 
-	c, err := createCoordinator(broker, ds)
+	c, err := e.createCoordinator(broker, ds)
 	if err != nil {
 		return err
 	}
 
 	// trigger the on-started hook
-	if err := onStarted(); err != nil {
+	if err := e.onStarted(); err != nil {
 		return errors.Wrapf(err, "error on-started hook")
 	}
 
-	awaitTerm()
+	e.awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if c != nil {
@@ -98,7 +99,7 @@ func runCoordinator() error {
 	return nil
 }
 
-func runWorker() error {
+func (e *Engine) runWorker() error {
 	broker, err := createBroker()
 	if err != nil {
 		return err
@@ -110,11 +111,11 @@ func runWorker() error {
 	}
 
 	// trigger the on-started hook
-	if err := onStarted(); err != nil {
+	if err := e.onStarted(); err != nil {
 		return errors.Wrapf(err, "error on-started hook")
 	}
 
-	awaitTerm()
+	e.awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if w != nil {
@@ -126,7 +127,7 @@ func runWorker() error {
 	return nil
 }
 
-func runStandalone() error {
+func (e *Engine) runStandalone() error {
 	broker, err := createBroker()
 	if err != nil {
 		return err
@@ -141,17 +142,17 @@ func runStandalone() error {
 	if err != nil {
 		return err
 	}
-	c, err := createCoordinator(broker, ds)
+	c, err := e.createCoordinator(broker, ds)
 	if err != nil {
 		return err
 	}
 
 	// trigger the on-started hook
-	if err := onStarted(); err != nil {
+	if err := e.onStarted(); err != nil {
 		return errors.Wrapf(err, "error on-started hook")
 	}
 
-	awaitTerm()
+	e.awaitTerm()
 
 	log.Debug().Msg("shutting down")
 	if w != nil {
@@ -171,8 +172,12 @@ func runStandalone() error {
 func createDatastore() (datastore.Datastore, error) {
 	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
 	var ds datastore.Datastore
-	if provider, ok := dsProviders[dstype]; ok {
-		return provider()
+	ds, err := datastore.NewFromProvider(dstype)
+	if err != nil && !errors.Is(err, datastore.ErrProviderNotFound) {
+		return nil, err
+	}
+	if ds != nil {
+		return ds, nil
 	}
 	switch dstype {
 	case datastore.DATASTORE_INMEMORY:
@@ -196,8 +201,13 @@ func createDatastore() (datastore.Datastore, error) {
 func createBroker() (mq.Broker, error) {
 	var b mq.Broker
 	bt := conf.StringDefault("broker.type", mq.BROKER_INMEMORY)
-	if provider, ok := mqProviders[bt]; ok {
-		return provider()
+
+	b, err := mq.NewFromProvider(bt)
+	if err != nil && !errors.Is(err, mq.ErrProviderNotFound) {
+		return nil, err
+	}
+	if b != nil {
+		return b, nil
 	}
 	switch bt {
 	case "inmemory":
@@ -214,15 +224,15 @@ func createBroker() (mq.Broker, error) {
 	return b, nil
 }
 
-func createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
+func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
 		Broker:      broker,
 		DataStore:   ds,
 		Queues:      queues,
 		Address:     conf.String("coordinator.address"),
-		Middlewares: middlewares,
-		Endpoints:   endpoints,
+		Middlewares: e.middlewares,
+		Endpoints:   e.endpoints,
 		Enabled:     conf.BoolMap("coordinator.api.endpoints"),
 	})
 	if err != nil {
@@ -260,73 +270,18 @@ func createWorker(b mq.Broker) (*worker.Worker, error) {
 	return w, nil
 }
 
-func setupLogging() error {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	logLevel := strings.ToLower(conf.StringDefault("logging.level", "debug"))
-	// setup log level
-	switch logLevel {
-	case "debug":
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	case "info":
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	case "warn", "warning":
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	case "error":
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-	default:
-		return errors.Errorf("invalid logging level: %s", logLevel)
-	}
-	// setup log format (pretty / json)
-	logFormat := strings.ToLower(conf.StringDefault("logging.format", "pretty"))
-	switch logFormat {
-	case "pretty":
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	case "json":
-		log.Logger = zerolog.New(os.Stderr).With().Timestamp().Logger()
-	default:
-		return errors.Errorf("invalid logging format: %s", logFormat)
-	}
-	return nil
-}
-
-func runMigration() error {
-	ds, err := createDatastore()
-	if err != nil {
-		return err
-	}
-	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
-	switch dstype {
-	case datastore.DATASTORE_POSTGRES:
-		if err := ds.(*datastore.PostgresDatastore).ExecScript(postgres.SCHEMA); err != nil {
-			return errors.Wrapf(err, "error when trying to create db schema")
-		}
-	default:
-		return errors.Errorf("can't perform db migration on: %s", dstype)
-	}
-	log.Info().Msg("migration completed!")
-	return nil
-}
-
-func awaitTerm() {
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+func (e *Engine) awaitTerm() {
+	signal.Notify(e.quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	select {
-	case <-quit:
-	case <-terminate:
+	case <-e.quit:
+	case <-e.terminate:
 	}
 }
 
-func RegisterDatastoreProvider(dsType string, provider datastore.Provider) {
-	dsProviders[dsType] = provider
+func (e *Engine) RegisterMiddleware(mw middleware.MiddlewareFunc) {
+	e.middlewares = append(e.middlewares, mw)
 }
 
-func RegisterBrokerProvider(mqType string, provider mq.Provider) {
-	mqProviders[mqType] = provider
-}
-
-func RegisterMiddleware(mw middleware.MiddlewareFunc) {
-	middlewares = append(middlewares, mw)
-}
-
-func RegisterEndpoint(method, path string, handler middleware.HandlerFunc) {
-	endpoints[fmt.Sprintf("%s %s", method, path)] = handler
+func (e *Engine) RegisterEndpoint(method, path string, handler middleware.HandlerFunc) {
+	e.endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }
