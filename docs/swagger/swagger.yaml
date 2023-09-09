@@ -1,0 +1,177 @@
+basePath: /
+host: localhost:8000
+info:
+  contact:
+    email: info@example.com
+    name: API Support
+    url: https://tork.run
+  description: This is the tork server API document.
+  license:
+    name: Apache 2.0
+    url: https://github.com/runabol/tork/blob/main/LICENSE
+  termsOfService: http://swagger.io/terms/
+  title: Echo Swagger tork API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - '*/*'
+      description: get the status of server.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Show the status of server.
+      tags:
+      - root
+  /jobs:
+    get:
+      consumes:
+      - '*/*'
+      description: get a list of the jobs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List of the jobs
+      tags:
+      - queues
+    post:
+      consumes:
+      - '*/*'
+      description: Create a new job
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new job
+      tags:
+      - jobs
+  /jobs/:id:
+    get:
+      consumes:
+      - '*/*'
+      description: get a job by id.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a job by id
+      tags:
+      - jobs
+  /jobs/:id/cancel:
+    put:
+      consumes:
+      - '*/*'
+      description: Cancel a job by id.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Cancel a job
+      tags:
+      - jobs
+  /jobs/:id/restart:
+    put:
+      consumes:
+      - '*/*'
+      description: Restart a job by id.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Restart a job
+      tags:
+      - jobs
+  /nodes:
+    get:
+      consumes:
+      - '*/*'
+      description: List of activa nodes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List of nodes
+      tags:
+      - nodes
+  /queues:
+    get:
+      consumes:
+      - '*/*'
+      description: get a list of the queues
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Show the queues
+      tags:
+      - queues
+  /stats:
+    get:
+      consumes:
+      - '*/*'
+      description: Stats.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Stats
+      tags:
+      - stats
+  /tasks/:id:
+    get:
+      consumes:
+      - '*/*'
+      description: get a by id.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a task by id
+      tags:
+      - tasks
+schemes:
+- http
+swagger: "2.0"

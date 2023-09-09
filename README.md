@@ -30,6 +30,31 @@ A Golang based high-performance, scalable and distributed workflow engine.
 
 See [https://www.tork.run](https://tork.run)
 
+## Swagger API docs
+
+* Download binary 'swag' from [https://github.com/swaggo/swag/releases](https://github.com/swaggo/swag/releases)
+* Add decorators like:
+```go
+// HealthCheck 
+// @Summary Show the status of server.
+// @Description get the status of server.
+// @Tags root
+// @Accept */*
+// @Produce application/json
+// @Success 200 {object} map[string]interface{}
+// @Router /health [get]
+func (s *API) health(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{
+		"status":  "UP",
+		"version": fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
+	})
+}
+```
+* Generate Swagger docs with:
+```shell
+swag init -g internal/coordinator/api/api.go --output docs/swagger
+``` 
+
 ## Quick Start
 
 1. Ensure you have [Docker](https://docs.docker.com/get-docker/) with API Version >= 1.42 (use `docker version | grep API` to check).
