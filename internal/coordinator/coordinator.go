@@ -40,15 +40,15 @@ type Coordinator struct {
 }
 
 type Config struct {
-	Broker          mq.Broker
-	DataStore       datastore.Datastore
-	Address         string
-	Queues          map[string]int
-	Middlewares     []request.MiddlewareFunc
-	Endpoints       map[string]request.HandlerFunc
-	Enabled         map[string]bool
-	TaskMiddlewares []task.MiddlewareFunc
-	JobMiddlewares  []job.MiddlewareFunc
+	Broker             mq.Broker
+	DataStore          datastore.Datastore
+	Address            string
+	Queues             map[string]int
+	Endpoints          map[string]request.HandlerFunc
+	Enabled            map[string]bool
+	RequestMiddlewares []request.MiddlewareFunc
+	TaskMiddlewares    []task.MiddlewareFunc
+	JobMiddlewares     []job.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -90,7 +90,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		Broker:      cfg.Broker,
 		DataStore:   cfg.DataStore,
 		Address:     cfg.Address,
-		Middlewares: cfg.Middlewares,
+		Middlewares: cfg.RequestMiddlewares,
 		Endpoints:   cfg.Endpoints,
 		Enabled:     cfg.Enabled,
 	})

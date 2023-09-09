@@ -29,25 +29,25 @@ const (
 type Mode string
 
 type Engine struct {
-	quit        chan os.Signal
-	terminate   chan any
-	onStarted   func() error
-	middlewares []request.MiddlewareFunc
-	taskmw      []task.MiddlewareFunc
-	jobmw       []job.MiddlewareFunc
-	endpoints   map[string]request.HandlerFunc
-	mode        Mode
+	quit      chan os.Signal
+	terminate chan any
+	onStarted func() error
+	requestmw []request.MiddlewareFunc
+	taskmw    []task.MiddlewareFunc
+	jobmw     []job.MiddlewareFunc
+	endpoints map[string]request.HandlerFunc
+	mode      Mode
 }
 
 func New(mode Mode) *Engine {
 	return &Engine{
-		quit:        make(chan os.Signal, 1),
-		terminate:   make(chan any, 1),
-		onStarted:   func() error { return nil },
-		middlewares: make([]request.MiddlewareFunc, 0),
-		taskmw:      make([]task.MiddlewareFunc, 0),
-		endpoints:   make(map[string]request.HandlerFunc, 0),
-		mode:        mode,
+		quit:      make(chan os.Signal, 1),
+		terminate: make(chan any, 1),
+		onStarted: func() error { return nil },
+		requestmw: make([]request.MiddlewareFunc, 0),
+		taskmw:    make([]task.MiddlewareFunc, 0),
+		endpoints: make(map[string]request.HandlerFunc, 0),
+		mode:      mode,
 	}
 }
 
@@ -233,15 +233,15 @@ func createBroker() (mq.Broker, error) {
 func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
-		Broker:          broker,
-		DataStore:       ds,
-		Queues:          queues,
-		Address:         conf.String("coordinator.address"),
-		Middlewares:     e.middlewares,
-		Endpoints:       e.endpoints,
-		Enabled:         conf.BoolMap("coordinator.api.endpoints"),
-		TaskMiddlewares: e.taskmw,
-		JobMiddlewares:  e.jobmw,
+		Broker:             broker,
+		DataStore:          ds,
+		Queues:             queues,
+		Address:            conf.String("coordinator.address"),
+		RequestMiddlewares: e.requestmw,
+		Endpoints:          e.endpoints,
+		Enabled:            conf.BoolMap("coordinator.api.endpoints"),
+		TaskMiddlewares:    e.taskmw,
+		JobMiddlewares:     e.jobmw,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -286,8 +286,8 @@ func (e *Engine) awaitTerm() {
 	}
 }
 
-func (e *Engine) RegisterMiddleware(mw request.MiddlewareFunc) {
-	e.middlewares = append(e.middlewares, mw)
+func (e *Engine) RegisterRequestMiddleware(mw request.MiddlewareFunc) {
+	e.requestmw = append(e.requestmw, mw)
 }
 
 func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
