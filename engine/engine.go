@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/middleware"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
@@ -30,6 +31,7 @@ type Engine struct {
 	terminate   chan any
 	onStarted   func() error
 	middlewares []middleware.MiddlewareFunc
+	taskmw      []task.MiddlewareFunc
 	endpoints   map[string]middleware.HandlerFunc
 	mode        Mode
 }
@@ -40,6 +42,7 @@ func New(mode Mode) *Engine {
 		terminate:   make(chan any, 1),
 		onStarted:   func() error { return nil },
 		middlewares: make([]middleware.MiddlewareFunc, 0),
+		taskmw:      make([]task.MiddlewareFunc, 0),
 		endpoints:   make(map[string]middleware.HandlerFunc, 0),
 		mode:        mode,
 	}
@@ -227,13 +230,14 @@ func createBroker() (mq.Broker, error) {
 func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
-		Broker:      broker,
-		DataStore:   ds,
-		Queues:      queues,
-		Address:     conf.String("coordinator.address"),
-		Middlewares: e.middlewares,
-		Endpoints:   e.endpoints,
-		Enabled:     conf.BoolMap("coordinator.api.endpoints"),
+		Broker:          broker,
+		DataStore:       ds,
+		Queues:          queues,
+		Address:         conf.String("coordinator.address"),
+		Middlewares:     e.middlewares,
+		Endpoints:       e.endpoints,
+		Enabled:         conf.BoolMap("coordinator.api.endpoints"),
+		TaskMiddlewares: e.taskmw,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -280,6 +284,10 @@ func (e *Engine) awaitTerm() {
 
 func (e *Engine) RegisterMiddleware(mw middleware.MiddlewareFunc) {
 	e.middlewares = append(e.middlewares, mw)
+}
+
+func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
+	e.taskmw = append(e.taskmw, mw)
 }
 
 func (e *Engine) RegisterEndpoint(method, path string, handler middleware.HandlerFunc) {

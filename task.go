@@ -1,7 +1,6 @@
 package tork
 
 import (
-	"context"
 	"time"
 
 	"github.com/runabol/tork/internal/clone"
@@ -20,8 +19,6 @@ const (
 	TaskStateCompleted TaskState = "COMPLETED"
 	TaskStateFailed    TaskState = "FAILED"
 )
-
-type TaskHandler func(context.Context, *Task) error
 
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {

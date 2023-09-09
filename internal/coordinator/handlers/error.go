@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 )
 
@@ -18,7 +19,7 @@ type errorHandler struct {
 	broker mq.Broker
 }
 
-func NewErrorHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
+func NewErrorHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
 	h := &errorHandler{
 		ds:     ds,
 		broker: b,

@@ -47,3 +47,40 @@ func Test_handlePendingTask(t *testing.T) {
 	// task should only be processed once
 	assert.Equal(t, 1, processed)
 }
+
+func Test_handleConditionalTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	completed := 0
+	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *tork.Task) error {
+		completed = completed + 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	handler := NewPendingHandler(ds, b)
+	assert.NotNil(t, handler)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Queue: "test-queue",
+		If:    "false",
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = handler(ctx, tk)
+	assert.NoError(t, err)
+
+	// wait for the task to get processed
+	time.Sleep(time.Millisecond * 100)
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+	// task should only be processed once
+	assert.Equal(t, 1, completed)
+}
