@@ -12,7 +12,8 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/coordinator/handlers"
-	"github.com/runabol/tork/middleware"
+
+	"github.com/runabol/tork/middleware/request"
 	"github.com/runabol/tork/middleware/task"
 
 	"github.com/runabol/tork/mq"
@@ -42,8 +43,8 @@ type Config struct {
 	DataStore       datastore.Datastore
 	Address         string
 	Queues          map[string]int
-	Middlewares     []middleware.MiddlewareFunc
-	Endpoints       map[string]middleware.HandlerFunc
+	Middlewares     []request.MiddlewareFunc
+	Endpoints       map[string]request.HandlerFunc
 	Enabled         map[string]bool
 	TaskMiddlewares []task.MiddlewareFunc
 }
@@ -60,7 +61,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Queues = make(map[string]int)
 	}
 	if cfg.Endpoints == nil {
-		cfg.Endpoints = make(map[string]middleware.HandlerFunc)
+		cfg.Endpoints = make(map[string]request.HandlerFunc)
 	}
 	if cfg.Enabled == nil {
 		cfg.Enabled = make(map[string]bool)
