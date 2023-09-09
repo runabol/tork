@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator/scheduler"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 )
 
@@ -19,7 +20,7 @@ type pendingHandler struct {
 	broker mq.Broker
 }
 
-func NewPendingHandler(ds datastore.Datastore, b mq.Broker) tork.TaskHandler {
+func NewPendingHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
 	h := &pendingHandler{
 		ds:     ds,
 		broker: b,

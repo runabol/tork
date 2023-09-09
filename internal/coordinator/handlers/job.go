@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 )
 
@@ -21,12 +22,12 @@ type jobHandler struct {
 	onCancel  func(context.Context, *tork.Job) error
 }
 
-func NewJobHandler(ds datastore.Datastore, b mq.Broker) tork.JobHandler {
+func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFunc) tork.JobHandler {
 	h := &jobHandler{
 		ds:        ds,
 		broker:    b,
-		onError:   NewErrorHandler(ds, b),
-		onPending: NewPendingHandler(ds, b),
+		onError:   task.ApplyMiddleware(NewErrorHandler(ds, b), mw),
+		onPending: task.ApplyMiddleware(NewPendingHandler(ds, b), mw),
 		onCancel:  NewCancelHandler(ds, b),
 	}
 	return h.handle

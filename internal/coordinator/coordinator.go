@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/coordinator/handlers"
 	"github.com/runabol/tork/middleware"
+	"github.com/runabol/tork/middleware/task"
 
 	"github.com/runabol/tork/mq"
 
@@ -28,22 +29,23 @@ type Coordinator struct {
 	api         *api.API
 	ds          datastore.Datastore
 	queues      map[string]int
-	onPending   tork.TaskHandler
-	onStarted   tork.TaskHandler
-	onError     tork.TaskHandler
+	onPending   task.HandlerFunc
+	onStarted   task.HandlerFunc
+	onError     task.HandlerFunc
 	onJob       tork.JobHandler
 	onHeartbeat tork.NodeHandler
-	onCompleted tork.TaskHandler
+	onCompleted task.HandlerFunc
 }
 
 type Config struct {
-	Broker      mq.Broker
-	DataStore   datastore.Datastore
-	Address     string
-	Queues      map[string]int
-	Middlewares []middleware.MiddlewareFunc
-	Endpoints   map[string]middleware.HandlerFunc
-	Enabled     map[string]bool
+	Broker          mq.Broker
+	DataStore       datastore.Datastore
+	Address         string
+	Queues          map[string]int
+	Middlewares     []middleware.MiddlewareFunc
+	Endpoints       map[string]middleware.HandlerFunc
+	Enabled         map[string]bool
+	TaskMiddlewares []task.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -93,35 +95,44 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		return nil, err
 	}
 
+	onPending := task.ApplyMiddleware(
+		handlers.NewPendingHandler(cfg.DataStore, cfg.Broker),
+		cfg.TaskMiddlewares,
+	)
+
+	onStarted := task.ApplyMiddleware(
+		handlers.NewStartedHandler(cfg.DataStore, cfg.Broker),
+		cfg.TaskMiddlewares,
+	)
+
+	onError := task.ApplyMiddleware(
+		handlers.NewErrorHandler(cfg.DataStore, cfg.Broker),
+		cfg.TaskMiddlewares,
+	)
+
+	onCompleted := task.ApplyMiddleware(
+		handlers.NewCompletedHandler(cfg.DataStore, cfg.Broker),
+		cfg.TaskMiddlewares,
+	)
+
 	return &Coordinator{
-		Name:   name,
-		api:    api,
-		broker: cfg.Broker,
-		ds:     cfg.DataStore,
-		queues: cfg.Queues,
-		onPending: handlers.NewPendingHandler(
-			cfg.DataStore,
-			cfg.Broker,
-		),
-		onStarted: handlers.NewStartedHandler(
-			cfg.DataStore,
-			cfg.Broker,
-		),
-		onError: handlers.NewErrorHandler(
-			cfg.DataStore,
-			cfg.Broker,
-		),
+		Name:      name,
+		api:       api,
+		broker:    cfg.Broker,
+		ds:        cfg.DataStore,
+		queues:    cfg.Queues,
+		onPending: onPending,
+		onStarted: onStarted,
+		onError:   onError,
 		onJob: handlers.NewJobHandler(
 			cfg.DataStore,
 			cfg.Broker,
+			cfg.TaskMiddlewares...,
 		),
 		onHeartbeat: handlers.NewHeartbeatHandler(
 			cfg.DataStore,
 		),
-		onCompleted: handlers.NewCompletedHandler(
-			cfg.DataStore,
-			cfg.Broker,
-		),
+		onCompleted: onCompleted,
 	}, nil
 }
 
