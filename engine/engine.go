@@ -12,7 +12,8 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
-	"github.com/runabol/tork/middleware"
+
+	"github.com/runabol/tork/middleware/request"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
@@ -30,9 +31,9 @@ type Engine struct {
 	quit        chan os.Signal
 	terminate   chan any
 	onStarted   func() error
-	middlewares []middleware.MiddlewareFunc
+	middlewares []request.MiddlewareFunc
 	taskmw      []task.MiddlewareFunc
-	endpoints   map[string]middleware.HandlerFunc
+	endpoints   map[string]request.HandlerFunc
 	mode        Mode
 }
 
@@ -41,9 +42,9 @@ func New(mode Mode) *Engine {
 		quit:        make(chan os.Signal, 1),
 		terminate:   make(chan any, 1),
 		onStarted:   func() error { return nil },
-		middlewares: make([]middleware.MiddlewareFunc, 0),
+		middlewares: make([]request.MiddlewareFunc, 0),
 		taskmw:      make([]task.MiddlewareFunc, 0),
-		endpoints:   make(map[string]middleware.HandlerFunc, 0),
+		endpoints:   make(map[string]request.HandlerFunc, 0),
 		mode:        mode,
 	}
 }
@@ -282,7 +283,7 @@ func (e *Engine) awaitTerm() {
 	}
 }
 
-func (e *Engine) RegisterMiddleware(mw middleware.MiddlewareFunc) {
+func (e *Engine) RegisterMiddleware(mw request.MiddlewareFunc) {
 	e.middlewares = append(e.middlewares, mw)
 }
 
@@ -290,6 +291,6 @@ func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
 	e.taskmw = append(e.taskmw, mw)
 }
 
-func (e *Engine) RegisterEndpoint(method, path string, handler middleware.HandlerFunc) {
+func (e *Engine) RegisterEndpoint(method, path string, handler request.HandlerFunc) {
 	e.endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }

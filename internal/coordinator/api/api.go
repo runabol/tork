@@ -19,8 +19,7 @@ import (
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
-
-	"github.com/runabol/tork/middleware"
+	"github.com/runabol/tork/middleware/request"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
@@ -43,8 +42,8 @@ type Config struct {
 	Broker      mq.Broker
 	DataStore   datastore.Datastore
 	Address     string
-	Middlewares []middleware.MiddlewareFunc
-	Endpoints   map[string]middleware.HandlerFunc
+	Middlewares []request.MiddlewareFunc
+	Endpoints   map[string]request.HandlerFunc
 	Enabled     map[string]bool
 }
 
@@ -112,9 +111,9 @@ func NewAPI(cfg Config) (*API, error) {
 	return s, nil
 }
 
-func (s *API) middlewareAdapter(m middleware.MiddlewareFunc) echo.MiddlewareFunc {
-	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) middleware.HandlerFunc {
-		return func(c middleware.Context) error {
+func (s *API) middlewareAdapter(m request.MiddlewareFunc) echo.MiddlewareFunc {
+	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) request.HandlerFunc {
+		return func(c request.Context) error {
 			return next(ec)
 		}
 	}
