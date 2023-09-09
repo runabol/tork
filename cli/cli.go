@@ -10,7 +10,7 @@ import (
 
 type CLI struct {
 	app         *ucli.App
-	customizers []func(eng *engine.Engine) error
+	configurers []func(eng *engine.Engine) error
 }
 
 func New() *CLI {
@@ -24,8 +24,8 @@ func New() *CLI {
 	return c
 }
 
-func (c *CLI) CustomizeEngine(cust func(eng *engine.Engine) error) {
-	c.customizers = append(c.customizers, cust)
+func (c *CLI) ConfigureEngine(cust func(eng *engine.Engine) error) {
+	c.configurers = append(c.configurers, cust)
 }
 
 func (c *CLI) Run() error {

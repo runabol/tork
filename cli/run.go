@@ -27,8 +27,8 @@ func (c *CLI) run(ctx *ucli.Context) error {
 
 	}
 	eng := engine.New(engine.Mode(ctx.Args().First()))
-	for _, cust := range c.customizers {
-		if err := cust(eng); err != nil {
+	for _, co := range c.configurers {
+		if err := co(eng); err != nil {
 			return err
 		}
 	}
