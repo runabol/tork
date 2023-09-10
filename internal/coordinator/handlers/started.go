@@ -6,8 +6,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/pkg/middleware/task"
 )
 
 type startedHandler struct {

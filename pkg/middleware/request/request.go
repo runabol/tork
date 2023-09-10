@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/pkg/input"
 )
 
 type MiddlewareFunc func(next HandlerFunc) HandlerFunc

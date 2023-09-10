@@ -6,7 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/conf"
+	"github.com/runabol/tork/pkg/conf"
 )
 
 func displayBanner() {

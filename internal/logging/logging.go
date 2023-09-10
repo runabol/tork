@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/conf"
+	"github.com/runabol/tork/pkg/conf"
 )
 
 func SetupLogging() error {

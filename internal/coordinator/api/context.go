@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/input"
-	"github.com/runabol/tork/middleware/request"
+	"github.com/runabol/tork/pkg/input"
+	"github.com/runabol/tork/pkg/middleware/request"
 
 	"github.com/runabol/tork/mq"
 )
