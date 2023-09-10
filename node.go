@@ -1,7 +1,6 @@
 package tork
 
 import (
-	"context"
 	"time"
 )
 
@@ -15,8 +14,6 @@ const (
 	NodeStatusDown    NodeStatus = "DOWN"
 	NodeStatusOffline NodeStatus = "OFFLINE"
 )
-
-type NodeHandler func(context.Context, Node) error
 
 type Node struct {
 	ID              string     `json:"id,omitempty"`

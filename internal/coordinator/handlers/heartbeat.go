@@ -6,27 +6,28 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/middleware/node"
 )
 
 type heartbeatHandler struct {
 	ds datastore.Datastore
 }
 
-func NewHeartbeatHandler(ds datastore.Datastore) tork.NodeHandler {
+func NewHeartbeatHandler(ds datastore.Datastore) node.HandlerFunc {
 	h := &heartbeatHandler{
 		ds: ds,
 	}
 	return h.handle
 }
 
-func (h *heartbeatHandler) handle(ctx context.Context, n tork.Node) error {
+func (h *heartbeatHandler) handle(ctx context.Context, n *tork.Node) error {
 	_, err := h.ds.GetNodeByID(ctx, n.ID)
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
 			Str("node-id", n.ID).
 			Str("hostname", n.Hostname).
 			Msg("received first heartbeat")
-		return h.ds.CreateNode(ctx, n)
+		return h.ds.CreateNode(ctx, *n)
 	}
 	return h.ds.UpdateNode(ctx, n.ID, func(u *tork.Node) error {
 		// ignore "old" heartbeats

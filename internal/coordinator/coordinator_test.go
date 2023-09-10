@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 
@@ -189,6 +190,40 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, tork.JobStateRunning, j2.State)
+}
+
+func TestNodeMiddlewareModify(t *testing.T) {
+	ds := datastore.NewInMemoryDatastore()
+	c, err := NewCoordinator(Config{
+		Broker:    mq.NewInMemoryBroker(),
+		DataStore: ds,
+		NodeMiddlewares: []node.MiddlewareFunc{
+			func(next node.HandlerFunc) node.HandlerFunc {
+				return func(ctx context.Context, n *tork.Node) error {
+					n.CPUPercent = 75
+					return next(ctx, n)
+				}
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	n := tork.Node{
+		ID:       uuid.NewUUID(),
+		Hostname: "node-1",
+	}
+
+	err = ds.CreateNode(context.Background(), n)
+	assert.NoError(t, err)
+
+	err = c.onHeartbeat(context.Background(), &n)
+	assert.NoError(t, err)
+
+	n2, err := ds.GetNodeByID(context.Background(), n.ID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, float64(75), n2.CPUPercent)
 }
 
 func TestStartCoordinator(t *testing.T) {
