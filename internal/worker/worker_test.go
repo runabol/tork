@@ -307,7 +307,7 @@ func Test_sendHeartbeat(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	heartbeats := 0
-	err = b.SubscribeForHeartbeats(func(n tork.Node) error {
+	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		assert.Contains(t, n.Version, tork.Version)
 		heartbeats = heartbeats + 1
 		return nil

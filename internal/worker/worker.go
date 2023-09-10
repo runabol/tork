@@ -318,7 +318,7 @@ func (w *Worker) sendHeartbeats() {
 		cpuPercent := getCPUPercent()
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
-			tork.Node{
+			&tork.Node{
 				ID:              w.id,
 				StartedAt:       w.startTime,
 				CPUPercent:      cpuPercent,

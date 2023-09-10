@@ -127,7 +127,7 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Ta
 	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, func(msg any) error {
 		t, ok := msg.(*tork.Task)
 		if !ok {
-			return errors.Errorf("expecting a task but got %T", t)
+			return errors.Errorf("expecting a *tork.Task but got %T", t)
 		}
 		return handler(t)
 	})
@@ -220,7 +220,7 @@ func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(msg
 
 func serialize(msg any) ([]byte, error) {
 	mtype := fmt.Sprintf("%T", msg)
-	if mtype != "*tork.Task" && mtype != "*tork.Job" && mtype != "tork.Node" {
+	if mtype != "*tork.Task" && mtype != "*tork.Job" && mtype != "*tork.Node" {
 		return nil, errors.Errorf("unnknown type: %T", msg)
 	}
 	body, err := json.Marshal(msg)
@@ -244,12 +244,12 @@ func deserialize(tname string, body []byte) (any, error) {
 			return nil, err
 		}
 		return &j, nil
-	case "tork.Node":
+	case "*tork.Node":
 		n := tork.Node{}
 		if err := json.Unmarshal(body, &n); err != nil {
 			return nil, err
 		}
-		return n, nil
+		return &n, nil
 	}
 	return nil, errors.Errorf("unknown message type: %s", tname)
 }
@@ -293,7 +293,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	return nil
 }
 
-func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n tork.Node) error {
+func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *tork.Node) error {
 	return b.publish(ctx, RMQ_EXCHANGE_DEFAULT, QUEUE_HEARBEAT, n)
 }
 
@@ -327,11 +327,11 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 	return nil
 }
 
-func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n tork.Node) error) error {
+func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) error {
 	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_HEARBEAT, func(msg any) error {
-		n, ok := msg.(tork.Node)
+		n, ok := msg.(*tork.Node)
 		if !ok {
-			return errors.Errorf("expecting a node but got %T", msg)
+			return errors.Errorf("expecting a *tork.Node but got %T", msg)
 		}
 		return handler(n)
 	})
@@ -344,7 +344,7 @@ func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error
 	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_JOBS, func(msg any) error {
 		j, ok := msg.(*tork.Job)
 		if !ok {
-			return errors.Errorf("expecting a job but got %T", msg)
+			return errors.Errorf("expecting a *tork.Job but got %T", msg)
 		}
 		return handler(j)
 	})

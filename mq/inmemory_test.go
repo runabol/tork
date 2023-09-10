@@ -100,12 +100,12 @@ func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	processed := 0
-	err := b.SubscribeForHeartbeats(func(n tork.Node) error {
+	err := b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		processed = processed + 1
 		return nil
 	})
 	assert.NoError(t, err)
-	err = b.PublishHeartbeat(ctx, tork.Node{})
+	err = b.PublishHeartbeat(ctx, &tork.Node{})
 	// wait for heartbeat to be processed
 	time.Sleep(time.Millisecond * 100)
 	assert.NoError(t, err)
