@@ -188,9 +188,9 @@ func (c *Coordinator) Start() error {
 					return c.onError(ctx, t)
 				})
 			case mq.QUEUE_HEARBEAT:
-				err = c.broker.SubscribeForHeartbeats(func(n tork.Node) error {
+				err = c.broker.SubscribeForHeartbeats(func(n *tork.Node) error {
 					ctx := context.Background()
-					return c.onHeartbeat(ctx, &n)
+					return c.onHeartbeat(ctx, n)
 				})
 			case mq.QUEUE_JOBS:
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
