@@ -20,14 +20,14 @@ var ErrContextNotFound = errors.New("context not found")
 
 type InMemoryDatastore struct {
 	tasks *syncx.Map[string, *tork.Task]
-	nodes *syncx.Map[string, tork.Node]
+	nodes *syncx.Map[string, *tork.Node]
 	jobs  *syncx.Map[string, *tork.Job]
 }
 
 func NewInMemoryDatastore() *InMemoryDatastore {
 	return &InMemoryDatastore{
 		tasks: new(syncx.Map[string, *tork.Task]),
-		nodes: new(syncx.Map[string, tork.Node]),
+		nodes: new(syncx.Map[string, *tork.Node]),
 		jobs:  new(syncx.Map[string, *tork.Job]),
 	}
 }
@@ -59,12 +59,12 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 	return nil
 }
 
-func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n tork.Node) error {
+func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *tork.Node) error {
 	_, ok := ds.nodes.Get(n.ID)
 	if ok {
 		return errors.Errorf("node %s already exists", n.ID)
 	}
-	ds.nodes.Set(n.ID, n)
+	ds.nodes.Set(n.ID, n.Clone())
 	return nil
 }
 
@@ -73,32 +73,31 @@ func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify f
 	if !ok {
 		return ErrNodeNotFound
 	}
-	if err := modify(&n); err != nil {
+	if err := modify(n); err != nil {
 		return err
 	}
-	ds.nodes.Set(n.ID, n)
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (tork.Node, error) {
+func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (*tork.Node, error) {
 	n, ok := ds.nodes.Get(id)
 	if !ok {
-		return tork.Node{}, ErrNodeNotFound
+		return nil, ErrNodeNotFound
 	}
-	return n, nil
+	return n.Clone(), nil
 }
 
-func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]tork.Node, error) {
-	nodes := make([]tork.Node, 0)
+func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]*tork.Node, error) {
+	nodes := make([]*tork.Node, 0)
 	timeout := time.Now().UTC().Add(-tork.LAST_HEARTBEAT_TIMEOUT)
-	ds.nodes.Iterate(func(_ string, n tork.Node) {
+	ds.nodes.Iterate(func(_ string, n *tork.Node) {
 		if n.LastHeartbeatAt.After(timeout) {
 			// if we hadn't seen an heartbeat for two or more
 			// consecutive periods we consider the node as offline
 			if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-tork.HEARTBEAT_RATE * 2)) {
 				n.Status = tork.NodeStatusOffline
 			}
-			nodes = append(nodes, n)
+			nodes = append(nodes, n.Clone())
 		}
 	})
 	sort.Slice(nodes, func(i, j int) bool {
@@ -218,7 +217,7 @@ func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*tork.Stats, error) 
 		}
 	})
 
-	ds.nodes.Iterate(func(_ string, n tork.Node) {
+	ds.nodes.Iterate(func(_ string, n *tork.Node) {
 		if n.LastHeartbeatAt.After(time.Now().UTC().Add(-(time.Minute * 5))) {
 			s.Nodes.Running = s.Nodes.Running + 1
 			s.Nodes.CPUPercent = s.Nodes.CPUPercent + n.CPUPercent

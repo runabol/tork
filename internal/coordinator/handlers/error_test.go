@@ -31,7 +31,10 @@ func Test_handleFailedTask(t *testing.T) {
 
 	now := time.Now().UTC()
 
-	node := tork.Node{ID: uuid.NewUUID(), Queue: uuid.NewUUID()}
+	node := &tork.Node{
+		ID:    uuid.NewUUID(),
+		Queue: uuid.NewUUID(),
+	}
 	err = ds.CreateNode(ctx, node)
 	assert.NoError(t, err)
 

@@ -76,7 +76,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	n1 := tork.Node{
+	n1 := &tork.Node{
 		ID:    uuid.NewUUID(),
 		Queue: qname,
 	}

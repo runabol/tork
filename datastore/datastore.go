@@ -17,10 +17,10 @@ type Datastore interface {
 	GetTaskByID(ctx context.Context, id string) (*tork.Task, error)
 	GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error)
 
-	CreateNode(ctx context.Context, n tork.Node) error
+	CreateNode(ctx context.Context, n *tork.Node) error
 	UpdateNode(ctx context.Context, id string, modify func(u *tork.Node) error) error
-	GetNodeByID(ctx context.Context, id string) (tork.Node, error)
-	GetActiveNodes(ctx context.Context) ([]tork.Node, error)
+	GetNodeByID(ctx context.Context, id string) (*tork.Node, error)
+	GetActiveNodes(ctx context.Context) ([]*tork.Node, error)
 
 	CreateJob(ctx context.Context, j *tork.Job) error
 	UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error

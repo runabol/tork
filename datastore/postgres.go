@@ -187,7 +187,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 	}, nil
 }
 
-func (r nodeRecord) toNode() tork.Node {
+func (r nodeRecord) toNode() *tork.Node {
 	n := tork.Node{
 		ID:              r.ID,
 		StartedAt:       r.StartedAt,
@@ -204,7 +204,7 @@ func (r nodeRecord) toNode() tork.Node {
 	if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-tork.HEARTBEAT_RATE * 2)) {
 		n.Status = tork.NodeStatusOffline
 	}
-	return n
+	return &n
 }
 
 func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
@@ -495,7 +495,7 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 	})
 }
 
-func (ds *PostgresDatastore) CreateNode(ctx context.Context, n tork.Node) error {
+func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *tork.Node) error {
 	q := `insert into nodes 
 	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_) 
 	      values
@@ -518,7 +518,7 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 			return errors.Wrapf(err, "error fetching node from db")
 		}
 		n := nr.toNode()
-		if err := modify(&n); err != nil {
+		if err := modify(n); err != nil {
 			return err
 		}
 		q := `update nodes set 
@@ -535,18 +535,18 @@ func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify f
 	})
 }
 
-func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (tork.Node, error) {
+func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (*tork.Node, error) {
 	nr := nodeRecord{}
 	if err := ds.get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return tork.Node{}, ErrNodeNotFound
+			return nil, ErrNodeNotFound
 		}
-		return tork.Node{}, errors.Wrapf(err, "error fetching task from db")
+		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
 	return nr.toNode(), nil
 }
 
-func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]tork.Node, error) {
+func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]*tork.Node, error) {
 	nrs := []nodeRecord{}
 	q := `SELECT * 
 	      FROM nodes 
@@ -556,7 +556,7 @@ func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]tork.Node, e
 	if err := ds.select_(&nrs, q, timeout); err != nil {
 		return nil, errors.Wrapf(err, "error getting active nodes from db")
 	}
-	ns := make([]tork.Node, len(nrs))
+	ns := make([]*tork.Node, len(nrs))
 	for i, n := range nrs {
 
 		ns[i] = n.toNode()
