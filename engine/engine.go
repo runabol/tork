@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/internal/worker"
 
 	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/request"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
@@ -35,6 +36,7 @@ type Engine struct {
 	requestmw []request.MiddlewareFunc
 	taskmw    []task.MiddlewareFunc
 	jobmw     []job.MiddlewareFunc
+	nodemw    []node.MiddlewareFunc
 	endpoints map[string]request.HandlerFunc
 	mode      Mode
 }
@@ -46,6 +48,8 @@ func New(mode Mode) *Engine {
 		onStarted: func() error { return nil },
 		requestmw: make([]request.MiddlewareFunc, 0),
 		taskmw:    make([]task.MiddlewareFunc, 0),
+		jobmw:     make([]job.MiddlewareFunc, 0),
+		nodemw:    make([]node.MiddlewareFunc, 0),
 		endpoints: make(map[string]request.HandlerFunc, 0),
 		mode:      mode,
 	}
@@ -238,10 +242,11 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 		Queues:             queues,
 		Address:            conf.String("coordinator.address"),
 		RequestMiddlewares: e.requestmw,
-		Endpoints:          e.endpoints,
-		Enabled:            conf.BoolMap("coordinator.api.endpoints"),
 		TaskMiddlewares:    e.taskmw,
 		JobMiddlewares:     e.jobmw,
+		NodeMiddlewares:    e.nodemw,
+		Endpoints:          e.endpoints,
+		Enabled:            conf.BoolMap("coordinator.api.endpoints"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
@@ -296,6 +301,10 @@ func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
 
 func (e *Engine) RegisterJobMiddleware(mw job.MiddlewareFunc) {
 	e.jobmw = append(e.jobmw, mw)
+}
+
+func (e *Engine) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
+	e.nodemw = append(e.nodemw, mw)
 }
 
 func (e *Engine) RegisterEndpoint(method, path string, handler request.HandlerFunc) {

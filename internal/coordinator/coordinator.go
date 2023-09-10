@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator/handlers"
 
 	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/request"
 	"github.com/runabol/tork/middleware/task"
 
@@ -35,7 +36,7 @@ type Coordinator struct {
 	onStarted   task.HandlerFunc
 	onError     task.HandlerFunc
 	onJob       job.HandlerFunc
-	onHeartbeat tork.NodeHandler
+	onHeartbeat node.HandlerFunc
 	onCompleted task.HandlerFunc
 }
 
@@ -49,6 +50,7 @@ type Config struct {
 	RequestMiddlewares []request.MiddlewareFunc
 	TaskMiddlewares    []task.MiddlewareFunc
 	JobMiddlewares     []job.MiddlewareFunc
+	NodeMiddlewares    []node.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -131,19 +133,22 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.JobMiddlewares,
 	)
 
+	onHeartbeat := node.ApplyMiddleware(
+		handlers.NewHeartbeatHandler(cfg.DataStore),
+		cfg.NodeMiddlewares,
+	)
+
 	return &Coordinator{
-		Name:      name,
-		api:       api,
-		broker:    cfg.Broker,
-		ds:        cfg.DataStore,
-		queues:    cfg.Queues,
-		onPending: onPending,
-		onStarted: onStarted,
-		onError:   onError,
-		onJob:     onJob,
-		onHeartbeat: handlers.NewHeartbeatHandler(
-			cfg.DataStore,
-		),
+		Name:        name,
+		api:         api,
+		broker:      cfg.Broker,
+		ds:          cfg.DataStore,
+		queues:      cfg.Queues,
+		onPending:   onPending,
+		onStarted:   onStarted,
+		onError:     onError,
+		onJob:       onJob,
+		onHeartbeat: onHeartbeat,
 		onCompleted: onCompleted,
 	}, nil
 }
@@ -185,7 +190,7 @@ func (c *Coordinator) Start() error {
 			case mq.QUEUE_HEARBEAT:
 				err = c.broker.SubscribeForHeartbeats(func(n tork.Node) error {
 					ctx := context.Background()
-					return c.onHeartbeat(ctx, n)
+					return c.onHeartbeat(ctx, &n)
 				})
 			case mq.QUEUE_JOBS:
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {

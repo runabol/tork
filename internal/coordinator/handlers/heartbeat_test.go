@@ -26,7 +26,7 @@ func Test_handleHeartbeat(t *testing.T) {
 		Status:          tork.NodeStatusUP,
 	}
 
-	err := handler(ctx, n1)
+	err := handler(ctx, &n1)
 	assert.NoError(t, err)
 
 	n11, err := ds.GetNodeByID(ctx, n1.ID)
@@ -44,7 +44,7 @@ func Test_handleHeartbeat(t *testing.T) {
 		TaskCount:       3,
 	}
 
-	err = handler(ctx, n2)
+	err = handler(ctx, &n2)
 	assert.NoError(t, err)
 
 	n22, err := ds.GetNodeByID(ctx, n1.ID)
@@ -60,7 +60,7 @@ func Test_handleHeartbeat(t *testing.T) {
 		CPUPercent:      75,
 	}
 
-	err = handler(ctx, n3)
+	err = handler(ctx, &n3)
 	assert.NoError(t, err)
 
 	n33, err := ds.GetNodeByID(ctx, n1.ID)
