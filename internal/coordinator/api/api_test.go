@@ -120,11 +120,11 @@ func Test_listJobs(t *testing.T) {
 
 func Test_getActiveNodes(t *testing.T) {
 	ds := datastore.NewInMemoryDatastore()
-	active := tork.Node{
+	active := &tork.Node{
 		ID:              "1234",
 		LastHeartbeatAt: time.Now().UTC(),
 	}
-	inactive := tork.Node{
+	inactive := &tork.Node{
 		ID:              "2345",
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Hour),
 	}

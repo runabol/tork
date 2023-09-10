@@ -90,7 +90,7 @@ func TestInMemoryUpdateTask(t *testing.T) {
 func TestInMemoryCreateAndGetNode(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := tork.Node{
+	n1 := &tork.Node{
 		ID: uuid.NewUUID(),
 	}
 	err := ds.CreateNode(ctx, n1)
@@ -103,7 +103,7 @@ func TestInMemoryCreateAndGetNode(t *testing.T) {
 func TestInMemoryUpdateNode(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := tork.Node{
+	n1 := &tork.Node{
 		ID:              uuid.NewUUID(),
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
 	}
@@ -126,17 +126,17 @@ func TestInMemoryUpdateNode(t *testing.T) {
 func TestInMemoryGetActiveNodes(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
-	n1 := tork.Node{
+	n1 := &tork.Node{
 		ID:              uuid.NewUUID(),
 		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Second * 20),
 	}
-	n2 := tork.Node{
+	n2 := &tork.Node{
 		ID:              uuid.NewUUID(),
 		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 4),
 	}
-	n3 := tork.Node{ // inactive
+	n3 := &tork.Node{ // inactive
 		ID:              uuid.NewUUID(),
 		Status:          tork.NodeStatusUP,
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * 10),
@@ -301,7 +301,7 @@ func TestInMemoryGetStats(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		err := ds.CreateNode(ctx, tork.Node{
+		err := ds.CreateNode(ctx, &tork.Node{
 			ID:              uuid.NewUUID(),
 			LastHeartbeatAt: time.Now().UTC().Add(-time.Minute * time.Duration(i)),
 			CPUPercent:      float64(i * 10),

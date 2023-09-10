@@ -209,7 +209,7 @@ func TestNodeMiddlewareModify(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	n := tork.Node{
+	n := &tork.Node{
 		ID:       uuid.NewUUID(),
 		Hostname: "node-1",
 	}
@@ -217,7 +217,7 @@ func TestNodeMiddlewareModify(t *testing.T) {
 	err = ds.CreateNode(context.Background(), n)
 	assert.NoError(t, err)
 
-	err = c.onHeartbeat(context.Background(), &n)
+	err = c.onHeartbeat(context.Background(), n)
 	assert.NoError(t, err)
 
 	n2, err := ds.GetNodeByID(context.Background(), n.ID)

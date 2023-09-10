@@ -27,7 +27,7 @@ func (h *heartbeatHandler) handle(ctx context.Context, n *tork.Node) error {
 			Str("node-id", n.ID).
 			Str("hostname", n.Hostname).
 			Msg("received first heartbeat")
-		return h.ds.CreateNode(ctx, *n)
+		return h.ds.CreateNode(ctx, n)
 	}
 	return h.ds.UpdateNode(ctx, n.ID, func(u *tork.Node) error {
 		// ignore "old" heartbeats

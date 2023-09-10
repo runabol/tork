@@ -26,3 +26,17 @@ type Node struct {
 	TaskCount       int        `json:"taskCount"`
 	Version         string     `json:"version"`
 }
+
+func (n *Node) Clone() *Node {
+	return &Node{
+		ID:              n.ID,
+		StartedAt:       n.StartedAt,
+		CPUPercent:      n.CPUPercent,
+		LastHeartbeatAt: n.LastHeartbeatAt,
+		Queue:           n.Queue,
+		Status:          n.Status,
+		Hostname:        n.Hostname,
+		TaskCount:       n.TaskCount,
+		Version:         n.Version,
+	}
+}
