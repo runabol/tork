@@ -3,8 +3,8 @@ package cli
 import (
 	"os"
 
-	"github.com/runabol/tork/engine"
 	"github.com/runabol/tork/internal/logging"
+	"github.com/runabol/tork/pkg/engine"
 	ucli "github.com/urfave/cli/v2"
 )
 

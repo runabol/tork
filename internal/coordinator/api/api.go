@@ -16,10 +16,10 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
-	"github.com/runabol/tork/middleware/request"
+	"github.com/runabol/tork/pkg/input"
+	"github.com/runabol/tork/pkg/middleware/request"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"

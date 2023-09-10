@@ -8,16 +8,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/pkg/conf"
 
-	"github.com/runabol/tork/middleware/job"
-	"github.com/runabol/tork/middleware/node"
-	"github.com/runabol/tork/middleware/request"
-	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/pkg/middleware/job"
+	"github.com/runabol/tork/pkg/middleware/node"
+	"github.com/runabol/tork/pkg/middleware/request"
+	"github.com/runabol/tork/pkg/middleware/task"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -26,6 +26,12 @@ const (
 	ModeWorker      Mode = "worker"
 	ModeStandalone  Mode = "standalone"
 )
+
+// OnStartedHandler a bootstrap hook that is
+// called after Tork has finished starting up.
+// If a non-nil error is returned it will
+// terminate the bootstrap process.
+type OnStartedHandler func() error
 
 type Mode string
 
