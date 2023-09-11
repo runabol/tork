@@ -28,10 +28,10 @@ func (c *CLI) run(ctx *ucli.Context) error {
 	}
 	eng := engine.New(engine.Config{
 		Middleware: engine.Middleware{
-			Request: c.requestmw,
-			Task:    c.taskmw,
-			Job:     c.jobmw,
-			Node:    c.nodemw,
+			Web:  c.webmw,
+			Task: c.taskmw,
+			Job:  c.jobmw,
+			Node: c.nodemw,
 		},
 		Endpoints: c.endpoints,
 		Mode:      engine.Mode(ctx.Args().First()),

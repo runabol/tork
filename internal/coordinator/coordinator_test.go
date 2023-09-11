@@ -41,14 +41,15 @@ func TestTaskMiddlewareWithResult(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: datastore.NewInMemoryDatastore(),
-		TaskMiddlewares: []task.MiddlewareFunc{
-			func(next task.HandlerFunc) task.HandlerFunc {
-				return func(ctx context.Context, t *tork.Task) error {
-					t.Result = "some result"
-					return nil
-				}
-			},
-		},
+		Middleware: Middleware{
+			Task: []task.MiddlewareFunc{
+				func(next task.HandlerFunc) task.HandlerFunc {
+					return func(ctx context.Context, t *tork.Task) error {
+						t.Result = "some result"
+						return nil
+					}
+				},
+			}},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
@@ -63,11 +64,13 @@ func TestTaskMiddlewareWithError(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: datastore.NewInMemoryDatastore(),
-		TaskMiddlewares: []task.MiddlewareFunc{
-			func(next task.HandlerFunc) task.HandlerFunc {
-				return func(ctx context.Context, t *tork.Task) error {
-					return Err
-				}
+		Middleware: Middleware{
+			Task: []task.MiddlewareFunc{
+				func(next task.HandlerFunc) task.HandlerFunc {
+					return func(ctx context.Context, t *tork.Task) error {
+						return Err
+					}
+				},
 			},
 		},
 	})
@@ -83,11 +86,13 @@ func TestTaskMiddlewareNoOp(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: ds,
-		TaskMiddlewares: []task.MiddlewareFunc{
-			func(next task.HandlerFunc) task.HandlerFunc {
-				return func(ctx context.Context, t *tork.Task) error {
-					return next(ctx, t)
-				}
+		Middleware: Middleware{
+			Task: []task.MiddlewareFunc{
+				func(next task.HandlerFunc) task.HandlerFunc {
+					return func(ctx context.Context, t *tork.Task) error {
+						return next(ctx, t)
+					}
+				},
 			},
 		},
 	})
@@ -116,12 +121,14 @@ func TestJobMiddlewareWithOutput(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: datastore.NewInMemoryDatastore(),
-		JobMiddlewares: []job.MiddlewareFunc{
-			func(next job.HandlerFunc) job.HandlerFunc {
-				return func(ctx context.Context, j *tork.Job) error {
-					j.Output = "some output"
-					return nil
-				}
+		Middleware: Middleware{
+			Job: []job.MiddlewareFunc{
+				func(next job.HandlerFunc) job.HandlerFunc {
+					return func(ctx context.Context, j *tork.Job) error {
+						j.Output = "some output"
+						return nil
+					}
+				},
 			},
 		},
 	})
@@ -138,11 +145,13 @@ func TestJobMiddlewareWithError(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: datastore.NewInMemoryDatastore(),
-		JobMiddlewares: []job.MiddlewareFunc{
-			func(next job.HandlerFunc) job.HandlerFunc {
-				return func(ctx context.Context, j *tork.Job) error {
-					return Err
-				}
+		Middleware: Middleware{
+			Job: []job.MiddlewareFunc{
+				func(next job.HandlerFunc) job.HandlerFunc {
+					return func(ctx context.Context, j *tork.Job) error {
+						return Err
+					}
+				},
 			},
 		},
 	})
@@ -158,11 +167,13 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: ds,
-		JobMiddlewares: []job.MiddlewareFunc{
-			func(next job.HandlerFunc) job.HandlerFunc {
-				return func(ctx context.Context, j *tork.Job) error {
-					return next(ctx, j)
-				}
+		Middleware: Middleware{
+			Job: []job.MiddlewareFunc{
+				func(next job.HandlerFunc) job.HandlerFunc {
+					return func(ctx context.Context, j *tork.Job) error {
+						return next(ctx, j)
+					}
+				},
 			},
 		},
 	})
@@ -197,12 +208,14 @@ func TestNodeMiddlewareModify(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: ds,
-		NodeMiddlewares: []node.MiddlewareFunc{
-			func(next node.HandlerFunc) node.HandlerFunc {
-				return func(ctx context.Context, n *tork.Node) error {
-					n.CPUPercent = 75
-					return next(ctx, n)
-				}
+		Middleware: Middleware{
+			Node: []node.MiddlewareFunc{
+				func(next node.HandlerFunc) node.HandlerFunc {
+					return func(ctx context.Context, n *tork.Node) error {
+						n.CPUPercent = 75
+						return next(ctx, n)
+					}
+				},
 			},
 		},
 	})

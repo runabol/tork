@@ -15,8 +15,8 @@ import (
 
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/request"
 	"github.com/runabol/tork/pkg/middleware/task"
+	"github.com/runabol/tork/pkg/middleware/web"
 
 	"github.com/runabol/tork/mq"
 
@@ -41,16 +41,20 @@ type Coordinator struct {
 }
 
 type Config struct {
-	Broker             mq.Broker
-	DataStore          datastore.Datastore
-	Address            string
-	Queues             map[string]int
-	Endpoints          map[string]request.HandlerFunc
-	Enabled            map[string]bool
-	RequestMiddlewares []request.MiddlewareFunc
-	TaskMiddlewares    []task.MiddlewareFunc
-	JobMiddlewares     []job.MiddlewareFunc
-	NodeMiddlewares    []node.MiddlewareFunc
+	Broker     mq.Broker
+	DataStore  datastore.Datastore
+	Address    string
+	Queues     map[string]int
+	Endpoints  map[string]web.HandlerFunc
+	Enabled    map[string]bool
+	Middleware Middleware
+}
+
+type Middleware struct {
+	Web  []web.MiddlewareFunc
+	Task []task.MiddlewareFunc
+	Job  []job.MiddlewareFunc
+	Node []node.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -65,7 +69,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Queues = make(map[string]int)
 	}
 	if cfg.Endpoints == nil {
-		cfg.Endpoints = make(map[string]request.HandlerFunc)
+		cfg.Endpoints = make(map[string]web.HandlerFunc)
 	}
 	if cfg.Enabled == nil {
 		cfg.Enabled = make(map[string]bool)
@@ -89,12 +93,12 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
 	}
 	api, err := api.NewAPI(api.Config{
-		Broker:      cfg.Broker,
-		DataStore:   cfg.DataStore,
-		Address:     cfg.Address,
-		Middlewares: cfg.RequestMiddlewares,
-		Endpoints:   cfg.Endpoints,
-		Enabled:     cfg.Enabled,
+		Broker:     cfg.Broker,
+		DataStore:  cfg.DataStore,
+		Address:    cfg.Address,
+		Middleware: cfg.Middleware.Web,
+		Endpoints:  cfg.Endpoints,
+		Enabled:    cfg.Enabled,
 	})
 	if err != nil {
 		return nil, err
@@ -102,40 +106,40 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 
 	onPending := task.ApplyMiddleware(
 		handlers.NewPendingHandler(cfg.DataStore, cfg.Broker),
-		cfg.TaskMiddlewares,
+		cfg.Middleware.Task,
 	)
 
 	onStarted := task.ApplyMiddleware(
 		handlers.NewStartedHandler(cfg.DataStore, cfg.Broker),
-		cfg.TaskMiddlewares,
+		cfg.Middleware.Task,
 	)
 
 	onError := task.ApplyMiddleware(
 		handlers.NewErrorHandler(cfg.DataStore, cfg.Broker),
-		cfg.TaskMiddlewares,
+		cfg.Middleware.Task,
 	)
 
 	onCompleted := task.ApplyMiddleware(
 		handlers.NewCompletedHandler(
 			cfg.DataStore,
 			cfg.Broker,
-			cfg.JobMiddlewares...,
+			cfg.Middleware.Job...,
 		),
-		cfg.TaskMiddlewares,
+		cfg.Middleware.Task,
 	)
 
 	onJob := job.ApplyMiddleware(
 		handlers.NewJobHandler(
 			cfg.DataStore,
 			cfg.Broker,
-			cfg.TaskMiddlewares...,
+			cfg.Middleware.Task...,
 		),
-		cfg.JobMiddlewares,
+		cfg.Middleware.Job,
 	)
 
 	onHeartbeat := node.ApplyMiddleware(
 		handlers.NewHeartbeatHandler(cfg.DataStore),
-		cfg.NodeMiddlewares,
+		cfg.Middleware.Node,
 	)
 
 	return &Coordinator{

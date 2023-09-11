@@ -19,7 +19,7 @@ import (
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/pkg/input"
-	"github.com/runabol/tork/pkg/middleware/request"
+	"github.com/runabol/tork/pkg/middleware/web"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
@@ -39,12 +39,12 @@ type API struct {
 }
 
 type Config struct {
-	Broker      mq.Broker
-	DataStore   datastore.Datastore
-	Address     string
-	Middlewares []request.MiddlewareFunc
-	Endpoints   map[string]request.HandlerFunc
-	Enabled     map[string]bool
+	Broker     mq.Broker
+	DataStore  datastore.Datastore
+	Address    string
+	Middleware []web.MiddlewareFunc
+	Endpoints  map[string]web.HandlerFunc
+	Enabled    map[string]bool
 }
 
 func NewAPI(cfg Config) (*API, error) {
@@ -60,8 +60,8 @@ func NewAPI(cfg Config) (*API, error) {
 		terminate: make(chan any),
 	}
 
-	// registering custom middlewares
-	for _, m := range cfg.Middlewares {
+	// registering custom middleware
+	for _, m := range cfg.Middleware {
 		r.Use(s.middlewareAdapter(m))
 	}
 
@@ -111,9 +111,9 @@ func NewAPI(cfg Config) (*API, error) {
 	return s, nil
 }
 
-func (s *API) middlewareAdapter(m request.MiddlewareFunc) echo.MiddlewareFunc {
-	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) request.HandlerFunc {
-		return func(c request.Context) error {
+func (s *API) middlewareAdapter(m web.MiddlewareFunc) echo.MiddlewareFunc {
+	nextAdapter := func(next echo.HandlerFunc, ec echo.Context) web.HandlerFunc {
+		return func(c web.Context) error {
 			return next(ec)
 		}
 	}
