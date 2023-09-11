@@ -16,7 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork/datastore"
-	_ "github.com/runabol/tork/docs/swagger"
+
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/pkg/input"
@@ -116,8 +116,6 @@ func NewAPI(cfg Config) (*API, error) {
 	if v, ok := cfg.Enabled["metrics"]; !ok || v {
 		r.GET("/metrics", s.getMetrics)
 	}
-
-	r.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// register additional custom endpoints
 	for spec, h := range cfg.Endpoints {

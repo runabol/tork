@@ -22,4 +22,6 @@ clean:
 
 .PHONY: generate-swagger
 generate-swagger: 
-	 swag init  --parseDependency -g internal/coordinator/api/api.go --output docs/swagger
+	 swag init  --parseDependency -g internal/coordinator/api/api.go --output docs
+	 rm docs/docs.go
+	 rm docs/swagger.yaml
