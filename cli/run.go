@@ -26,7 +26,16 @@ func (c *CLI) run(ctx *ucli.Context) error {
 		os.Exit(1)
 
 	}
-	eng := engine.New(engine.Mode(ctx.Args().First()))
+	eng := engine.New(engine.Config{
+		Middleware: engine.Middleware{
+			Request: c.requestmw,
+			Task:    c.taskmw,
+			Job:     c.jobmw,
+			Node:    c.nodemw,
+		},
+		Endpoints: c.endpoints,
+		Mode:      engine.Mode(ctx.Args().First()),
+	})
 	for _, co := range c.configurers {
 		if err := co(eng); err != nil {
 			return err
