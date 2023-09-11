@@ -149,13 +149,26 @@ See the [REST API](https://www.tork.run/rest) documentation.
 
 ### Swagger Docs
 
+Make sure you have CORS configured in your [config file](https://www.tork.run/config):
+
+```toml
+[coordinator.api.middleware.cors]
+enabled = true
+```
+
 Start Tork in `standalone` or `coordinator` mode.
 
 ```shell
 go run cmd/main.go run standalone
 ```
 
-Visit [http://localhost:8000/swagger](http://localhost:8000/swagger)
+Server the Swagger Docs
+
+```shell
+docker compose up -d swagger
+```
+
+Visit [http://localhost:9000](http://localhost:9000)
 
 ## Web UI
 

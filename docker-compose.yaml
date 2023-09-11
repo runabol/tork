@@ -15,6 +15,15 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
+  swagger:
+    image: swaggerapi/swagger-ui
+    restart: always
+    ports:
+      - 9000:8080
+    environment:
+      SWAGGER_JSON: /code/docs/swagger.json
+    volumes:
+      - .:/code
   migration:
     image: golang:1.19
     working_dir: /code
