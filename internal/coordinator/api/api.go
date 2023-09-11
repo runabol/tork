@@ -85,8 +85,8 @@ func NewAPI(cfg Config) (*API, error) {
 		r.PUT("/jobs/:id/cancel", s.cancelJob)
 		r.PUT("/jobs/:id/restart", s.restartJob)
 	}
-	if v, ok := cfg.Enabled["stats"]; !ok || v {
-		r.GET("/stats", s.getStats)
+	if v, ok := cfg.Enabled["metrics"]; !ok || v {
+		r.GET("/metrics", s.getMetrics)
 	}
 
 	// register additional custom endpoints
@@ -283,12 +283,12 @@ func (s *API) getTask(c echo.Context) error {
 	return c.JSON(http.StatusOK, redact.Task(t))
 }
 
-func (s *API) getStats(c echo.Context) error {
-	stats, err := s.ds.GetStats(c.Request().Context())
+func (s *API) getMetrics(c echo.Context) error {
+	metrics, err := s.ds.GetMetrics(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, stats)
+	return c.JSON(http.StatusOK, metrics)
 }
 
 func (s *API) restartJob(c echo.Context) error {

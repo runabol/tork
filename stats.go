@@ -1,20 +1,20 @@
 package tork
 
-type Stats struct {
-	Jobs  JobStats   `json:"jobs"`
-	Tasks TasksStats `json:"tasks"`
-	Nodes NodeStats  `json:"nodes"`
+type Metrics struct {
+	Jobs  JobMetrics  `json:"jobs"`
+	Tasks TaskMetrics `json:"tasks"`
+	Nodes NodeMetrics `json:"nodes"`
 }
 
-type JobStats struct {
+type JobMetrics struct {
 	Running int `json:"running"`
 }
 
-type TasksStats struct {
+type TaskMetrics struct {
 	Running int `json:"running"`
 }
 
-type NodeStats struct {
+type NodeMetrics struct {
 	Running    int     `json:"online"`
 	CPUPercent float64 `json:"cpuPercent"`
 }

@@ -732,8 +732,8 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	}, nil
 }
 
-func (ds *PostgresDatastore) GetStats(ctx context.Context) (*tork.Stats, error) {
-	s := &tork.Stats{}
+func (ds *PostgresDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, error) {
+	s := &tork.Metrics{}
 
 	if err := ds.get(&s.Jobs.Running, "select count(*) from jobs where state = 'RUNNING'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running jobs count")

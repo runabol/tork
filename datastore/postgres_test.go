@@ -571,7 +571,7 @@ func TestPostgresSearchJobs(t *testing.T) {
 	assert.Equal(t, 101, p1.TotalItems)
 }
 
-func TestPostgresGetStats(t *testing.T) {
+func TestPostgresGetMetrics(t *testing.T) {
 	ctx := context.Background()
 	schemaName := fmt.Sprintf("tork%d", rand.Int())
 	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
@@ -585,7 +585,7 @@ func TestPostgresGetStats(t *testing.T) {
 	}()
 	err = ds.ExecScript(postgres.SCHEMA)
 	assert.NoError(t, err)
-	s, err := ds.GetStats(ctx)
+	s, err := ds.GetMetrics(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, s.Jobs.Running)
 	assert.Equal(t, 0, s.Tasks.Running)
@@ -638,7 +638,7 @@ func TestPostgresGetStats(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	s, err = ds.GetStats(ctx)
+	s, err = ds.GetMetrics(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 50, s.Jobs.Running)
 	assert.Equal(t, 50, s.Tasks.Running)

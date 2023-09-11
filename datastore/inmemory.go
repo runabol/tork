@@ -254,8 +254,8 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 	}, nil
 }
 
-func (ds *InMemoryDatastore) GetStats(ctx context.Context) (*tork.Stats, error) {
-	s := &tork.Stats{}
+func (ds *InMemoryDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, error) {
+	s := &tork.Metrics{}
 
 	ds.jobs.Iterate(func(_ string, j *tork.Job) {
 		if j.State == tork.JobStateRunning {

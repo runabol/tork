@@ -27,7 +27,7 @@ type Datastore interface {
 	GetJobByID(ctx context.Context, id string) (*tork.Job, error)
 	GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.Job], error)
 
-	GetStats(ctx context.Context) (*tork.Stats, error)
+	GetMetrics(ctx context.Context) (*tork.Metrics, error)
 
 	WithTx(ctx context.Context, f func(tx Datastore) error) error
 }
