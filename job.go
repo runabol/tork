@@ -38,6 +38,23 @@ type Job struct {
 	Error       string            `json:"error,omitempty"`
 }
 
+type JobSummary struct {
+	ID          string     `json:"id,omitempty"`
+	ParentID    string     `json:"parentId,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Description string     `json:"description,omitempty"`
+	State       JobState   `json:"state,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt,omitempty"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+	FailedAt    *time.Time `json:"failedAt,omitempty"`
+	Position    int        `json:"position"`
+	TaskCount   int        `json:"taskCount,omitempty"`
+	Output      string     `json:"output,omitempty"`
+	Result      string     `json:"result,omitempty"`
+	Error       string     `json:"error,omitempty"`
+}
+
 type JobContext struct {
 	Inputs map[string]string `json:"inputs,omitempty"`
 	Tasks  map[string]string `json:"tasks,omitempty"`
@@ -77,5 +94,24 @@ func (c JobContext) AsMap() map[string]any {
 	return map[string]any{
 		"inputs": c.Inputs,
 		"tasks":  c.Tasks,
+	}
+}
+
+func NewJobSummary(j *Job) *JobSummary {
+	return &JobSummary{
+		ID:          j.ID,
+		ParentID:    j.ParentID,
+		Name:        j.Name,
+		Description: j.Description,
+		State:       j.State,
+		CreatedAt:   j.CreatedAt,
+		StartedAt:   j.StartedAt,
+		CompletedAt: j.CompletedAt,
+		FailedAt:    j.FailedAt,
+		Position:    j.Position,
+		TaskCount:   j.TaskCount,
+		Output:      j.Output,
+		Result:      j.Result,
+		Error:       j.Error,
 	}
 }

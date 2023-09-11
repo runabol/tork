@@ -685,7 +685,7 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return actives, nil
 }
 
-func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.Job], error) {
+func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error) {
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
@@ -698,13 +698,13 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	if err := ds.select_(&rs, qry, q); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
-	result := make([]*tork.Job, len(rs))
+	result := make([]*tork.JobSummary, len(rs))
 	for i, r := range rs {
 		j, err := r.toJob([]*tork.Task{}, []*tork.Task{})
 		if err != nil {
 			return nil, err
 		}
-		result[i] = j
+		result[i] = tork.NewJobSummary(j)
 	}
 
 	var count *int
@@ -723,7 +723,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 		totalPages = totalPages + 1
 	}
 
-	return &Page[*tork.Job]{
+	return &Page[*tork.JobSummary]{
 		Items:      result,
 		Number:     page,
 		Size:       len(result),

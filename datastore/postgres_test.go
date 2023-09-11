@@ -498,8 +498,6 @@ func TestPostgresGetJobs(t *testing.T) {
 	p1, err := ds.GetJobs(ctx, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
-	assert.Empty(t, p1.Items[0].Tasks)
-	assert.Empty(t, p1.Items[0].Execution)
 	assert.Equal(t, 101, p1.TotalItems)
 
 	p2, err := ds.GetJobs(ctx, "", 2, 10)

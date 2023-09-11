@@ -179,7 +179,7 @@ func (s *API) createJob(c echo.Context) error {
 	if j, err := s.submitJob(c.Request().Context(), ji); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	} else {
-		return c.JSON(http.StatusOK, redact.Job(j))
+		return c.JSON(http.StatusOK, tork.NewJobSummary(j))
 	}
 }
 
@@ -265,11 +265,11 @@ func (s *API) listJobs(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, datastore.Page[*tork.Job]{
+	return c.JSON(http.StatusOK, datastore.Page[*tork.JobSummary]{
 		Number:     res.Number,
 		Size:       res.Size,
 		TotalPages: res.TotalPages,
-		Items:      redact.Jobs(res.Items),
+		Items:      res.Items,
 		TotalItems: res.TotalItems,
 	})
 }
