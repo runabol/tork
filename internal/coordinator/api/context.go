@@ -24,6 +24,18 @@ func (c *Context) Request() *http.Request {
 	return c.ctx.Request()
 }
 
+func (c *Context) Response() http.ResponseWriter {
+	return c.ctx.Response().Unwrap()
+}
+
+func (c *Context) Get(key string) any {
+	return c.ctx.Get(key)
+}
+
+func (c *Context) NoContent(code int) error {
+	return c.ctx.NoContent(code)
+}
+
 func (c *Context) Bind(i any) error {
 	return c.ctx.Bind(i)
 }

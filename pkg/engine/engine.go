@@ -5,10 +5,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
+
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/pkg/conf"
 
@@ -247,7 +249,8 @@ func createBroker() (mq.Broker, error) {
 
 func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
-	c, err := coordinator.NewCoordinator(coordinator.Config{
+
+	cfg := coordinator.Config{
 		Broker:    broker,
 		DataStore: ds,
 		Queues:    queues,
@@ -260,7 +263,42 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 		},
 		Endpoints: e.cfg.Endpoints,
 		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
-	})
+	}
+
+	// register built-in middleware
+
+	// CORS
+	corsEnabled := conf.Bool("coordinator.api.middleware.cors.enabled")
+	if corsEnabled {
+		log.Debug().Msg("CORS middleware enabled")
+		cfg.Middleware.Echo = append(cfg.Middleware.Echo,
+			middleware.CORSWithConfig(
+				middleware.CORSConfig{
+					AllowOrigins: conf.StringsDefault(
+						"coordinator.api.middleware.cors.allow_origins",
+						[]string{"*"},
+					),
+					AllowMethods: conf.StringsDefault(
+						"coordinator.api.middleware.cors.allow_methods",
+						[]string{"*"},
+					),
+					AllowHeaders: conf.StringsDefault(
+						"coordinator.api.middleware.cors.allow_headers",
+						[]string{"*"},
+					),
+					AllowCredentials: conf.Bool(
+						"coordinator.api.middleware.cors.allow_credentials",
+					),
+					ExposeHeaders: conf.StringsDefault(
+						"coordinator.api.middleware.cors.expose_headers",
+						[]string{"*"},
+					),
+				},
+			),
+		)
+	}
+
+	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
 	}

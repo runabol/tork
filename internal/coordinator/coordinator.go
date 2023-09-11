@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -55,6 +56,7 @@ type Middleware struct {
 	Task []task.MiddlewareFunc
 	Job  []job.MiddlewareFunc
 	Node []node.MiddlewareFunc
+	Echo []echo.MiddlewareFunc
 }
 
 func NewCoordinator(cfg Config) (*Coordinator, error) {
@@ -93,12 +95,15 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
 	}
 	api, err := api.NewAPI(api.Config{
-		Broker:     cfg.Broker,
-		DataStore:  cfg.DataStore,
-		Address:    cfg.Address,
-		Middleware: cfg.Middleware.Web,
-		Endpoints:  cfg.Endpoints,
-		Enabled:    cfg.Enabled,
+		Broker:    cfg.Broker,
+		DataStore: cfg.DataStore,
+		Address:   cfg.Address,
+		Middleware: api.Middleware{
+			Web:  cfg.Middleware.Web,
+			Echo: cfg.Middleware.Echo,
+		},
+		Endpoints: cfg.Endpoints,
+		Enabled:   cfg.Enabled,
 	})
 	if err != nil {
 		return nil, err

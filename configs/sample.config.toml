@@ -24,20 +24,29 @@ dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disa
 address = "localhost:8000"
 
 [coordinator.api]
-endpoints.health = true # turn on|off the /health endpoint
-endpoints.jobs = true   # turn on|off the /jobs endpoints
-endpoints.tasks = true  # turn on|off the /tasks endpoints
-endpoints.nodes = true  # turn on|off the /nodes endpoint
-endpoints.queues = true # turn on|off the /queues endpoint
-endpoints.stats = true  # turn on|off the /stats endpoint
+endpoints.health = true  # turn on|off the /health endpoint
+endpoints.jobs = true    # turn on|off the /jobs endpoints
+endpoints.tasks = true   # turn on|off the /tasks endpoints
+endpoints.nodes = true   # turn on|off the /nodes endpoint
+endpoints.queues = true  # turn on|off the /queues endpoint
+endpoints.metrics = true # turn on|off the /metrics endpoint
 
 [coordinator.queues]
-completed = 1 # completed queue consumers (default: 1)
-error = 1     # error queue consumers (default: 1)
-pending = 1   # pending queue consumers (default: 1)
-started = 1   # started queue consumers (default: 1)
-hearbeat = 1  # heartbeat queue consumers (default: 1)
-jobs = 1      # jobs queue consumers (default: 1)
+completed = 1 # completed queue consumers
+error = 1     # error queue consumers
+pending = 1   # pending queue consumers
+started = 1   # started queue consumers
+hearbeat = 1  # heartbeat queue consumers
+jobs = 1      # jobs queue consumers
+
+# cors middleware
+[coordinator.api.middleware.cors]
+enabled = false
+allow_origins = "*"
+allow_methods = "*"
+allow_credentials = false
+expose_headers = "*"
+
 
 [worker]
 address = "localhost:8001"
