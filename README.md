@@ -28,7 +28,7 @@ A Golang based high-performance, scalable and distributed workflow engine.
 
 ## Documentation
 
-See [https://www.tork.run](https://tork.run)
+See [https://www.tork.run](https://tork.run) for the full documentation.
 
 ## Quick Start
 
