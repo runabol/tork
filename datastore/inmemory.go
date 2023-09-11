@@ -221,7 +221,7 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return result, nil
 }
 
-func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.Job], error) {
+func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error) {
 	offset := (page - 1) * size
 	filtered := make([]*tork.Job, 0)
 	ds.jobs.Iterate(func(_ string, j *tork.Job) {
@@ -233,19 +233,16 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 	sort.Slice(filtered, func(i, j int) bool {
 		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
 	})
-	result := make([]*tork.Job, 0)
+	result := make([]*tork.JobSummary, 0)
 	for i := offset; i < (offset+size) && i < len(filtered); i++ {
 		j := filtered[i]
-		jc := j.Clone()
-		jc.Tasks = make([]*tork.Task, 0)
-		jc.Execution = make([]*tork.Task, 0)
-		result = append(result, jc)
+		result = append(result, tork.NewJobSummary(j))
 	}
 	totalPages := len(filtered) / size
 	if len(filtered)%size != 0 {
 		totalPages = totalPages + 1
 	}
-	return &Page[*tork.Job]{
+	return &Page[*tork.JobSummary]{
 		Items:      result,
 		Number:     page,
 		Size:       len(result),
