@@ -15,7 +15,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/pkg/input"
-	"github.com/runabol/tork/pkg/middleware/request"
+	"github.com/runabol/tork/pkg/middleware/web"
 
 	"github.com/runabol/tork/mq"
 
@@ -501,8 +501,8 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 }
 
 func Test_middleware(t *testing.T) {
-	mw := func(next request.HandlerFunc) request.HandlerFunc {
-		return func(c request.Context) error {
+	mw := func(next web.HandlerFunc) web.HandlerFunc {
+		return func(c web.Context) error {
 			if strings.HasPrefix(c.Request().URL.Path, "/middleware") {
 				return c.String(http.StatusOK, "OK")
 			}
@@ -511,9 +511,9 @@ func Test_middleware(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:   datastore.NewInMemoryDatastore(),
-		Broker:      b,
-		Middlewares: []request.MiddlewareFunc{mw},
+		DataStore:  datastore.NewInMemoryDatastore(),
+		Broker:     b,
+		Middleware: []web.MiddlewareFunc{mw},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -530,16 +530,16 @@ func Test_middleware(t *testing.T) {
 }
 
 func Test_middlewareMultiple(t *testing.T) {
-	mw1 := func(next request.HandlerFunc) request.HandlerFunc {
-		return func(c request.Context) error {
+	mw1 := func(next web.HandlerFunc) web.HandlerFunc {
+		return func(c web.Context) error {
 			if strings.HasPrefix(c.Request().URL.Path, "/middleware1") {
 				return c.String(http.StatusOK, "OK1")
 			}
 			return next(c)
 		}
 	}
-	mw2 := func(next request.HandlerFunc) request.HandlerFunc {
-		return func(c request.Context) error {
+	mw2 := func(next web.HandlerFunc) web.HandlerFunc {
+		return func(c web.Context) error {
 			if strings.HasPrefix(c.Request().URL.Path, "/middleware2") {
 				return c.String(http.StatusOK, "OK2")
 			}
@@ -548,9 +548,9 @@ func Test_middlewareMultiple(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:   datastore.NewInMemoryDatastore(),
-		Broker:      b,
-		Middlewares: []request.MiddlewareFunc{mw1, mw2},
+		DataStore:  datastore.NewInMemoryDatastore(),
+		Broker:     b,
+		Middleware: []web.MiddlewareFunc{mw1, mw2},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -579,8 +579,8 @@ func Test_middlewareMultiple(t *testing.T) {
 }
 
 func Test_middlewareSubmitJob(t *testing.T) {
-	mw := func(next request.HandlerFunc) request.HandlerFunc {
-		return func(c request.Context) error {
+	mw := func(next web.HandlerFunc) web.HandlerFunc {
+		return func(c web.Context) error {
 			if !strings.HasPrefix(c.Request().URL.Path, "/create-special-job") {
 				return next(c)
 			}
@@ -599,9 +599,9 @@ func Test_middlewareSubmitJob(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:   datastore.NewInMemoryDatastore(),
-		Broker:      b,
-		Middlewares: []request.MiddlewareFunc{mw},
+		DataStore:  datastore.NewInMemoryDatastore(),
+		Broker:     b,
+		Middleware: []web.MiddlewareFunc{mw},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -618,14 +618,14 @@ func Test_middlewareSubmitJob(t *testing.T) {
 }
 
 func Test_customEndpoint(t *testing.T) {
-	h := func(c request.Context) error {
+	h := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK")
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    b,
-		Endpoints: map[string]request.HandlerFunc{
+		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
 		},
 	})
@@ -644,14 +644,14 @@ func Test_customEndpoint(t *testing.T) {
 }
 
 func Test_customEndpointInvalidSpec(t *testing.T) {
-	h := func(c request.Context) error {
+	h := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK")
 	}
 	b := mq.NewInMemoryBroker()
 	_, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    b,
-		Endpoints: map[string]request.HandlerFunc{
+		Endpoints: map[string]web.HandlerFunc{
 			"xyz": h,
 		},
 	})
@@ -659,7 +659,7 @@ func Test_customEndpointInvalidSpec(t *testing.T) {
 }
 
 func Test_customEndpointError(t *testing.T) {
-	h := func(c request.Context) error {
+	h := func(c web.Context) error {
 		c.Error(http.StatusBadRequest, errors.Errorf("bad stuff happened"))
 		return nil
 	}
@@ -667,7 +667,7 @@ func Test_customEndpointError(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    b,
-		Endpoints: map[string]request.HandlerFunc{
+		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
 		},
 	})
@@ -686,7 +686,7 @@ func Test_customEndpointError(t *testing.T) {
 }
 
 func Test_customEndpointBind(t *testing.T) {
-	h := func(c request.Context) error {
+	h := func(c web.Context) error {
 		type MyStruct struct {
 			Name string `json:"name"`
 		}
@@ -700,7 +700,7 @@ func Test_customEndpointBind(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    b,
-		Endpoints: map[string]request.HandlerFunc{
+		Endpoints: map[string]web.HandlerFunc{
 			"POST /myendpoint": h,
 		},
 	})
@@ -738,8 +738,8 @@ func Test_disableEndpoint(t *testing.T) {
 }
 
 func TestShutdown(t *testing.T) {
-	mw := func(next request.HandlerFunc) request.HandlerFunc {
-		return func(c request.Context) error {
+	mw := func(next web.HandlerFunc) web.HandlerFunc {
+		return func(c web.Context) error {
 			select {
 			case <-time.After(time.Hour):
 			case <-c.Done():
@@ -749,9 +749,9 @@ func TestShutdown(t *testing.T) {
 	}
 
 	api, err := NewAPI(Config{
-		DataStore:   datastore.NewInMemoryDatastore(),
-		Broker:      mq.NewInMemoryBroker(),
-		Middlewares: []request.MiddlewareFunc{mw},
+		DataStore:  datastore.NewInMemoryDatastore(),
+		Broker:     mq.NewInMemoryBroker(),
+		Middleware: []web.MiddlewareFunc{mw},
 	})
 	assert.NoError(t, err)
 

@@ -15,8 +15,8 @@ import (
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/request"
 	"github.com/runabol/tork/pkg/middleware/task"
+	"github.com/runabol/tork/pkg/middleware/web"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -44,19 +44,19 @@ type Engine struct {
 type Config struct {
 	Mode       Mode
 	Middleware Middleware
-	Endpoints  map[string]request.HandlerFunc
+	Endpoints  map[string]web.HandlerFunc
 }
 
 type Middleware struct {
-	Request []request.MiddlewareFunc
-	Task    []task.MiddlewareFunc
-	Job     []job.MiddlewareFunc
-	Node    []node.MiddlewareFunc
+	Web  []web.MiddlewareFunc
+	Task []task.MiddlewareFunc
+	Job  []job.MiddlewareFunc
+	Node []node.MiddlewareFunc
 }
 
 func New(cfg Config) *Engine {
 	if cfg.Endpoints == nil {
-		cfg.Endpoints = make(map[string]request.HandlerFunc)
+		cfg.Endpoints = make(map[string]web.HandlerFunc)
 	}
 	return &Engine{
 		quit:      make(chan os.Signal, 1),
@@ -248,16 +248,18 @@ func createBroker() (mq.Broker, error) {
 func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
 	queues := conf.IntMap("coordinator.queues")
 	c, err := coordinator.NewCoordinator(coordinator.Config{
-		Broker:             broker,
-		DataStore:          ds,
-		Queues:             queues,
-		Address:            conf.String("coordinator.address"),
-		RequestMiddlewares: e.cfg.Middleware.Request,
-		TaskMiddlewares:    e.cfg.Middleware.Task,
-		JobMiddlewares:     e.cfg.Middleware.Job,
-		NodeMiddlewares:    e.cfg.Middleware.Node,
-		Endpoints:          e.cfg.Endpoints,
-		Enabled:            conf.BoolMap("coordinator.api.endpoints"),
+		Broker:    broker,
+		DataStore: ds,
+		Queues:    queues,
+		Address:   conf.String("coordinator.address"),
+		Middleware: coordinator.Middleware{
+			Web:  e.cfg.Middleware.Web,
+			Task: e.cfg.Middleware.Task,
+			Job:  e.cfg.Middleware.Job,
+			Node: e.cfg.Middleware.Node,
+		},
+		Endpoints: e.cfg.Endpoints,
+		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")

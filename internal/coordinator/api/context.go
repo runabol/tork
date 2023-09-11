@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/pkg/input"
-	"github.com/runabol/tork/pkg/middleware/request"
+	"github.com/runabol/tork/pkg/middleware/web"
 
 	"github.com/runabol/tork/mq"
 )
@@ -36,7 +36,7 @@ func (c *Context) JSON(code int, data any) error {
 	return c.ctx.JSON(code, data)
 }
 
-func (c *Context) SubmitJob(ij *input.Job, listeners ...request.JobListener) (*tork.Job, error) {
+func (c *Context) SubmitJob(ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
 	if err := c.api.broker.SubscribeForEvents(c.ctx.Request().Context(), mq.TOPIC_JOB, func(ev any) {
 		j, ok := ev.(*tork.Job)
 		if !ok {

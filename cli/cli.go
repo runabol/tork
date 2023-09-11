@@ -8,19 +8,19 @@ import (
 	"github.com/runabol/tork/pkg/engine"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/request"
 	"github.com/runabol/tork/pkg/middleware/task"
+	"github.com/runabol/tork/pkg/middleware/web"
 	ucli "github.com/urfave/cli/v2"
 )
 
 type CLI struct {
 	app         *ucli.App
 	configurers []func(eng *engine.Engine) error
-	requestmw   []request.MiddlewareFunc
+	webmw       []web.MiddlewareFunc
 	taskmw      []task.MiddlewareFunc
 	jobmw       []job.MiddlewareFunc
 	nodemw      []node.MiddlewareFunc
-	endpoints   map[string]request.HandlerFunc
+	endpoints   map[string]web.HandlerFunc
 }
 
 func New() *CLI {
@@ -30,15 +30,15 @@ func New() *CLI {
 	}
 	c := &CLI{
 		app:       app,
-		endpoints: make(map[string]request.HandlerFunc),
+		endpoints: make(map[string]web.HandlerFunc),
 	}
 	app.Before = c.before
 	app.Commands = c.commands()
 	return c
 }
 
-func (c *CLI) RegisterRequestMiddleware(mw request.MiddlewareFunc) {
-	c.requestmw = append(c.requestmw, mw)
+func (c *CLI) RegisterWebMiddleware(mw web.MiddlewareFunc) {
+	c.webmw = append(c.webmw, mw)
 }
 
 func (c *CLI) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
@@ -53,7 +53,7 @@ func (c *CLI) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	c.nodemw = append(c.nodemw, mw)
 }
 
-func (c *CLI) RegisterEndpoint(method, path string, handler request.HandlerFunc) {
+func (c *CLI) RegisterEndpoint(method, path string, handler web.HandlerFunc) {
 	c.endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }
 
