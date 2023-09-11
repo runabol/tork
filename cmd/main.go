@@ -14,7 +14,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := cli.New().Run(); err != nil {
+	app := cli.New()
+
+	if err := app.Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

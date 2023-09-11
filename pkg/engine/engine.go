@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -39,30 +38,36 @@ type Engine struct {
 	quit      chan os.Signal
 	terminate chan any
 	onStarted func() error
-	requestmw []request.MiddlewareFunc
-	taskmw    []task.MiddlewareFunc
-	jobmw     []job.MiddlewareFunc
-	nodemw    []node.MiddlewareFunc
-	endpoints map[string]request.HandlerFunc
-	mode      Mode
+	cfg       Config
 }
 
-func New(mode Mode) *Engine {
+type Config struct {
+	Mode       Mode
+	Middleware Middleware
+	Endpoints  map[string]request.HandlerFunc
+}
+
+type Middleware struct {
+	Request []request.MiddlewareFunc
+	Task    []task.MiddlewareFunc
+	Job     []job.MiddlewareFunc
+	Node    []node.MiddlewareFunc
+}
+
+func New(cfg Config) *Engine {
+	if cfg.Endpoints == nil {
+		cfg.Endpoints = make(map[string]request.HandlerFunc)
+	}
 	return &Engine{
 		quit:      make(chan os.Signal, 1),
 		terminate: make(chan any, 1),
 		onStarted: func() error { return nil },
-		requestmw: make([]request.MiddlewareFunc, 0),
-		taskmw:    make([]task.MiddlewareFunc, 0),
-		jobmw:     make([]job.MiddlewareFunc, 0),
-		nodemw:    make([]node.MiddlewareFunc, 0),
-		endpoints: make(map[string]request.HandlerFunc, 0),
-		mode:      mode,
+		cfg:       cfg,
 	}
 }
 
 func (e *Engine) Start() error {
-	switch e.mode {
+	switch e.cfg.Mode {
 	case ModeCoordinator:
 		return e.runCoordinator()
 	case ModeWorker:
@@ -71,7 +76,7 @@ func (e *Engine) Start() error {
 		return e.runStandalone()
 
 	default:
-		return errors.Errorf("Unknown mode: %s", e.mode)
+		return errors.Errorf("Unknown mode: %s", e.cfg.Mode)
 	}
 }
 
@@ -247,11 +252,11 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 		DataStore:          ds,
 		Queues:             queues,
 		Address:            conf.String("coordinator.address"),
-		RequestMiddlewares: e.requestmw,
-		TaskMiddlewares:    e.taskmw,
-		JobMiddlewares:     e.jobmw,
-		NodeMiddlewares:    e.nodemw,
-		Endpoints:          e.endpoints,
+		RequestMiddlewares: e.cfg.Middleware.Request,
+		TaskMiddlewares:    e.cfg.Middleware.Task,
+		JobMiddlewares:     e.cfg.Middleware.Job,
+		NodeMiddlewares:    e.cfg.Middleware.Node,
+		Endpoints:          e.cfg.Endpoints,
 		Enabled:            conf.BoolMap("coordinator.api.endpoints"),
 	})
 	if err != nil {
@@ -295,24 +300,4 @@ func (e *Engine) awaitTerm() {
 	case <-e.quit:
 	case <-e.terminate:
 	}
-}
-
-func (e *Engine) RegisterRequestMiddleware(mw request.MiddlewareFunc) {
-	e.requestmw = append(e.requestmw, mw)
-}
-
-func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
-	e.taskmw = append(e.taskmw, mw)
-}
-
-func (e *Engine) RegisterJobMiddleware(mw job.MiddlewareFunc) {
-	e.jobmw = append(e.jobmw, mw)
-}
-
-func (e *Engine) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
-	e.nodemw = append(e.nodemw, mw)
-}
-
-func (e *Engine) RegisterEndpoint(method, path string, handler request.HandlerFunc) {
-	e.endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }

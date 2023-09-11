@@ -12,7 +12,9 @@ func TestRunStandalone(t *testing.T) {
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
 
-	eng := engine.New(engine.ModeStandalone)
+	eng := engine.New(engine.Config{
+		Mode: engine.ModeStandalone,
+	})
 
 	started := false
 	eng.OnStarted(func() error {
@@ -31,7 +33,7 @@ func TestRunCoordinator(t *testing.T) {
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
 
-	eng := engine.New(engine.ModeCoordinator)
+	eng := engine.New(engine.Config{Mode: engine.ModeCoordinator})
 
 	started := false
 	eng.OnStarted(func() error {
@@ -50,7 +52,7 @@ func TestRunWorker(t *testing.T) {
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
 
-	eng := engine.New(engine.ModeWorker)
+	eng := engine.New(engine.Config{Mode: engine.ModeWorker})
 
 	started := false
 	eng.OnStarted(func() error {
