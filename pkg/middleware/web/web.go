@@ -17,6 +17,15 @@ type Context interface {
 	// Request returns `*http.Request`.
 	Request() *http.Request
 
+	// Get retrieves data from the context.
+	Get(key string) any
+
+	// Response returns `http.ResponseWriter`.
+	Response() http.ResponseWriter
+
+	// NoContent sends a response with no body and a status code.
+	NoContent(code int) error
+
 	// String sends a string response with status code.
 	String(code int, s string) error
 

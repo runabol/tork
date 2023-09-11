@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
@@ -511,9 +512,40 @@ func Test_middleware(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:  datastore.NewInMemoryDatastore(),
-		Broker:     b,
-		Middleware: []web.MiddlewareFunc{mw},
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Middleware: Middleware{
+			Web: []web.MiddlewareFunc{mw},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/middleware", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK", string(body))
+}
+
+func Test_echoMiddleware(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+	api, err := NewAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Middleware: Middleware{
+			Echo: []echo.MiddlewareFunc{
+				func(next echo.HandlerFunc) echo.HandlerFunc {
+					return func(c echo.Context) error {
+						return c.String(http.StatusOK, "OK")
+					}
+				},
+			},
+		},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -548,9 +580,11 @@ func Test_middlewareMultiple(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:  datastore.NewInMemoryDatastore(),
-		Broker:     b,
-		Middleware: []web.MiddlewareFunc{mw1, mw2},
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Middleware: Middleware{
+			Web: []web.MiddlewareFunc{mw1, mw2},
+		},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -599,9 +633,11 @@ func Test_middlewareSubmitJob(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore:  datastore.NewInMemoryDatastore(),
-		Broker:     b,
-		Middleware: []web.MiddlewareFunc{mw},
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Middleware: Middleware{
+			Web: []web.MiddlewareFunc{mw},
+		},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -749,9 +785,11 @@ func TestShutdown(t *testing.T) {
 	}
 
 	api, err := NewAPI(Config{
-		DataStore:  datastore.NewInMemoryDatastore(),
-		Broker:     mq.NewInMemoryBroker(),
-		Middleware: []web.MiddlewareFunc{mw},
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    mq.NewInMemoryBroker(),
+		Middleware: Middleware{
+			Web: []web.MiddlewareFunc{mw},
+		},
 	})
 	assert.NoError(t, err)
 

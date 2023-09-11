@@ -68,6 +68,22 @@ func BoolMap(key string) map[string]bool {
 	return konf.BoolMap(key)
 }
 
+func StringMap(key string) map[string]string {
+	return konf.StringMap(key)
+}
+
+func Strings(key string) []string {
+	return konf.Strings(key)
+}
+
+func StringsDefault(key string, dv []string) []string {
+	v := konf.Get(key)
+	if v == nil {
+		return dv
+	}
+	return konf.Strings(key)
+}
+
 func String(key string) string {
 	return konf.String(key)
 }
@@ -85,9 +101,9 @@ func Bool(key string) bool {
 }
 
 func BoolDefault(key string, dv bool) bool {
-	v := konf.String(key)
-	if v != "" {
-		return Bool(key)
+	v := konf.Get(key)
+	if v == nil {
+		return dv
 	}
-	return dv
+	return Bool(key)
 }

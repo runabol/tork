@@ -42,9 +42,14 @@ type Config struct {
 	Broker     mq.Broker
 	DataStore  datastore.Datastore
 	Address    string
-	Middleware []web.MiddlewareFunc
+	Middleware Middleware
 	Endpoints  map[string]web.HandlerFunc
 	Enabled    map[string]bool
+}
+
+type Middleware struct {
+	Web  []web.MiddlewareFunc
+	Echo []echo.MiddlewareFunc
 }
 
 func NewAPI(cfg Config) (*API, error) {
@@ -61,8 +66,13 @@ func NewAPI(cfg Config) (*API, error) {
 	}
 
 	// registering custom middleware
-	for _, m := range cfg.Middleware {
+	for _, m := range cfg.Middleware.Web {
 		r.Use(s.middlewareAdapter(m))
+	}
+
+	// reigsering echo middleware
+	for _, m := range cfg.Middleware.Echo {
+		r.Use(m)
 	}
 
 	// built-in endpoints
