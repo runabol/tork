@@ -7,21 +7,19 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/pkg/conf"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"golang.org/x/time/rate"
 )
 
-func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*coordinator.Coordinator, error) {
+func (e *Engine) initCoordinator() error {
 	queues := conf.IntMap("coordinator.queues")
 
 	cfg := coordinator.Config{
-		Broker:    broker,
-		DataStore: ds,
+		Broker:    e.broker,
+		DataStore: e.ds,
 		Queues:    queues,
 		Address:   conf.String("coordinator.address"),
 		Middleware: coordinator.Middleware{
@@ -43,13 +41,16 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 
 	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating the coordinator")
+		return errors.Wrap(err, "error creating the coordinator")
 	}
 
 	if err := c.Start(); err != nil {
-		return nil, err
+		return err
 	}
-	return c, nil
+
+	e.coordinator = c
+
+	return nil
 }
 
 func echoMiddleware() []echo.MiddlewareFunc {

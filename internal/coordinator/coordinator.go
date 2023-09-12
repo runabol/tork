@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/coordinator/handlers"
 
+	"github.com/runabol/tork/pkg/input"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
 	"github.com/runabol/tork/pkg/middleware/task"
@@ -161,6 +162,10 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		onHeartbeat: onHeartbeat,
 		onCompleted: onCompleted,
 	}, nil
+}
+
+func (c *Coordinator) SubmitJob(ctx context.Context, ij *input.Job) (*tork.Job, error) {
+	return c.api.SubmitJob(ctx, ij)
 }
 
 func (c *Coordinator) Start() error {

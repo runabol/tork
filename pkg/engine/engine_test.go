@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,7 +9,10 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/runabol/tork"
+	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/pkg/conf"
+	"github.com/runabol/tork/pkg/input"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -178,4 +182,70 @@ func Test_rateLimitCustomRPS(t *testing.T) {
 			assert.Equal(t, http.StatusTooManyRequests, w.Code)
 		}
 	}
+}
+
+func TestSubmitJob(t *testing.T) {
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+
+	eng := New(Config{Mode: ModeStandalone})
+
+	assert.Equal(t, StateIdle, eng.state)
+
+	err = eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	called := false
+	listener := func(j *tork.Job) {
+		called = true
+		assert.Equal(t, tork.JobStateCompleted, j.State)
+	}
+
+	ctx := context.Background()
+
+	j, err := eng.SubmitJob(ctx, &input.Job{
+		Name: "test job",
+		Tasks: []input.Task{
+			{
+				Name:  "first task",
+				Image: "some:image",
+			},
+		},
+	}, listener)
+	assert.NoError(t, err)
+
+	j.State = tork.JobStateCompleted
+
+	err = eng.broker.PublishEvent(context.Background(), mq.TOPIC_JOB_COMPLETED, j)
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 100)
+
+	assert.True(t, called)
+}
+
+func TestSubmitJobPanics(t *testing.T) {
+	eng := New(Config{Mode: ModeStandalone})
+	assert.Panics(t, func() {
+		_, _ = eng.SubmitJob(context.Background(), &input.Job{})
+	})
+}
+
+func TestSubmitInvalidJob(t *testing.T) {
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+
+	eng := New(Config{Mode: ModeStandalone})
+
+	assert.Equal(t, StateIdle, eng.state)
+
+	err = eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	ctx := context.Background()
+
+	_, err = eng.SubmitJob(ctx, &input.Job{})
+	assert.Error(t, err)
 }

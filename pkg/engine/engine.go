@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,6 +11,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/internal/coordinator"
+	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/pkg/input"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
 	"github.com/runabol/tork/pkg/middleware/task"
@@ -38,12 +45,16 @@ const (
 )
 
 type Engine struct {
-	quit       chan os.Signal
-	terminate  chan any
-	terminated chan any
-	cfg        Config
-	state      string
-	mu         sync.Mutex
+	quit        chan os.Signal
+	terminate   chan any
+	terminated  chan any
+	cfg         Config
+	state       string
+	mu          sync.Mutex
+	broker      mq.Broker
+	ds          datastore.Datastore
+	coordinator *coordinator.Coordinator
+	worker      *worker.Worker
 }
 
 type Config struct {
@@ -121,18 +132,15 @@ func (e *Engine) SetMode(mode Mode) {
 }
 
 func (e *Engine) runCoordinator() error {
-	broker, err := createBroker()
-	if err != nil {
+	if err := e.initBroker(); err != nil {
 		return err
 	}
 
-	ds, err := createDatastore()
-	if err != nil {
+	if err := e.initDatastore(); err != nil {
 		return err
 	}
 
-	c, err := e.createCoordinator(broker, ds)
-	if err != nil {
+	if err := e.initCoordinator(); err != nil {
 		return err
 	}
 
@@ -140,8 +148,8 @@ func (e *Engine) runCoordinator() error {
 		e.awaitTerm()
 
 		log.Debug().Msg("shutting down")
-		if c != nil {
-			if err := c.Stop(); err != nil {
+		if e.coordinator != nil {
+			if err := e.coordinator.Stop(); err != nil {
 				log.Error().Err(err).Msg("error stopping coordinator")
 			}
 		}
@@ -152,13 +160,11 @@ func (e *Engine) runCoordinator() error {
 }
 
 func (e *Engine) runWorker() error {
-	broker, err := createBroker()
-	if err != nil {
+	if err := e.initBroker(); err != nil {
 		return err
 	}
 
-	w, err := createWorker(broker)
-	if err != nil {
+	if err := e.initWorker(); err != nil {
 		return err
 	}
 
@@ -166,8 +172,8 @@ func (e *Engine) runWorker() error {
 		e.awaitTerm()
 
 		log.Debug().Msg("shutting down")
-		if w != nil {
-			if err := w.Stop(); err != nil {
+		if e.worker != nil {
+			if err := e.worker.Stop(); err != nil {
 				log.Error().Err(err).Msg("error stopping worker")
 			}
 		}
@@ -178,22 +184,19 @@ func (e *Engine) runWorker() error {
 }
 
 func (e *Engine) runStandalone() error {
-	broker, err := createBroker()
-	if err != nil {
+	if err := e.initBroker(); err != nil {
 		return err
 	}
 
-	ds, err := createDatastore()
-	if err != nil {
+	if err := e.initDatastore(); err != nil {
 		return err
 	}
 
-	w, err := createWorker(broker)
-	if err != nil {
+	if err := e.initWorker(); err != nil {
 		return err
 	}
-	c, err := e.createCoordinator(broker, ds)
-	if err != nil {
+
+	if err := e.initCoordinator(); err != nil {
 		return err
 	}
 
@@ -201,13 +204,13 @@ func (e *Engine) runStandalone() error {
 		e.awaitTerm()
 
 		log.Debug().Msg("shutting down")
-		if w != nil {
-			if err := w.Stop(); err != nil {
+		if e.worker != nil {
+			if err := e.worker.Stop(); err != nil {
 				log.Error().Err(err).Msg("error stopping worker")
 			}
 		}
-		if c != nil {
-			if err := c.Stop(); err != nil {
+		if e.coordinator != nil {
+			if err := e.coordinator.Stop(); err != nil {
 				log.Error().Err(err).Msg("error stopping coordinator")
 			}
 		}
@@ -256,6 +259,31 @@ func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) 
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
 	e.cfg.Endpoints[fmt.Sprintf("%s %s", method, path)] = handler
+}
+
+func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
+	e.mustState(StateRunning)
+	if e.cfg.Mode != ModeStandalone && e.cfg.Mode != ModeCoordinator {
+		panic(errors.Errorf("engine not in coordinator/standalone mode"))
+	}
+	if err := e.broker.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(ev any) {
+		j, ok := ev.(*tork.Job)
+		if !ok {
+			log.Error().Msg("unable to cast event to *tork.Job")
+		}
+		if ij.ID() == j.ID {
+			for _, listener := range listeners {
+				listener(j)
+			}
+		}
+	}); err != nil {
+		return nil, errors.New("error subscribing for job events")
+	}
+	job, err := e.coordinator.SubmitJob(ctx, ij)
+	if err != nil {
+		return nil, err
+	}
+	return job.Clone(), nil
 }
 
 func (e *Engine) awaitTerm() {
