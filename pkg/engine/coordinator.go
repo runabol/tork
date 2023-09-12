@@ -34,7 +34,7 @@ func (e *Engine) initCoordinator() error {
 	}
 
 	// redact
-	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", true)
+	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", false)
 	if redactJobEnabled {
 		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact)
 	}

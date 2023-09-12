@@ -59,7 +59,7 @@ enabled = false
 rps = 20        # requests per second per IP
 
 [middleware.job.redact]
-enabled = true
+enabled = false
 
 [worker]
 address = "localhost:8001"
