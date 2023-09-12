@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/uuid"
+	"golang.org/x/time/rate"
 
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/pkg/conf"
@@ -293,7 +294,18 @@ func echoMiddleware() []echo.MiddlewareFunc {
 		mw = append(mw, basicAuth())
 	}
 
+	// rate limit
+	rateLimitEnabled := conf.Bool("coordinator.api.middleware.ratelimit.enabled")
+	if rateLimitEnabled {
+		mw = append(mw, rateLimit())
+	}
+
 	return mw
+}
+
+func rateLimit() echo.MiddlewareFunc {
+	rps := conf.IntDefault("coordinator.api.middleware.ratelimit.rps", 20)
+	return middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(rps)))
 }
 
 func basicAuth() echo.MiddlewareFunc {
