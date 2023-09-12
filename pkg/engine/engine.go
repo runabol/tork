@@ -1,15 +1,18 @@
 package engine
 
 import (
+	"crypto/subtle"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
+	"github.com/runabol/tork/internal/uuid"
 
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/pkg/conf"
@@ -260,52 +263,80 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 			Task: e.cfg.Middleware.Task,
 			Job:  e.cfg.Middleware.Job,
 			Node: e.cfg.Middleware.Node,
+			Echo: echoMiddleware(),
 		},
 		Endpoints: e.cfg.Endpoints,
 		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
-	}
-
-	// register built-in middleware
-
-	// CORS
-	corsEnabled := conf.Bool("coordinator.api.middleware.cors.enabled")
-	if corsEnabled {
-		log.Debug().Msg("CORS middleware enabled")
-		cfg.Middleware.Echo = append(cfg.Middleware.Echo,
-			middleware.CORSWithConfig(
-				middleware.CORSConfig{
-					AllowOrigins: conf.StringsDefault(
-						"coordinator.api.middleware.cors.allow_origins",
-						[]string{"*"},
-					),
-					AllowMethods: conf.StringsDefault(
-						"coordinator.api.middleware.cors.allow_methods",
-						[]string{"*"},
-					),
-					AllowHeaders: conf.StringsDefault(
-						"coordinator.api.middleware.cors.allow_headers",
-						[]string{"*"},
-					),
-					AllowCredentials: conf.Bool(
-						"coordinator.api.middleware.cors.allow_credentials",
-					),
-					ExposeHeaders: conf.StringsDefault(
-						"coordinator.api.middleware.cors.expose_headers",
-						[]string{"*"},
-					),
-				},
-			),
-		)
 	}
 
 	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")
 	}
+
 	if err := c.Start(); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+func echoMiddleware() []echo.MiddlewareFunc {
+	mw := make([]echo.MiddlewareFunc, 0)
+	// cors
+	corsEnabled := conf.Bool("coordinator.api.middleware.cors.enabled")
+	if corsEnabled {
+		mw = append(mw, cors())
+	}
+	// basic auth
+	basicAuthEnabled := conf.Bool("coordinator.api.middleware.basic_auth.enabled")
+	if basicAuthEnabled {
+		mw = append(mw, basicAuth())
+	}
+
+	return mw
+}
+
+func basicAuth() echo.MiddlewareFunc {
+	username := conf.StringDefault("coordinator.api.middleware.basic_auth.username", "tork")
+	password := conf.String("coordinator.api.middleware.basic_auth.password")
+	if password == "" {
+		password = uuid.NewUUID()
+		log.Debug().Msgf("Basic Auth Password: %s", password)
+	}
+	return middleware.BasicAuth(func(user, pass string, ctx echo.Context) (bool, error) {
+		if subtle.ConstantTimeCompare([]byte(user), []byte(username)) == 1 &&
+			subtle.ConstantTimeCompare([]byte(pass), []byte(password)) == 1 {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+func cors() echo.MiddlewareFunc {
+	log.Debug().Msg("CORS middleware enabled")
+	return middleware.CORSWithConfig(
+		middleware.CORSConfig{
+			AllowOrigins: conf.StringsDefault(
+				"coordinator.api.middleware.cors.allow_origins",
+				[]string{"*"},
+			),
+			AllowMethods: conf.StringsDefault(
+				"coordinator.api.middleware.cors.allow_methods",
+				[]string{"*"},
+			),
+			AllowHeaders: conf.StringsDefault(
+				"coordinator.api.middleware.cors.allow_headers",
+				[]string{"*"},
+			),
+			AllowCredentials: conf.Bool(
+				"coordinator.api.middleware.cors.allow_credentials",
+			),
+			ExposeHeaders: conf.StringsDefault(
+				"coordinator.api.middleware.cors.expose_headers",
+				[]string{"*"},
+			),
+		},
+	)
 }
 
 func createWorker(b mq.Broker) (*worker.Worker, error) {
