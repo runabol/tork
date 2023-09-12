@@ -185,14 +185,11 @@ func Test_rateLimitCustomRPS(t *testing.T) {
 }
 
 func TestSubmitJob(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{Mode: ModeStandalone})
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
@@ -233,14 +230,11 @@ func TestSubmitJobPanics(t *testing.T) {
 }
 
 func TestSubmitInvalidJob(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{Mode: ModeStandalone})
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 

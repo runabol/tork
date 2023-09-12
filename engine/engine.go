@@ -224,28 +224,28 @@ func (e *Engine) RegisterWebMiddleware(mw web.MiddlewareFunc) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	e.cfg.Middleware.Web = append(defaultEngine.cfg.Middleware.Web, mw)
+	e.cfg.Middleware.Web = append(e.cfg.Middleware.Web, mw)
 }
 
 func (e *Engine) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	e.cfg.Middleware.Task = append(defaultEngine.cfg.Middleware.Task, mw)
+	e.cfg.Middleware.Task = append(e.cfg.Middleware.Task, mw)
 }
 
 func (e *Engine) RegisterJobMiddleware(mw job.MiddlewareFunc) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	e.cfg.Middleware.Job = append(defaultEngine.cfg.Middleware.Job, mw)
+	e.cfg.Middleware.Job = append(e.cfg.Middleware.Job, mw)
 }
 
 func (e *Engine) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	e.cfg.Middleware.Node = append(defaultEngine.cfg.Middleware.Node, mw)
+	e.cfg.Middleware.Node = append(e.cfg.Middleware.Node, mw)
 }
 
 func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) {
