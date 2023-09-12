@@ -41,16 +41,8 @@ func Task(t *tork.Task) *tork.Task {
 	return redacted
 }
 
-func Jobs(js []*tork.Job) []*tork.Job {
-	result := make([]*tork.Job, len(js))
-	for i, j := range js {
-		result[i] = Job(j)
-	}
-	return result
-}
-
-func Job(j *tork.Job) *tork.Job {
-	redacted := j.Clone()
+func Job(j *tork.Job) {
+	redacted := j
 	// redact inputs
 	redacted.Inputs = redactVars(redacted.Inputs)
 	// redact context
@@ -64,7 +56,6 @@ func Job(j *tork.Job) *tork.Job {
 	for i, t := range redacted.Execution {
 		redacted.Execution[i] = Task(t)
 	}
-	return redacted
 }
 
 func redactVars(m map[string]string) map[string]string {

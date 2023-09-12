@@ -270,6 +270,12 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
 	}
 
+	// redact
+	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", true)
+	if redactJobEnabled {
+		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact)
+	}
+
 	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the coordinator")

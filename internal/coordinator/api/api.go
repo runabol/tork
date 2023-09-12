@@ -20,6 +20,7 @@ import (
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/pkg/input"
+	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/web"
 
 	"github.com/runabol/tork"
@@ -41,6 +42,7 @@ type API struct {
 	broker    mq.Broker
 	ds        datastore.Datastore
 	terminate chan any
+	onReadJob job.HandlerFunc
 }
 
 type Config struct {
@@ -54,6 +56,7 @@ type Config struct {
 
 type Middleware struct {
 	Web  []web.MiddlewareFunc
+	Job  []job.MiddlewareFunc
 	Echo []echo.MiddlewareFunc
 }
 
@@ -81,6 +84,10 @@ func NewAPI(cfg Config) (*API, error) {
 		},
 		ds:        cfg.DataStore,
 		terminate: make(chan any),
+		onReadJob: job.ApplyMiddleware(
+			job.NoOpHandlerFunc,
+			cfg.Middleware.Job,
+		),
 	}
 
 	// registering custom middleware
@@ -88,7 +95,7 @@ func NewAPI(cfg Config) (*API, error) {
 		r.Use(s.middlewareAdapter(m))
 	}
 
-	// reigsering echo middleware
+	// registering echo middleware
 	for _, m := range cfg.Middleware.Echo {
 		r.Use(m)
 	}
@@ -290,12 +297,16 @@ func bindJobInputYAML(r io.ReadCloser) (*input.Job, error) {
 // @Router /jobs/{id} [get]
 // @Param id path string true "Job ID"
 func (s *API) getJob(c echo.Context) error {
+	ctx := c.Request().Context()
 	id := c.Param("id")
-	j, err := s.ds.GetJobByID(c.Request().Context(), id)
+	j, err := s.ds.GetJobByID(ctx, id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err)
 	}
-	return c.JSON(http.StatusOK, redact.Job(j))
+	if err := s.onReadJob(ctx, job.Read, j); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, j)
 }
 
 // listJobs

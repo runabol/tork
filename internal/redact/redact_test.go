@@ -60,7 +60,7 @@ func TestRedactTask(t *testing.T) {
 }
 
 func TestRedactJob(t *testing.T) {
-	j := Job(&tork.Job{
+	o := &tork.Job{
 		Tasks: []*tork.Task{
 			{
 				Env: map[string]string{
@@ -97,7 +97,9 @@ func TestRedactJob(t *testing.T) {
 				"task2":  "helloworld",
 			},
 		},
-	})
+	}
+	j := o.Clone()
+	Job(j)
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["SecrET_2"])
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["PASSword"])

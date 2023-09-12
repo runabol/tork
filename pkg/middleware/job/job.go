@@ -6,14 +6,28 @@ import (
 	"github.com/runabol/tork"
 )
 
-type HandlerFunc func(context.Context, *tork.Job) error
+type EventType string
+
+const (
+	// StateChange occurs when a job's state changes.
+	// Handler can inspect the job's State property
+	// in order to determine what state the job is at.
+	StateChange = "STATE_CHANGE"
+	// Read occurs when a Job is read by the client
+	// through the API.
+	Read = "READ"
+)
+
+type HandlerFunc func(ctx context.Context, et EventType, j *tork.Job) error
+
+func NoOpHandlerFunc(ctx context.Context, et EventType, j *tork.Job) error { return nil }
 
 type MiddlewareFunc func(next HandlerFunc) HandlerFunc
 
 func ApplyMiddleware(h HandlerFunc, mws []MiddlewareFunc) HandlerFunc {
-	return func(ctx context.Context, t *tork.Job) error {
+	return func(ctx context.Context, et EventType, t *tork.Job) error {
 		nx := next(ctx, 0, mws, h)
-		return nx(ctx, t)
+		return nx(ctx, et, t)
 	}
 }
 
