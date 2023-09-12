@@ -128,7 +128,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		return errors.New("task id is required")
 	}
 	if err := d.imagePull(ctx, t); err != nil {
-		return errors.Wrapf(err, "error pulling image")
+		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
 
 	env := []string{}
