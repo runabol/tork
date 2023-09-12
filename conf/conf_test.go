@@ -178,3 +178,42 @@ func TestBoolMap(t *testing.T) {
 	assert.False(t, m["key1"])
 	assert.True(t, m["key2"])
 }
+
+func TestUnmarshal(t *testing.T) {
+	konf := `
+	[main]
+	str1 = "value1"
+	bool1 = true
+	sarr1 = ["a","b"]
+	`
+
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+
+	err = conf.LoadConfig()
+	assert.NoError(t, err)
+
+	type MyConfig struct {
+		Str1  string   `koanf:"str1"`
+		Str2  string   `koanf:"str2"`
+		Bool1 bool     `koanf:"bool1"`
+		SArr1 []string `koanf:"sarr1"`
+		SArr2 []string `koanf:"sarr2"`
+	}
+
+	c := &MyConfig{
+		Str2:  "default",
+		SArr2: []string{"default1", "default2"},
+	}
+	err = conf.Unmarshal("main", &c)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "value1", c.Str1)
+	assert.Equal(t, "default", c.Str2)
+	assert.True(t, c.Bool1)
+	assert.Equal(t, []string{"a", "b"}, c.SArr1)
+	assert.Equal(t, []string{"default1", "default2"}, c.SArr2)
+}

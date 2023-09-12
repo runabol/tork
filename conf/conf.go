@@ -64,6 +64,10 @@ func IntMap(key string) map[string]int {
 	return konf.IntMap(key)
 }
 
+func Unmarshal(key string, o any) error {
+	return konf.Unmarshal(key, o)
+}
+
 func BoolMap(key string) map[string]bool {
 	return konf.BoolMap(key)
 }

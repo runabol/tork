@@ -97,28 +97,35 @@ func basicAuth() echo.MiddlewareFunc {
 }
 
 func cors() echo.MiddlewareFunc {
+	type CORSConfig struct {
+		AllowOrigins     []string `koanf:"origins"`
+		AllowMethods     []string `koanf:"methods"`
+		AllowHeaders     []string `koanf:"headers"`
+		AllowCredentials bool     `koanf:"credentials"`
+		ExposeHeaders    []string `koanf:"headers"`
+	}
+
+	cf := CORSConfig{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"*"},
+		AllowCredentials: false,
+		ExposeHeaders:    []string{"*"},
+	}
+
+	if err := conf.Unmarshal("middleware.web.cors", &cf); err != nil {
+		panic(errors.Wrapf(err, "error parsing CORS middleware config"))
+	}
+
 	log.Debug().Msg("CORS middleware enabled")
+
 	return middleware.CORSWithConfig(
 		middleware.CORSConfig{
-			AllowOrigins: conf.StringsDefault(
-				"middleware.web.cors.allow_origins",
-				[]string{"*"},
-			),
-			AllowMethods: conf.StringsDefault(
-				"middleware.web.cors.allow_methods",
-				[]string{"*"},
-			),
-			AllowHeaders: conf.StringsDefault(
-				"middleware.web.cors.allow_headers",
-				[]string{"*"},
-			),
-			AllowCredentials: conf.Bool(
-				"middleware.web.cors.allow_credentials",
-			),
-			ExposeHeaders: conf.StringsDefault(
-				"middleware.web.cors.expose_headers",
-				[]string{"*"},
-			),
+			AllowOrigins:     cf.AllowOrigins,
+			AllowMethods:     cf.AllowMethods,
+			AllowHeaders:     cf.AllowHeaders,
+			AllowCredentials: cf.AllowCredentials,
+			ExposeHeaders:    cf.AllowHeaders,
 		},
 	)
 }
