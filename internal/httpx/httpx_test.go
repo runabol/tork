@@ -18,7 +18,7 @@ func TestStartAsync(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	s := &http.Server{
-		Addr:    "localhost:8888",
+		Addr:    "localhost:7777",
 		Handler: mux,
 	}
 	err := httpx.StartAsync(s)

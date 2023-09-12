@@ -173,7 +173,7 @@ func Test_rateLimitCustomRPS(t *testing.T) {
 }
 
 func TestSubmitJob(t *testing.T) {
-	eng := New(Config{Mode: ModeStandalone})
+	eng := New(Config{Mode: ModeCoordinator})
 
 	assert.Equal(t, StateIdle, eng.state)
 
