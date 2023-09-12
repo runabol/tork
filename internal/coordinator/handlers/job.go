@@ -18,9 +18,9 @@ import (
 type jobHandler struct {
 	ds        datastore.Datastore
 	broker    mq.Broker
-	onError   func(context.Context, *tork.Task) error
-	onPending func(context.Context, *tork.Task) error
-	onCancel  func(context.Context, *tork.Job) error
+	onError   task.HandlerFunc
+	onPending task.HandlerFunc
+	onCancel  job.HandlerFunc
 }
 
 func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFunc) job.HandlerFunc {
@@ -34,12 +34,12 @@ func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFun
 	return h.handle
 }
 
-func (h *jobHandler) handle(ctx context.Context, j *tork.Job) error {
+func (h *jobHandler) handle(ctx context.Context, et job.EventType, j *tork.Job) error {
 	switch j.State {
 	case tork.JobStatePending:
 		return h.startJob(ctx, j)
 	case tork.JobStateCancelled:
-		return h.onCancel(ctx, j)
+		return h.onCancel(ctx, et, j)
 	case tork.JobStateRestart:
 		return h.restartJob(ctx, j)
 	case tork.JobStateCompleted:

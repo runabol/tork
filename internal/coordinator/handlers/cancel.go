@@ -24,7 +24,7 @@ func NewCancelHandler(ds datastore.Datastore, b mq.Broker) job.HandlerFunc {
 	return h.handle
 }
 
-func (h *cancelHandler) handle(ctx context.Context, j *tork.Job) error {
+func (h *cancelHandler) handle(ctx context.Context, _ job.EventType, j *tork.Job) error {
 	// mark the job as cancelled
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
 		if u.State != tork.JobStateRunning {

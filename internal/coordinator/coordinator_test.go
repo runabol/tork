@@ -124,7 +124,7 @@ func TestJobMiddlewareWithOutput(t *testing.T) {
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
 				func(next job.HandlerFunc) job.HandlerFunc {
-					return func(ctx context.Context, j *tork.Job) error {
+					return func(ctx context.Context, _ job.EventType, j *tork.Job) error {
 						j.Output = "some output"
 						return nil
 					}
@@ -136,7 +136,7 @@ func TestJobMiddlewareWithOutput(t *testing.T) {
 	assert.NotNil(t, c)
 
 	j := &tork.Job{}
-	assert.NoError(t, c.onJob(context.Background(), j))
+	assert.NoError(t, c.onJob(context.Background(), job.StateChange, j))
 	assert.Equal(t, "some output", j.Output)
 }
 
@@ -148,7 +148,7 @@ func TestJobMiddlewareWithError(t *testing.T) {
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
 				func(next job.HandlerFunc) job.HandlerFunc {
-					return func(ctx context.Context, j *tork.Job) error {
+					return func(ctx context.Context, _ job.EventType, j *tork.Job) error {
 						return Err
 					}
 				},
@@ -159,7 +159,7 @@ func TestJobMiddlewareWithError(t *testing.T) {
 	assert.NotNil(t, c)
 
 	j := &tork.Job{}
-	assert.ErrorIs(t, c.onJob(context.Background(), j), Err)
+	assert.ErrorIs(t, c.onJob(context.Background(), job.StateChange, j), Err)
 }
 
 func TestJobMiddlewareNoOp(t *testing.T) {
@@ -170,8 +170,8 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
 				func(next job.HandlerFunc) job.HandlerFunc {
-					return func(ctx context.Context, j *tork.Job) error {
-						return next(ctx, j)
+					return func(ctx context.Context, et job.EventType, j *tork.Job) error {
+						return next(ctx, et, j)
 					}
 				},
 			},
@@ -194,7 +194,7 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 
-	err = c.onJob(context.Background(), j)
+	err = c.onJob(context.Background(), job.StateChange, j)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(context.Background(), j.ID)
@@ -317,7 +317,7 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = c.onJob(ctx, j1)
+	err = c.onJob(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)

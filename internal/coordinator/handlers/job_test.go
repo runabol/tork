@@ -9,6 +9,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +34,7 @@ func Test_handleJobs(t *testing.T) {
 	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
@@ -97,7 +98,7 @@ func Test_handleCancelJob(t *testing.T) {
 	assert.NoError(t, err)
 
 	// start the job
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
@@ -106,7 +107,7 @@ func Test_handleCancelJob(t *testing.T) {
 
 	j1.State = tork.JobStateCancelled
 	// cancel the job
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	// wait for the cancellation
@@ -140,7 +141,7 @@ func Test_handleRestartJob(t *testing.T) {
 	assert.NoError(t, err)
 
 	// start the job
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
@@ -149,7 +150,7 @@ func Test_handleRestartJob(t *testing.T) {
 
 	// cancel the job
 	j1.State = tork.JobStateCancelled
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err = ds.GetJobByID(ctx, j1.ID)
@@ -158,7 +159,7 @@ func Test_handleRestartJob(t *testing.T) {
 
 	// restart the job
 	j1.State = tork.JobStateRestart
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err = ds.GetJobByID(ctx, j1.ID)
@@ -167,7 +168,7 @@ func Test_handleRestartJob(t *testing.T) {
 
 	// try to restart again
 	j1.State = tork.JobStateRestart
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.Error(t, err)
 }
 
@@ -195,7 +196,7 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
@@ -238,7 +239,7 @@ func Test_handleCompleteJob(t *testing.T) {
 
 	j1.State = tork.JobStateCompleted
 
-	err = handler(ctx, j1)
+	err = handler(ctx, job.StateChange, j1)
 	assert.NoError(t, err)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)

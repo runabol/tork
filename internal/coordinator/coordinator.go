@@ -101,6 +101,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		Middleware: api.Middleware{
 			Web:  cfg.Middleware.Web,
 			Echo: cfg.Middleware.Echo,
+			Job:  cfg.Middleware.Job,
 		},
 		Endpoints: cfg.Endpoints,
 		Enabled:   cfg.Enabled,
@@ -204,7 +205,7 @@ func (c *Coordinator) Start() error {
 			case mq.QUEUE_JOBS:
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
 					ctx := context.Background()
-					return c.onJob(ctx, j)
+					return c.onJob(ctx, job.StateChange, j)
 				})
 			}
 			if err != nil {

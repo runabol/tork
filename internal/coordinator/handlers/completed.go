@@ -19,7 +19,7 @@ import (
 type completedHandler struct {
 	ds     datastore.Datastore
 	broker mq.Broker
-	onJob  func(context.Context, *tork.Job) error
+	onJob  job.HandlerFunc
 }
 
 func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
@@ -218,7 +218,7 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 		return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
 	} else {
 		j.State = tork.JobStateCompleted
-		return c.onJob(ctx, j)
+		return c.onJob(ctx, job.StateChange, j)
 	}
 
 }
