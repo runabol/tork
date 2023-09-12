@@ -3,18 +3,14 @@ package engine
 import (
 	"testing"
 
-	"github.com/runabol/tork/conf"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultRunStandalone(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	SetMode(ModeStandalone)
 
 	assert.Equal(t, StateIdle, defaultEngine.state)
-	err = Start()
+	err := Start()
 
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, defaultEngine.state)

@@ -17,16 +17,13 @@ import (
 )
 
 func TestStartStandalone(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{
 		Mode: ModeStandalone,
 	})
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	err := eng.Start()
 	assert.NoError(t, err)
 
 	assert.Equal(t, StateRunning, eng.state)
@@ -36,9 +33,6 @@ func TestStartStandalone(t *testing.T) {
 }
 
 func TestRunStandalone(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{
 		Mode: ModeStandalone,
 	})
@@ -46,7 +40,7 @@ func TestRunStandalone(t *testing.T) {
 	assert.Equal(t, StateIdle, eng.state)
 
 	go func() {
-		err = eng.Run()
+		err := eng.Run()
 		assert.NoError(t, err)
 	}()
 
@@ -54,20 +48,17 @@ func TestRunStandalone(t *testing.T) {
 	time.Sleep(time.Second)
 
 	assert.Equal(t, StateRunning, eng.state)
-	err = eng.Terminate()
+	err := eng.Terminate()
 	assert.NoError(t, err)
 	assert.Equal(t, StateTerminated, eng.state)
 }
 
 func TestStartCoordinator(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{Mode: ModeCoordinator})
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
@@ -77,14 +68,11 @@ func TestStartCoordinator(t *testing.T) {
 }
 
 func TestStartWorker(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
 	eng := New(Config{Mode: ModeWorker})
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
