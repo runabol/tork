@@ -3,9 +3,9 @@ package cli
 import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
-	"github.com/runabol/tork/pkg/conf"
 	ucli "github.com/urfave/cli/v2"
 )
 

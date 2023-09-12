@@ -2,8 +2,8 @@ package engine
 
 import (
 	"github.com/pkg/errors"
+	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/worker"
-	"github.com/runabol/tork/pkg/conf"
 	"github.com/runabol/tork/runtime"
 )
 

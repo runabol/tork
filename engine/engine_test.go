@@ -10,9 +10,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/conf"
+	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/pkg/conf"
-	"github.com/runabol/tork/pkg/input"
 	"github.com/stretchr/testify/assert"
 )
 

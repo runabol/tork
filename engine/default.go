@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/pkg/input"
-	"github.com/runabol/tork/pkg/middleware/job"
-	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/task"
-	"github.com/runabol/tork/pkg/middleware/web"
+	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
+	"github.com/runabol/tork/middleware/task"
+	"github.com/runabol/tork/middleware/web"
 )
 
 var defaultEngine *Engine = New(Config{})

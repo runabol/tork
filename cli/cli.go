@@ -3,12 +3,12 @@ package cli
 import (
 	"os"
 
+	"github.com/runabol/tork/engine"
 	"github.com/runabol/tork/internal/logging"
-	"github.com/runabol/tork/pkg/engine"
-	"github.com/runabol/tork/pkg/middleware/job"
-	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/task"
-	"github.com/runabol/tork/pkg/middleware/web"
+	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
+	"github.com/runabol/tork/middleware/task"
+	"github.com/runabol/tork/middleware/web"
 	ucli "github.com/urfave/cli/v2"
 )
 

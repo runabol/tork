@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/pkg/middleware/node"
+	"github.com/runabol/tork/middleware/node"
 )
 
 type heartbeatHandler struct {

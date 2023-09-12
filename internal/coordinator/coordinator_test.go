@@ -9,10 +9,10 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/node"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/pkg/middleware/job"
-	"github.com/runabol/tork/pkg/middleware/node"
-	"github.com/runabol/tork/pkg/middleware/task"
 
 	"github.com/runabol/tork/runtime"
 

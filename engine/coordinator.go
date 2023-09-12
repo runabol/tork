@@ -7,10 +7,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/pkg/conf"
-	"github.com/runabol/tork/pkg/middleware/job"
+	"github.com/runabol/tork/middleware/job"
 	"golang.org/x/time/rate"
 )
 
