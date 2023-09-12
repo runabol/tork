@@ -1,6 +1,10 @@
 package engine
 
 import (
+	"context"
+
+	"github.com/runabol/tork"
+	"github.com/runabol/tork/pkg/input"
 	"github.com/runabol/tork/pkg/middleware/job"
 	"github.com/runabol/tork/pkg/middleware/node"
 	"github.com/runabol/tork/pkg/middleware/task"
@@ -27,6 +31,10 @@ func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 
 func RegisterEndpoint(method, path string, handler web.HandlerFunc) {
 	defaultEngine.RegisterEndpoint(method, path, handler)
+}
+
+func SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
+	return defaultEngine.SubmitJob(ctx, ij, listeners...)
 }
 
 func Start() error {

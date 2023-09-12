@@ -3,19 +3,18 @@ package engine
 import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/internal/worker"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/pkg/conf"
 	"github.com/runabol/tork/runtime"
 )
 
-func createWorker(b mq.Broker) (*worker.Worker, error) {
+func (e *Engine) initWorker() error {
 	queues := conf.IntMap("worker.queues")
 	rt, err := runtime.NewDockerRuntime()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	w, err := worker.NewWorker(worker.Config{
-		Broker:  b,
+		Broker:  e.broker,
 		Runtime: rt,
 		Queues:  queues,
 		Limits: worker.Limits{
@@ -26,10 +25,11 @@ func createWorker(b mq.Broker) (*worker.Worker, error) {
 		Address: conf.String("worker.address"),
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating worker")
+		return errors.Wrapf(err, "error creating worker")
 	}
 	if err := w.Start(); err != nil {
-		return nil, err
+		return err
 	}
-	return w, nil
+	e.worker = w
+	return nil
 }

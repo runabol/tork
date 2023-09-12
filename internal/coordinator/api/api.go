@@ -238,14 +238,14 @@ func (s *API) createJob(c echo.Context) error {
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
-	if j, err := s.submitJob(c.Request().Context(), ji); err != nil {
+	if j, err := s.SubmitJob(c.Request().Context(), ji); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	} else {
 		return c.JSON(http.StatusOK, tork.NewJobSummary(j))
 	}
 }
 
-func (s *API) submitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
+func (s *API) SubmitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
 	if err := ji.Validate(); err != nil {
 		return nil, err
 	}

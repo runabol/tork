@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/pkg/input"
 )
 
 type MiddlewareFunc func(next HandlerFunc) HandlerFunc
@@ -38,9 +37,6 @@ type Context interface {
 
 	// Error sends an error back to the client.
 	Error(code int, err error)
-
-	// SubmitJob submits a job input for processing
-	SubmitJob(j *input.Job, listeners ...JobListener) (*tork.Job, error)
 
 	// Done returns a channel that's closed when work done on behalf of this
 	// context should be canceled.
