@@ -86,7 +86,7 @@ func Test_basicAuthWrongPassword(t *testing.T) {
 }
 
 func Test_basicCorrectPassword(t *testing.T) {
-	key := "TORK_COORDINATOR_API_MIDDLEWARE_BASICAUTH_PASSWORD"
+	key := "TORK_MIDDLEWARE_WEB_BASICAUTH_PASSWORD"
 	assert.NoError(t, os.Setenv(key, "password"))
 	defer func() {
 		assert.NoError(t, os.Unsetenv(key))
@@ -132,7 +132,7 @@ func Test_rateLimit(t *testing.T) {
 }
 
 func Test_rateLimitCustomRPS(t *testing.T) {
-	key := "TORK_COORDINATOR_API_MIDDLEWARE_RATELIMIT_RPS"
+	key := "TORK_MIDDLEWARE_WEB_RATELIMIT_RPS"
 	assert.NoError(t, os.Setenv(key, "10"))
 	defer func() {
 		assert.NoError(t, os.Unsetenv(key))

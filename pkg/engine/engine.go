@@ -290,18 +290,18 @@ func (e *Engine) createCoordinator(broker mq.Broker, ds datastore.Datastore) (*c
 func echoMiddleware() []echo.MiddlewareFunc {
 	mw := make([]echo.MiddlewareFunc, 0)
 	// cors
-	corsEnabled := conf.Bool("coordinator.api.middleware.cors.enabled")
+	corsEnabled := conf.Bool("middleware.web.cors.enabled")
 	if corsEnabled {
 		mw = append(mw, cors())
 	}
 	// basic auth
-	basicAuthEnabled := conf.Bool("coordinator.api.middleware.basicauth.enabled")
+	basicAuthEnabled := conf.Bool("middleware.web.basicauth.enabled")
 	if basicAuthEnabled {
 		mw = append(mw, basicAuth())
 	}
 
 	// rate limit
-	rateLimitEnabled := conf.Bool("coordinator.api.middleware.ratelimit.enabled")
+	rateLimitEnabled := conf.Bool("middleware.web.ratelimit.enabled")
 	if rateLimitEnabled {
 		mw = append(mw, rateLimit())
 	}
@@ -310,13 +310,13 @@ func echoMiddleware() []echo.MiddlewareFunc {
 }
 
 func rateLimit() echo.MiddlewareFunc {
-	rps := conf.IntDefault("coordinator.api.middleware.ratelimit.rps", 20)
+	rps := conf.IntDefault("middleware.web.ratelimit.rps", 20)
 	return middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(rps)))
 }
 
 func basicAuth() echo.MiddlewareFunc {
-	username := conf.StringDefault("coordinator.api.middleware.basicauth.username", "tork")
-	password := conf.String("coordinator.api.middleware.basicauth.password")
+	username := conf.StringDefault("middleware.web.basicauth.username", "tork")
+	password := conf.String("middleware.web.basicauth.password")
 	if password == "" {
 		password = uuid.NewUUID()
 		log.Debug().Msgf("Basic Auth Password: %s", password)
@@ -335,22 +335,22 @@ func cors() echo.MiddlewareFunc {
 	return middleware.CORSWithConfig(
 		middleware.CORSConfig{
 			AllowOrigins: conf.StringsDefault(
-				"coordinator.api.middleware.cors.allow_origins",
+				"middleware.web.cors.allow_origins",
 				[]string{"*"},
 			),
 			AllowMethods: conf.StringsDefault(
-				"coordinator.api.middleware.cors.allow_methods",
+				"middleware.web.cors.allow_methods",
 				[]string{"*"},
 			),
 			AllowHeaders: conf.StringsDefault(
-				"coordinator.api.middleware.cors.allow_headers",
+				"middleware.web.cors.allow_headers",
 				[]string{"*"},
 			),
 			AllowCredentials: conf.Bool(
-				"coordinator.api.middleware.cors.allow_credentials",
+				"middleware.web.cors.allow_credentials",
 			),
 			ExposeHeaders: conf.StringsDefault(
-				"coordinator.api.middleware.cors.expose_headers",
+				"middleware.web.cors.expose_headers",
 				[]string{"*"},
 			),
 		},

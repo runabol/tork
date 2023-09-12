@@ -152,7 +152,7 @@ See the [REST API](https://www.tork.run/rest) documentation.
 Make sure you have CORS configured in your [config file](https://www.tork.run/config):
 
 ```toml
-[coordinator.api.middleware.cors]
+[middleware.web.cors]
 enabled = true
 ```
 
