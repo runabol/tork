@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/pkg/middleware/web"
+	"github.com/runabol/tork/middleware/web"
 
 	"github.com/runabol/tork/mq"
 

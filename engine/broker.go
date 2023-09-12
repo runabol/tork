@@ -2,8 +2,8 @@ package engine
 
 import (
 	"github.com/pkg/errors"
+	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/pkg/conf"
 )
 
 func (e *Engine) initBroker() error {

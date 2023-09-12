@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/runabol/tork/pkg/conf"
+	"github.com/runabol/tork/conf"
 	"github.com/stretchr/testify/assert"
 )
 
