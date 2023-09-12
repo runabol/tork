@@ -163,7 +163,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 }
 
 func (c *Coordinator) Start() error {
-	log.Info().Msgf("starting %s", c.Name)
+	log.Info().Msgf("starting Coordinator")
 	// start the coordinator API
 	if err := c.api.Start(); err != nil {
 		return err
