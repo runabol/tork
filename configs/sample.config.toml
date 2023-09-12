@@ -53,6 +53,11 @@ enabled = false
 username = "tork"
 password = ""
 
+# rate limiter middleware
+[coordinator.api.middleware.ratelimit]
+enabled = false
+rps = 20        # requests per second per IP
+
 [worker]
 address = "localhost:8001"
 tempdir = "/tmp"

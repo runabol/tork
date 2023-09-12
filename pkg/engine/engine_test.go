@@ -107,3 +107,56 @@ func Test_basicCorrectPassword(t *testing.T) {
 	err = x(ctx)
 	assert.NoError(t, err)
 }
+
+func Test_rateLimit(t *testing.T) {
+	mw := rateLimit()
+	req, err := http.NewRequest("GET", "/health", nil)
+	req.SetBasicAuth("tork", "password")
+	req.Header.Set("X-Real-Ip", "1.1.1.1")
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, w)
+	h := func(c echo.Context) error {
+		return nil
+	}
+	for i := 0; i < 30; i++ {
+		x := mw(h)
+		err = x(ctx)
+		assert.NoError(t, err)
+		if i < 20 {
+			assert.Equal(t, http.StatusOK, w.Code)
+		} else {
+			assert.Equal(t, http.StatusTooManyRequests, w.Code)
+		}
+	}
+}
+
+func Test_rateLimitCustomRPS(t *testing.T) {
+	key := "TORK_COORDINATOR_API_MIDDLEWARE_RATELIMIT_RPS"
+	assert.NoError(t, os.Setenv(key, "10"))
+	defer func() {
+		assert.NoError(t, os.Unsetenv(key))
+	}()
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+	mw := rateLimit()
+	req, err := http.NewRequest("GET", "/health", nil)
+	req.SetBasicAuth("tork", "password")
+	req.Header.Set("X-Real-Ip", "1.1.1.1")
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, w)
+	h := func(c echo.Context) error {
+		return nil
+	}
+	for i := 0; i < 30; i++ {
+		x := mw(h)
+		err = x(ctx)
+		assert.NoError(t, err)
+		if i < 10 {
+			assert.Equal(t, http.StatusOK, w.Code)
+		} else {
+			assert.Equal(t, http.StatusTooManyRequests, w.Code)
+		}
+	}
+}

@@ -84,6 +84,14 @@ func StringsDefault(key string, dv []string) []string {
 	return konf.Strings(key)
 }
 
+func IntDefault(key string, dv int) int {
+	v := konf.Get(key)
+	if v == nil {
+		return dv
+	}
+	return konf.Int(key)
+}
+
 func String(key string) string {
 	return konf.String(key)
 }
