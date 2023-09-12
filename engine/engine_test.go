@@ -4,13 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +80,7 @@ func TestStartWorker(t *testing.T) {
 }
 
 func Test_basicAuthWrongPassword(t *testing.T) {
-	mw := basicAuth()
+	mw := basicAuth("tork", "")
 	req, err := http.NewRequest("GET", "/health", nil)
 	req.SetBasicAuth("tork", "password")
 	assert.NoError(t, err)
@@ -97,15 +95,7 @@ func Test_basicAuthWrongPassword(t *testing.T) {
 }
 
 func Test_basicCorrectPassword(t *testing.T) {
-	key := "TORK_MIDDLEWARE_WEB_BASICAUTH_PASSWORD"
-	assert.NoError(t, os.Setenv(key, "password"))
-	defer func() {
-		assert.NoError(t, os.Unsetenv(key))
-	}()
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-
-	mw := basicAuth()
+	mw := basicAuth("tork", "password")
 	req, err := http.NewRequest("GET", "/health", nil)
 	req.SetBasicAuth("tork", "password")
 	assert.NoError(t, err)
@@ -120,7 +110,7 @@ func Test_basicCorrectPassword(t *testing.T) {
 }
 
 func Test_rateLimit(t *testing.T) {
-	mw := rateLimit()
+	mw := rateLimit(20)
 	req, err := http.NewRequest("GET", "/health", nil)
 	req.SetBasicAuth("tork", "password")
 	req.Header.Set("X-Real-Ip", "1.1.1.1")
@@ -143,14 +133,7 @@ func Test_rateLimit(t *testing.T) {
 }
 
 func Test_rateLimitCustomRPS(t *testing.T) {
-	key := "TORK_MIDDLEWARE_WEB_RATELIMIT_RPS"
-	assert.NoError(t, os.Setenv(key, "10"))
-	defer func() {
-		assert.NoError(t, os.Unsetenv(key))
-	}()
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
-	mw := rateLimit()
+	mw := rateLimit(10)
 	req, err := http.NewRequest("GET", "/health", nil)
 	req.SetBasicAuth("tork", "password")
 	req.Header.Set("X-Real-Ip", "1.1.1.1")

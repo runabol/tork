@@ -6,13 +6,10 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
-	"github.com/runabol/tork/conf"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCORS(t *testing.T) {
-	err := conf.LoadConfig()
-	assert.NoError(t, err)
 	mw := cors()
 	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)

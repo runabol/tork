@@ -63,26 +63,26 @@ func echoMiddleware() []echo.MiddlewareFunc {
 	// basic auth
 	basicAuthEnabled := conf.Bool("middleware.web.basicauth.enabled")
 	if basicAuthEnabled {
-		mw = append(mw, basicAuth())
+		username := conf.StringDefault("middleware.web.basicauth.username", "tork")
+		password := conf.String("middleware.web.basicauth.password")
+		mw = append(mw, basicAuth(username, password))
 	}
 
 	// rate limit
 	rateLimitEnabled := conf.Bool("middleware.web.ratelimit.enabled")
 	if rateLimitEnabled {
-		mw = append(mw, rateLimit())
+		rps := conf.IntDefault("middleware.web.ratelimit.rps", 20)
+		mw = append(mw, rateLimit(rps))
 	}
 
 	return mw
 }
 
-func rateLimit() echo.MiddlewareFunc {
-	rps := conf.IntDefault("middleware.web.ratelimit.rps", 20)
+func rateLimit(rps int) echo.MiddlewareFunc {
 	return middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(rps)))
 }
 
-func basicAuth() echo.MiddlewareFunc {
-	username := conf.StringDefault("middleware.web.basicauth.username", "tork")
-	password := conf.String("middleware.web.basicauth.password")
+func basicAuth(username, password string) echo.MiddlewareFunc {
 	if password == "" {
 		password = uuid.NewUUID()
 		log.Debug().Msgf("Basic Auth Password: %s", password)
