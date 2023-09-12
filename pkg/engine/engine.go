@@ -288,7 +288,7 @@ func echoMiddleware() []echo.MiddlewareFunc {
 		mw = append(mw, cors())
 	}
 	// basic auth
-	basicAuthEnabled := conf.Bool("coordinator.api.middleware.basic_auth.enabled")
+	basicAuthEnabled := conf.Bool("coordinator.api.middleware.basicauth.enabled")
 	if basicAuthEnabled {
 		mw = append(mw, basicAuth())
 	}
@@ -297,8 +297,8 @@ func echoMiddleware() []echo.MiddlewareFunc {
 }
 
 func basicAuth() echo.MiddlewareFunc {
-	username := conf.StringDefault("coordinator.api.middleware.basic_auth.username", "tork")
-	password := conf.String("coordinator.api.middleware.basic_auth.password")
+	username := conf.StringDefault("coordinator.api.middleware.basicauth.username", "tork")
+	password := conf.String("coordinator.api.middleware.basicauth.password")
 	if password == "" {
 		password = uuid.NewUUID()
 		log.Debug().Msgf("Basic Auth Password: %s", password)

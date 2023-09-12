@@ -48,7 +48,7 @@ allow_credentials = false
 expose_headers = "*"
 
 # basic auth middleware
-[coordinator.api.middleware.basic_auth]
+[coordinator.api.middleware.basicauth]
 enabled = false
 username = "tork"
 password = ""
