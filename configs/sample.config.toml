@@ -42,10 +42,10 @@ jobs = 1      # jobs queue consumers
 # cors middleware
 [middleware.web.cors]
 enabled = false
-allow_origins = "*"
-allow_methods = "*"
-allow_credentials = false
-expose_headers = "*"
+origins = "*"
+methods = "*"
+credentials = false
+headers = "*"
 
 # basic auth middleware
 [middleware.web.basicauth]
