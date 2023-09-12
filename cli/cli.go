@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/runabol/tork/internal/logging"
@@ -14,13 +13,7 @@ import (
 )
 
 type CLI struct {
-	app         *ucli.App
-	configurers []func(eng *engine.Engine) error
-	webmw       []web.MiddlewareFunc
-	taskmw      []task.MiddlewareFunc
-	jobmw       []job.MiddlewareFunc
-	nodemw      []node.MiddlewareFunc
-	endpoints   map[string]web.HandlerFunc
+	app *ucli.App
 }
 
 func New() *CLI {
@@ -29,8 +22,7 @@ func New() *CLI {
 		Usage: "a distributed workflow engine",
 	}
 	c := &CLI{
-		app:       app,
-		endpoints: make(map[string]web.HandlerFunc),
+		app: app,
 	}
 	app.Before = c.before
 	app.Commands = c.commands()
@@ -38,23 +30,23 @@ func New() *CLI {
 }
 
 func (c *CLI) RegisterWebMiddleware(mw web.MiddlewareFunc) {
-	c.webmw = append(c.webmw, mw)
+	engine.RegisterWebMiddleware(mw)
 }
 
 func (c *CLI) RegisterTaskMiddleware(mw task.MiddlewareFunc) {
-	c.taskmw = append(c.taskmw, mw)
+	engine.RegisterTaskMiddleware(mw)
 }
 
 func (c *CLI) RegisterJobMiddleware(mw job.MiddlewareFunc) {
-	c.jobmw = append(c.jobmw, mw)
+	engine.RegisterJobMiddleware(mw)
 }
 
 func (c *CLI) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
-	c.nodemw = append(c.nodemw, mw)
+	engine.RegisterNodeMiddleware(mw)
 }
 
 func (c *CLI) RegisterEndpoint(method, path string, handler web.HandlerFunc) {
-	c.endpoints[fmt.Sprintf("%s %s", method, path)] = handler
+	engine.RegisterEndpoint(method, path, handler)
 }
 
 func (c *CLI) Run() error {

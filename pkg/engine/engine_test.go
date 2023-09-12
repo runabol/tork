@@ -5,11 +5,31 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork/pkg/conf"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestStartStandalone(t *testing.T) {
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+
+	eng := New(Config{
+		Mode: ModeStandalone,
+	})
+
+	assert.Equal(t, StateIdle, eng.state)
+
+	err = eng.Start()
+	assert.NoError(t, err)
+
+	assert.Equal(t, StateRunning, eng.state)
+	err = eng.Terminate()
+	assert.NoError(t, err)
+	assert.Equal(t, StateTerminated, eng.state)
+}
 
 func TestRunStandalone(t *testing.T) {
 	err := conf.LoadConfig()
@@ -19,55 +39,54 @@ func TestRunStandalone(t *testing.T) {
 		Mode: ModeStandalone,
 	})
 
-	started := false
-	eng.OnStarted(func() error {
-		started = true
-		eng.Terminate()
-		return nil
-	})
+	assert.Equal(t, StateIdle, eng.state)
 
-	err = eng.Start()
+	go func() {
+		err = eng.Run()
+		assert.NoError(t, err)
+	}()
+
+	// wait for the engine to start
+	time.Sleep(time.Second)
+
+	assert.Equal(t, StateRunning, eng.state)
+	err = eng.Terminate()
 	assert.NoError(t, err)
-
-	assert.True(t, started)
+	assert.Equal(t, StateTerminated, eng.state)
 }
 
-func TestRunCoordinator(t *testing.T) {
+func TestStartCoordinator(t *testing.T) {
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
 
 	eng := New(Config{Mode: ModeCoordinator})
 
-	started := false
-	eng.OnStarted(func() error {
-		started = true
-		eng.Terminate()
-		return nil
-	})
+	assert.Equal(t, StateIdle, eng.state)
 
 	err = eng.Start()
 	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
 
-	assert.True(t, started)
+	err = eng.Terminate()
+	assert.NoError(t, err)
+	assert.Equal(t, StateTerminated, eng.state)
 }
 
-func TestRunWorker(t *testing.T) {
+func TestStartWorker(t *testing.T) {
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
 
 	eng := New(Config{Mode: ModeWorker})
 
-	started := false
-	eng.OnStarted(func() error {
-		started = true
-		eng.Terminate()
-		return nil
-	})
+	assert.Equal(t, StateIdle, eng.state)
 
 	err = eng.Start()
 	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
 
-	assert.True(t, started)
+	err = eng.Terminate()
+	assert.NoError(t, err)
+	assert.Equal(t, StateTerminated, eng.state)
 }
 
 func Test_basicAuthWrongPassword(t *testing.T) {
