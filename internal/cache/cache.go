@@ -5,19 +5,14 @@ package cache
 import (
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type Item[V any] struct {
 	Object     V
 	Expiration int64
-}
-
-// Returns true if the item has expired.
-func (item Item[V]) Expired() bool {
-	if item.Expiration == 0 {
-		return false
-	}
-	return time.Now().UnixNano() > item.Expiration
+	mu         sync.Mutex
 }
 
 const (
@@ -31,7 +26,7 @@ const (
 
 type Cache[V any] struct {
 	defaultExpiration time.Duration
-	items             map[string]Item[V]
+	items             map[string]*Item[V]
 	mu                sync.RWMutex
 	onEvicted         func(string, V)
 	janitor           *janitor[V]
@@ -50,7 +45,7 @@ func (c *Cache[V]) SetWithExpiration(k string, x V, d time.Duration) {
 		e = time.Now().Add(d).UnixNano()
 	}
 	c.mu.Lock()
-	c.items[k] = Item[V]{
+	c.items[k] = &Item[V]{
 		Object:     x,
 		Expiration: e,
 	}
@@ -68,7 +63,7 @@ func (c *Cache[V]) set(k string, x V, d time.Duration) {
 		e = time.Now().Add(d).UnixNano()
 	}
 	c.mu.Lock()
-	c.items[k] = Item[V]{
+	c.items[k] = &Item[V]{
 		Object:     x,
 		Expiration: e,
 	}
@@ -79,6 +74,26 @@ func (c *Cache[V]) set(k string, x V, d time.Duration) {
 // expiration.
 func (c *Cache[V]) Set(k string, x V) {
 	c.set(k, x, DefaultExpiration)
+}
+
+func (c *Cache[V]) Modify(k string, m func(x V) (V, error)) error {
+	c.mu.RLock()
+	// "Inlining" of get and Expired
+	item, found := c.items[k]
+	if !found {
+		c.mu.RUnlock()
+		return errors.Errorf("unknown key: %s", k)
+	}
+	c.mu.RUnlock()
+	item.mu.Lock()
+	v := item.Object
+	v, err := m(v)
+	if err != nil {
+		return err
+	}
+	item.Object = v
+	item.mu.Unlock()
+	return nil
 }
 
 // Get an item from the cache. Returns the item or nil, and a bool indicating
@@ -128,7 +143,7 @@ type keyAndValue[V any] struct {
 }
 
 // Delete all expired items from the cache.
-func (c *Cache[V]) DeleteExpired() {
+func (c *Cache[V]) deleteExpired() {
 	var evictedItems []keyAndValue[V]
 	now := time.Now().UnixNano()
 	c.mu.Lock()
@@ -157,10 +172,10 @@ func (c *Cache[V]) OnEvicted(f func(string, V)) {
 }
 
 // Copies all unexpired items in the cache into a new map and returns it.
-func (c *Cache[V]) allItems() map[string]Item[V] {
+func (c *Cache[V]) allItems() map[string]*Item[V] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string]Item[V], len(c.items))
+	m := make(map[string]*Item[V], len(c.items))
 	now := time.Now().UnixNano()
 	for k, v := range c.items {
 		// "Inlining" of Expired
@@ -193,7 +208,7 @@ func (c *Cache[V]) ItemCount() int {
 // Delete all items from the cache.
 func (c *Cache[V]) Flush() {
 	c.mu.Lock()
-	c.items = map[string]Item[V]{}
+	c.items = map[string]*Item[V]{}
 	c.mu.Unlock()
 }
 
@@ -207,7 +222,7 @@ func (j *janitor[V]) Run(c *Cache[V]) {
 	for {
 		select {
 		case <-ticker.C:
-			c.DeleteExpired()
+			c.deleteExpired()
 		case <-j.stop:
 			ticker.Stop()
 			return
@@ -232,7 +247,7 @@ func runJanitor[V any](c *Cache[V], ci time.Duration) {
 	go j.Run(c)
 }
 
-func newCache[V any](de time.Duration, m map[string]Item[V]) *Cache[V] {
+func newCache[V any](de time.Duration, m map[string]*Item[V]) *Cache[V] {
 	if de == 0 {
 		de = -1
 	}
@@ -243,7 +258,7 @@ func newCache[V any](de time.Duration, m map[string]Item[V]) *Cache[V] {
 	return c
 }
 
-func newCacheWithJanitor[V any](de time.Duration, ci time.Duration, m map[string]Item[V]) *Cache[V] {
+func newCacheWithJanitor[V any](de time.Duration, ci time.Duration, m map[string]*Item[V]) *Cache[V] {
 	c := newCache[V](de, m)
 	if ci > 0 {
 		runJanitor(c, ci)
@@ -257,6 +272,6 @@ func newCacheWithJanitor[V any](de time.Duration, ci time.Duration, m map[string
 // manually. If the cleanup interval is less than one, expired items are not
 // deleted from the cache before calling c.DeleteExpired().
 func New[V any](defaultExpiration, cleanupInterval time.Duration) *Cache[V] {
-	items := make(map[string]Item[V])
+	items := make(map[string]*Item[V])
 	return newCacheWithJanitor[V](defaultExpiration, cleanupInterval, items)
 }
