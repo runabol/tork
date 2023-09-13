@@ -45,14 +45,54 @@ jobs:
 
       - name: Test Tork
         run: |
+          # start tork
           ./tork run standalone &
           PID=$!
+          # give it a second to start
           sleep 1
+
+          # perform a health check
           STATUS=$(curl -f -s http://localhost:8000/health | jq -r .status)
           echo "STATUS: $STATUS"
           if [ "$STATUS" != "UP" ]; then
             exit 1
           fi
+
+          # submit a simple job 
+          JOB_ID=$(curl -s -X POST --data-binary @examples/hello.yaml \
+          -H "Content-type: text/yaml" http://localhost:8000/jobs | jq -r .id)
+          for i in {1..5}
+          do
+            JOB_STATE=$(curl -s  http://localhost:8000/jobs/$JOB_ID | jq -r .state)
+            echo "$JOB_ID $JOB_STATE"
+            if [ "$JOB_STATE" == "COMPLETED" ]; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          # submit a simple job 
+          JOB_ID=$(curl -s -X POST --data-binary @examples/hello.yaml \
+          -H "Content-type: text/yaml" http://localhost:8000/jobs | jq -r .id)
+          for i in {1..10}
+          do
+            JOB_STATE=$(curl -s  http://localhost:8000/jobs/$JOB_ID | jq -r .state)
+            echo "$JOB_ID $JOB_STATE"
+            if [ "$JOB_STATE" == "COMPLETED" ]; then
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$JOB_STATE" != "COMPLETED" ]; then
+              exit 1
+          fi
+          JOB_RESULT=$(curl -s  http://localhost:8000/jobs/$JOB_ID | jq -r .result)
+          if [ "$JOB_RESULT" != "hello world" ]; then
+              echo "invalid job result"
+              exit 1
+          fi
+
+          # terminate Tork
           kill -9 $PID
 
       - name: Run DB migration

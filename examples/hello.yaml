@@ -1,5 +1,7 @@
 name: hello world
+output: "{{ tasks.hello }}"
 tasks:
-  - name: simple task
+  - var: hello
+    name: simple task
     image: ubuntu:mantic
-    run: echo hello world
+    run: echo -n hello world > $TORK_OUTPUT

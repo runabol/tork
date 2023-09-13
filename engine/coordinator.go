@@ -129,7 +129,6 @@ func logger() echo.MiddlewareFunc {
 			return false
 		},
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			fmt.Println("here")
 			log.WithLevel(level).
 				Str("URI", v.URI).
 				Str("method", v.Method).
