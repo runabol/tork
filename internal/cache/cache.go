@@ -67,10 +67,12 @@ func (c *Cache[V]) set(k string, x V, d time.Duration) {
 	if d > 0 {
 		e = time.Now().Add(d).UnixNano()
 	}
+	c.mu.Lock()
 	c.items[k] = Item[V]{
 		Object:     x,
 		Expiration: e,
 	}
+	c.mu.Unlock()
 }
 
 // Add an item to the cache, replacing any existing item, using the default
