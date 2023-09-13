@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -36,8 +38,14 @@ type printableReader struct {
 }
 
 type pullRequest struct {
-	image string
-	done  chan error
+	image    string
+	registry registry
+	done     chan error
+}
+
+type registry struct {
+	username string
+	password string
 }
 
 func (r printableReader) Read(p []byte) (int, error) {
@@ -100,6 +108,12 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 		image: t.Image,
 		done:  make(chan error),
 	}
+	if t.Registry != nil {
+		pr.registry = registry{
+			username: t.Registry.Username,
+			password: t.Registry.Password,
+		}
+	}
 	d.pullq <- pr
 	return <-pr.done
 }
@@ -108,16 +122,26 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 // to pull images from the docker repo
 func (d *DockerRuntime) puller(ctx context.Context) {
 	for pr := range d.pullq {
-		reader, err := d.client.ImagePull(
-			ctx, pr.image, types.ImagePullOptions{})
+		authConfig := types.AuthConfig{
+			Username: pr.registry.username,
+			Password: pr.registry.password,
+		}
+		encodedJSON, err := json.Marshal(authConfig)
 		if err != nil {
 			pr.done <- err
-			return
+			continue
+		}
+		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
+		reader, err := d.client.ImagePull(
+			ctx, pr.image, types.ImagePullOptions{RegistryAuth: authStr})
+		if err != nil {
+			pr.done <- err
+			continue
 		}
 		_, err = io.Copy(os.Stdout, reader)
 		if err != nil {
 			pr.done <- err
-			return
+			continue
 		}
 		pr.done <- nil
 	}

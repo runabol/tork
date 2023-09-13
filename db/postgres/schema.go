@@ -63,6 +63,7 @@ CREATE TABLE tasks (
     entrypoint    text[],
     run_script    text,
     image         varchar(256),
+    registry      jsonb,
     env           jsonb,
     files_        jsonb,
     queue         varchar(256),

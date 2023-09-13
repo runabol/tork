@@ -231,6 +231,9 @@ func Test_imagePull(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	err = rt.imagePull(ctx, &tork.Task{Image: "localhost:5000/no/suchthing"})
+	assert.Error(t, err)
+
 	wg := sync.WaitGroup{}
 	wg.Add(3)
 
@@ -242,4 +245,39 @@ func Test_imagePull(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func Test_imagePullPrivateRegistry(t *testing.T) {
+	ctx := context.Background()
+
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	r1, err := rt.client.ImagePull(ctx, "alpine:3.18.3", types.ImagePullOptions{})
+	assert.NoError(t, err)
+	assert.NoError(t, r1.Close())
+
+	images, err := rt.client.ImageList(ctx, types.ImageListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 1)
+
+	err = rt.client.ImageTag(ctx, "alpine:3.18.3", "localhost:5000/tork/alpine:3.18.3")
+	assert.NoError(t, err)
+
+	r2, err := rt.client.ImagePush(ctx, "localhost:5000/tork/alpine:3.18.3", types.ImagePushOptions{RegistryAuth: "noauth"})
+	assert.NoError(t, err)
+	assert.NoError(t, r2.Close())
+
+	err = rt.imagePull(ctx, &tork.Task{
+		Image: "localhost:5000/tork/alpine:3.18.3",
+		Registry: &tork.Registry{
+			Username: "username",
+			Password: "password",
+		},
+	})
+
+	assert.NoError(t, err)
 }

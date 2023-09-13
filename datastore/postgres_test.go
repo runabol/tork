@@ -34,6 +34,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 		Description: "some description",
 		Networks:    []string{"some-network"},
 		Files:       map[string]string{"myfile": "hello world"},
+		Registry:    &tork.Registry{Username: "me", Password: "secret"},
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
@@ -43,6 +44,8 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.Description, t2.Description)
 	assert.Equal(t, []string([]string{"some-network"}), t2.Networks)
 	assert.Equal(t, map[string]string{"myfile": "hello world"}, t2.Files)
+	assert.Equal(t, "me", t2.Registry.Username)
+	assert.Equal(t, "secret", t2.Registry.Password)
 }
 
 func TestPostgresCreateTaskBadOutput(t *testing.T) {

@@ -38,6 +38,7 @@ type Task struct {
 	Entrypoint  []string          `json:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty"`
 	Image       string            `json:"image,omitempty"`
+	Registry    *Registry         `json:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
 	Files       map[string]string `json:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty"`
@@ -89,6 +90,11 @@ type TaskLimits struct {
 	Memory string `json:"memory,omitempty"`
 }
 
+type Registry struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 func (s TaskState) IsActive() bool {
 	return s == TaskStatePending ||
 		s == TaskStateScheduled ||
@@ -116,6 +122,10 @@ func (t *Task) Clone() *Task {
 	if t.Parallel != nil {
 		parallel = t.Parallel.Clone()
 	}
+	var registry *Registry
+	if t.Registry != nil {
+		registry = t.Registry.Clone()
+	}
 	return &Task{
 		ID:          t.ID,
 		JobID:       t.JobID,
@@ -132,6 +142,7 @@ func (t *Task) Clone() *Task {
 		Entrypoint:  t.Entrypoint,
 		Run:         t.Run,
 		Image:       t.Image,
+		Registry:    registry,
 		Env:         clone.CloneStringMap(t.Env),
 		Files:       clone.CloneStringMap(t.Files),
 		Queue:       t.Queue,
@@ -200,5 +211,12 @@ func (p *ParallelTask) Clone() *ParallelTask {
 	return &ParallelTask{
 		Tasks:       CloneTasks(p.Tasks),
 		Completions: p.Completions,
+	}
+}
+
+func (r *Registry) Clone() *Registry {
+	return &Registry{
+		Username: r.Username,
+		Password: r.Password,
 	}
 }

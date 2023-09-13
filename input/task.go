@@ -12,6 +12,7 @@ type Task struct {
 	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
 	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
+	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Files       map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
@@ -36,11 +37,19 @@ type AuxTask struct {
 	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
 	Image       string            `json:"image,omitempty" yaml:"image,omitempty" validate:"required"`
+	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 func (i AuxTask) toTask() *tork.Task {
+	var registry *tork.Registry
+	if i.Registry != nil {
+		registry = &tork.Registry{
+			Username: i.Registry.Username,
+			Password: i.Registry.Password,
+		}
+	}
 	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
@@ -50,6 +59,7 @@ func (i AuxTask) toTask() *tork.Task {
 		Image:       i.Image,
 		Env:         i.Env,
 		Timeout:     i.Timeout,
+		Registry:    registry,
 	}
 }
 
@@ -92,6 +102,13 @@ func (i Task) toTask() *tork.Task {
 			Tasks: toTasks(i.Parallel.Tasks),
 		}
 	}
+	var registry *tork.Registry
+	if i.Registry != nil {
+		registry = &tork.Registry{
+			Username: i.Registry.Username,
+			Password: i.Registry.Password,
+		}
+	}
 	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
@@ -99,6 +116,7 @@ func (i Task) toTask() *tork.Task {
 		Entrypoint:  i.Entrypoint,
 		Run:         i.Run,
 		Image:       i.Image,
+		Registry:    registry,
 		Env:         i.Env,
 		Files:       i.Files,
 		Queue:       i.Queue,
@@ -158,4 +176,9 @@ type Retry struct {
 type Limits struct {
 	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
+}
+
+type Registry struct {
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 }
