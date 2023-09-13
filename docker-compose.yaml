@@ -24,6 +24,20 @@ services:
       SWAGGER_JSON: /code/docs/swagger.json
     volumes:
       - .:/code
+  registry:
+    image: registry:2
+    restart: always
+    ports:
+      - 5000:5000
+  web:
+    image: runabol/tork-web
+    restart: always
+    ports:
+      - 8100:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BACKEND_URL: "http://host.docker.internal:8000"
   migration:
     image: golang:1.19
     working_dir: /code

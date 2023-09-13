@@ -6,6 +6,10 @@ import (
 	"github.com/runabol/tork"
 )
 
+const (
+	redactedStr = "[REDACTED]"
+)
+
 type matcher func(string) bool
 
 var matchers = []matcher{
@@ -38,6 +42,10 @@ func Task(t *tork.Task) *tork.Task {
 			redacted.Parallel.Tasks[i] = Task(p)
 		}
 	}
+	// registry creds
+	if redacted.Registry != nil {
+		redacted.Registry.Password = redactedStr
+	}
 	return redacted
 }
 
@@ -63,7 +71,7 @@ func redactVars(m map[string]string) map[string]string {
 	for k, v := range m {
 		for _, m := range matchers {
 			if m(k) {
-				v = "[REDACTED]"
+				v = redactedStr
 				break
 			}
 		}

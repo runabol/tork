@@ -36,6 +36,7 @@ type taskRecord struct {
 	Entrypoint  pq.StringArray `db:"entrypoint"`
 	Run         string         `db:"run_script"`
 	Image       string         `db:"image"`
+	Registry    []byte         `db:"registry"`
 	Env         []byte         `db:"env"`
 	Files       []byte         `db:"files_"`
 	Queue       string         `db:"queue"`
@@ -149,7 +150,13 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.subjob")
 		}
 	}
-
+	var registry *tork.Registry
+	if r.Registry != nil {
+		registry = &tork.Registry{}
+		if err := json.Unmarshal(r.Registry, registry); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.registry")
+		}
+	}
 	return &tork.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -165,6 +172,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Entrypoint:  r.Entrypoint,
 		Run:         r.Run,
 		Image:       r.Image,
+		Registry:    registry,
 		Env:         env,
 		Files:       files,
 		Queue:       r.Queue,
@@ -320,6 +328,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		s := string(b)
 		subjob = &s
 	}
+	var registry *string
+	if t.Registry != nil {
+		b, err := json.Marshal(t.Registry)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.registry")
+		}
+		s := string(b)
+		registry = &s
+	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -353,12 +370,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 			description, -- $30
 			subjob, -- $31
 			networks, -- $32
-			files_ -- $33
+			files_, -- $33
+			registry -- $34
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32,$33)`
+			$27,$28,$29,$30,$31,$32,$33,$34)`
 	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -393,6 +411,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		subjob,                       // $31
 		pq.StringArray(t.Networks),   // $32
 		files,                        // $33
+		registry,                     // $34
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
