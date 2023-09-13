@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"runtime"
 	"strconv"
 	"sync"
@@ -145,6 +146,41 @@ func TestItemCount(t *testing.T) {
 	if n := tc.ItemCount(); n != 3 {
 		t.Errorf("Item count is not 3: %d", n)
 	}
+}
+
+func TestIterate(t *testing.T) {
+	tc := New[string](DefaultExpiration, 0)
+
+	for i := 0; i < 1000; i++ {
+		tc.SetWithExpiration(fmt.Sprintf("foo%d", i), fmt.Sprintf("%d", i), DefaultExpiration)
+	}
+
+	r := sync.WaitGroup{}
+	r.Add(10)
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer r.Done()
+			tc.Iterate(func(key string, v string) {
+				time.Sleep(time.Millisecond)
+			})
+		}()
+	}
+
+	w := sync.WaitGroup{}
+	w.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer w.Done()
+			for i := 0; i < 1000; i++ {
+				time.Sleep(time.Millisecond)
+				tc.Set(fmt.Sprintf("foo%d", i), fmt.Sprintf("%d", i))
+			}
+		}()
+	}
+
+	r.Wait()
+	w.Wait()
 }
 
 func TestFlush(t *testing.T) {
