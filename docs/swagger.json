@@ -348,6 +348,9 @@
                 "name": {
                     "type": "string"
                 },
+                "registry": {
+                    "$ref": "#/definitions/input.Registry"
+                },
                 "run": {
                     "type": "string"
                 },
@@ -425,6 +428,17 @@
                     "items": {
                         "$ref": "#/definitions/input.Task"
                     }
+                }
+            }
+        },
+        "input.Registry": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -545,6 +559,9 @@
                 },
                 "queue": {
                     "type": "string"
+                },
+                "registry": {
+                    "$ref": "#/definitions/input.Registry"
                 },
                 "retry": {
                     "$ref": "#/definitions/input.Retry"
@@ -813,6 +830,17 @@
                 }
             }
         },
+        "tork.Registry": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "tork.SubJobTask": {
             "type": "object",
             "properties": {
@@ -937,6 +965,9 @@
                 },
                 "queue": {
                     "type": "string"
+                },
+                "registry": {
+                    "$ref": "#/definitions/tork.Registry"
                 },
                 "result": {
                     "type": "string"

@@ -162,7 +162,7 @@ Start Tork in `standalone` or `coordinator` mode.
 go run cmd/main.go run standalone
 ```
 
-Server the Swagger Docs
+Serve the Swagger Docs
 
 ```shell
 docker compose up -d swagger
