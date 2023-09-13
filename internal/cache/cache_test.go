@@ -1,12 +1,16 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 	"runtime"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type TestStruct struct {
@@ -225,6 +229,46 @@ func TestOnEvicted(t *testing.T) {
 	if x.(int) != 4 {
 		t.Error("bar was not 4")
 	}
+}
+
+func TestModify(t *testing.T) {
+	tc := New[int](DefaultExpiration, 0)
+	tc.Set("number", 0)
+	for i := 0; i < 10; i++ {
+		err := tc.Modify("number", func(x int) (int, error) {
+			return x + 1, nil
+		})
+		assert.NoError(t, err)
+	}
+	v, ok := tc.Get("number")
+	assert.True(t, ok)
+	assert.Equal(t, 10, v)
+
+	err := tc.Modify("number", func(x int) (int, error) {
+		return 0, errors.New("something bad happened")
+	})
+	assert.Error(t, err)
+}
+
+func TestModifyConcurrently(t *testing.T) {
+	tc := New[int](DefaultExpiration, 0)
+	tc.Set("number", 0)
+	wg := sync.WaitGroup{}
+	wg.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer wg.Done()
+			err := tc.Modify("number", func(x int) (int, error) {
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+				return x + 1, nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+	v, ok := tc.Get("number")
+	assert.True(t, ok)
+	assert.Equal(t, 1000, v)
 }
 
 func BenchmarkCacheGetExpiring(b *testing.B) {
@@ -465,6 +509,6 @@ func BenchmarkDeleteExpiredLoop(b *testing.B) {
 	tc.mu.Unlock()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		tc.DeleteExpired()
+		tc.deleteExpired()
 	}
 }

@@ -2,6 +2,8 @@ package datastore_test
 
 import (
 	"context"
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -86,6 +88,80 @@ func TestInMemoryUpdateTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 }
 
+func TestInMemoryUpdateTaskConcurrently(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+		Parallel:  &tork.ParallelTask{},
+	}
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+				u.State = tork.TaskStateScheduled
+				u.Result = "my result"
+				u.Parallel.Completions = u.Parallel.Completions + 1
+				return nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateScheduled, t2.State)
+	assert.Equal(t, "my result", t2.Result)
+	assert.Equal(t, 1000, t2.Parallel.Completions)
+}
+
+func TestInMemoryUpdateJobConcurrently(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		TaskCount: 0,
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+				u.TaskCount = u.TaskCount + 1
+				return nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 1000, j2.TaskCount)
+}
+
 func TestInMemoryCreateAndGetNode(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()
@@ -120,6 +196,37 @@ func TestInMemoryUpdateNode(t *testing.T) {
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, now, n2.LastHeartbeatAt)
+}
+
+func TestInMemoryUpdateNodeConcurrently(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	n1 := &tork.Node{
+		ID:              uuid.NewUUID(),
+		LastHeartbeatAt: time.Now().UTC().Add(-time.Minute),
+	}
+	err := ds.CreateNode(ctx, n1)
+	assert.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer wg.Done()
+			err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+				u.TaskCount = u.TaskCount + 1
+				return nil
+			})
+			assert.NoError(t, err)
+		}()
+	}
+
+	wg.Wait()
+
+	n2, err := ds.GetNodeByID(ctx, n1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 1000, n2.TaskCount)
 }
 
 func TestInMemoryExpiredNodes(t *testing.T) {

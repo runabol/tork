@@ -91,15 +91,16 @@ func (ds *InMemoryDatastore) GetTaskByID(ctx context.Context, id string) (*tork.
 }
 
 func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify func(u *tork.Task) error) error {
-	t, ok := ds.tasks.Get(id)
+	_, ok := ds.tasks.Get(id)
 	if !ok {
 		return ErrTaskNotFound
 	}
-	if err := modify(t); err != nil {
-		return err
-	}
-	ds.tasks.Set(id, t)
-	return nil
+	return ds.tasks.Modify(id, func(t *tork.Task) (*tork.Task, error) {
+		if err := modify(t); err != nil {
+			return nil, errors.Wrapf(err, "error modifying task %s", id)
+		}
+		return t, nil
+	})
 }
 
 func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *tork.Node) error {
@@ -112,15 +113,16 @@ func (ds *InMemoryDatastore) CreateNode(ctx context.Context, n *tork.Node) error
 }
 
 func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify func(u *tork.Node) error) error {
-	n, ok := ds.nodes.Get(id)
+	_, ok := ds.nodes.Get(id)
 	if !ok {
 		return ErrNodeNotFound
 	}
-	if err := modify(n); err != nil {
-		return err
-	}
-	ds.nodes.Set(id, n)
-	return nil
+	return ds.nodes.Modify(id, func(n *tork.Node) (*tork.Node, error) {
+		if err := modify(n); err != nil {
+			return nil, errors.Wrapf(err, "error modifying node %s", id)
+		}
+		return n, nil
+	})
 }
 
 func (ds *InMemoryDatastore) GetNodeByID(ctx context.Context, id string) (*tork.Node, error) {
@@ -156,13 +158,27 @@ func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 }
 
 func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error {
+	_, ok := ds.jobs.Get(id)
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	err := ds.jobs.Modify(id, func(j *tork.Job) (*tork.Job, error) {
+		if err := modify(j); err != nil {
+			return nil, errors.Wrapf(err, "error modifying job %s", id)
+		}
+		return j, nil
+	})
+
+	if err != nil {
+		return err
+	}
+
 	j, ok := ds.jobs.Get(id)
 	if !ok {
 		return ErrJobNotFound
 	}
-	if err := modify(j); err != nil {
-		return err
-	}
+
 	if j.State == tork.JobStateCompleted || j.State == tork.JobStateFailed {
 		exp := defaultJobExpiration
 		if ds.jobExpiration != nil {
@@ -172,6 +188,7 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	} else {
 		ds.jobs.Set(j.ID, j)
 	}
+
 	return nil
 }
 
