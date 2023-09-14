@@ -19,7 +19,7 @@ services:
     image: swaggerapi/swagger-ui
     restart: always
     ports:
-      - 9000:8080
+      - 8200:8080
     environment:
       SWAGGER_JSON: /code/docs/swagger.json
     volumes:
