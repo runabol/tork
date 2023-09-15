@@ -195,3 +195,12 @@ func TestRabbitMQPublishUnknownEvent(t *testing.T) {
 	err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, "not a thing")
 	assert.Error(t, err)
 }
+
+func TestRabbitMQHealthChech(t *testing.T) {
+	ctx := context.Background()
+	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	assert.NoError(t, b.HealthCheck(ctx))
+	assert.NoError(t, b.Shutdown(ctx))
+	assert.Error(t, b.HealthCheck(ctx))
+}

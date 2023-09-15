@@ -181,6 +181,7 @@ func (s *API) middlewareAdapter(m web.MiddlewareFunc) echo.MiddlewareFunc {
 func (s *API) health(c echo.Context) error {
 	result := health.HealthCheck().
 		WithIndicator("datastore", s.ds.HealthCheck).
+		WithIndicator("broker", s.broker.HealthCheck).
 		Do(c.Request().Context())
 	if result.Status == health.StatusDown {
 		return c.JSON(http.StatusServiceUnavailable, result)
