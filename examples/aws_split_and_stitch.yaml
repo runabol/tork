@@ -1,6 +1,6 @@
-name: split and stitch demo long content
+name: Split and stitch demo long content on AWS
 description: |
-  this job splits an input video into 10s chunks, transcodes the various chunks in parallel, 
+  This job splits an input video into 30s chunks, transcodes the chunks in parallel, 
   and finally stitches the final result into a single file.
 inputs:
   bucket: my-bucket
