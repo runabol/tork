@@ -714,3 +714,28 @@ func TestPostgresWithTxUpdateTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
+
+func TestPostgresHealthCheck(t *testing.T) {
+	ctx := context.Background()
+	schemaName := fmt.Sprintf("tork%d", rand.Int())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	assert.NoError(t, err)
+	_, err = ds.db.Exec(fmt.Sprintf("create schema %s", schemaName))
+	assert.NoError(t, err)
+	defer func() {
+		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
+		assert.NoError(t, err)
+	}()
+	err = ds.ExecScript(postgres.SCHEMA)
+	assert.NoError(t, err)
+
+	err = ds.HealthCheck(ctx)
+	assert.NoError(t, err)
+
+	_, err = ds.db.Exec("drop table nodes cascade")
+	assert.NoError(t, err)
+
+	err = ds.HealthCheck(ctx)
+	assert.Error(t, err)
+}

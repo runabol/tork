@@ -312,3 +312,7 @@ func (ds *InMemoryDatastore) onJobEviction(s string, job *tork.Job) {
 		ds.tasks.Delete(task.ID)
 	}
 }
+
+func (ds *InMemoryDatastore) HealthCheck(ctx context.Context) error {
+	return nil
+}

@@ -327,7 +327,7 @@ func (w *Worker) sendHeartbeats() {
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
 				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
-				Version:         fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
+				Version:         tork.FormattedVersion(),
 			},
 		)
 		if err != nil {

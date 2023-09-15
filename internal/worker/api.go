@@ -49,7 +49,7 @@ func (s *api) health(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  status,
-		"version": fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
+		"version": tork.FormattedVersion(),
 	})
 }
 
