@@ -99,10 +99,18 @@ func TestTaskMiddlewareNoOp(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
+	j1 := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+	err = ds.CreateJob(context.Background(), j1)
+	assert.NoError(t, err)
+
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Name:  "my task",
 		State: tork.TaskStatePending,
+		JobID: j1.ID,
 	}
 
 	err = ds.CreateTask(context.Background(), tk)

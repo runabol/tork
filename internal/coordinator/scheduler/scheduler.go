@@ -36,15 +36,49 @@ func (s *Scheduler) ScheduleTask(ctx context.Context, t *tork.Task) error {
 
 func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
+	// apply job-level defaults
+	job, err := s.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return err
+	}
+	if job.Defaults.Queue != "" {
+		t.Queue = job.Defaults.Queue
+	}
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
 	}
+	if job.Defaults.Limits != nil {
+		if t.Limits == nil {
+			t.Limits = &tork.TaskLimits{}
+		}
+		if t.Limits.CPUs == "" {
+			t.Limits.CPUs = job.Defaults.Limits.CPUs
+		}
+		if t.Limits.Memory == "" {
+			t.Limits.Memory = job.Defaults.Limits.Memory
+		}
+	}
+	if t.Timeout == "" {
+		t.Timeout = job.Defaults.Timeout
+	}
+	if job.Defaults.Retry != nil {
+		if t.Retry == nil {
+			t.Retry = &tork.TaskRetry{}
+		}
+		if t.Retry.Limit == 0 {
+			t.Retry.Limit = job.Defaults.Retry.Limit
+		}
+	}
+	// mark job state as scheduled
 	t.State = tork.TaskStateScheduled
 	t.ScheduledAt = &now
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		u.State = t.State
 		u.ScheduledAt = t.ScheduledAt
 		u.Queue = t.Queue
+		u.Limits = t.Limits
+		u.Timeout = t.Timeout
+		u.Retry = t.Retry
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")

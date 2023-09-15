@@ -3,6 +3,7 @@ package input
 import (
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -82,6 +83,25 @@ func TestValidateJobNoName(t *testing.T) {
 	}
 	err := j.Validate()
 	assert.Error(t, err)
+}
+
+func TestValidateJobDefaults(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "some task",
+				Image: "some:image",
+			},
+		},
+		Defaults: Defaults{
+			Timeout: "1234",
+		},
+	}
+	err := j.Validate()
+	assert.Error(t, err)
+	errs := err.(validator.ValidationErrors)
+	assert.Equal(t, "Timeout", errs[0].Field())
 }
 
 func TestValidateJobTaskNoName(t *testing.T) {

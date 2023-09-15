@@ -68,16 +68,11 @@ func (i Task) toTask() *tork.Task {
 	post := toAuxTasks(i.Post)
 	var retry *tork.TaskRetry
 	if i.Retry != nil {
-		retry = &tork.TaskRetry{
-			Limit: i.Retry.Limit,
-		}
+		retry = i.Retry.toTaskRetry()
 	}
 	var limits *tork.TaskLimits
 	if i.Limits != nil {
-		limits = &tork.TaskLimits{
-			CPUs:   i.Limits.CPUs,
-			Memory: i.Limits.Memory,
-		}
+		limits = i.Limits.toTaskLimits()
 	}
 	var each *tork.EachTask
 	if i.Each != nil {
@@ -149,6 +144,19 @@ func toTasks(tis []Task) []*tork.Task {
 		result[i] = ti.toTask()
 	}
 	return result
+}
+
+func (l *Limits) toTaskLimits() *tork.TaskLimits {
+	return &tork.TaskLimits{
+		CPUs:   l.CPUs,
+		Memory: l.Memory,
+	}
+}
+
+func (r *Retry) toTaskRetry() *tork.TaskRetry {
+	return &tork.TaskRetry{
+		Limit: r.Limit,
+	}
 }
 
 type SubJob struct {

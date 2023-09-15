@@ -32,7 +32,8 @@ CREATE TABLE jobs (
     task_count    int         not null,
     output_       text,
     result        text,
-    error_        text
+    error_        text,
+    defaults      jsonb
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);

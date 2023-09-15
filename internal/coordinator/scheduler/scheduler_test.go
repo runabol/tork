@@ -28,9 +28,17 @@ func Test_scheduleRegularTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
 
+	j1 := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
+		JobID: j1.ID,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -47,6 +55,53 @@ func Test_scheduleRegularTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
 	// task should only be processed once
 	assert.Equal(t, 1, processed)
+}
+
+func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := datastore.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+
+	j1 := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+		Defaults: tork.JobDefaults{
+			Queue: "some-queue",
+			Retry: &tork.TaskRetry{
+				Limit: 5,
+			},
+			Limits: &tork.TaskLimits{
+				CPUs:   ".5",
+				Memory: "10m",
+			},
+			Timeout: "5s",
+		},
+	}
+
+	err := ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j1.ID,
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleRegularTask(ctx, tk)
+	assert.NoError(t, err)
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+	assert.Equal(t, "some-queue", tk.Queue)
+	assert.Equal(t, 5, tk.Retry.Limit)
+	assert.Equal(t, ".5", tk.Limits.CPUs)
+	assert.Equal(t, "10m", tk.Limits.Memory)
+	assert.Equal(t, "5s", tk.Timeout)
 }
 
 func Test_scheduleParallelTask(t *testing.T) {
