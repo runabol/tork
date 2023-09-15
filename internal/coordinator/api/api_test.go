@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -154,7 +155,7 @@ func Test_getActiveNodes(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func Test_health(t *testing.T) {
+func Test_healthOK(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: datastore.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
@@ -170,6 +171,28 @@ func Test_health(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "\"status\":\"UP\"")
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func Test_healthNotOK(t *testing.T) {
+	schemaName := fmt.Sprintf("tork%d", rand.Int())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := datastore.NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/health", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "\"status\":\"DOWN\"")
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 }
 
 func Test_getUnknownTask(t *testing.T) {
