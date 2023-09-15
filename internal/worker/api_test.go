@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_getStatus(t *testing.T) {
+func Test_health(t *testing.T) {
 	rt, err := runtime.NewDockerRuntime()
 	assert.NoError(t, err)
 	api := newAPI(Config{

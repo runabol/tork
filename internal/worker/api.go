@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/runabol/tork"
+	"github.com/runabol/tork/health"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
@@ -43,14 +43,14 @@ func newAPI(cfg Config) *api {
 }
 
 func (s *api) health(c echo.Context) error {
-	var status = "UP"
-	if err := s.runtime.HealthCheck(c.Request().Context()); err != nil {
-		status = "DOWN"
+	result := health.HealthCheck().
+		WithIndicator("datastore", s.runtime.HealthCheck).
+		Do(c.Request().Context())
+	if result.Status == health.StatusDown {
+		return c.JSON(http.StatusServiceUnavailable, result)
+	} else {
+		return c.JSON(http.StatusOK, result)
 	}
-	return c.JSON(http.StatusOK, map[string]string{
-		"status":  status,
-		"version": tork.FormattedVersion(),
-	})
 }
 
 func (s *api) start() error {

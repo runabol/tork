@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/health"
 
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
@@ -178,17 +179,14 @@ func (s *API) middlewareAdapter(m web.MiddlewareFunc) echo.MiddlewareFunc {
 // @Success 200 {object} HealthResponse
 // @Router /health [get]
 func (s *API) health(c echo.Context) error {
-	if err := s.ds.HealthCheck(c.Request().Context()); err != nil {
-		log.Error().Err(err).Msg("datastore failed healthcheck")
-		return c.JSON(http.StatusOK, map[string]string{
-			"status":  "DOWN",
-			"version": tork.FormattedVersion(),
-		})
+	result := health.HealthCheck().
+		WithIndicator("datastore", s.ds.HealthCheck).
+		Do(c.Request().Context())
+	if result.Status == health.StatusDown {
+		return c.JSON(http.StatusServiceUnavailable, result)
+	} else {
+		return c.JSON(http.StatusOK, result)
 	}
-	return c.JSON(http.StatusOK, map[string]string{
-		"status":  "UP",
-		"version": tork.FormattedVersion(),
-	})
 }
 
 // listQueues
