@@ -1,0 +1,22 @@
+name: create test content master
+tasks:
+  - name: stitch the chunks into a single video
+    run: |
+      mkdir /tmp/chunks
+      wget "http://ftp.nluug.nl/pub/graphics/blender/demo/movies/ToS/tears_of_steel_1080p.mov" -O /tmp/chunks/chunk0.mov
+      for i in 1 2 3 4 5; do
+        cp /tmp/chunks/chunk0.mov "/tmp/chunks/chunk$i.mov"
+      done
+      for filename in /tmp/chunks/*.mov; do
+        echo "file $filename" >> /tmp/chunks/chunks.txt
+      done
+      ffmpeg -f concat -safe 0 -i /tmp/chunks/chunks.txt -c:v copy -c:a copy /tmp/master.mov
+    image: jrottenberg/ffmpeg:3.4-alpine
+    post:
+      - name: upload the final video to minio
+        run: aws s3 cp /tmp/master.mov s3://$BUCKET_NAME/master.mov
+        image: amazon/aws-cli:2.13.10
+        env:
+          BUCKET_NAME: my-bucket
+    volumes:
+      - /tmp
