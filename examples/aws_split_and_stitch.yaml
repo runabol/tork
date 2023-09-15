@@ -1,0 +1,162 @@
+name: split and stitch demo long content
+description: |
+  this job splits an input video into 10s chunks, transcodes the various chunks in parallel, 
+  and finally stitches the final result into a single file.
+inputs:
+  bucket: my-bucket
+  source: s3://my-bucket/master.mov
+tasks:
+  - name: create a presigned url
+    var: signedURL
+    run: aws s3 presign $SOURCE --expires-in 7200 > $TORK_OUTPUT
+    image: amazon/aws-cli:2.13.10
+    env:
+      SOURCE: "{{ inputs.source }}"
+    
+  - name: get the video metadata
+    var: ffprobe
+    run: |
+      ffprobe \
+        -v quiet \
+        -print_format json \
+        -show_error \
+        -show_format \
+        -show_streams \
+        $SOURCE > $TORK_OUTPUT
+    image: jrottenberg/ffmpeg:3.4-alpine
+    env:
+      SOURCE: "{{ tasks.signedURL }}"
+    
+  - name: extract the duration of the video
+    var: duration
+    run: |
+      DURATION=$(echo -n $FFPROBE | jq -r '.format.duration')
+      echo -n $DURATION >> $TORK_OUTPUT
+    image: badouralix/curl-jq
+    env:
+      FFPROBE: "{{ tasks.ffprobe }}"
+
+  - name: extract the framerate of the video
+    var: framerate
+    run: |
+      FRAMERATE=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .r_frame_rate')
+      echo -n $FRAMERATE >> $TORK_OUTPUT
+    image: badouralix/curl-jq
+    env:
+      FFPROBE: "{{ tasks.ffprobe }}"
+    
+  - name: clean and parse framerate
+    var: framerate
+    run: |
+      python script.py $FRAMERATE > $TORK_OUTPUT
+    image: python:3-slim
+    env:
+      FRAMERATE: "{{ tasks.framerate }}"
+    files:
+      script.py: |
+        import re
+        import sys
+        cfrate = re.sub(r"[^0-9/\\.]", "", sys.argv[1])
+        pfrate = cfrate.split("/")
+        frate = float(pfrate[0])/float(pfrate[1])
+        print(frate,end="")
+    
+  - name: calculate chunks times
+    var: chunks
+    run: |
+      python script.py $DURATION $FRAMERATE > $TORK_OUTPUT
+    image: python:3-slim
+    env:
+      DURATION: "{{ tasks.duration }}"
+      FRAMERATE: "{{ tasks.framerate }}"
+    files:
+      script.py: |
+        import math
+        import json
+        import sys
+
+        duration = float(sys.argv[1])
+        frate = float(sys.argv[2])
+
+        frate_ceil = math.ceil(frate)
+        time_unit = frate_ceil/frate
+        chunk_size = 30*time_unit
+
+        chunks = []
+        start = 0
+        length = 0
+        while(start<duration):
+          if(duration-start<chunk_size):
+            length=duration-start
+          else:
+            length=chunk_size
+
+          if duration-(start+length) < 5:
+            length=duration-start
+
+          chunks.append({"start":start,"length":length})
+          
+          start = start+length;
+
+        print(json.dumps(chunks))
+    
+  - name: generate a random folder name to store the results
+    var: folderName
+    run: echo -n "video-$(shuf -i 1-10000 -n1)" > $TORK_OUTPUT
+    image: ubuntu:mantic
+    
+
+  - name: transcode the chunks in parallel
+    each:
+      list: "{{ fromJSON(tasks.chunks) }}"
+      task:
+        name: encode the chunk
+        var: chunk{{ item.index }}
+        run: |
+          ffmpeg -ss ${START} -i $SOURCE -to $LENGTH -vf scale=w=-2:h=720 -c:v h264 -c:a aac -ar 48000 -b:a 128k /tmp/chunk.mp4
+        image: jrottenberg/ffmpeg:3.4-alpine
+        env:
+          LENGTH: "{{ item.value.length }}"
+          SOURCE: "{{ tasks.signedURL }}"
+          START: "{{ item.value.start }}"
+        post:
+          - name: upload the chunk to minio
+            run: aws s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/$FOLDER_NAME/chunks/chunk_$NUMBER.mp4
+            image: amazon/aws-cli:2.13.10
+            env:
+              BUCKET_NAME: "{{inputs.bucket}}"
+              FOLDER_NAME: "{{tasks.folderName}}"
+              NUMBER: "{{ item.index }}"
+        volumes:
+          - /tmp
+        retry:
+          limit: 2
+        timeout: 180s
+
+  - name: stitch the chunks into a single video
+    run: |
+      for filename in /tmp/chunks/*.mp4; do
+        echo "file $filename" >> /tmp/chunks.txt
+      done
+      ffmpeg -f concat -safe 0 -i /tmp/chunks.txt -c copy /tmp/output.mp4
+    image: jrottenberg/ffmpeg:3.4-alpine
+    env:
+      BUCKET_NAME: "{{tasks.bucketName}}"
+    pre:
+      - name: download the chunks
+        run: aws s3 sync s3://$BUCKET_NAME/$FOLDER_NAME/chunks /tmp/chunks
+        image: amazon/aws-cli:2.13.10
+        env:
+          BUCKET_NAME: "{{inputs.bucket}}"
+          FOLDER_NAME: "{{tasks.folderName}}"
+    post:
+      - name: upload the final video to s3
+        run: aws s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/$FOLDER_NAME/output.mp4
+        image: amazon/aws-cli:2.13.10
+        env:
+          BUCKET_NAME: "{{inputs.bucket}}"
+          FOLDER_NAME: "{{tasks.folderName}}"
+    volumes:
+      - /tmp
+    retry:
+      limit: 2
