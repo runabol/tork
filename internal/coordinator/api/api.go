@@ -178,9 +178,16 @@ func (s *API) middlewareAdapter(m web.MiddlewareFunc) echo.MiddlewareFunc {
 // @Success 200 {object} HealthResponse
 // @Router /health [get]
 func (s *API) health(c echo.Context) error {
+	if err := s.ds.HealthCheck(c.Request().Context()); err != nil {
+		log.Error().Err(err).Msg("datastore failed healthcheck")
+		return c.JSON(http.StatusOK, map[string]string{
+			"status":  "DOWN",
+			"version": tork.FormattedVersion(),
+		})
+	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"status":  "UP",
-		"version": fmt.Sprintf("%s (%s)", tork.Version, tork.GitCommit),
+		"version": tork.FormattedVersion(),
 	})
 }
 

@@ -30,6 +30,8 @@ type Datastore interface {
 	GetMetrics(ctx context.Context) (*tork.Metrics, error)
 
 	WithTx(ctx context.Context, f func(tx Datastore) error) error
+
+	HealthCheck(ctx context.Context) error
 }
 
 type Page[T any] struct {
