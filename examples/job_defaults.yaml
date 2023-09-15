@@ -1,0 +1,16 @@
+name: job defaults example
+
+defaults:
+  timeout: 5s
+  retry:
+    limit: 2
+
+tasks:
+
+  - name: sleep a little
+    image: alpine:3.18.3
+    run: sleep 1
+
+  - name: sleep too much
+    image: alpine:3.18.3
+    run: sleep 10

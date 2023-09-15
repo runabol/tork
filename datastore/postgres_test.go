@@ -383,6 +383,16 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 		Inputs: map[string]string{
 			"var1": "val1",
 		},
+		Defaults: tork.JobDefaults{
+			Timeout: "5s",
+			Retry: &tork.TaskRetry{
+				Limit: 2,
+			},
+			Limits: &tork.TaskLimits{
+				CPUs:   ".5",
+				Memory: "10MB",
+			},
+		},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -390,6 +400,10 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, "val1", j2.Inputs["var1"])
+	assert.Equal(t, "5s", j2.Defaults.Timeout)
+	assert.Equal(t, 2, j2.Defaults.Retry.Limit)
+	assert.Equal(t, ".5", j2.Defaults.Limits.CPUs)
+	assert.Equal(t, "10MB", j2.Defaults.Limits.Memory)
 }
 
 func TestPostgresUpdateJob(t *testing.T) {

@@ -27,9 +27,17 @@ func Test_handlePendingTask(t *testing.T) {
 	handler := NewPendingHandler(ds, b)
 	assert.NotNil(t, handler)
 
+	j1 := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Queue: "test-queue",
+		JobID: j1.ID,
 	}
 
 	err = ds.CreateTask(ctx, tk)
