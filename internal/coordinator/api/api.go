@@ -443,7 +443,7 @@ func (s *API) Start() error {
 		}
 	} else {
 		// attempting to dynamically assign port
-		for port := MIN_PORT; port <= MAX_PORT; port++ {
+		for port := MIN_PORT; port < MAX_PORT; port++ {
 			s.server.Addr = fmt.Sprintf("localhost:%d", port)
 			if err := httpx.StartAsync(s.server); err != nil {
 				if errors.Is(err, syscall.EADDRINUSE) {
