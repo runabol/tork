@@ -229,3 +229,11 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	assert.Equal(t, 20, processed1)
 	assert.Equal(t, 10, processed2)
 }
+
+func TestInMemoryHealthChech(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	assert.NoError(t, b.HealthCheck(ctx))
+	assert.NoError(t, b.Shutdown(ctx))
+	assert.Error(t, b.HealthCheck(ctx))
+}

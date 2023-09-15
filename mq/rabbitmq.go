@@ -456,3 +456,16 @@ func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, pattern string,
 func (b *RabbitMQBroker) PublishEvent(ctx context.Context, topic string, event any) error {
 	return b.publish(ctx, RMQ_EXCHANGE_TOPIC, topic, event)
 }
+
+func (b *RabbitMQBroker) HealthCheck(ctx context.Context) error {
+	conn, err := b.getConnection()
+	if err != nil {
+		return errors.Wrapf(err, "error getting a connection")
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		return errors.Wrapf(err, "error creating channel")
+	}
+	defer ch.Close()
+	return nil
+}

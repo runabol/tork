@@ -271,3 +271,10 @@ func (b *InMemoryBroker) PublishEvent(ctx context.Context, topicName string, eve
 	})
 	return nil
 }
+
+func (b *InMemoryBroker) HealthCheck(ctx context.Context) error {
+	if b.terminate.Load() {
+		return errors.New("broker is terminated")
+	}
+	return nil
+}

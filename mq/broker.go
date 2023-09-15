@@ -26,4 +26,5 @@ type Broker interface {
 	Shutdown(ctx context.Context) error
 	PublishEvent(ctx context.Context, topic string, event any) error
 	SubscribeForEvents(ctx context.Context, pattern string, handler func(event any)) error
+	HealthCheck(ctx context.Context) error
 }
