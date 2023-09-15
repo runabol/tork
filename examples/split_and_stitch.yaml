@@ -1,29 +1,22 @@
 name: split and stitch demo
-description: |
-  this job splits an input video into 10s chunks, transcodes the various chunks in parallel, 
-  and finally stitches the final result into a single file.
-
-  This demo assumes a locally running instace of Minio (AWS S3-like service) which will be used to store the 
-  video chunks and the final video output
-
-  You can get a running instance of minio using the following command: 
-
-  docker run --name=minio -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
-
-  You'll like have to change the endpointURL below to the IP address of your minio server
-
-  The default credentials for Minio Server are minioadmin/minioadmin
 inputs:
-  source: https://upload.wikimedia.org/wikipedia/commons/1/18/Big_Buck_Bunny_Trailer_1080p.ogv
   accessKeyID: minioadmin
+  endpointURL: http://my-minio-server:9000
   secretKeyID: minioadmin
-  endpointURL: http://minio.local:9000
+  source: s3://master/master.mov
 tasks:
-  - var: ffprobe
-    name: get the video metadata
-    image: jrottenberg/ffmpeg:3.4-alpine
+  - name: presign the s3 source
+    var: signedURL
+    run: aws --endpoint-url $ENDPOINT_URL s3 presign $SOURCE --expires-in 86400 > $TORK_OUTPUT
+    image: amazon/aws-cli:2.13.10
     env:
-      SOURCE: "{{ inputs.source }}" 
+      AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
+      AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
+      ENDPOINT_URL: "{{inputs.endpointURL}}"
+      SOURCE: "{{ inputs.source }}"
+
+  - name: get the video metadata
+    var: ffprobe
     run: |
       ffprobe \
         -v quiet \
@@ -32,32 +25,35 @@ tasks:
         -show_format \
         -show_streams \
         $SOURCE > $TORK_OUTPUT
-
-  - var: duration
-    name: extract the duration of the video
-    image: badouralix/curl-jq
+    image: jrottenberg/ffmpeg:3.4-alpine
     env:
-      FFPROBE: "{{ tasks.ffprobe }}" 
-    cmd: 
+      SOURCE: "{{ tasks.signedURL }}"
+
+  - name: extract the duration of the video
+    var: duration
     run: |
-      DURATION=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .duration')
+      DURATION=$(echo -n $FFPROBE | jq -r '.format.duration')
       echo -n $DURATION >> $TORK_OUTPUT
-
-  - var: framerate
-    name: extract the framerate of the video
     image: badouralix/curl-jq
     env:
-      FFPROBE: "{{ tasks.ffprobe }}" 
-    cmd: 
+      FFPROBE: "{{ tasks.ffprobe }}"
+
+  - name: extract the framerate of the video
+    var: framerate
     run: |
       FRAMERATE=$(echo -n $FFPROBE | jq -r '.streams[] | select (.codec_type=="video") | .r_frame_rate')
       echo -n $FRAMERATE >> $TORK_OUTPUT
+    image: badouralix/curl-jq
+    env:
+      FFPROBE: "{{ tasks.ffprobe }}"
 
-  - var: framerate
-    name: clean and parse framerate
+  - name: clean and parse framerate
+    var: framerate
+    run: |
+      python script.py $FRAMERATE > $TORK_OUTPUT
     image: python:3-slim
     env:
-      FRAMERATE: "{{ tasks.framerate }}" 
+      FRAMERATE: "{{ tasks.framerate }}"
     files:
       script.py: |
         import re
@@ -66,16 +62,15 @@ tasks:
         pfrate = cfrate.split("/")
         frate = float(pfrate[0])/float(pfrate[1])
         print(frate,end="")
-    run: |
-      python script.py $FRAMERATE > $TORK_OUTPUT
 
-  - var: chunks
-    name: calculate chunks times 
+  - name: calculate chunks times
+    var: chunks
+    run: |
+      python script.py $DURATION $FRAMERATE > $TORK_OUTPUT
     image: python:3-slim
     env:
       DURATION: "{{ tasks.duration }}"
-      FRAMERATE: "{{ tasks.framerate }}" 
-    cmd:
+      FRAMERATE: "{{ tasks.framerate }}"
     files:
       script.py: |
         import math
@@ -87,7 +82,7 @@ tasks:
 
         frate_ceil = math.ceil(frate)
         time_unit = frate_ceil/frate
-        chunk_size = 10*time_unit
+        chunk_size = 30*time_unit
 
         chunks = []
         start = 0
@@ -104,86 +99,82 @@ tasks:
           chunks.append({"start":start,"length":length})
           
           start = start+length;
-        
-        print(json.dumps(chunks))
-    run: |
-      python script.py $DURATION $FRAMERATE > $TORK_OUTPUT
 
-  - var: bucketName
-    name: generate a random bucket name to store the results
-    image: ubuntu:mantic
+        print(json.dumps(chunks))
+
+  - name: generate a random bucket name to store the results
+    var: bucketName
     run: echo -n "video-$(shuf -i 1-10000 -n1)" > $TORK_OUTPUT
+    image: ubuntu:mantic
 
   - name: create a temporary bucket to house the chunks
-    image: "amazon/aws-cli:2.13.10"
+    run: |
+      aws \
+        --endpoint-url $ENDPOINT_URL s3api create-bucket --bucket $BUCKET_NAME
+    image: amazon/aws-cli:2.13.10
     env:
       AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
       AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
       BUCKET_NAME: "{{tasks.bucketName}}"
       ENDPOINT_URL: "{{inputs.endpointURL}}"
-    run: | 
-      aws \
-        --endpoint-url $ENDPOINT_URL s3api create-bucket --bucket $BUCKET_NAME
 
   - name: transcode the chunks in parallel
     each:
       list: "{{ fromJSON(tasks.chunks) }}"
       task:
         name: encode the chunk
-        retry: 
-          limit: 2
-        volumes:
-          - /tmp
-        env:
-          SOURCE: "{{ inputs.source }}"
-          START: "{{ item.value.start }}"
-          LENGTH: "{{ item.value.length }}"
-        var: "chunk{{ item.index }}"
-        image: jrottenberg/ffmpeg:3.4-alpine
+        var: chunk{{ item.index }}
         run: |
           ffmpeg -ss ${START} -i $SOURCE -to $LENGTH /tmp/chunk.mp4
+        image: jrottenberg/ffmpeg:3.4-alpine
+        env:
+          LENGTH: "{{ item.value.length }}"
+          SOURCE: "{{ tasks.signedURL }}"
+          START: "{{ item.value.start }}"
         post:
           - name: upload the chunk to minio
-            image: "amazon/aws-cli:2.13.10"
+            run: aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
+            image: amazon/aws-cli:2.13.10
             env:
               AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
               AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
               BUCKET_NAME: "{{tasks.bucketName}}"
-              NUMBER: "{{ item.index }}"
               ENDPOINT_URL: "{{inputs.endpointURL}}"
-            run:
-              aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/chunk.mp4 s3://$BUCKET_NAME/chunks/chunk_$NUMBER.mp4
+              NUMBER: "{{ item.index }}"
+        volumes:
+          - /tmp
+        retry:
+          limit: 2
 
   - name: stitch the chunks into a single video
-    retry: 
-      limit: 2
-    volumes:
-      - /tmp
-    env:
-      BUCKET_NAME: "{{tasks.bucketName}}"
-    image: jrottenberg/ffmpeg:3.4-alpine
     run: |
       for filename in /tmp/chunks/*.mp4; do
         echo "file $filename" >> /tmp/chunks.txt
       done
       ffmpeg -f concat -safe 0 -i /tmp/chunks.txt -c copy /tmp/output.mp4
+    image: jrottenberg/ffmpeg:3.4-alpine
+    env:
+      BUCKET_NAME: "{{tasks.bucketName}}"
     pre:
-      - name: download the chunks 
-        image: "amazon/aws-cli:2.13.10"
+      - name: download the chunks
+        run: aws --endpoint-url $ENDPOINT_URL s3 sync s3://$BUCKET_NAME/chunks /tmp/chunks
+        image: amazon/aws-cli:2.13.10
         env:
           AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
           AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
           BUCKET_NAME: "{{tasks.bucketName}}"
           ENDPOINT_URL: "{{inputs.endpointURL}}"
-        run:
-          aws --endpoint-url $ENDPOINT_URL s3 sync s3://$BUCKET_NAME/chunks /tmp/chunks
     post:
       - name: upload the final video to minio
-        image: "amazon/aws-cli:2.13.10"
+        run: aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/output.mp4
+        image: amazon/aws-cli:2.13.10
         env:
           AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
           AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
           BUCKET_NAME: "{{tasks.bucketName}}"
           ENDPOINT_URL: "{{inputs.endpointURL}}"
-        run:
-          aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/output.mp4 s3://$BUCKET_NAME/output.mp4
+    volumes:
+      - /tmp
+    retry:
+      limit: 2
+    timeout: 120s
