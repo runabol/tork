@@ -54,6 +54,30 @@ func (c *Cache[V]) SetWithExpiration(k string, x V, d time.Duration) {
 	c.mu.Unlock()
 }
 
+func (c *Cache[V]) ModifyExpiration(k string, d time.Duration) error {
+	var e int64
+	if d == DefaultExpiration {
+		d = c.defaultExpiration
+	}
+	if d > 0 {
+		e = time.Now().Add(d).UnixNano()
+	}
+	c.mu.RLock()
+	item, found := c.items[k]
+	if !found {
+		c.mu.RUnlock()
+		return errors.Errorf("unknown key: %s", k)
+	}
+	c.mu.RUnlock()
+	c.mu.Lock()
+	item.Expiration = e
+	// TODO: Calls to mu.Unlock are currently not deferred because defer
+	// adds ~200 ns (as of go1.)
+	c.mu.Unlock()
+	return nil
+
+}
+
 func (c *Cache[V]) set(k string, x V, d time.Duration) {
 	var e int64
 	if d == DefaultExpiration {

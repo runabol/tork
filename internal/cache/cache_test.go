@@ -36,9 +36,9 @@ func TestCache(t *testing.T) {
 		t.Error("Getting C found value that shouldn't exist:", c)
 	}
 
-	tc.SetWithExpiration("a", 1, DefaultExpiration)
-	tc.SetWithExpiration("b", "b", DefaultExpiration)
-	tc.SetWithExpiration("c", 3.5, DefaultExpiration)
+	tc.Set("a", 1)
+	tc.Set("b", "b")
+	tc.Set("c", 3.5)
 
 	x, found := tc.Get("a")
 	if !found {
@@ -248,6 +248,29 @@ func TestModify(t *testing.T) {
 		return 0, errors.New("something bad happened")
 	})
 	assert.Error(t, err)
+}
+
+func TestModifyExpiration(t *testing.T) {
+	tc := New[int](DefaultExpiration, 0)
+	tc.Set("number", 0)
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			err := tc.ModifyExpiration("number", NoExpiration)
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	v, ok := tc.Get("number")
+	assert.True(t, ok)
+	assert.Equal(t, 0, v)
+
+	assert.Equal(t, int64(0), tc.items["number"].Expiration)
 }
 
 func TestModifyConcurrently(t *testing.T) {

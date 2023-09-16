@@ -2,7 +2,7 @@ package input
 
 import (
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/clone"
+	"golang.org/x/exp/maps"
 )
 
 type Task struct {
@@ -87,7 +87,7 @@ func (i Task) toTask() *tork.Task {
 			Name:        i.SubJob.Name,
 			Description: i.SubJob.Description,
 			Tasks:       toTasks(i.SubJob.Tasks),
-			Inputs:      clone.CloneStringMap(i.SubJob.Inputs),
+			Inputs:      maps.Clone(i.SubJob.Inputs),
 			Output:      i.SubJob.Output,
 		}
 	}

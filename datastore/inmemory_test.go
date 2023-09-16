@@ -2,6 +2,7 @@ package datastore_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -142,20 +143,38 @@ func TestInMemoryUpdateJobConcurrently(t *testing.T) {
 	err := ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1000)
+	w := sync.WaitGroup{}
+	w.Add(1000)
 	for i := 0; i < 1000; i++ {
 		go func() {
-			defer wg.Done()
+			defer w.Done()
 			err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.TaskCount = u.TaskCount + 1
+				if u.Context.Tasks == nil {
+					u.Context.Tasks = make(map[string]string)
+				}
+				u.Context.Tasks[fmt.Sprintf("someVar-%d", rand.Intn(100000))] = "some value"
 				return nil
 			})
 			assert.NoError(t, err)
 		}()
 	}
-	wg.Wait()
+
+	r := sync.WaitGroup{}
+	r.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer r.Done()
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+			j2, err := ds.GetJobByID(ctx, j1.ID)
+			assert.NoError(t, err)
+			_ = j2.Clone()
+		}()
+	}
+
+	w.Wait()
+	r.Wait()
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
