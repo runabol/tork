@@ -12,6 +12,10 @@ import (
 const (
 	StatusUp   = "UP"
 	StatusDown = "DOWN"
+
+	ServiceDatastore = "datastore"
+	ServiceBroker    = "broker"
+	ServiceRuntime   = "runtime"
 )
 
 type HealthIndicator func(ctx context.Context) error
@@ -21,11 +25,11 @@ type HealthCheckResult struct {
 	Version string `json:"version"`
 }
 
-type HealthCheckBuilder struct {
+type HealthCheck struct {
 	indicators map[string]HealthIndicator
 }
 
-func (b *HealthCheckBuilder) WithIndicator(name string, ind HealthIndicator) *HealthCheckBuilder {
+func (b *HealthCheck) WithIndicator(name string, ind HealthIndicator) *HealthCheck {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		panic("health indicator name must not be empty")
@@ -37,13 +41,13 @@ func (b *HealthCheckBuilder) WithIndicator(name string, ind HealthIndicator) *He
 	return b
 }
 
-func HealthCheck() *HealthCheckBuilder {
-	return &HealthCheckBuilder{
+func NewHealthCheck() *HealthCheck {
+	return &HealthCheck{
 		indicators: make(map[string]HealthIndicator),
 	}
 }
 
-func (b *HealthCheckBuilder) Do(ctx context.Context) HealthCheckResult {
+func (b *HealthCheck) Do(ctx context.Context) HealthCheckResult {
 	for name, ind := range b.indicators {
 		if err := ind(ctx); err != nil {
 			log.Error().Err(err).Msgf("failed %s healthcheck", name)

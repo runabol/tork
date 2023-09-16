@@ -43,9 +43,9 @@ func newAPI(cfg Config) *api {
 }
 
 func (s *api) health(c echo.Context) error {
-	result := health.HealthCheck().
-		WithIndicator("datastore", s.runtime.HealthCheck).
-		WithIndicator("broker", s.broker.HealthCheck).
+	result := health.NewHealthCheck().
+		WithIndicator(health.ServiceRuntime, s.runtime.HealthCheck).
+		WithIndicator(health.ServiceBroker, s.broker.HealthCheck).
 		Do(c.Request().Context())
 	if result.Status == health.StatusDown {
 		return c.JSON(http.StatusServiceUnavailable, result)
