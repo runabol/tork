@@ -1,12 +1,37 @@
-## Tork
+<h1 align="center">
+  <img src="docs/logo.svg"  alt="tork" width="300px">
+  <br>
+</h1>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/runabol/tork)](https://goreportcard.com/report/github.com/runabol/tork)
-![Build Status](https://github.com/runabol/tork/workflows/ci/badge.svg)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+<a href="https://opensource.org/licenses/MIT">
+  <img src="https://img.shields.io/badge/license-MIT-_red.svg">
+</a>
+<a href="https://goreportcard.com/report/github.com/runabol/tork">
+  <img src="https://goreportcard.com/badge/github.com/runabol/tork">
+</a>
+<a href="https://github.com/runabol/tork/releases">
+  <img src="https://img.shields.io/github/release/runabol/tork">
+</a>
+  <img src="https://github.com/runabol/tork/workflows/ci/badge.svg">
+</p>
 
-A Golang based high-performance, scalable and distributed workflow engine.
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="https://www.tork.run/installation">Installation</a> •
+  <a href="https://www.tork.run">Documentation</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="https://www.tork.run/rest">REST API</a>
+</p>
+
+Tork is a highly-scalable, general-purpose workflow engine.
 
 ## Features:
+
+<h1 align="center">
+  <img src="docs/cli_v3.jpg" alt="tork" width="700px">
+  <br>
+</h1>
 
 - [REST API](https://www.tork.run/rest)
 - [Extensible](https://www.tork.run/customize)
