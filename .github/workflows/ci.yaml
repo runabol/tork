@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:${{ postgres-version }}
+        image: postgres:${{ matrix.postgres-version }}
         env:
           POSTGRES_DB: tork        
           POSTGRES_PASSWORD: tork
