@@ -3,7 +3,7 @@ package tork
 import (
 	"time"
 
-	"github.com/runabol/tork/internal/clone"
+	"golang.org/x/exp/maps"
 )
 
 // State defines the list of states that a
@@ -143,8 +143,8 @@ func (t *Task) Clone() *Task {
 		Run:         t.Run,
 		Image:       t.Image,
 		Registry:    registry,
-		Env:         clone.CloneStringMap(t.Env),
-		Files:       clone.CloneStringMap(t.Files),
+		Env:         maps.Clone(t.Env),
+		Files:       maps.Clone(t.Files),
 		Queue:       t.Queue,
 		Error:       t.Error,
 		Pre:         CloneTasks(t.Pre),
@@ -201,7 +201,7 @@ func (s *SubJobTask) Clone() *SubJobTask {
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,
-		Inputs:      clone.CloneStringMap(s.Inputs),
+		Inputs:      maps.Clone(s.Inputs),
 		Tasks:       CloneTasks(s.Tasks),
 		Output:      s.Output,
 	}

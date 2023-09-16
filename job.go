@@ -3,7 +3,7 @@ package tork
 import (
 	"time"
 
-	"github.com/runabol/tork/internal/clone"
+	"golang.org/x/exp/maps"
 )
 
 type JobState string
@@ -94,8 +94,8 @@ func (j *Job) Clone() *Job {
 
 func (c JobContext) Clone() JobContext {
 	return JobContext{
-		Inputs: clone.CloneStringMap(c.Inputs),
-		Tasks:  clone.CloneStringMap(c.Tasks),
+		Inputs: maps.Clone(c.Inputs),
+		Tasks:  maps.Clone(c.Tasks),
 	}
 }
 

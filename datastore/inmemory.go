@@ -164,10 +164,11 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	}
 
 	err := ds.jobs.Modify(id, func(j *tork.Job) (*tork.Job, error) {
-		if err := modify(j); err != nil {
+		copy := j.Clone()
+		if err := modify(copy); err != nil {
 			return nil, errors.Wrapf(err, "error modifying job %s", id)
 		}
-		return j, nil
+		return copy, nil
 	})
 
 	if err != nil {
@@ -184,9 +185,9 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		if ds.jobExpiration != nil {
 			exp = *ds.jobExpiration
 		}
-		ds.jobs.SetWithExpiration(j.ID, j, exp)
-	} else {
-		ds.jobs.Set(j.ID, j)
+		if err := ds.jobs.ModifyExpiration(j.ID, exp); err != nil {
+			return errors.Wrap(err, "error modifying job expiration")
+		}
 	}
 
 	return nil
