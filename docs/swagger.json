@@ -359,6 +359,23 @@
                 }
             }
         },
+        "input.Defaults": {
+            "type": "object",
+            "properties": {
+                "limits": {
+                    "$ref": "#/definitions/input.Limits"
+                },
+                "queue": {
+                    "type": "string"
+                },
+                "retry": {
+                    "$ref": "#/definitions/input.Retry"
+                },
+                "timeout": {
+                    "type": "string"
+                }
+            }
+        },
         "input.Each": {
             "type": "object",
             "required": [
@@ -381,6 +398,9 @@
                 "tasks"
             ],
             "properties": {
+                "defaults": {
+                    "$ref": "#/definitions/input.Defaults"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -632,6 +652,9 @@
                 "createdAt": {
                     "type": "string"
                 },
+                "defaults": {
+                    "$ref": "#/definitions/tork.JobDefaults"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -702,6 +725,23 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "tork.JobDefaults": {
+            "type": "object",
+            "properties": {
+                "limits": {
+                    "$ref": "#/definitions/tork.TaskLimits"
+                },
+                "queue": {
+                    "type": "string"
+                },
+                "retry": {
+                    "$ref": "#/definitions/tork.TaskRetry"
+                },
+                "timeout": {
+                    "type": "string"
                 }
             }
         },
