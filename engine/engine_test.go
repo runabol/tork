@@ -164,9 +164,10 @@ func TestSubmitJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
-	called := false
+	c := make(chan any)
+
 	listener := func(j *tork.Job) {
-		called = true
+		close(c)
 		assert.Equal(t, tork.JobStateCompleted, j.State)
 	}
 
@@ -187,10 +188,7 @@ func TestSubmitJob(t *testing.T) {
 
 	err = eng.broker.PublishEvent(context.Background(), mq.TOPIC_JOB_COMPLETED, j)
 	assert.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 100)
-
-	assert.True(t, called)
+	<-c
 }
 
 func TestSubmitJobPanics(t *testing.T) {
