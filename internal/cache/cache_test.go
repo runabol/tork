@@ -154,32 +154,38 @@ func TestItemCount(t *testing.T) {
 }
 
 func TestIterate(t *testing.T) {
-	tc := New[string](DefaultExpiration, 0)
+	tc := New[*tork.Task](DefaultExpiration, 0)
 
 	for i := 0; i < 1000; i++ {
-		tc.SetWithExpiration(fmt.Sprintf("foo%d", i), fmt.Sprintf("%d", i), DefaultExpiration)
+		tc.SetWithExpiration(fmt.Sprintf("foo%d", i), &tork.Task{Name: "some task"}, DefaultExpiration)
 	}
 
 	r := sync.WaitGroup{}
-	r.Add(10)
+	r.Add(100)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		go func() {
 			defer r.Done()
-			tc.Iterate(func(key string, v string) {
-				time.Sleep(time.Millisecond)
+			tc.Iterate(func(key string, v *tork.Task) {
+				_ = v.Name
 			})
 		}()
 	}
 
 	w := sync.WaitGroup{}
-	w.Add(10)
-	for i := 0; i < 10; i++ {
+	w.Add(100)
+	for i := 0; i < 100; i++ {
 		go func() {
 			defer w.Done()
 			for i := 0; i < 1000; i++ {
-				time.Sleep(time.Millisecond)
-				tc.Set(fmt.Sprintf("foo%d", i), fmt.Sprintf("%d", i))
+				err := tc.Modify(fmt.Sprintf("foo%d", i), func(x *tork.Task) (*tork.Task, error) {
+					x.Clone()
+					x.Env = map[string]string{
+						"SOME_VAR": "someval",
+					}
+					return x, nil
+				})
+				assert.NoError(t, err)
 			}
 		}()
 	}
