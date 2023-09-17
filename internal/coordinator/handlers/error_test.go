@@ -16,12 +16,12 @@ func Test_handleFailedTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	events := 0
+	events := make(chan any)
 	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_FAILED, func(event any) {
 		j, ok := event.(*tork.Job)
 		assert.True(t, ok)
 		assert.Equal(t, tork.JobStateFailed, j.State)
-		events = events + 1
+		close(events)
 	})
 	assert.NoError(t, err)
 
@@ -84,7 +84,7 @@ func Test_handleFailedTask(t *testing.T) {
 	err = handler(ctx, t1)
 	assert.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 500)
+	<-events
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
@@ -101,16 +101,15 @@ func Test_handleFailedTask(t *testing.T) {
 	actives, err = ds.GetActiveTasks(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, actives, 0)
-	assert.Equal(t, 1, events)
 }
 
 func Test_handleFailedTaskRetry(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t *tork.Task) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -153,8 +152,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	err = handler(ctx, t1)
 	assert.NoError(t, err)
 
-	// wait for the retry delay
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
@@ -167,5 +165,4 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, tork.JobStateRunning, j2.State)
-	assert.Equal(t, 1, processed)
 }
