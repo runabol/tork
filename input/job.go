@@ -14,7 +14,7 @@ type Job struct {
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
-	Defaults    Defaults          `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 }
 
 type Defaults struct {
@@ -49,11 +49,13 @@ func (ji *Job) ToJob() *tork.Job {
 	j.Context.Inputs = ji.Inputs
 	j.TaskCount = len(tasks)
 	j.Output = ji.Output
-	j.Defaults = ji.Defaults.ToJobDefaults()
+	if ji.Defaults != nil {
+		j.Defaults = ji.Defaults.ToJobDefaults()
+	}
 	return j
 }
 
-func (d Defaults) ToJobDefaults() tork.JobDefaults {
+func (d Defaults) ToJobDefaults() *tork.JobDefaults {
 	jd := tork.JobDefaults{}
 	if d.Retry != nil {
 		jd.Retry = d.Retry.toTaskRetry()
@@ -63,5 +65,5 @@ func (d Defaults) ToJobDefaults() tork.JobDefaults {
 	}
 	jd.Timeout = d.Timeout
 	jd.Queue = d.Queue
-	return jd
+	return &jd
 }

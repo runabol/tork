@@ -94,7 +94,7 @@ func TestValidateJobDefaults(t *testing.T) {
 				Image: "some:image",
 			},
 		},
-		Defaults: Defaults{
+		Defaults: &Defaults{
 			Timeout: "1234",
 		},
 	}

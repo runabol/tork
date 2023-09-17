@@ -36,7 +36,7 @@ type Job struct {
 	Output      string            `json:"output,omitempty"`
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
-	Defaults    JobDefaults       `json:"defaults,omitempty"`
+	Defaults    *JobDefaults      `json:"defaults,omitempty"`
 }
 
 type JobSummary struct {
@@ -69,6 +69,10 @@ type JobDefaults struct {
 }
 
 func (j *Job) Clone() *Job {
+	var defaults *JobDefaults
+	if j.Defaults != nil {
+		defaults = j.Defaults.Clone()
+	}
 	return &Job{
 		ID:          j.ID,
 		Name:        j.Name,
@@ -88,7 +92,7 @@ func (j *Job) Clone() *Job {
 		Output:      j.Output,
 		Result:      j.Result,
 		Error:       j.Error,
-		Defaults:    j.Defaults.Clone(),
+		Defaults:    defaults,
 	}
 }
 
@@ -106,7 +110,7 @@ func (c JobContext) AsMap() map[string]any {
 	}
 }
 
-func (d JobDefaults) Clone() JobDefaults {
+func (d *JobDefaults) Clone() *JobDefaults {
 	clone := JobDefaults{}
 	if d.Limits != nil {
 		clone.Limits = d.Limits.Clone()
@@ -116,7 +120,7 @@ func (d JobDefaults) Clone() JobDefaults {
 	}
 	clone.Queue = d.Queue
 	clone.Timeout = d.Timeout
-	return clone
+	return &clone
 }
 
 func NewJobSummary(j *Job) *JobSummary {
