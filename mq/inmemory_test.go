@@ -125,7 +125,7 @@ func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed := make(chan any, 100)
+	processed := make(chan any, 10)
 	mu := sync.Mutex{}
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
 		mu.Lock()
@@ -193,8 +193,8 @@ func TestInMemoryShutdown(t *testing.T) {
 func TestInMemorSubsribeForEvent(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed1 := make(chan any, 100)
-	processed2 := make(chan any, 100)
+	processed1 := make(chan any, 20)
+	processed2 := make(chan any, 10)
 	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateCompleted,
@@ -218,10 +218,15 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 		err = b.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j1)
 		assert.NoError(t, err)
 	}
-	// wait for task to be processed
-	time.Sleep(time.Millisecond * 500)
-	assert.Equal(t, 20, len(processed1))
-	assert.Equal(t, 10, len(processed2))
+
+	for i := 0; i < 20; i++ {
+		<-processed1
+	}
+	close(processed1)
+	for i := 0; i < 10; i++ {
+		<-processed2
+	}
+	close(processed2)
 }
 
 func TestInMemoryHealthChech(t *testing.T) {
