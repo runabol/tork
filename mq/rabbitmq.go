@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	RMQ_EXCHANGE_TOPIC   = "amq.topic"
-	RMQ_EXCHANGE_DEFAULT = ""
-	RMQ_KEY_DEFAULT      = ""
+	exchangeTopic       = "amq.topic"
+	exchangeDefault     = ""
+	keyDefault          = ""
+	defaultHeartbeatTTL = 60000
 )
 
 type RabbitMQBroker struct {
@@ -33,6 +34,7 @@ type RabbitMQBroker struct {
 	mu            sync.RWMutex
 	url           string
 	shuttingDown  bool
+	heartbeatTTL  int
 }
 
 type subscription struct {
@@ -42,7 +44,18 @@ type subscription struct {
 	done  chan int
 }
 
-func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
+type Option = func(b *RabbitMQBroker)
+
+// WithHeartbeatTTL sets the TTL for a hearbeat pending in the queue.
+// The value of the TTL argument or policy must be a non-negative integer (0 <= n),
+// describing the TTL period in milliseconds.
+func WithHeartbeatTTL(ttl int) Option {
+	return func(b *RabbitMQBroker) {
+		b.heartbeatTTL = ttl
+	}
+}
+
+func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 	connPool := make([]*amqp.Connection, 3)
 	for i := 0; i < len(connPool); i++ {
 		conn, err := amqp.Dial(url)
@@ -51,13 +64,18 @@ func NewRabbitMQBroker(url string) (*RabbitMQBroker, error) {
 		}
 		connPool[i] = conn
 	}
-	return &RabbitMQBroker{
+	b := &RabbitMQBroker{
 		queues:        new(syncx.Map[string, string]),
 		topics:        new(syncx.Map[string, string]),
 		url:           url,
 		connPool:      connPool,
 		subscriptions: make([]*subscription, 0),
-	}, nil
+		heartbeatTTL:  defaultHeartbeatTTL,
+	}
+	for _, o := range opts {
+		o(b)
+	}
+	return b, nil
 }
 
 func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
@@ -117,14 +135,14 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 		return errors.Wrapf(err, "error creating channel")
 	}
 	defer ch.Close()
-	if err := b.declareQueue(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, ch); err != nil {
+	if err := b.declareQueue(exchangeDefault, keyDefault, qname, ch); err != nil {
 		return errors.Wrapf(err, "error (re)declaring queue")
 	}
-	return b.publish(ctx, RMQ_EXCHANGE_DEFAULT, qname, t)
+	return b.publish(ctx, exchangeDefault, qname, t)
 }
 
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, qname, func(msg any) error {
+	return b.subscribe(exchangeDefault, keyDefault, qname, func(msg any) error {
 		t, ok := msg.(*tork.Task)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Task but got %T", t)
@@ -272,18 +290,22 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	}
 	if !exists {
 		log.Debug().Msgf("declaring queue: %s", qname)
+		args := amqp.Table{}
+		if qname == QUEUE_HEARBEAT {
+			args["x-message-ttl"] = b.heartbeatTTL
+		}
 		_, err = ch.QueueDeclare(
 			qname,
 			false, // durable
 			false, // delete when unused
 			strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
 			false, // no-wait
-			nil,   // arguments
+			args,  // arguments
 		)
 		if err != nil {
 			return err
 		}
-		if exchange != RMQ_EXCHANGE_DEFAULT {
+		if exchange != exchangeDefault {
 			if err := ch.QueueBind(qname, key, exchange, false, nil); err != nil {
 				return err
 			}
@@ -294,7 +316,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 }
 
 func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *tork.Node) error {
-	return b.publish(ctx, RMQ_EXCHANGE_DEFAULT, QUEUE_HEARBEAT, n)
+	return b.publish(ctx, exchangeDefault, QUEUE_HEARBEAT, n)
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg any) error {
@@ -328,7 +350,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 }
 
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_HEARBEAT, func(msg any) error {
+	return b.subscribe(exchangeDefault, keyDefault, QUEUE_HEARBEAT, func(msg any) error {
 		n, ok := msg.(*tork.Node)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Node but got %T", msg)
@@ -338,10 +360,10 @@ func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error
 }
 
 func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *tork.Job) error {
-	return b.publish(ctx, RMQ_EXCHANGE_DEFAULT, QUEUE_JOBS, j)
+	return b.publish(ctx, exchangeDefault, QUEUE_JOBS, j)
 }
 func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
-	return b.subscribe(RMQ_EXCHANGE_DEFAULT, RMQ_KEY_DEFAULT, QUEUE_JOBS, func(msg any) error {
+	return b.subscribe(exchangeDefault, keyDefault, QUEUE_JOBS, func(msg any) error {
 		j, ok := msg.(*tork.Job)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Job but got %T", msg)
@@ -447,14 +469,14 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, pattern string, handler func(event any)) error {
 	key := strings.ReplaceAll(pattern, "*", "#")
 	qname := fmt.Sprintf("%s-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	return b.subscribe(RMQ_EXCHANGE_TOPIC, key, qname, func(msg any) error {
+	return b.subscribe(exchangeTopic, key, qname, func(msg any) error {
 		handler(msg)
 		return nil
 	})
 }
 
 func (b *RabbitMQBroker) PublishEvent(ctx context.Context, topic string, event any) error {
-	return b.publish(ctx, RMQ_EXCHANGE_TOPIC, topic, event)
+	return b.publish(ctx, exchangeTopic, topic, event)
 }
 
 func (b *RabbitMQBroker) HealthCheck(ctx context.Context) error {
