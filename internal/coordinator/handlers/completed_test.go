@@ -542,7 +542,7 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	assert.NotNil(t, handler)
 
 	err = b.SubscribeForTasks(mq.QUEUE_PENDING, func(t1 *tork.Task) error {
-		return err
+		return nil
 	})
 	assert.NoError(t, err)
 

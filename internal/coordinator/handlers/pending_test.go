@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
@@ -16,9 +15,9 @@ func Test_handlePendingTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -47,22 +46,20 @@ func Test_handlePendingTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	// wait for the task to get processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
-	// task should only be processed once
-	assert.Equal(t, 1, processed)
 }
 
 func Test_handleConditionalTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	completed := 0
+	completed := make(chan any)
 	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *tork.Task) error {
-		completed = completed + 1
+		close(completed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -84,11 +81,9 @@ func Test_handleConditionalTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	// wait for the task to get processed
-	time.Sleep(time.Millisecond * 100)
+	<-completed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
-	// task should only be processed once
-	assert.Equal(t, 1, completed)
 }

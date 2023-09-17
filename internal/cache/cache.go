@@ -54,7 +54,7 @@ func (c *Cache[V]) SetWithExpiration(k string, x V, d time.Duration) {
 	c.mu.Unlock()
 }
 
-func (c *Cache[V]) ModifyExpiration(k string, d time.Duration) error {
+func (c *Cache[V]) SetExpiration(k string, d time.Duration) error {
 	var e int64
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
@@ -69,11 +69,11 @@ func (c *Cache[V]) ModifyExpiration(k string, d time.Duration) error {
 		return errors.Errorf("unknown key: %s", k)
 	}
 	c.mu.RUnlock()
-	c.mu.Lock()
+	item.mu.Lock()
 	item.Expiration = e
 	// TODO: Calls to mu.Unlock are currently not deferred because defer
 	// adds ~200 ns (as of go1.)
-	c.mu.Unlock()
+	item.mu.Unlock()
 	return nil
 
 }
@@ -130,13 +130,14 @@ func (c *Cache[V]) Get(k string) (val V, ok bool) {
 		c.mu.RUnlock()
 		return val, false
 	}
+	c.mu.RUnlock()
+	item.mu.Lock()
+	defer item.mu.Unlock()
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
-			c.mu.RUnlock()
 			return val, false
 		}
 	}
-	c.mu.RUnlock()
 	return item.Object, true
 }
 
@@ -173,12 +174,14 @@ func (c *Cache[V]) deleteExpired() {
 	c.mu.Lock()
 	for k, v := range c.items {
 		// "Inlining" of expired
+		v.mu.Lock()
 		if v.Expiration > 0 && now > v.Expiration {
 			ov, evicted := c.delete(k)
 			if evicted {
 				evictedItems = append(evictedItems, keyAndValue[V]{k, ov})
 			}
 		}
+		v.mu.Unlock()
 	}
 	c.mu.Unlock()
 	for _, v := range evictedItems {
@@ -216,7 +219,9 @@ func (c *Cache[V]) allItems() map[string]*Item[V] {
 func (c *Cache[V]) Iterate(it func(key string, v V)) {
 	items := c.allItems()
 	for k, v := range items {
+		v.mu.Lock()
 		it(k, v.Object)
+		v.mu.Unlock()
 	}
 }
 

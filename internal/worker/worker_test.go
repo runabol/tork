@@ -55,18 +55,18 @@ func Test_handleTaskRun(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
 
-	completions := 0
+	completions := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(0), atomic.LoadInt32(&w.taskCount))
-		completions = completions + 1
+		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
 
-	starts := 0
+	starts := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
-		assert.Equal(t, int32(1), w.taskCount)
-		starts = starts + 1
+		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
+		close(starts)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -84,12 +84,10 @@ func Test_handleTaskRun(t *testing.T) {
 
 	err = w.handleTask(t1)
 
-	// give the task some time to "process"
-	time.Sleep(time.Millisecond * 100)
+	<-starts
+	<-completions
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, completions)
-	assert.Equal(t, 1, starts)
 	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 }
 
@@ -128,9 +126,9 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	completions := 0
+	completions := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
-		completions = completions + 1
+		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -166,11 +164,9 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 
 	err = w.handleTask(t1)
 
-	// give the task some time to "process"
-	time.Sleep(time.Millisecond * 100)
+	<-completions
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, completions)
 	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 }
 
@@ -188,17 +184,17 @@ func Test_handleTaskCancel(t *testing.T) {
 
 	tid := uuid.NewUUID()
 
-	errs := 0
+	errs := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
-		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
+		close(errs)
 		return nil
 	})
 	assert.NoError(t, err)
 
 	// cancel the task immediately upon start
 	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
-		err = w.handleTask(&tork.Task{
+		err := w.handleTask(&tork.Task{
 			ID:    tid,
 			State: tork.TaskStateCancelled,
 		})
@@ -220,10 +216,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	// some time to process the task
-	time.Sleep(time.Millisecond * 100)
-
-	assert.Equal(t, 1, errs)
+	<-errs
 }
 
 func Test_handleTaskError(t *testing.T) {
@@ -232,10 +225,10 @@ func Test_handleTaskError(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	errs := 0
+	errs := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
-		errs = errs + 1
 		assert.NotEmpty(t, tk.Error)
+		close(errs)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -256,11 +249,9 @@ func Test_handleTaskError(t *testing.T) {
 		CMD:   []string{"no_such_thing"},
 	})
 
-	// give the task some time to "process"
-	time.Sleep(time.Millisecond * 100)
+	<-errs
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, errs)
 }
 
 func Test_handleTaskOutput(t *testing.T) {
@@ -269,10 +260,10 @@ func Test_handleTaskOutput(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	completions := 0
+	completions := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
-		completions = completions + 1
 		assert.NotEmpty(t, tk.Result)
+		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -293,11 +284,9 @@ func Test_handleTaskOutput(t *testing.T) {
 		Run:   "echo -n 'hello world' >> $TORK_OUTPUT",
 	})
 
-	// give the task some time to "process"
-	time.Sleep(time.Millisecond * 100)
+	<-completions
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, completions)
 }
 
 func Test_sendHeartbeat(t *testing.T) {
