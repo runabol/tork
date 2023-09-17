@@ -190,7 +190,7 @@ func TestPostgresUpdateTaskConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+			err := ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
 				u.State = tork.TaskStateScheduled
 				u.Result = "my result"
 				u.Parallel.Completions = u.Parallel.Completions + 1
@@ -310,7 +310,7 @@ func TestPostgresUpdateNodeConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
+			err := ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 				u.LastHeartbeatAt = now
 				u.CPUPercent = u.CPUPercent + 1
 				return nil
@@ -457,12 +457,13 @@ func TestPostgresUpdateJobConcurrently(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		go func() {
 			defer wg.Done()
-			err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+			err := ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
 				u.State = tork.JobStateCompleted
 				u.Context.Inputs["var2"] = "val2"
 				u.Position = u.Position + 1
 				return nil
 			})
+			assert.NoError(t, err)
 		}()
 	}
 	wg.Wait()
