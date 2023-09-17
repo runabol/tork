@@ -1,0 +1,45 @@
+name: govulncheck
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - "docker-compose.yml"
+      - ".github/ISSUE_TEMPLATE/*.yml"
+      - ".github/dependabot.yml"
+      - ".github/release-drafter.yml"
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - "docker-compose.dev.yml"
+      - ".github/ISSUE_TEMPLATE/*.yml"
+      - ".github/dependabot.yml"
+      - ".github/release-drafter.yml"
+
+jobs:
+  govulncheck-check:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Fetch Repository
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "stable"
+          check-latest: true
+          cache: false
+
+      - name: Install Govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run Govulncheck
+        run: govulncheck ./...
