@@ -91,7 +91,7 @@ func TestRunAndStopTask(t *testing.T) {
 		CMD:   []string{"sleep", "10"},
 	}
 	go func() {
-		err = rt.Run(context.Background(), t1)
+		err := rt.Run(context.Background(), t1)
 		assert.Error(t, err)
 	}()
 	// give the task a chance to get started
@@ -240,7 +240,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err = rt.imagePull(ctx, &tork.Task{Image: "alpine:3.18.3"})
+			err := rt.imagePull(ctx, &tork.Task{Image: "alpine:3.18.3"})
 			assert.NoError(t, err)
 		}()
 	}

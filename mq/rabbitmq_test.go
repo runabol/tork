@@ -53,34 +53,30 @@ func TestRabbitMQPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
-	processed := 0
+	processed := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishHeartbeat(ctx, &tork.Node{})
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
-	processed := 0
+	processed := make(chan any)
 	err = b.SubscribeForJobs(func(j *tork.Job) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishJob(ctx, &tork.Job{})
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestRabbitMQPublisConcurrent(t *testing.T) {
@@ -88,9 +84,9 @@ func TestRabbitMQPublisConcurrent(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	testq := fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, "test")
-	processed := 0
+	processed := make(chan any, 300)
 	err = b.SubscribeForTasks(testq, func(t *tork.Task) error {
-		processed = processed + 1
+		processed <- 1
 		return nil
 	})
 	assert.NoError(t, err)
@@ -100,15 +96,16 @@ func TestRabbitMQPublisConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				err = b.PublishTask(ctx, testq, &tork.Task{})
+				err := b.PublishTask(ctx, testq, &tork.Task{})
+				assert.NoError(t, err)
 			}
 		}()
 	}
 	wg.Wait()
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
-	assert.NoError(t, err)
-	assert.Equal(t, 300, processed)
+	for i := 0; i < 300; i++ {
+		<-processed
+	}
+	close(processed)
 }
 
 func TestRabbitMQShutdown(t *testing.T) {
@@ -116,12 +113,10 @@ func TestRabbitMQShutdown(t *testing.T) {
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	mu := sync.Mutex{}
-	processed := 0
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err = b.SubscribeForTasks(qname, func(t1 *tork.Task) error {
 		mu.Lock()
 		defer mu.Unlock()
-		processed = processed + 1
 		// should not be able to block
 		// the termination process
 		time.Sleep(time.Hour)
@@ -135,7 +130,6 @@ func TestRabbitMQShutdown(t *testing.T) {
 	// cleanly shutdown
 	err = b.Shutdown(ctx)
 	assert.NoError(t, err)
-	assert.Greater(t, processed, 0)
 	// there should be no more processing past the shutdown
 	err = b.PublishTask(ctx, qname, &tork.Task{})
 	assert.Error(t, err)
@@ -154,17 +148,17 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateCompleted,
 	}
-	processed1 := 0
-	processed2 := 0
+	processed1 := make(chan any, 30)
+	processed2 := make(chan any, 10)
 	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
-		processed1 = processed1 + 1
+		processed1 <- 1
 	})
 	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
-		processed2 = processed2 + 1
+		processed2 <- 1
 	})
 	assert.NoError(t, err)
 
@@ -174,10 +168,15 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 		err = b.PublishEvent(ctx, "job.x.y.z", j1)
 		assert.NoError(t, err)
 	}
-	// wait for task to be processed
-	time.Sleep(time.Millisecond * 500)
-	assert.Equal(t, 30, processed1)
-	assert.Equal(t, 10, processed2)
+
+	for i := 0; i < 30; i++ {
+		<-processed1
+	}
+	close(processed1)
+	for i := 0; i < 10; i++ {
+		<-processed2
+	}
+	close(processed2)
 }
 
 func TestRabbitMQPublishUnknownEvent(t *testing.T) {
