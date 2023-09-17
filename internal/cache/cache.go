@@ -219,7 +219,9 @@ func (c *Cache[V]) allItems() map[string]*Item[V] {
 func (c *Cache[V]) Iterate(it func(key string, v V)) {
 	items := c.allItems()
 	for k, v := range items {
+		v.mu.Lock()
 		it(k, v.Object)
+		v.mu.Unlock()
 	}
 }
 
