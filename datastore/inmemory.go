@@ -119,10 +119,11 @@ func (ds *InMemoryDatastore) UpdateNode(ctx context.Context, id string, modify f
 		return ErrNodeNotFound
 	}
 	return ds.nodes.Modify(id, func(n *tork.Node) (*tork.Node, error) {
-		if err := modify(n); err != nil {
+		update := n.Clone()
+		if err := modify(update); err != nil {
 			return nil, errors.Wrapf(err, "error modifying node %s", id)
 		}
-		return n, nil
+		return update, nil
 	})
 }
 

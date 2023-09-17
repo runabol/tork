@@ -243,11 +243,11 @@ func TestInMemoryUpdateNodeConcurrently(t *testing.T) {
 	err := ds.CreateNode(ctx, n1)
 	assert.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1000)
+	w := sync.WaitGroup{}
+	w.Add(1000)
 	for i := 0; i < 1000; i++ {
 		go func() {
-			defer wg.Done()
+			defer w.Done()
 			err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.TaskCount = u.TaskCount + 1
@@ -257,7 +257,20 @@ func TestInMemoryUpdateNodeConcurrently(t *testing.T) {
 		}()
 	}
 
-	wg.Wait()
+	r := sync.WaitGroup{}
+	r.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer r.Done()
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+			n2, err := ds.GetNodeByID(ctx, n1.ID)
+			assert.NoError(t, err)
+			_ = n2.Clone()
+		}()
+	}
+
+	r.Wait()
+	w.Wait()
 
 	n2, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
