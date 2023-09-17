@@ -1,6 +1,6 @@
 module github.com/runabol/tork
 
-go 1.19
+go 1.21
 
 retract v0.1.0
 
