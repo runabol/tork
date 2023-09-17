@@ -114,7 +114,7 @@ func TestInMemoryUpdateTaskConcurrently(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		go func() {
 			defer w.Done()
-			err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
+			err := ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.State = tork.TaskStateScheduled
 				u.Result = "my result"
@@ -164,7 +164,7 @@ func TestInMemoryUpdateJobConcurrently(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		go func() {
 			defer w.Done()
-			err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
+			err := ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.TaskCount = u.TaskCount + 1
 				if u.Context.Tasks == nil {
@@ -188,9 +188,9 @@ func TestInMemoryUpdateJobConcurrently(t *testing.T) {
 			_ = j2.Clone()
 		}()
 	}
+	r.Wait()
 
 	w.Wait()
-	r.Wait()
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
@@ -248,7 +248,7 @@ func TestInMemoryUpdateNodeConcurrently(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		go func() {
 			defer w.Done()
-			err = ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
+			err := ds.UpdateNode(ctx, n1.ID, func(u *tork.Node) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.TaskCount = u.TaskCount + 1
 				return nil
