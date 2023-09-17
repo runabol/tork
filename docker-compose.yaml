@@ -31,6 +31,7 @@ services:
       - 5000:5000
   web:
     image: runabol/tork-web
+    platform: linux/amd64
     restart: always
     ports:
       - 8100:3000
