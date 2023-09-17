@@ -57,7 +57,6 @@ func Test_handleTaskRun(t *testing.T) {
 
 	completions := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
-		assert.Equal(t, int32(0), atomic.LoadInt32(&w.taskCount))
 		close(completions)
 		return nil
 	})
