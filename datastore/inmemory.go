@@ -187,7 +187,7 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		if ds.jobExpiration != nil {
 			exp = *ds.jobExpiration
 		}
-		if err := ds.jobs.ModifyExpiration(j.ID, exp); err != nil {
+		if err := ds.jobs.SetExpiration(j.ID, exp); err != nil {
 			return errors.Wrap(err, "error modifying job expiration")
 		}
 	}
@@ -210,6 +210,7 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	if !ok {
 		return nil, ErrJobNotFound
 	}
+	j = j.Clone()
 	execution := ds.getExecution(id)
 	sort.Slice(execution, func(i, j int) bool {
 		posi := execution[i].Position

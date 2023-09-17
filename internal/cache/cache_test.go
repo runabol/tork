@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -250,6 +251,53 @@ func TestModify(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestModifyObjectConcurrently(t *testing.T) {
+	tc := New[*tork.Job](DefaultExpiration, 0)
+	tc.Set("job", &tork.Job{
+		Context: tork.JobContext{
+			Tasks: map[string]string{},
+		},
+	})
+
+	w := sync.WaitGroup{}
+	w.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer w.Done()
+			err := tc.Modify("job", func(x *tork.Job) (*tork.Job, error) {
+				x = x.Clone()
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+				x.TaskCount = x.TaskCount + 1
+				x.Context.Tasks[fmt.Sprintf("someVar-%d", rand.Intn(100000))] = "some value"
+				return x, nil
+			})
+
+			assert.NoError(t, err)
+		}()
+	}
+
+	r := sync.WaitGroup{}
+	r.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer r.Done()
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+			j2, ok := tc.Get("job")
+			assert.True(t, ok)
+			_ = j2.Clone()
+		}()
+	}
+
+	r.Wait()
+	w.Wait()
+
+	j, ok := tc.Get("job")
+	assert.True(t, ok)
+
+	assert.Equal(t, 1000, j.TaskCount)
+
+}
+
 func TestModifyExpiration(t *testing.T) {
 	tc := New[int](DefaultExpiration, 0)
 	tc.Set("number", 0)
@@ -260,7 +308,7 @@ func TestModifyExpiration(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			err := tc.ModifyExpiration("number", NoExpiration)
+			err := tc.SetExpiration("number", NoExpiration)
 			assert.NoError(t, err)
 		}()
 	}
