@@ -41,33 +41,35 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 	if err != nil {
 		return err
 	}
-	if job.Defaults.Queue != "" {
-		t.Queue = job.Defaults.Queue
+	if job.Defaults != nil {
+		if job.Defaults.Queue != "" {
+			t.Queue = job.Defaults.Queue
+		}
+		if job.Defaults.Limits != nil {
+			if t.Limits == nil {
+				t.Limits = &tork.TaskLimits{}
+			}
+			if t.Limits.CPUs == "" {
+				t.Limits.CPUs = job.Defaults.Limits.CPUs
+			}
+			if t.Limits.Memory == "" {
+				t.Limits.Memory = job.Defaults.Limits.Memory
+			}
+		}
+		if t.Timeout == "" {
+			t.Timeout = job.Defaults.Timeout
+		}
+		if job.Defaults.Retry != nil {
+			if t.Retry == nil {
+				t.Retry = &tork.TaskRetry{}
+			}
+			if t.Retry.Limit == 0 {
+				t.Retry.Limit = job.Defaults.Retry.Limit
+			}
+		}
 	}
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
-	}
-	if job.Defaults.Limits != nil {
-		if t.Limits == nil {
-			t.Limits = &tork.TaskLimits{}
-		}
-		if t.Limits.CPUs == "" {
-			t.Limits.CPUs = job.Defaults.Limits.CPUs
-		}
-		if t.Limits.Memory == "" {
-			t.Limits.Memory = job.Defaults.Limits.Memory
-		}
-	}
-	if t.Timeout == "" {
-		t.Timeout = job.Defaults.Timeout
-	}
-	if job.Defaults.Retry != nil {
-		if t.Retry == nil {
-			t.Retry = &tork.TaskRetry{}
-		}
-		if t.Retry.Limit == 0 {
-			t.Retry.Limit = job.Defaults.Retry.Limit
-		}
 	}
 	// mark job state as scheduled
 	t.State = tork.TaskStateScheduled

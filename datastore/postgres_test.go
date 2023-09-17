@@ -383,7 +383,7 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 		Inputs: map[string]string{
 			"var1": "val1",
 		},
-		Defaults: tork.JobDefaults{
+		Defaults: &tork.JobDefaults{
 			Timeout: "5s",
 			Retry: &tork.TaskRetry{
 				Limit: 2,

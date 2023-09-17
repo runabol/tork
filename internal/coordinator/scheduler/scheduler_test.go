@@ -64,7 +64,7 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	j1 := &tork.Job{
 		ID:   uuid.NewUUID(),
 		Name: "test job",
-		Defaults: tork.JobDefaults{
+		Defaults: &tork.JobDefaults{
 			Queue: "some-queue",
 			Retry: &tork.TaskRetry{
 				Limit: 5,

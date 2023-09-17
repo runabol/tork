@@ -200,6 +200,8 @@ Visit [http://localhost:9000](http://localhost:9000)
 
 [Tork Web](https://www.tork.run/web-ui) is a web based tool for interacting with Tork.
 
+![Web UI](docs/webui.png "Web UI")
+
 ## License
 
 Copyright (c) 2023-present Arik Cohen. Tork is free and open-source software licensed under the MIT License.

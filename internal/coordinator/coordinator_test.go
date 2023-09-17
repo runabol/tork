@@ -283,6 +283,12 @@ func TestRunSubjobJob(t *testing.T) {
 	assert.Equal(t, 6, len(j1.Execution))
 }
 
+func TestRunJobDefaultsJob(t *testing.T) {
+	j1 := doRunJob(t, "../../examples/job_defaults.yaml")
+	assert.Equal(t, tork.JobStateCompleted, j1.State)
+	assert.Equal(t, 2, len(j1.Execution))
+}
+
 func doRunJob(t *testing.T, filename string) *tork.Job {
 	ctx := context.Background()
 
@@ -296,6 +302,10 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 
 	err = c.Start()
 	assert.NoError(t, err)
+
+	defer func() {
+		assert.NoError(t, c.Stop())
+	}()
 
 	rt, err := runtime.NewDockerRuntime()
 	assert.NoError(t, err)

@@ -133,7 +133,8 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 	}
 	var parallel *tork.ParallelTask
 	if r.Parallel != nil {
-		if err := json.Unmarshal(r.Parallel, &parallel); err != nil {
+		parallel = &tork.ParallelTask{}
+		if err := json.Unmarshal(r.Parallel, parallel); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.parallel")
 		}
 	}
@@ -225,9 +226,12 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
 	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.inputs")
 	}
-	var defaults tork.JobDefaults
-	if err := json.Unmarshal(r.Defaults, &defaults); err != nil {
-		return nil, errors.Wrapf(err, "error deserializing job.defaults")
+	var defaults *tork.JobDefaults
+	if r.Defaults != nil {
+		defaults = &tork.JobDefaults{}
+		if err := json.Unmarshal(r.Defaults, defaults); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.defaults")
+		}
 	}
 	return &tork.Job{
 		ID:          r.ID,
