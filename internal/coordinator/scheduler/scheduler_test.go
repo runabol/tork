@@ -16,9 +16,9 @@ func Test_scheduleRegularTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -47,14 +47,11 @@ func Test_scheduleRegularTask(t *testing.T) {
 	err = s.scheduleRegularTask(ctx, tk)
 	assert.NoError(t, err)
 
-	// wait for the task to get processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
-	// task should only be processed once
-	assert.Equal(t, 1, processed)
 }
 
 func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
@@ -214,9 +211,9 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -254,11 +251,9 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	// wait for the task to get processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
-	// task should only be processed once
-	assert.Equal(t, 1, processed)
 }
