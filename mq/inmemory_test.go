@@ -16,9 +16,9 @@ import (
 func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -28,10 +28,8 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 		Volumes: []string{"/somevolume"},
 	}
 	err = b.PublishTask(ctx, "test-queue", t1)
-	// wait for task to be processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
 }
 
@@ -99,51 +97,47 @@ func TestInMemoryGetQueuesUnacked(t *testing.T) {
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForHeartbeats(func(n *tork.Node) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishHeartbeat(ctx, &tork.Node{})
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed := 0
+	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
-		processed = processed + 1
+		close(processed)
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishJob(ctx, &tork.Job{})
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed := 0
+	processed := make(chan any, 100)
 	mu := sync.Mutex{}
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
 		mu.Lock()
 		defer mu.Unlock()
-		processed = processed + 1
+		processed <- 1
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.SubscribeForJobs(func(j *tork.Job) error {
 		mu.Lock()
 		defer mu.Unlock()
-		processed = processed + 1
+		processed <- 1
 		return nil
 	})
 	assert.NoError(t, err)
@@ -152,27 +146,28 @@ func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			wg.Done()
-			err = b.PublishJob(ctx, &tork.Job{})
+			err := b.PublishJob(ctx, &tork.Job{})
+			assert.NoError(t, err)
 		}()
 	}
 	wg.Wait()
-	// wait for heartbeat to be processed
-	time.Sleep(time.Millisecond * 100)
-	assert.NoError(t, err)
-	assert.Equal(t, 10, processed)
+
+	for i := 0; i < 10; i++ {
+		<-processed
+	}
 }
 
 func TestInMemoryShutdown(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 	mu := sync.Mutex{}
-	processed := 0
+	processed := make(chan any)
 	qname1 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	qname2 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err := b.SubscribeForTasks(qname1, func(j *tork.Task) error {
 		mu.Lock()
 		defer mu.Unlock()
-		processed = processed + 1
+		close(processed)
 		// should not be able to block
 		// the termination process
 		time.Sleep(time.Hour)
@@ -185,22 +180,21 @@ func TestInMemoryShutdown(t *testing.T) {
 		err = b.PublishTask(ctx, qname2, &tork.Task{})
 		assert.NoError(t, err)
 	}
-	time.Sleep(time.Millisecond * 100)
+	<-processed
 	// cleanly shutdown
 	err = b.Shutdown(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
+
 	// there should be no more processing past the shutdown
 	err = b.PublishTask(ctx, qname1, &tork.Task{})
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestInMemorSubsribeForEvent(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
-	processed1 := 0
-	processed2 := 0
+	processed1 := make(chan any, 100)
+	processed2 := make(chan any, 100)
 	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateCompleted,
@@ -208,13 +202,13 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
-		processed1 = processed1 + 1
+		processed1 <- 1
 	})
 	assert.NoError(t, err)
 	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
-		processed2 = processed2 + 1
+		processed2 <- 1
 	})
 	assert.NoError(t, err)
 
@@ -226,8 +220,8 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	}
 	// wait for task to be processed
 	time.Sleep(time.Millisecond * 500)
-	assert.Equal(t, 20, processed1)
-	assert.Equal(t, 10, processed2)
+	assert.Equal(t, 20, len(processed1))
+	assert.Equal(t, 10, len(processed2))
 }
 
 func TestInMemoryHealthChech(t *testing.T) {
