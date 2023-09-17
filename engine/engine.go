@@ -77,6 +77,12 @@ func New(cfg Config) *Engine {
 	}
 }
 
+func (e *Engine) State() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.state
+}
+
 func (e *Engine) Start() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

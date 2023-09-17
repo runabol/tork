@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
@@ -19,15 +18,15 @@ func TestStartStandalone(t *testing.T) {
 		Mode: ModeStandalone,
 	})
 
-	assert.Equal(t, StateIdle, eng.state)
+	assert.Equal(t, StateIdle, eng.State())
 
 	err := eng.Start()
 	assert.NoError(t, err)
 
-	assert.Equal(t, StateRunning, eng.state)
+	assert.Equal(t, StateRunning, eng.State())
 	err = eng.Terminate()
 	assert.NoError(t, err)
-	assert.Equal(t, StateTerminated, eng.state)
+	assert.Equal(t, StateTerminated, eng.State())
 }
 
 func TestRunStandalone(t *testing.T) {
@@ -37,18 +36,13 @@ func TestRunStandalone(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	go func() {
-		err := eng.Run()
-		assert.NoError(t, err)
-	}()
-
-	// wait for the engine to start
-	time.Sleep(time.Second)
-
-	assert.Equal(t, StateRunning, eng.state)
-	err := eng.Terminate()
+	err := eng.Start()
 	assert.NoError(t, err)
-	assert.Equal(t, StateTerminated, eng.state)
+
+	assert.Equal(t, StateRunning, eng.State())
+	err = eng.Terminate()
+	assert.NoError(t, err)
+	assert.Equal(t, StateTerminated, eng.State())
 }
 
 func TestStartCoordinator(t *testing.T) {
