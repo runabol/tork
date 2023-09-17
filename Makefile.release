@@ -13,7 +13,7 @@ ifeq (, $(shell which curl))
 endif
 
 NAME:=tork
-VERSION:=$(shell grep 'Version' version.go | awk '{ print $$3 }' | tr -d '"')
+VERSION:=$(shell grep 'Version' version.go | awk '{ print $$3 }' | head -n1 | tr -d '"')
 GITHUB:=runabol
 LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x mips riscv64
 
