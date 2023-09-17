@@ -104,26 +104,42 @@ func TestInMemoryUpdateTaskConcurrently(t *testing.T) {
 		CreatedAt: &now,
 		JobID:     j1.ID,
 		Parallel:  &tork.ParallelTask{},
+		Env:       make(map[string]string),
 	}
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1000)
+	w := sync.WaitGroup{}
+	w.Add(1000)
 	for i := 0; i < 1000; i++ {
 		go func() {
-			defer wg.Done()
+			defer w.Done()
 			err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
 				u.State = tork.TaskStateScheduled
 				u.Result = "my result"
 				u.Parallel.Completions = u.Parallel.Completions + 1
+				u.Env[fmt.Sprintf("SOME_VAR_%d", rand.Intn(100000))] = "some value"
 				return nil
 			})
 			assert.NoError(t, err)
 		}()
 	}
-	wg.Wait()
+
+	r := sync.WaitGroup{}
+	r.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer r.Done()
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+			t2, err := ds.GetTaskByID(ctx, t1.ID)
+			assert.NoError(t, err)
+			_ = t2.Clone()
+		}()
+	}
+
+	r.Wait()
+	w.Wait()
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)

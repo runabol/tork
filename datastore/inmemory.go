@@ -96,10 +96,11 @@ func (ds *InMemoryDatastore) UpdateTask(ctx context.Context, id string, modify f
 		return ErrTaskNotFound
 	}
 	return ds.tasks.Modify(id, func(t *tork.Task) (*tork.Task, error) {
-		if err := modify(t); err != nil {
+		update := t.Clone()
+		if err := modify(update); err != nil {
 			return nil, errors.Wrapf(err, "error modifying task %s", id)
 		}
-		return t, nil
+		return update, nil
 	})
 }
 
@@ -164,11 +165,11 @@ func (ds *InMemoryDatastore) UpdateJob(ctx context.Context, id string, modify fu
 	}
 
 	err := ds.jobs.Modify(id, func(j *tork.Job) (*tork.Job, error) {
-		copy := j.Clone()
-		if err := modify(copy); err != nil {
+		update := j.Clone()
+		if err := modify(update); err != nil {
 			return nil, errors.Wrapf(err, "error modifying job %s", id)
 		}
-		return copy, nil
+		return update, nil
 	})
 
 	if err != nil {
