@@ -21,7 +21,8 @@
   <a href="https://www.tork.run/installation">Installation</a> •
   <a href="https://www.tork.run">Documentation</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="https://www.tork.run/rest">REST API</a>
+  <a href="https://www.tork.run/rest">REST API</a> •
+  <a href="https://www.tork.run/web-ui">Web UI</a>
 </p>
 
 Tork is a highly-scalable, general-purpose workflow engine.
@@ -50,7 +51,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - [Parallel Task](https://www.tork.run/tasks#parallel-task)
 - [Each Task](https://www.tork.run/tasks#each-task)
 - [Subjob Task](https://www.tork.run/tasks#sub-job-task)
-- [Web UI](#web-ui)
+- [Web UI](https://www.tork.run/web-ui)
 
 ## Documentation
 
