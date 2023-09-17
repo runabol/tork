@@ -56,9 +56,9 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 
 	qname := uuid.NewUUID()
 
-	cancellations := 0
+	cancellations := make(chan any)
 	err := b.SubscribeForTasks(qname, func(t *tork.Task) error {
-		cancellations = cancellations + 1
+		close(cancellations)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -97,12 +97,11 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	err = handler(ctx, t1)
 	assert.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 100)
+	<-cancellations
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
-	assert.Equal(t, 1, cancellations)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
 	assert.Equal(t, t1.NodeID, t2.NodeID)
 }
