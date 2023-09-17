@@ -49,18 +49,22 @@ func TestRabbitMQGetQueues(t *testing.T) {
 	assert.True(t, found)
 }
 
-func TestRabbitMQPublishAndSubsribeForHeartbeat(t *testing.T) {
+func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", mq.WithHeartbeatTTL(10))
 	assert.NoError(t, err)
 	processed := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		close(processed)
+		time.Sleep(time.Millisecond * 100)
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishHeartbeat(ctx, &tork.Node{})
+	assert.NoError(t, err)
 	<-processed
+	// second hearbeat should expire
+	err = b.PublishHeartbeat(ctx, &tork.Node{})
 	assert.NoError(t, err)
 }
 
@@ -79,7 +83,7 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRabbitMQPublisConcurrent(t *testing.T) {
+func TestRabbitMQPublishConcurrent(t *testing.T) {
 	ctx := context.Background()
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
