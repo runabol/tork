@@ -37,7 +37,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - [REST API](https://www.tork.run/rest)
 - [Extensible](https://www.tork.run/customize)
 - Horizontally scalable
-- Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](#limits)
+- Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](https://www.tork.run/tasks#limits)
 - Automatic recovery of tasks in the event of a worker crash
 - Supports both stand-alone and [distributed](https://www.tork.run/installation#running-in-a-distributed-mode) setup
 - Retry failed tasks
