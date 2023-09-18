@@ -1,4 +1,4 @@
-name: job output example
+name: Resizing image demo
 description: |  
   This job takes an input source image and resizes it to multiple outputs.
 
@@ -7,59 +7,61 @@ description: |
 
   You can get a running instance of minio using the following command: 
 
-  docker run --name=minio -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+  docker network create minio
+
+  docker run --name=minio --network=minio -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
 
   You'll like have to change the endpointURL below to the IP address of your minio server
 
   The default credentials for a Minio Server are minioadmin/minioadmin
 inputs:
-  accessKeyID: minioadmin
-  endpointURL: http://my-minio-server:9000
-  secretKeyID: minioadmin
-  source: https://upload.wikimedia.org/wikipedia/commons/c/ca/Bbb-splash.png
-  target: s3://my-bucket/my/folder
+  accessKeyID: minioadmin # the default minio username
+  secretKeyID: minioadmin # the default minio password
+  endpointURL: http://minio:9000
+  source: https://upload.wikimedia.org/wikipedia/commons/c/ca/Bbb-splash.png # or some other image
+  target: s3://images
 tasks:
-  - name: get the file extension of the source
+  - name: Extract the filename extension of the source
     var: fileExt
     image: alpine:3.18.3
     env:
-      SOURCE: "{{ inputs.source }}"
+      SOURCE: '{{ inputs.source }}'
     run: |
       FILENAME=$(basename -- "$SOURCE")
       EXT="${FILENAME##*.}"
-      echo $EXT > $TORK_OUTPUT
+      echo -n $EXT > $TORK_OUTPUT
 
   - name: Convert the image to various resolutions
     each:
       list: "{{ ['1920x1080','1366x768','1280x720','768x1024','100x100','200x200'] }}"
-      task: 
-        name: "Scale the image to {{ item.value }}"
+      task:
+        name: 'Scale the image to {{ item.value }}'
         volumes:
-          - /tmp
+          - /workdir
+        networks:
+          - minio
         image: dpokidov/imagemagick
         env:
-          EXT: "{{ tasks.fileExt }}"
-          SIZE: "{{ item.value }}"
+          EXT: '{{ tasks.fileExt }}'
+          SIZE: '{{ item.value }}'
         run: |
-          mkdir /tmp/targets
-          convert "/tmp/source.$EXT" -resize $SIZE "/tmp/targets/$SIZE.jpg"
-        pre:   
+          mkdir /workdir/targets
+          convert "/workdir/source.$EXT" -resize $SIZE "/workdir/targets/$SIZE.jpg"
+        pre:
           - name: download the remote file
             image: alpine:3.18.3
             env:
-              SOURCE: "{{ inputs.source }}"
-              EXT: "{{ tasks.fileExt }}"
+              SOURCE: '{{ inputs.source }}'
+              EXT: '{{ tasks.fileExt }}'
             run: |
-              wget $SOURCE -O "/tmp/source.$EXT"
+              wget $SOURCE -O "/workdir/source.$EXT"
         post:
           - name: upload the converted image to minio
-            run: aws --endpoint-url $ENDPOINT_URL s3 cp /tmp/targets/$SIZE.jpg $TARGET/$SIZE.jpg
+            run: aws --endpoint-url $ENDPOINT_URL s3 cp /workdir/targets/$SIZE.jpg $TARGET/$SIZE.jpg
             image: amazon/aws-cli:2.13.10
             env:
-              AWS_ACCESS_KEY_ID: "{{inputs.accessKeyID}}"
-              AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
-              TARGET: "{{inputs.target}}"
-              ENDPOINT_URL: "{{inputs.endpointURL}}"
-              SIZE: "{{ item.value }}"
-
-
+              AWS_ACCESS_KEY_ID: '{{inputs.accessKeyID}}'
+              AWS_SECRET_ACCESS_KEY: '{{inputs.secretKeyID}}'
+              TARGET: '{{inputs.target}}'
+              ENDPOINT_URL: '{{inputs.endpointURL}}'
+              SIZE: '{{ item.value }}'
