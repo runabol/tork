@@ -18,7 +18,7 @@ type Task struct {
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Pre         []AuxTask         `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
 	Post        []AuxTask         `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
-	Volumes     []string          `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	Mounts      []Mount           `json:"mounts,omitempty" yaml:"mounts,omitempty" validate:"dive"`
 	Networks    []string          `json:"networks,omitempty" yaml:"networks,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
 	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
@@ -28,6 +28,11 @@ type Task struct {
 	Parallel    *Parallel         `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
+}
+type Mount struct {
+	Type   string `json:"type,omitempty" yaml:"type,omitempty"`
+	Source string `json:"source,omitempty" yaml:"source,omitempty"`
+	Target string `json:"target,omitempty" yaml:"target,omitempty"`
 }
 
 type AuxTask struct {
@@ -40,6 +45,14 @@ type AuxTask struct {
 	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+}
+
+func (m Mount) toMount() tork.Mount {
+	return tork.Mount{
+		Type:   m.Type,
+		Source: m.Source,
+		Target: m.Target,
+	}
 }
 
 func (i AuxTask) toTask() *tork.Task {
@@ -117,7 +130,7 @@ func (i Task) toTask() *tork.Task {
 		Queue:       i.Queue,
 		Pre:         pre,
 		Post:        post,
-		Volumes:     i.Volumes,
+		Mounts:      toMounts(i.Mounts),
 		Networks:    i.Networks,
 		Retry:       retry,
 		Limits:      limits,
@@ -128,6 +141,14 @@ func (i Task) toTask() *tork.Task {
 		Each:        each,
 		SubJob:      subjob,
 	}
+}
+
+func toMounts(ms []Mount) []tork.Mount {
+	result := make([]tork.Mount, len(ms))
+	for i, m := range ms {
+		result[i] = m.toMount()
+	}
+	return result
 }
 
 func toAuxTasks(tis []AuxTask) []*tork.Task {

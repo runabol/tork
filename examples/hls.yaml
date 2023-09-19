@@ -57,8 +57,9 @@ tasks:
         - name: Generate 360p HLS stream
           retry: 
             limit: 2
-          volumes:
-            - /tmp
+          mounts:
+            - type: volume
+              target: /tmp
           networks:
             - minio
           run: |
@@ -83,8 +84,9 @@ tasks:
         - name: Generate 480p HLS stream
           retry: 
             limit: 2
-          volumes:
-            - /tmp
+          mounts:
+            - type: volume
+              target: /tmp
           networks:
             - minio
           run: |
@@ -109,8 +111,9 @@ tasks:
         - name: Generate 720p HLS stream
           retry: 
             limit: 2
-          volumes:
-            - /tmp
+          mounts:
+            - type: volume
+              target: /tmp
           networks:
             - minio
           run: |

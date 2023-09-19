@@ -184,33 +184,27 @@ func (c *Coordinator) Start() error {
 			switch qname {
 			case mq.QUEUE_PENDING:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					ctx := context.Background()
-					return c.onPending(ctx, t)
+					return c.onPending(context.Background(), t)
 				})
 			case mq.QUEUE_COMPLETED:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					ctx := context.Background()
-					return c.onCompleted(ctx, t)
+					return c.onCompleted(context.Background(), t)
 				})
 			case mq.QUEUE_STARTED:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					ctx := context.Background()
-					return c.onStarted(ctx, t)
+					return c.onStarted(context.Background(), t)
 				})
 			case mq.QUEUE_ERROR:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					ctx := context.Background()
-					return c.onError(ctx, t)
+					return c.onError(context.Background(), t)
 				})
 			case mq.QUEUE_HEARBEAT:
 				err = c.broker.SubscribeForHeartbeats(func(n *tork.Node) error {
-					ctx := context.Background()
-					return c.onHeartbeat(ctx, n)
+					return c.onHeartbeat(context.Background(), n)
 				})
 			case mq.QUEUE_JOBS:
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
-					ctx := context.Background()
-					return c.onJob(ctx, job.StateChange, j)
+					return c.onJob(context.Background(), job.StateChange, j)
 				})
 			}
 			if err != nil {

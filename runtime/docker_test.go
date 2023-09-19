@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path"
 	"sync"
@@ -205,9 +204,17 @@ func TestRunTaskWithVolume(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		Run:   "-",
-		Volumes: []string{
-			fmt.Sprintf("volume:%s:%s", vname, "/xyz"),
-			fmt.Sprintf("bind:%s:%s", rundir, "/tork"),
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Source: vname,
+				Target: "/xyz",
+			},
+			{
+				Type:   tork.MountTypeBind,
+				Source: rundir,
+				Target: "/tork",
+			},
 		},
 	}
 	err = rt.Run(ctx, t1)

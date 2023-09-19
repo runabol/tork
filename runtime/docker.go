@@ -162,25 +162,31 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 
 	var mounts []mount.Mount
 
-	for _, v := range t.Volumes {
-		vol := strings.Split(v, ":")
-		if len(vol) != 3 {
-			return errors.Errorf("invalid volume %s", v)
-		}
+	for _, m := range t.Mounts {
 		var mt mount.Type
-		switch vol[0] {
-		case "volume":
+		switch m.Type {
+		case tork.MountTypeVolume:
 			mt = mount.TypeVolume
-		case "bind":
+			if m.Target == "" {
+				return errors.Errorf("volume target is required")
+			}
+		case tork.MountTypeBind:
 			mt = mount.TypeBind
+			if m.Target == "" {
+				return errors.Errorf("bind target is required")
+			}
+			if m.Source == "" {
+				return errors.Errorf("bind source is required")
+			}
 		default:
-			return errors.Errorf("unknown volume type: %s", vol[0])
+			return errors.Errorf("unknown volume type: %s", m.Type)
 		}
 		mount := mount.Mount{
 			Type:   mt,
-			Source: vol[1],
-			Target: vol[2],
+			Source: m.Source,
+			Target: m.Target,
 		}
+		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
 		mounts = append(mounts, mount)
 	}
 
@@ -321,7 +327,7 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
 	d.tasks.Delete(t.ID)
 	log.Printf("Attempting to stop and remove container %v", containerID)
 	return d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
-		RemoveVolumes: false,
+		RemoveVolumes: true,
 		RemoveLinks:   false,
 		Force:         true,
 	})

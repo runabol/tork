@@ -71,7 +71,7 @@ CREATE TABLE tasks (
     error_        text,
     pre_tasks     jsonb,
     post_tasks    jsonb,
-    volumes       text[],
+    mounts       jsonb,
     node_id       varchar(32),
     retry         jsonb,
     limits        jsonb,

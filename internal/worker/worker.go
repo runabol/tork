@@ -15,6 +15,7 @@ import (
 	"github.com/runabol/tork/mq"
 
 	"github.com/runabol/tork/internal/syncx"
+	"github.com/runabol/tork/internal/wildcard"
 	"github.com/runabol/tork/runtime"
 
 	"github.com/runabol/tork/internal/uuid"
@@ -32,6 +33,17 @@ type Worker struct {
 	tempdir   string
 	api       *api
 	taskCount int32
+	mounts    Mounts
+}
+
+type Config struct {
+	Address    string
+	Broker     mq.Broker
+	Runtime    runtime.Runtime
+	Queues     map[string]int
+	Limits     Limits
+	TempDir    string
+	BindMounts Mounts
 }
 
 type Limits struct {
@@ -39,13 +51,10 @@ type Limits struct {
 	DefaultMemoryLimit string
 }
 
-type Config struct {
-	Address string
-	Broker  mq.Broker
-	Runtime runtime.Runtime
-	Queues  map[string]int
-	Limits  Limits
-	TempDir string
+type Mounts struct {
+	Allowed   bool
+	Allowlist []string
+	Denylist  []string
 }
 
 type runningTask struct {
@@ -73,6 +82,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		tempdir:   cfg.TempDir,
 		api:       newAPI(cfg),
 		stop:      make(chan any),
+		mounts:    cfg.BindMounts,
 	}
 	return w, nil
 }
@@ -164,28 +174,26 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	if t.Limits != nil && t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
-	// prepare shared volumes
-
-	vols := []string{}
-	for _, v := range t.Volumes {
-		volName := uuid.NewUUID()
-		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
+	// prepare mounts
+	for i, mount := range t.Mounts {
+		delete, err := w.prepareMount(ctx, &mount)
+		if err != nil {
 			return err
 		}
-		defer func(vname string) {
-			if err := w.runtime.DeleteVolume(ctx, vname); err != nil {
+		defer func(m tork.Mount) {
+			if err := delete(); err != nil {
 				log.Error().
 					Err(err).
-					Msgf("error deleting volume: %s", vname)
+					Msgf("error deleting mount: %s", m)
 			}
-		}(volName)
-		vols = append(vols, fmt.Sprintf("volume:%s:%s", volName, v))
+		}(mount)
+		t.Mounts[i] = mount
 	}
-	t.Volumes = vols
+
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.ID = uuid.NewUUID()
-		pre.Volumes = t.Volumes
+		pre.Mounts = t.Mounts
 		pre.Networks = t.Networks
 		pre.Limits = t.Limits
 		if err := w.doExecuteTask(ctx, pre); err != nil {
@@ -217,7 +225,7 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	// execute post tasks
 	for _, post := range t.Post {
 		post.ID = uuid.NewUUID()
-		post.Volumes = t.Volumes
+		post.Mounts = t.Mounts
 		post.Networks = t.Networks
 		post.Limits = t.Limits
 		if err := w.doExecuteTask(ctx, post); err != nil {
@@ -238,6 +246,35 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	t.CompletedAt = &finished
 	t.State = tork.TaskStateCompleted
 	return nil
+}
+
+func (w *Worker) prepareMount(ctx context.Context, m *tork.Mount) (delete func() error, err error) {
+	if m.Type == tork.MountTypeBind {
+		if !w.mounts.Allowed {
+			return nil, errors.New("bind mounts are not allowed")
+		}
+		for _, deny := range w.mounts.Denylist {
+			if wildcard.Match(deny, m.Source) {
+				return nil, errors.Errorf("mount point not allowed: %s", m.Source)
+			}
+		}
+		for _, allow := range w.mounts.Allowlist {
+			if wildcard.Match(allow, m.Source) {
+				return func() error { return nil }, nil
+			}
+		}
+		return nil, errors.Errorf("mount point not allowed: %s", m.Source)
+	} else {
+		volName := uuid.NewUUID()
+		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
+			return nil, err
+		}
+		delete = func() error {
+			return w.runtime.DeleteVolume(ctx, volName)
+		}
+		m.Source = volName
+		return delete, nil
+	}
 }
 
 func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
@@ -264,7 +301,7 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 			return errors.Wrapf(err, "error making file %s read only", filename)
 		}
 	}
-	t.Volumes = append(t.Volumes, fmt.Sprintf("bind:%s:%s", workdir, "/tork"))
+	t.Mounts = append(t.Mounts, tork.Mount{Type: tork.MountTypeBind, Source: workdir, Target: "/tork"})
 	// set the path for task outputs
 	if t.Env == nil {
 		t.Env = make(map[string]string)

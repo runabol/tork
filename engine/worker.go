@@ -23,6 +23,11 @@ func (e *Engine) initWorker() error {
 		},
 		TempDir: conf.String("worker.tempdir"),
 		Address: conf.String("worker.address"),
+		BindMounts: worker.Mounts{
+			Allowed:   conf.Bool("worker.mounts.bind.allowed"),
+			Allowlist: conf.Strings("worker.mounts.bind.allowlist"),
+			Denylist:  conf.Strings("worker.mounts.bind.denylist"),
+		},
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error creating worker")

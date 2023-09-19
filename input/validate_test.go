@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -326,6 +327,165 @@ func TestValidateExpr(t *testing.T) {
 					Task: Task{
 						Name:  "test task",
 						Image: "some:image",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+}
+
+func TestValidateMounts(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   "", // missing
+						Target: "", // missing
+					},
+				},
+			},
+		},
+	}
+	err := j.Validate()
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeVolume,
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   "bad type",
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "", // missing
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "../some/source", // invalid
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some#/source", // invalid
+						Target: "/some/target",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some:/target", // invalid
 					},
 				},
 			},

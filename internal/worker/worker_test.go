@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -74,11 +75,16 @@ func Test_handleTaskRun(t *testing.T) {
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
-		ID:      uuid.NewUUID(),
-		State:   tork.TaskStateScheduled,
-		Image:   "ubuntu:mantic",
-		CMD:     []string{"ls"},
-		Volumes: []string{"/somevolume"},
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateScheduled,
+		Image: "ubuntu:mantic",
+		CMD:   []string{"ls"},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/somevolume",
+			},
+		},
 	}
 
 	err = w.handleTask(t1)
@@ -87,7 +93,138 @@ func Test_handleTaskRun(t *testing.T) {
 	<-completions
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
+	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
+}
+
+func Test_createMountVolume(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	mount := &tork.Mount{
+		Type:   tork.MountTypeVolume,
+		Target: "/somevol",
+	}
+
+	delete, err := w.prepareMount(context.Background(), mount)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, delete())
+	}()
+	assert.Equal(t, "/somevol", mount.Target)
+	assert.NotEmpty(t, mount.Source)
+}
+
+func Test_createMountBindNotAllowed(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	_, err = w.prepareMount(context.Background(), &tork.Mount{
+		Type:   tork.MountTypeBind,
+		Source: "/tmp",
+		Target: "/somevol",
+	})
+	assert.Error(t, err)
+}
+
+func Test_createMountBindDenylist(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		BindMounts: Mounts{
+			Allowed:  true,
+			Denylist: []string{"/tmp"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	_, err = w.prepareMount(context.Background(), &tork.Mount{
+		Type:   tork.MountTypeBind,
+		Source: "/tmp",
+		Target: "/somevol",
+	})
+	assert.Error(t, err)
+}
+
+func Test_createMountBindAllowlist(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		BindMounts: Mounts{
+			Allowed:   true,
+			Allowlist: []string{"/tmp"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	mount := tork.Mount{
+		Type:   tork.MountTypeBind,
+		Source: "/tmp",
+		Target: "/somevol",
+	}
+
+	delete, err := w.prepareMount(context.Background(), &mount)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, delete())
+	}()
+	assert.Equal(t, "/somevol", mount.Target)
+	assert.Equal(t, "/tmp", mount.Source)
+	assert.Equal(t, tork.MountTypeBind, mount.Type)
+}
+
+func Test_createMountBindNotInAllowlist(t *testing.T) {
+	rt, err := runtime.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		BindMounts: Mounts{
+			Allowed:   true,
+			Allowlist: []string{"/tmp"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	_, err = w.prepareMount(context.Background(), &tork.Mount{
+		Type:   tork.MountTypeBind,
+		Source: "/other",
+		Target: "/somevol",
+	})
+	assert.Error(t, err)
 }
 
 func Test_handleTaskRunOutput(t *testing.T) {
@@ -142,11 +279,16 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
-		ID:      uuid.NewUUID(),
-		State:   tork.TaskStateScheduled,
-		Image:   "ubuntu:mantic",
-		CMD:     []string{"ls"},
-		Volumes: []string{"/somevolume"},
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateScheduled,
+		Image: "ubuntu:mantic",
+		CMD:   []string{"ls"},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/somevolume",
+			},
+		},
 		Pre: []*tork.Task{
 			{
 				Image: "ubuntu:mantic",
@@ -166,7 +308,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	<-completions
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
+	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
 
 func Test_handleTaskCancel(t *testing.T) {

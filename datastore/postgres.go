@@ -43,7 +43,7 @@ type taskRecord struct {
 	Error       string         `db:"error_"`
 	Pre         []byte         `db:"pre_tasks"`
 	Post        []byte         `db:"post_tasks"`
-	Volumes     pq.StringArray `db:"volumes"`
+	Mounts      []byte         `db:"mounts"`
 	Networks    pq.StringArray `db:"networks"`
 	NodeID      string         `db:"node_id"`
 	Retry       []byte         `db:"retry"`
@@ -159,6 +159,12 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")
 		}
 	}
+	var mounts []tork.Mount
+	if r.Mounts != nil {
+		if err := json.Unmarshal(r.Mounts, &mounts); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.registry")
+		}
+	}
 	return &tork.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -181,7 +187,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Error:       r.Error,
 		Pre:         pre,
 		Post:        post,
-		Volumes:     r.Volumes,
+		Mounts:      mounts,
 		Networks:    r.Networks,
 		NodeID:      r.NodeID,
 		Retry:       retry,
@@ -347,6 +353,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		s := string(b)
 		registry = &s
 	}
+	var mounts *string
+	if len(t.Mounts) > 0 {
+		b, err := json.Marshal(t.Mounts)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.mounts")
+		}
+		s := string(b)
+		mounts = &s
+	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -367,7 +382,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 			error_, -- $17
 			pre_tasks, -- $18
 			post_tasks, -- $19
-			volumes, -- $20
+			mounts, -- $20
 			node_id, -- $21
 			retry, -- $22
 			limits, -- $23
@@ -407,7 +422,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		sanitizeString(t.Error),      // $17
 		pre,                          // $18
 		post,                         // $19
-		pq.StringArray(t.Volumes),    // $20
+		mounts,                       // $20
 		t.NodeID,                     // $21
 		retry,                        // $22
 		limits,                       // $23
