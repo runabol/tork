@@ -36,8 +36,9 @@ tasks:
       list: "{{ ['1920x1080','1366x768','1280x720','768x1024','100x100','200x200'] }}"
       task:
         name: 'Scale the image to {{ item.value }}'
-        volumes:
-          - /workdir
+        mounts:
+          - type: volume
+            target: /workdir
         networks:
           - minio
         image: dpokidov/imagemagick

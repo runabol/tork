@@ -155,8 +155,9 @@ tasks:
               BUCKET_NAME: "{{tasks.bucketName}}"
               ENDPOINT_URL: "{{inputs.endpointURL}}"
               NUMBER: "{{ item.index }}"
-        volumes:
-          - /tmp
+        mounts:
+          - type: volume
+            target: /tmp
         retry:
           limit: 2
 
@@ -187,8 +188,9 @@ tasks:
           AWS_SECRET_ACCESS_KEY: "{{inputs.secretKeyID}}"
           BUCKET_NAME: "{{tasks.bucketName}}"
           ENDPOINT_URL: "{{inputs.endpointURL}}"
-    volumes:
-      - /tmp
+    mounts:
+      - type: volume
+        target: /tmp
     retry:
       limit: 2
     timeout: 120s

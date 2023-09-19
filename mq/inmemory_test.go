@@ -24,13 +24,18 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
-		ID:      uuid.NewUUID(),
-		Volumes: []string{"/somevolume"},
+		ID: uuid.NewUUID(),
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/somevolume",
+			},
+		},
 	}
 	err = b.PublishTask(ctx, "test-queue", t1)
 	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"/somevolume"}, t1.Volumes)
+	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
 
 func TestInMemoryGetQueues(t *testing.T) {

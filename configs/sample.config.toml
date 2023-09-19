@@ -71,6 +71,13 @@ enabled = false
 address = "localhost:8001"
 tempdir = "/tmp"
 
+# default task limits
 [worker.limits]
-cpus = "1"
-memory = "100"
+cpus = ""   # supports fractions
+memory = "" # e.g. 100m 
+
+
+[worker.mounts.bind]
+allowed = false
+allowlist = []  # supports wildcards (*)
+denylist = []   # supports wildcards (*)

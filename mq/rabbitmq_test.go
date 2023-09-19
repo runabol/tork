@@ -17,18 +17,16 @@ func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
 	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
-	processed := 0
+	processed := make(chan any)
 	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
-		processed = processed + 1
+		processed <- 1
 		return nil
 	})
 	assert.NoError(t, err)
 	err = b.PublishTask(ctx, qname, &tork.Task{})
-	// wait for task to be processed
-	time.Sleep(time.Millisecond * 500)
+	<-processed
 	assert.NoError(t, err)
-	assert.Equal(t, 1, processed)
 }
 
 func TestRabbitMQGetQueues(t *testing.T) {

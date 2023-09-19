@@ -127,8 +127,9 @@ tasks:
               BUCKET_NAME: "{{inputs.bucket}}"
               FOLDER_NAME: "{{tasks.folderName}}"
               NUMBER: "{{ item.index }}"
-        volumes:
-          - /tmp
+        mounts:
+          - type: volume
+            target: /tmp
         retry:
           limit: 2
         timeout: 180s
@@ -156,7 +157,8 @@ tasks:
         env:
           BUCKET_NAME: "{{inputs.bucket}}"
           FOLDER_NAME: "{{tasks.folderName}}"
-    volumes:
-      - /tmp
+    mounts:
+      - type: volume
+        target: /tmp
     retry:
       limit: 2

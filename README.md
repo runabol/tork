@@ -134,8 +134,9 @@ tasks:
     image: jrottenberg/ffmpeg:3.4-alpine
     run: |
       ffmpeg -i /tmp/input.ogv -t 5 /tmp/output.mp4
-    volumes:
-      - /tmp
+    mounts:
+      - type: volume
+        target: /tmp
     pre:
       - name: download the remote file
         image: alpine:3.18.3

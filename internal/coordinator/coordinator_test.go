@@ -76,9 +76,7 @@ func TestTaskMiddlewareWithError(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
-
-	tk := &tork.Task{}
-	assert.ErrorIs(t, c.onPending(context.Background(), tk), Err)
+	assert.ErrorIs(t, c.onPending(context.Background(), &tork.Task{}), Err)
 }
 
 func TestTaskMiddlewareNoOp(t *testing.T) {
@@ -166,8 +164,7 @@ func TestJobMiddlewareWithError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 
-	j := &tork.Job{}
-	assert.ErrorIs(t, c.onJob(context.Background(), job.StateChange, j), Err)
+	assert.ErrorIs(t, c.onJob(context.Background(), job.StateChange, &tork.Job{}), Err)
 }
 
 func TestJobMiddlewareNoOp(t *testing.T) {

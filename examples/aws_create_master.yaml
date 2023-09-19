@@ -18,5 +18,6 @@ tasks:
         image: amazon/aws-cli:2.13.10
         env:
           BUCKET_NAME: my-bucket
-    volumes:
-      - /tmp
+    mounts:
+      - type: volume
+        target: /tmp

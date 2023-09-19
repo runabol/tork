@@ -1,12 +1,18 @@
 package input
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/mq"
+)
+
+var (
+	mountPattern = regexp.MustCompile("^/[0-9a-zA-Z_/]+$")
 )
 
 func (ji Job) Validate() error {
@@ -20,6 +26,7 @@ func (ji Job) Validate() error {
 	if err := validate.RegisterValidation("expr", validateExpr); err != nil {
 		return err
 	}
+	validate.RegisterStructValidation(validateMount, Mount{})
 	validate.RegisterStructValidation(taskInputValidation, Task{})
 	return validate.Struct(ji)
 }
@@ -30,6 +37,23 @@ func validateExpr(fl validator.FieldLevel) bool {
 		return true
 	}
 	return eval.ValidExpr(v)
+}
+
+func validateMount(sl validator.StructLevel) {
+	mount := sl.Current().Interface().(Mount)
+	if mount.Type == "" {
+		sl.ReportError(mount, "mount", "Mount", "typerequired", "")
+	} else if mount.Type != tork.MountTypeBind && mount.Type != tork.MountTypeVolume {
+		sl.ReportError(mount, "mount", "Mount", "invalidtype", "")
+	} else if mount.Type == tork.MountTypeVolume && mount.Source != "" {
+		sl.ReportError(mount, "mount", "Mount", "sourcenotempty", "")
+	} else if mount.Type == tork.MountTypeBind && mount.Source == "" {
+		sl.ReportError(mount, "mount", "Mount", "sourcerequired", "")
+	} else if mount.Source != "" && !mountPattern.MatchString(mount.Source) {
+		sl.ReportError(mount, "mount", "Mount", "invalidsource", "")
+	} else if mount.Target != "" && !mountPattern.MatchString(mount.Target) {
+		sl.ReportError(mount, "mount", "Mount", "invalidtarget", "")
+	}
 }
 
 func validateDuration(fl validator.FieldLevel) bool {
@@ -110,8 +134,8 @@ func compositeTaskValidation(sl validator.StructLevel) {
 	if len(t.Post) > 0 {
 		sl.ReportError(t.Post, "post", "Post", "invalidcompositetask", "")
 	}
-	if len(t.Volumes) > 0 {
-		sl.ReportError(t.Volumes, "volumes", "Volumes", "invalidcompositetask", "")
+	if len(t.Mounts) > 0 {
+		sl.ReportError(t.Mounts, "mounts", "Mounts", "invalidcompositetask", "")
 	}
 	if t.Retry != nil {
 		sl.ReportError(t.Retry, "retry", "Retry", "invalidcompositetask", "")
