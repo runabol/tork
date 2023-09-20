@@ -436,6 +436,20 @@
                 }
             }
         },
+        "input.Mount": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "input.Parallel": {
             "type": "object",
             "required": [
@@ -553,6 +567,12 @@
                 "limits": {
                     "$ref": "#/definitions/input.Limits"
                 },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/input.Mount"
+                    }
+                },
                 "name": {
                     "type": "string"
                 },
@@ -597,12 +617,6 @@
                 },
                 "var": {
                     "type": "string"
-                },
-                "volumes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -811,6 +825,20 @@
                 }
             }
         },
+        "tork.Mount": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "tork.Node": {
             "type": "object",
             "properties": {
@@ -970,6 +998,12 @@
                 "limits": {
                     "$ref": "#/definitions/tork.TaskLimits"
                 },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tork.Mount"
+                    }
+                },
                 "name": {
                     "type": "string"
                 },
@@ -1035,12 +1069,6 @@
                 },
                 "var": {
                     "type": "string"
-                },
-                "volumes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
