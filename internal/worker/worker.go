@@ -178,7 +178,11 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	for i, mount := range t.Mounts {
 		delete, err := w.prepareMount(ctx, &mount)
 		if err != nil {
-			return err
+			finished := time.Now().UTC()
+			t.State = tork.TaskStateFailed
+			t.Error = err.Error()
+			t.FailedAt = &finished
+			return nil
 		}
 		defer func(m tork.Mount) {
 			if err := delete(); err != nil {
