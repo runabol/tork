@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -13,6 +14,18 @@ func (e *Engine) initWorker() error {
 	if err != nil {
 		return err
 	}
+
+	mounter, err := mount.NewMounter(mount.Config{
+		Bind: mount.BindConfig{
+			Allowed:   conf.Bool("mounts.bind.allowed"),
+			Allowlist: conf.Strings("mounts.bind.allowlist"),
+			Denylist:  conf.Strings("mounts.bind.denylist"),
+		},
+	})
+	if err != nil {
+		return errors.Wrapf(err, "error initializing mounter")
+	}
+
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  e.broker,
 		Runtime: rt,
@@ -23,11 +36,7 @@ func (e *Engine) initWorker() error {
 		},
 		TempDir: conf.String("worker.tempdir"),
 		Address: conf.String("worker.address"),
-		BindMounts: worker.Mounts{
-			Allowed:   conf.Bool("worker.mounts.bind.allowed"),
-			Allowlist: conf.Strings("worker.mounts.bind.allowlist"),
-			Denylist:  conf.Strings("worker.mounts.bind.denylist"),
-		},
+		Mounter: mounter,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error creating worker")

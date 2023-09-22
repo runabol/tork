@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/eval"
+	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 )
 
@@ -40,19 +40,21 @@ func validateExpr(fl validator.FieldLevel) bool {
 }
 
 func validateMount(sl validator.StructLevel) {
-	mount := sl.Current().Interface().(Mount)
-	if mount.Type == "" {
-		sl.ReportError(mount, "mount", "Mount", "typerequired", "")
-	} else if mount.Type != tork.MountTypeBind && mount.Type != tork.MountTypeVolume {
-		sl.ReportError(mount, "mount", "Mount", "invalidtype", "")
-	} else if mount.Type == tork.MountTypeVolume && mount.Source != "" {
-		sl.ReportError(mount, "mount", "Mount", "sourcenotempty", "")
-	} else if mount.Type == tork.MountTypeBind && mount.Source == "" {
-		sl.ReportError(mount, "mount", "Mount", "sourcerequired", "")
-	} else if mount.Source != "" && !mountPattern.MatchString(mount.Source) {
-		sl.ReportError(mount, "mount", "Mount", "invalidsource", "")
-	} else if mount.Target != "" && !mountPattern.MatchString(mount.Target) {
-		sl.ReportError(mount, "mount", "Mount", "invalidtarget", "")
+	mnt := sl.Current().Interface().(Mount)
+	if mnt.Type == "" {
+		sl.ReportError(mnt, "mount", "Mount", "typerequired", "")
+	} else if mnt.Type != mount.TypeBind && mnt.Type != mount.TypeVolume {
+		sl.ReportError(mnt, "mount", "Mount", "invalidtype", "")
+	} else if mnt.Type == mount.TypeVolume && mnt.Source != "" {
+		sl.ReportError(mnt, "mount", "Mount", "sourcenotempty", "")
+	} else if mnt.Type == mount.TypeVolume && mnt.Target == "" {
+		sl.ReportError(mnt, "mount", "Mount", "targetrequired", "")
+	} else if mnt.Type == mount.TypeBind && mnt.Source == "" {
+		sl.ReportError(mnt, "mount", "Mount", "sourcerequired", "")
+	} else if mnt.Source != "" && !mountPattern.MatchString(mnt.Source) {
+		sl.ReportError(mnt, "mount", "Mount", "invalidsource", "")
+	} else if mnt.Target != "" && !mountPattern.MatchString(mnt.Target) {
+		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
 	}
 }
 
