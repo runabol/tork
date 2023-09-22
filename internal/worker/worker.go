@@ -15,8 +15,8 @@ import (
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
+	"github.com/runabol/tork/internal/runtime"
 	"github.com/runabol/tork/internal/syncx"
-	"github.com/runabol/tork/runtime"
 
 	"github.com/runabol/tork/internal/uuid"
 )

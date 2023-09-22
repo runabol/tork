@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/runabol/tork/internal/runtime"
 	"github.com/runabol/tork/mq"
-	"github.com/runabol/tork/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
