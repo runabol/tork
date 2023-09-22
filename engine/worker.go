@@ -21,6 +21,9 @@ func (e *Engine) initWorker() error {
 			Allowlist: conf.Strings("mounts.bind.allowlist"),
 			Denylist:  conf.Strings("mounts.bind.denylist"),
 		},
+		Temp: mount.TempConfig{
+			TempDir: conf.StringDefault("mount.temp.dir", "/tmp"),
+		},
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error initializing mounter")
@@ -34,7 +37,6 @@ func (e *Engine) initWorker() error {
 			DefaultCPUsLimit:   conf.String("worker.limits.cpus"),
 			DefaultMemoryLimit: conf.String("worker.limits.memory"),
 		},
-		TempDir: conf.String("worker.tempdir"),
 		Address: conf.String("worker.address"),
 		Mounter: mounter,
 	})
