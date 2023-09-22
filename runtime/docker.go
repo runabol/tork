@@ -14,16 +14,15 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/syncx"
+	tmount "github.com/runabol/tork/mount"
 )
 
 type DockerRuntime struct {
@@ -165,12 +164,12 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	for _, m := range t.Mounts {
 		var mt mount.Type
 		switch m.Type {
-		case tork.MountTypeVolume:
+		case tmount.TypeVolume:
 			mt = mount.TypeVolume
 			if m.Target == "" {
 				return errors.Errorf("volume target is required")
 			}
-		case tork.MountTypeBind:
+		case tmount.TypeBind:
 			mt = mount.TypeBind
 			if m.Target == "" {
 				return errors.Errorf("bind target is required")
@@ -359,29 +358,4 @@ func parseMemory(limits *tork.TaskLimits) (int64, error) {
 		return 0, nil
 	}
 	return units.RAMInBytes(limits.Memory)
-}
-
-func (d *DockerRuntime) CreateVolume(ctx context.Context, name string) error {
-	v, err := d.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
-	if err != nil {
-		return err
-	}
-	log.Debug().
-		Str("mount-point", v.Mountpoint).Msgf("created volume %s", v.Name)
-	return nil
-}
-
-func (d *DockerRuntime) DeleteVolume(ctx context.Context, name string) error {
-	ls, err := d.client.VolumeList(ctx, filters.NewArgs(filters.Arg("name", name)))
-	if err != nil {
-		return err
-	}
-	if len(ls.Volumes) == 0 {
-		return errors.Errorf("unknown volume: %s", name)
-	}
-	if err := d.client.VolumeRemove(ctx, name, true); err != nil {
-		return err
-	}
-	log.Debug().Msgf("removed volume %s", name)
-	return nil
 }

@@ -12,10 +12,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
 	"github.com/runabol/tork/internal/syncx"
-	"github.com/runabol/tork/internal/wildcard"
 	"github.com/runabol/tork/runtime"
 
 	"github.com/runabol/tork/internal/uuid"
@@ -33,28 +33,22 @@ type Worker struct {
 	tempdir   string
 	api       *api
 	taskCount int32
-	mounts    Mounts
+	mounter   mount.Mounter
 }
 
 type Config struct {
-	Address    string
-	Broker     mq.Broker
-	Runtime    runtime.Runtime
-	Queues     map[string]int
-	Limits     Limits
-	TempDir    string
-	BindMounts Mounts
+	Address string
+	Broker  mq.Broker
+	Runtime runtime.Runtime
+	Queues  map[string]int
+	Limits  Limits
+	TempDir string
+	Mounter mount.Mounter
 }
 
 type Limits struct {
 	DefaultCPUsLimit   string
 	DefaultMemoryLimit string
-}
-
-type Mounts struct {
-	Allowed   bool
-	Allowlist []string
-	Denylist  []string
 }
 
 type runningTask struct {
@@ -82,7 +76,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		tempdir:   cfg.TempDir,
 		api:       newAPI(cfg),
 		stop:      make(chan any),
-		mounts:    cfg.BindMounts,
+		mounter:   cfg.Mounter,
 	}
 	return w, nil
 }
@@ -175,8 +169,8 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
 	// prepare mounts
-	for i, mount := range t.Mounts {
-		delete, err := w.prepareMount(ctx, &mount)
+	for i, mnt := range t.Mounts {
+		err := w.mounter.Mount(ctx, &mnt)
 		if err != nil {
 			finished := time.Now().UTC()
 			t.State = tork.TaskStateFailed
@@ -184,14 +178,14 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 			t.FailedAt = &finished
 			return nil
 		}
-		defer func(m tork.Mount) {
-			if err := delete(); err != nil {
+		defer func(m mount.Mount) {
+			if err := w.mounter.Unmount(ctx, &m); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error deleting mount: %s", m)
 			}
-		}(mount)
-		t.Mounts[i] = mount
+		}(mnt)
+		t.Mounts[i] = mnt
 	}
 
 	// excute pre-tasks
@@ -252,35 +246,6 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	return nil
 }
 
-func (w *Worker) prepareMount(ctx context.Context, m *tork.Mount) (delete func() error, err error) {
-	if m.Type == tork.MountTypeBind {
-		if !w.mounts.Allowed {
-			return nil, errors.New("bind mounts are not allowed")
-		}
-		for _, deny := range w.mounts.Denylist {
-			if wildcard.Match(deny, m.Source) {
-				return nil, errors.Errorf("mount point not allowed: %s", m.Source)
-			}
-		}
-		for _, allow := range w.mounts.Allowlist {
-			if wildcard.Match(allow, m.Source) {
-				return func() error { return nil }, nil
-			}
-		}
-		return nil, errors.Errorf("mount point not allowed: %s", m.Source)
-	} else {
-		volName := uuid.NewUUID()
-		if err := w.runtime.CreateVolume(ctx, volName); err != nil {
-			return nil, err
-		}
-		delete = func() error {
-			return w.runtime.DeleteVolume(ctx, volName)
-		}
-		m.Source = volName
-		return delete, nil
-	}
-}
-
 func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 	t := o.Clone()
 	// create a temporary mount point
@@ -305,7 +270,7 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 			return errors.Wrapf(err, "error making file %s read only", filename)
 		}
 	}
-	t.Mounts = append(t.Mounts, tork.Mount{Type: tork.MountTypeBind, Source: workdir, Target: "/tork"})
+	t.Mounts = append(t.Mounts, mount.Mount{Type: mount.TypeBind, Source: workdir, Target: "/tork"})
 	// set the path for task outputs
 	if t.Env == nil {
 		t.Env = make(map[string]string)

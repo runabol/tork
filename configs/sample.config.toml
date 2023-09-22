@@ -77,7 +77,7 @@ cpus = ""   # supports fractions
 memory = "" # e.g. 100m 
 
 
-[worker.mounts.bind]
+[mounts.bind]
 allowed = false
 allowlist = []  # supports wildcards (*)
 denylist = []   # supports wildcards (*)
