@@ -7,6 +7,7 @@ import (
 const (
 	TypeVolume string = "volume"
 	TypeBind   string = "bind"
+	TypeTemp   string = "temp"
 )
 
 type Mounter interface {

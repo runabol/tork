@@ -12,12 +12,17 @@ type MapperMounter struct {
 
 type Config struct {
 	Bind BindConfig
+	Temp TempConfig
 }
 
 type BindConfig struct {
 	Allowed   bool
 	Allowlist []string
 	Denylist  []string
+}
+
+type TempConfig struct {
+	TempDir string
 }
 
 func NewMounter(cfg Config) (*MapperMounter, error) {
@@ -27,8 +32,9 @@ func NewMounter(cfg Config) (*MapperMounter, error) {
 	}
 	return &MapperMounter{
 		mounters: map[string]Mounter{
-			TypeBind:   NewBindMounter(cfg.Bind),
+			TypeBind:   &BindMounter{cfg: cfg.Bind},
 			TypeVolume: vol,
+			TypeTemp:   &TempMounter{cfg: cfg.Temp},
 		},
 	}, nil
 }

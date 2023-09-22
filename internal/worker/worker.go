@@ -30,7 +30,6 @@ type Worker struct {
 	queues    map[string]int
 	tasks     *syncx.Map[string, runningTask]
 	limits    Limits
-	tempdir   string
 	api       *api
 	taskCount int32
 	mounter   mount.Mounter
@@ -42,7 +41,6 @@ type Config struct {
 	Runtime runtime.Runtime
 	Queues  map[string]int
 	Limits  Limits
-	TempDir string
 	Mounter mount.Mounter
 }
 
@@ -73,7 +71,6 @@ func NewWorker(cfg Config) (*Worker, error) {
 		queues:    cfg.Queues,
 		tasks:     new(syncx.Map[string, runningTask]),
 		limits:    cfg.Limits,
-		tempdir:   cfg.TempDir,
 		api:       newAPI(cfg),
 		stop:      make(chan any),
 		mounter:   cfg.Mounter,
@@ -248,29 +245,35 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 
 func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 	t := o.Clone()
-	// create a temporary mount point
-	// we can use to write the run script to
-	workdir, err := os.MkdirTemp(w.tempdir, "tork-")
-	if err != nil {
-		return errors.Wrapf(err, "error creating temp dir")
+	mnt := mount.Mount{Type: mount.TypeTemp, Target: "/tork"}
+	if err := w.mounter.Mount(ctx, &mnt); err != nil {
+		return err
 	}
-	defer deleteTempDir(workdir)
-	if err := os.WriteFile(path.Join(workdir, "entrypoint"), []byte(t.Run), os.ModePerm); err != nil {
+	defer func() {
+		if err := w.mounter.Unmount(ctx, &mnt); err != nil {
+			log.Error().Err(err).Msgf("error unmounting temp dir")
+		}
+	}()
+	if err := os.WriteFile(path.Join(mnt.Source, "entrypoint"), []byte(t.Run), os.ModePerm); err != nil {
 		return err
 	}
 	stdoutFile := "stdout"
-	if err := os.WriteFile(path.Join(workdir, stdoutFile), []byte{}, os.ModePerm); err != nil {
+	if err := os.WriteFile(path.Join(mnt.Source, stdoutFile), []byte{}, os.ModePerm); err != nil {
 		return err
 	}
 	for filename, contents := range t.Files {
-		if err := os.WriteFile(path.Join(workdir, filename), []byte(contents), os.ModePerm); err != nil {
+		if err := os.WriteFile(path.Join(mnt.Source, filename), []byte(contents), os.ModePerm); err != nil {
 			return err
 		}
-		if err := os.Chmod(path.Join(workdir, filename), 0444); err != nil {
+		if err := os.Chmod(path.Join(mnt.Source, filename), 0444); err != nil {
 			return errors.Wrapf(err, "error making file %s read only", filename)
 		}
 	}
-	t.Mounts = append(t.Mounts, mount.Mount{Type: mount.TypeBind, Source: workdir, Target: "/tork"})
+	t.Mounts = append(t.Mounts, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: mnt.Source,
+		Target: mnt.Target,
+	})
 	// set the path for task outputs
 	if t.Env == nil {
 		t.Env = make(map[string]string)
@@ -290,22 +293,14 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 	if err := w.runtime.Run(rctx, t); err != nil {
 		return err
 	}
-	if _, err := os.Stat(path.Join(workdir, stdoutFile)); err == nil {
-		contents, err := os.ReadFile(path.Join(workdir, stdoutFile))
+	if _, err := os.Stat(path.Join(mnt.Source, stdoutFile)); err == nil {
+		contents, err := os.ReadFile(path.Join(mnt.Source, stdoutFile))
 		if err != nil {
 			return errors.Wrapf(err, "error reading output file")
 		}
 		o.Result = string(contents)
 	}
 	return nil
-}
-
-func deleteTempDir(dirname string) {
-	if err := os.RemoveAll(dirname); err != nil {
-		log.Error().
-			Err(err).
-			Msgf("error deleting volume: %s", dirname)
-	}
 }
 
 func (w *Worker) sendHeartbeats() {

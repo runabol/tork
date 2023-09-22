@@ -106,9 +106,13 @@ func Test_handleTaskRunOutput(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
+	mounter, err := mount.NewMounter(mount.Config{})
+	assert.NoError(t, err)
+
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -194,9 +198,13 @@ func Test_handleTaskCancel(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
+	mounter, err := mount.NewMounter(mount.Config{})
+	assert.NoError(t, err)
+
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 
@@ -243,6 +251,9 @@ func Test_handleTaskError(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
+	mounter, err := mount.NewMounter(mount.Config{})
+	assert.NoError(t, err)
+
 	errs := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
 		assert.NotEmpty(t, tk.Error)
@@ -254,6 +265,7 @@ func Test_handleTaskError(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -286,9 +298,13 @@ func Test_handleTaskOutput(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	mounter, err := mount.NewMounter(mount.Config{})
+	assert.NoError(t, err)
+
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)

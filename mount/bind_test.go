@@ -8,9 +8,9 @@ import (
 )
 
 func Test_createMountBindNotAllowed(t *testing.T) {
-	m := NewBindMounter(BindConfig{
+	m := &BindMounter{cfg: BindConfig{
 		Allowed: false,
-	})
+	}}
 
 	err := m.Mount(context.Background(), &Mount{
 		Type:   TypeBind,
@@ -21,10 +21,10 @@ func Test_createMountBindNotAllowed(t *testing.T) {
 }
 
 func Test_createMountBindDenylist(t *testing.T) {
-	m := NewBindMounter(BindConfig{
+	m := &BindMounter{cfg: BindConfig{
 		Allowed:  true,
 		Denylist: []string{"/tmp"},
-	})
+	}}
 	err := m.Mount(context.Background(), &Mount{
 		Type:   TypeBind,
 		Source: "/tmp",
@@ -34,10 +34,10 @@ func Test_createMountBindDenylist(t *testing.T) {
 }
 
 func Test_createMountBindAllowlist(t *testing.T) {
-	m := NewBindMounter(BindConfig{
+	m := &BindMounter{cfg: BindConfig{
 		Allowed:   true,
 		Allowlist: []string{"/tmp"},
-	})
+	}}
 	mnt := Mount{
 		Type:   TypeBind,
 		Source: "/tmp",

@@ -69,7 +69,6 @@ enabled = false
 
 [worker]
 address = "localhost:8001"
-tempdir = "/tmp"
 
 # default task limits
 [worker.limits]
@@ -81,3 +80,6 @@ memory = "" # e.g. 100m
 allowed = false
 allowlist = []  # supports wildcards (*)
 denylist = []   # supports wildcards (*)
+
+[mounts.temp]
+dir = "/tmp"
