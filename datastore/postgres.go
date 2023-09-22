@@ -649,9 +649,14 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize job.inputs")
 	}
-	defaults, err := json.Marshal(j.Defaults)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize job.defaults")
+	var defaults *string
+	if j.Defaults != nil {
+		b, err := json.Marshal(j.Defaults)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.defaults")
+		}
+		s := string(b)
+		defaults = &s
 	}
 	q := `insert into jobs 
 	       (id,name,description,state,created_at,started_at,tasks,position,
