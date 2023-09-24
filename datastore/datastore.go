@@ -6,6 +6,8 @@ import (
 	"github.com/runabol/tork"
 )
 
+type Provider func() (Datastore, error)
+
 const (
 	DATASTORE_INMEMORY = "inmemory"
 	DATASTORE_POSTGRES = "postgres"

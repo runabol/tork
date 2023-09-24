@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
@@ -213,6 +214,22 @@ func TestRegisterMounter(t *testing.T) {
 	assert.Equal(t, StateIdle, eng.state)
 
 	eng.RegisterMounter("bind2", mount.NewBindMounter(mount.BindConfig{}))
+
+	err := eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	err = eng.Terminate()
+	assert.NoError(t, err)
+}
+
+func TestRegisterDatastoreProvider(t *testing.T) {
+	eng := New(Config{Mode: ModeStandalone})
+	assert.Equal(t, StateIdle, eng.state)
+
+	eng.RegisterDatastoreProvider("inmem2", func() (datastore.Datastore, error) {
+		return datastore.NewInMemoryDatastore(), nil
+	})
 
 	err := eng.Start()
 	assert.NoError(t, err)
