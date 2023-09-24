@@ -49,7 +49,7 @@ func Test_handleTaskRun(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
@@ -106,7 +106,7 @@ func Test_handleTaskRunOutput(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
@@ -146,7 +146,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
@@ -198,7 +198,7 @@ func Test_handleTaskCancel(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
@@ -251,7 +251,7 @@ func Test_handleTaskError(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	errs := make(chan any)
@@ -298,7 +298,7 @@ func Test_handleTaskOutput(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{

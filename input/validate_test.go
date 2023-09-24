@@ -384,7 +384,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   "bad type",
+						Type:   "custom",
 						Target: "/some/target",
 					},
 				},
@@ -392,7 +392,7 @@ func TestValidateMounts(t *testing.T) {
 		},
 	}
 	err = j.Validate()
-	assert.Error(t, err)
+	assert.NoError(t, err)
 
 	j = Job{
 		Name: "test job",

@@ -7,9 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMapperVolumeMount(t *testing.T) {
-	m, err := NewMounter(Config{})
+func TestMultiVolumeMount(t *testing.T) {
+	m := NewMultiMounter()
+	vm, err := NewVolumeMounter()
 	assert.NoError(t, err)
+	m.RegisterMounter(TypeVolume, vm)
 	ctx := context.Background()
 	mnt := &Mount{Type: TypeVolume, Target: "/mnt"}
 	err = m.Mount(ctx, mnt)
@@ -20,11 +22,10 @@ func TestMapperVolumeMount(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMapperBadTypeMount(t *testing.T) {
-	m, err := NewMounter(Config{})
-	assert.NoError(t, err)
+func TestMultiBadTypeMount(t *testing.T) {
+	m := NewMultiMounter()
 	ctx := context.Background()
 	mnt := &Mount{Type: "badone", Target: "/mnt"}
-	err = m.Mount(ctx, mnt)
+	err := m.Mount(ctx, mnt)
 	assert.Error(t, err)
 }

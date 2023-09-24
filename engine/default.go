@@ -9,6 +9,7 @@ import (
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
+	"github.com/runabol/tork/mount"
 )
 
 var defaultEngine *Engine = New(Config{})
@@ -27,6 +28,10 @@ func RegisterJobMiddleware(mw job.MiddlewareFunc) {
 
 func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	defaultEngine.RegisterNodeMiddleware(mw)
+}
+
+func RegisterMounter(mtype string, mounter mount.Mounter) {
+	defaultEngine.RegisterMounter(mtype, mounter)
 }
 
 func RegisterEndpoint(method, path string, handler web.HandlerFunc) {

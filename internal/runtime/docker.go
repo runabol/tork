@@ -188,7 +188,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 				return errors.Errorf("bind source is required")
 			}
 		default:
-			return errors.Errorf("unknown volume type: %s", m.Type)
+			return errors.Errorf("unknown mount type: %s", m.Type)
 		}
 		mount := mount.Mount{
 			Type:   mt,

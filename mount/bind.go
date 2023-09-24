@@ -11,6 +11,18 @@ type BindMounter struct {
 	cfg BindConfig
 }
 
+type BindConfig struct {
+	Allowed   bool
+	Allowlist []string
+	Denylist  []string
+}
+
+func NewBindMounter(cfg BindConfig) *BindMounter {
+	return &BindMounter{
+		cfg: cfg,
+	}
+}
+
 func (m *BindMounter) Mount(ctx context.Context, mnt *Mount) error {
 	if !m.cfg.Allowed {
 		return errors.New("bind mounts are not allowed")

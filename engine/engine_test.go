@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -205,4 +206,18 @@ func TestSubmitInvalidJob(t *testing.T) {
 
 	_, err = eng.SubmitJob(ctx, &input.Job{})
 	assert.Error(t, err)
+}
+
+func TestRegisterMounter(t *testing.T) {
+	eng := New(Config{Mode: ModeStandalone})
+	assert.Equal(t, StateIdle, eng.state)
+
+	eng.RegisterMounter("bind2", mount.NewBindMounter(mount.BindConfig{}))
+
+	err := eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	err = eng.Terminate()
+	assert.NoError(t, err)
 }

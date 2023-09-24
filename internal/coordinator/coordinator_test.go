@@ -308,7 +308,7 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 	rt, err := runtime.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewMounter(mount.Config{})
+	mounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
 
 	w, err := worker.NewWorker(worker.Config{
