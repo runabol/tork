@@ -55,6 +55,8 @@ func validateMount(sl validator.StructLevel) {
 		sl.ReportError(mnt, "mount", "Mount", "invalidsource", "")
 	} else if mnt.Target != "" && !mountPattern.MatchString(mnt.Target) {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
+	} else if mnt.Target == "/tork" {
+		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
 	}
 }
 
