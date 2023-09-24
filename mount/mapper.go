@@ -34,7 +34,6 @@ func NewMounter(cfg Config) (*MapperMounter, error) {
 		mounters: map[string]Mounter{
 			TypeBind:   &BindMounter{cfg: cfg.Bind},
 			TypeVolume: vol,
-			TypeTemp:   &TempMounter{cfg: cfg.Temp},
 		},
 	}, nil
 }

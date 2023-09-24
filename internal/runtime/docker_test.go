@@ -2,8 +2,7 @@ package runtime
 
 import (
 	"context"
-	"os"
-	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -56,10 +55,11 @@ func TestNewDockerRuntime(t *testing.T) {
 	assert.NotNil(t, rt)
 }
 
-func TestRunTask(t *testing.T) {
+func TestRunTaskCMD(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
+
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
@@ -130,7 +130,6 @@ func TestRunTaskWithNetwork(t *testing.T) {
 		Networks: []string{"default"},
 	})
 	assert.NoError(t, err)
-
 	rt, err = NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
@@ -164,34 +163,34 @@ func TestRunTaskWithVolume(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	rundir, err := os.MkdirTemp("/tmp", "tork-")
-	assert.NoError(t, err)
-
-	defer func() {
-		err := os.RemoveAll(rundir)
-		assert.NoError(t, err)
-	}()
-
-	script := `echo hello world > /xyz/thing`
-
-	err = os.WriteFile(path.Join(rundir, "entrypoint"), []byte(script), os.ModePerm)
-	assert.NoError(t, err)
-
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
-		Run:   "-",
+		Run:   "echo hello world > /xyz/thing",
 		Mounts: []mount.Mount{
 			vmnt,
-			{
-				Type:   mount.TypeBind,
-				Source: rundir,
-				Target: "/tork",
-			},
 		},
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
+}
+
+func TestRunTaskInitWorkdir(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "cat hello.txt > $TORK_OUTPUT",
+		Files: map[string]string{
+			"hello.txt": "hello world",
+			"large.txt": strings.Repeat("a", 100_000),
+		},
+	}
+	ctx := context.Background()
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world", t1.Result)
 }
 
 func Test_imagePull(t *testing.T) {
