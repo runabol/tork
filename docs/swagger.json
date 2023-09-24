@@ -314,6 +314,20 @@
                 "message": {}
             }
         },
+        "github_com_runabol_tork_mount.Mount": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "input.AuxTask": {
             "type": "object",
             "required": [
@@ -825,20 +839,6 @@
                 }
             }
         },
-        "tork.Mount": {
-            "type": "object",
-            "properties": {
-                "source": {
-                    "type": "string"
-                },
-                "target": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
         "tork.Node": {
             "type": "object",
             "properties": {
@@ -1001,7 +1001,7 @@
                 "mounts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/tork.Mount"
+                        "$ref": "#/definitions/github_com_runabol_tork_mount.Mount"
                     }
                 },
                 "name": {
