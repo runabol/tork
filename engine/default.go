@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/node"
@@ -32,6 +33,10 @@ func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 
 func RegisterMounter(mtype string, mounter mount.Mounter) {
 	defaultEngine.RegisterMounter(mtype, mounter)
+}
+
+func RegisterDatastoreProvider(name string, provider datastore.Provider) {
+	defaultEngine.RegisterDatastoreProvider(name, provider)
 }
 
 func RegisterEndpoint(method, path string, handler web.HandlerFunc) {

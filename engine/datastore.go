@@ -8,31 +8,29 @@ import (
 
 func (e *Engine) initDatastore() error {
 	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
-	var ds datastore.Datastore
-	ds, err := datastore.NewFromProvider(dstype)
-	if err != nil && !errors.Is(err, datastore.ErrProviderNotFound) {
+	ds, err := e.createDatastore(dstype)
+	if err != nil {
 		return err
 	}
-	if ds != nil {
-		e.ds = ds
-		return nil
+	e.ds = ds
+	return nil
+}
+
+func (e *Engine) createDatastore(dstype string) (datastore.Datastore, error) {
+	dsp, ok := e.dsProviders[dstype]
+	if ok {
+		return dsp()
 	}
 	switch dstype {
 	case datastore.DATASTORE_INMEMORY:
-		ds = datastore.NewInMemoryDatastore()
+		return datastore.NewInMemoryDatastore(), nil
 	case datastore.DATASTORE_POSTGRES:
 		dsn := conf.StringDefault(
 			"datastore.postgres.dsn",
 			"host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
 		)
-		pg, err := datastore.NewPostgresDataStore(dsn)
-		if err != nil {
-			return err
-		}
-		ds = pg
+		return datastore.NewPostgresDataStore(dsn)
 	default:
-		return errors.Errorf("unknown datastore type: %s", dstype)
+		return nil, errors.Errorf("unknown datastore type: %s", dstype)
 	}
-	e.ds = ds
-	return nil
 }

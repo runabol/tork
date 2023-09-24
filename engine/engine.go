@@ -51,6 +51,7 @@ type Engine struct {
 	mounter     *mount.MultiMounter
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
+	dsProviders map[string]datastore.Provider
 }
 
 type Config struct {
@@ -71,12 +72,13 @@ func New(cfg Config) *Engine {
 		cfg.Endpoints = make(map[string]web.HandlerFunc)
 	}
 	return &Engine{
-		quit:       make(chan os.Signal, 1),
-		terminate:  make(chan any),
-		terminated: make(chan any),
-		cfg:        cfg,
-		state:      StateIdle,
-		mounter:    mount.NewMultiMounter(),
+		quit:        make(chan os.Signal, 1),
+		terminate:   make(chan any),
+		terminated:  make(chan any),
+		cfg:         cfg,
+		state:       StateIdle,
+		mounter:     mount.NewMultiMounter(),
+		dsProviders: make(map[string]datastore.Provider),
 	}
 }
 
@@ -269,6 +271,16 @@ func (e *Engine) RegisterMounter(mtype string, mounter mount.Mounter) {
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
 	e.mounter.RegisterMounter(mtype, mounter)
+}
+
+func (e *Engine) RegisterDatastoreProvider(name string, provider datastore.Provider) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	if _, ok := e.dsProviders[name]; ok {
+		panic("engine: RegisterDatastoreProvider called twice for driver " + name)
+	}
+	e.dsProviders[name] = provider
 }
 
 func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
