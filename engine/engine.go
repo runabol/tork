@@ -20,6 +20,7 @@ import (
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
+	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 )
 
@@ -47,6 +48,7 @@ type Engine struct {
 	mu          sync.Mutex
 	broker      mq.Broker
 	ds          datastore.Datastore
+	mounter     *mount.MultiMounter
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
 }
@@ -74,6 +76,7 @@ func New(cfg Config) *Engine {
 		terminated: make(chan any),
 		cfg:        cfg,
 		state:      StateIdle,
+		mounter:    mount.NewMultiMounter(),
 	}
 }
 
@@ -259,6 +262,13 @@ func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) 
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
 	e.cfg.Endpoints[fmt.Sprintf("%s %s", method, path)] = handler
+}
+
+func (e *Engine) RegisterMounter(mtype string, mounter mount.Mounter) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	e.mounter.RegisterMounter(mtype, mounter)
 }
 
 func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {

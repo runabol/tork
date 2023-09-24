@@ -43,8 +43,6 @@ func validateMount(sl validator.StructLevel) {
 	mnt := sl.Current().Interface().(Mount)
 	if mnt.Type == "" {
 		sl.ReportError(mnt, "mount", "Mount", "typerequired", "")
-	} else if mnt.Type != mount.TypeBind && mnt.Type != mount.TypeVolume {
-		sl.ReportError(mnt, "mount", "Mount", "invalidtype", "")
 	} else if mnt.Type == mount.TypeVolume && mnt.Source != "" {
 		sl.ReportError(mnt, "mount", "Mount", "sourcenotempty", "")
 	} else if mnt.Type == mount.TypeVolume && mnt.Target == "" {
