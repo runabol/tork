@@ -3,7 +3,7 @@ package tork
 import "fmt"
 
 const (
-	Version = "0.1.15"
+	Version = "0.1.16"
 )
 
 var (
