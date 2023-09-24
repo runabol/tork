@@ -6,6 +6,8 @@ import (
 	"github.com/runabol/tork"
 )
 
+type Provider func() (Broker, error)
+
 const (
 	BROKER_INMEMORY     = "inmemory"
 	BROKER_RABBITMQ     = "rabbitmq"

@@ -11,6 +11,7 @@ import (
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
 	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork/mq"
 )
 
 var defaultEngine *Engine = New(Config{})
@@ -37,6 +38,10 @@ func RegisterMounter(mtype string, mounter mount.Mounter) {
 
 func RegisterDatastoreProvider(name string, provider datastore.Provider) {
 	defaultEngine.RegisterDatastoreProvider(name, provider)
+}
+
+func RegisterBrokerProvider(name string, provider mq.Provider) {
+	defaultEngine.RegisterBrokerProvider(name, provider)
 }
 
 func RegisterEndpoint(method, path string, handler web.HandlerFunc) {
