@@ -7,29 +7,30 @@ import (
 )
 
 func (e *Engine) initBroker() error {
-	var b mq.Broker
 	bt := conf.StringDefault("broker.type", mq.BROKER_INMEMORY)
-
-	b, err := mq.NewFromProvider(bt)
-	if err != nil && !errors.Is(err, mq.ErrProviderNotFound) {
+	broker, err := e.createBroker(bt)
+	if err != nil {
 		return err
 	}
-	if b != nil {
-		e.broker = b
-		return nil
+	e.broker = broker
+	return nil
+}
+
+func (e *Engine) createBroker(btype string) (mq.Broker, error) {
+	p, ok := e.mqProviders[btype]
+	if ok {
+		return p()
 	}
-	switch bt {
+	switch btype {
 	case "inmemory":
-		b = mq.NewInMemoryBroker()
+		return mq.NewInMemoryBroker(), nil
 	case "rabbitmq":
 		rb, err := mq.NewRabbitMQBroker(conf.StringDefault("broker.rabbitmq.url", "amqp://guest:guest@localhost:5672/"))
 		if err != nil {
-			return errors.Wrapf(err, "unable to connect to RabbitMQ")
+			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
 		}
-		b = rb
+		return rb, nil
 	default:
-		return errors.Errorf("invalid broker type: %s", bt)
+		return nil, errors.Errorf("invalid broker type: %s", btype)
 	}
-	e.broker = b
-	return nil
 }

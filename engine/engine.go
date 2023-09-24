@@ -52,6 +52,7 @@ type Engine struct {
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
 	dsProviders map[string]datastore.Provider
+	mqProviders map[string]mq.Provider
 }
 
 type Config struct {
@@ -79,6 +80,7 @@ func New(cfg Config) *Engine {
 		state:       StateIdle,
 		mounter:     mount.NewMultiMounter(),
 		dsProviders: make(map[string]datastore.Provider),
+		mqProviders: make(map[string]mq.Provider),
 	}
 }
 
@@ -281,6 +283,16 @@ func (e *Engine) RegisterDatastoreProvider(name string, provider datastore.Provi
 		panic("engine: RegisterDatastoreProvider called twice for driver " + name)
 	}
 	e.dsProviders[name] = provider
+}
+
+func (e *Engine) RegisterBrokerProvider(name string, provider mq.Provider) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	if _, ok := e.mqProviders[name]; ok {
+		panic("engine: RegisterBrokerProvider called twice for driver " + name)
+	}
+	e.mqProviders[name] = provider
 }
 
 func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
