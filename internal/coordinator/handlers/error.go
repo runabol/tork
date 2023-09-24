@@ -27,7 +27,7 @@ func NewErrorHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
 	return h.handle
 }
 
-func (h *errorHandler) handle(ctx context.Context, t *tork.Task) error {
+func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	j, err := h.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
 		return errors.Wrapf(err, "unknown job: %s", t.JobID)

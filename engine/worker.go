@@ -37,8 +37,9 @@ func (e *Engine) initWorker() error {
 			DefaultCPUsLimit:   conf.String("worker.limits.cpus"),
 			DefaultMemoryLimit: conf.String("worker.limits.memory"),
 		},
-		Address: conf.String("worker.address"),
-		Mounter: e.mounter,
+		Address:    conf.String("worker.address"),
+		Mounter:    e.mounter,
+		Middleware: e.cfg.Middleware.Task,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error creating worker")

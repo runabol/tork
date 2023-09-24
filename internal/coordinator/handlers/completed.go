@@ -31,7 +31,7 @@ func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.Middlewa
 	return h.handle
 }
 
-func (h *completedHandler) handle(ctx context.Context, t *tork.Task) error {
+func (h *completedHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	return h.completeTask(ctx, t)
 }
 

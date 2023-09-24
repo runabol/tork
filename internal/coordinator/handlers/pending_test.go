@@ -7,6 +7,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,7 +43,7 @@ func Test_handlePendingTask(t *testing.T) {
 	err = ds.CreateTask(ctx, tk)
 	assert.NoError(t, err)
 
-	err = handler(ctx, tk)
+	err = handler(ctx, task.StateChange, tk)
 	assert.NoError(t, err)
 
 	// wait for the task to get processed
@@ -77,7 +78,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	err = ds.CreateTask(ctx, tk)
 	assert.NoError(t, err)
 
-	err = handler(ctx, tk)
+	err = handler(ctx, task.StateChange, tk)
 	assert.NoError(t, err)
 
 	// wait for the task to get processed

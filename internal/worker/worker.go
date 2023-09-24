@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
@@ -21,26 +22,28 @@ import (
 )
 
 type Worker struct {
-	id        string
-	startTime time.Time
-	runtime   runtime.Runtime
-	broker    mq.Broker
-	stop      chan any
-	queues    map[string]int
-	tasks     *syncx.Map[string, runningTask]
-	limits    Limits
-	api       *api
-	taskCount int32
-	mounter   mount.Mounter
+	id         string
+	startTime  time.Time
+	runtime    runtime.Runtime
+	broker     mq.Broker
+	stop       chan any
+	queues     map[string]int
+	tasks      *syncx.Map[string, runningTask]
+	limits     Limits
+	api        *api
+	taskCount  int32
+	mounter    mount.Mounter
+	middleware []task.MiddlewareFunc
 }
 
 type Config struct {
-	Address string
-	Broker  mq.Broker
-	Runtime runtime.Runtime
-	Queues  map[string]int
-	Limits  Limits
-	Mounter mount.Mounter
+	Address    string
+	Broker     mq.Broker
+	Runtime    runtime.Runtime
+	Queues     map[string]int
+	Limits     Limits
+	Mounter    mount.Mounter
+	Middleware []task.MiddlewareFunc
 }
 
 type Limits struct {
@@ -63,16 +66,17 @@ func NewWorker(cfg Config) (*Worker, error) {
 		return nil, errors.New("must provide runtime")
 	}
 	w := &Worker{
-		id:        uuid.NewUUID(),
-		startTime: time.Now().UTC(),
-		broker:    cfg.Broker,
-		runtime:   cfg.Runtime,
-		queues:    cfg.Queues,
-		tasks:     new(syncx.Map[string, runningTask]),
-		limits:    cfg.Limits,
-		api:       newAPI(cfg),
-		stop:      make(chan any),
-		mounter:   cfg.Mounter,
+		id:         uuid.NewUUID(),
+		startTime:  time.Now().UTC(),
+		broker:     cfg.Broker,
+		runtime:    cfg.Runtime,
+		queues:     cfg.Queues,
+		tasks:      new(syncx.Map[string, runningTask]),
+		limits:     cfg.Limits,
+		api:        newAPI(cfg),
+		stop:       make(chan any),
+		mounter:    cfg.Mounter,
+		middleware: cfg.Middleware,
 	}
 	return w, nil
 }
@@ -315,13 +319,18 @@ func (w *Worker) Start() error {
 	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
+	onTask := task.ApplyMiddleware(func(ctx context.Context, et task.EventType, t *tork.Task) error {
+		return w.handleTask(t)
+	}, w.middleware)
 	// subscribe to shared work queues
 	for qname, concurrency := range w.queues {
 		if !mq.IsWorkerQueue(qname) {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
-			err := w.broker.SubscribeForTasks(qname, w.handleTask)
+			err := w.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
+				return onTask(context.Background(), task.StateChange, t)
+			})
 			if err != nil {
 				return errors.Wrapf(err, "error subscribing for queue: %s", qname)
 			}
