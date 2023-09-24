@@ -493,4 +493,24 @@ func TestValidateMounts(t *testing.T) {
 	}
 	err = j.Validate()
 	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   mount.TypeBind,
+						Source: "/some/source",
+						Target: "/tork",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
 }
