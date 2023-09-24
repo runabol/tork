@@ -15,6 +15,7 @@ import (
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/internal/wildcard"
 	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/task"
 	"golang.org/x/time/rate"
 )
 
@@ -41,6 +42,7 @@ func (e *Engine) initCoordinator() error {
 	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", false)
 	if redactJobEnabled {
 		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact)
+		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact)
 	}
 
 	c, err := coordinator.NewCoordinator(cfg)

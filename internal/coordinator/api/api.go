@@ -20,8 +20,8 @@ import (
 
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/httpx"
-	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/middleware/job"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
 
 	"github.com/runabol/tork"
@@ -39,11 +39,12 @@ type HealthResponse struct {
 }
 
 type API struct {
-	server    *http.Server
-	broker    mq.Broker
-	ds        datastore.Datastore
-	terminate chan any
-	onReadJob job.HandlerFunc
+	server     *http.Server
+	broker     mq.Broker
+	ds         datastore.Datastore
+	terminate  chan any
+	onReadJob  job.HandlerFunc
+	onReadTask task.HandlerFunc
 }
 
 type Config struct {
@@ -58,6 +59,7 @@ type Config struct {
 type Middleware struct {
 	Web  []web.MiddlewareFunc
 	Job  []job.MiddlewareFunc
+	Task []task.MiddlewareFunc
 	Echo []echo.MiddlewareFunc
 }
 
@@ -88,6 +90,10 @@ func NewAPI(cfg Config) (*API, error) {
 		onReadJob: job.ApplyMiddleware(
 			job.NoOpHandlerFunc,
 			cfg.Middleware.Job,
+		),
+		onReadTask: task.ApplyMiddleware(
+			task.NoOpHandlerFunc,
+			cfg.Middleware.Task,
 		),
 	}
 
@@ -376,7 +382,10 @@ func (s *API) getTask(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	return c.JSON(http.StatusOK, redact.Task(t))
+	if err := s.onReadTask(c.Request().Context(), task.Read, t); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, t)
 }
 
 func (s *API) getMetrics(c echo.Context) error {

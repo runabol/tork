@@ -8,6 +8,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,7 +62,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	// wait for the job itself to complete
@@ -144,7 +145,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 100)
@@ -201,7 +202,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 100)
@@ -255,7 +256,7 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 100)
@@ -354,10 +355,10 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t5)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t5)
+	err = handler(ctx, task.StateChange, t5)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -456,10 +457,10 @@ func Test_handleCompletedEachTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t5)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t5)
+	err = handler(ctx, task.StateChange, t5)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -522,7 +523,7 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 
 	t1.JobID = "bad_job_id"
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.Error(t, err)
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
@@ -576,7 +577,7 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
@@ -626,7 +627,7 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 
 	t1.JobID = "bad_job_id"
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.Error(t, err)
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
@@ -676,7 +677,7 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 
 	t1.JobID = "bad_job_id"
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.Error(t, err)
 
 	t11, err := ds.GetTaskByID(ctx, t1.ID)

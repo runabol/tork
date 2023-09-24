@@ -8,6 +8,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +41,7 @@ func Test_handleStartedTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
@@ -94,7 +95,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	<-cancellations

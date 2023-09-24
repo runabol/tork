@@ -29,7 +29,7 @@ func NewPendingHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
 	return h.handle
 }
 
-func (h *pendingHandler) handle(ctx context.Context, t *tork.Task) error {
+func (h *pendingHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("handling pending task")

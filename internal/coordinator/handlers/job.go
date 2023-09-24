@@ -76,9 +76,9 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 		return err
 	}
 	if t.State == tork.TaskStateFailed {
-		return h.onError(ctx, t)
+		return h.onError(ctx, task.StateChange, t)
 	}
-	return h.onPending(ctx, t)
+	return h.onPending(ctx, task.StateChange, t)
 }
 
 func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {

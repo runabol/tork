@@ -24,29 +24,28 @@ func contains(substr string) func(s string) bool {
 	}
 }
 
-func Task(t *tork.Task) *tork.Task {
-	redacted := t.Clone()
+func Task(t *tork.Task) {
+	redacted := t
 	// redact env vars
 	redacted.Env = redactVars(redacted.Env)
 	// redact pre tasks
-	for i, p := range redacted.Pre {
-		redacted.Pre[i] = Task(p)
+	for _, p := range redacted.Pre {
+		Task(p)
 	}
 	// redact post tasks
-	for i, p := range redacted.Post {
-		redacted.Post[i] = Task(p)
+	for _, p := range redacted.Post {
+		Task(p)
 	}
 	// redact parallel tasks
 	if redacted.Parallel != nil {
-		for i, p := range redacted.Parallel.Tasks {
-			redacted.Parallel.Tasks[i] = Task(p)
+		for _, p := range redacted.Parallel.Tasks {
+			Task(p)
 		}
 	}
 	// registry creds
 	if redacted.Registry != nil {
 		redacted.Registry.Password = redactedStr
 	}
-	return redacted
 }
 
 func Job(j *tork.Job) {
@@ -57,12 +56,12 @@ func Job(j *tork.Job) {
 	redacted.Context.Inputs = redactVars(redacted.Context.Inputs)
 	redacted.Context.Tasks = redactVars(redacted.Context.Tasks)
 	// redact tasks
-	for i, t := range redacted.Tasks {
-		redacted.Tasks[i] = Task(t)
+	for _, t := range redacted.Tasks {
+		Task(t)
 	}
 	// redact execution
-	for i, t := range redacted.Execution {
-		redacted.Execution[i] = Task(t)
+	for _, t := range redacted.Execution {
+		Task(t)
 	}
 }
 

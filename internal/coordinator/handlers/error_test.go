@@ -8,6 +8,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -81,7 +82,7 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, actives, 2)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	<-events
@@ -149,7 +150,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
-	err = handler(ctx, t1)
+	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
 	<-processed

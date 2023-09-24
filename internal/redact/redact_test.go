@@ -47,21 +47,22 @@ func TestRedactTask(t *testing.T) {
 			Password: "secret",
 		},
 	}
-	tr := Task(&ta)
 
-	assert.Equal(t, "[REDACTED]", tr.Env["secret_1"])
-	assert.Equal(t, "[REDACTED]", tr.Env["SecrET_2"])
-	assert.Equal(t, "[REDACTED]", tr.Env["PASSword"])
-	assert.Equal(t, "hello world", tr.Env["harmless"])
-	assert.Equal(t, "[REDACTED]", tr.Env["AWS_ACCESS_KEY_ID"])
-	assert.Equal(t, "[REDACTED]", tr.Pre[0].Env["secret_1"])
-	assert.Equal(t, "[REDACTED]", tr.Pre[0].Env["secret_1"])
-	assert.Equal(t, "hello world", tr.Pre[0].Env["harmless"])
-	assert.Equal(t, "[REDACTED]", tr.Post[0].Env["secret_1"])
-	assert.Equal(t, "hello world", tr.Post[0].Env["harmless"])
-	assert.Equal(t, "[REDACTED]", tr.Parallel.Tasks[0].Env["secret_1"])
-	assert.Equal(t, "hello world", tr.Parallel.Tasks[0].Env["harmless"])
-	assert.Equal(t, "[REDACTED]", tr.Registry.Password)
+	Task(&ta)
+
+	assert.Equal(t, "[REDACTED]", ta.Env["secret_1"])
+	assert.Equal(t, "[REDACTED]", ta.Env["SecrET_2"])
+	assert.Equal(t, "[REDACTED]", ta.Env["PASSword"])
+	assert.Equal(t, "hello world", ta.Env["harmless"])
+	assert.Equal(t, "[REDACTED]", ta.Env["AWS_ACCESS_KEY_ID"])
+	assert.Equal(t, "[REDACTED]", ta.Pre[0].Env["secret_1"])
+	assert.Equal(t, "[REDACTED]", ta.Pre[0].Env["secret_1"])
+	assert.Equal(t, "hello world", ta.Pre[0].Env["harmless"])
+	assert.Equal(t, "[REDACTED]", ta.Post[0].Env["secret_1"])
+	assert.Equal(t, "hello world", ta.Post[0].Env["harmless"])
+	assert.Equal(t, "[REDACTED]", ta.Parallel.Tasks[0].Env["secret_1"])
+	assert.Equal(t, "hello world", ta.Parallel.Tasks[0].Env["harmless"])
+	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 }
 
 func TestRedactJob(t *testing.T) {

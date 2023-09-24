@@ -23,7 +23,7 @@ func NewStartedHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
 	return h.handle
 }
 
-func (h *startedHandler) handle(ctx context.Context, t *tork.Task) error {
+func (h *startedHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	log.Debug().
 		Str("task-id", t.ID).
 		Msg("received task start")
