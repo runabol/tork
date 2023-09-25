@@ -18,7 +18,7 @@ const (
 	QUEUE_DEFAULT = "default"
 	// The queue used by workers to periodically
 	// notify the coordinator about their aliveness
-	QUEUE_HEARBEAT = "hearbeat"
+	QUEUE_HEARTBEAT = "heartbeat"
 	// The queue used by for job creation
 	// and job-related state changes (e.g. cancellation)
 	QUEUE_JOBS = "jobs"
@@ -40,7 +40,7 @@ func IsCoordinatorQueue(qname string) bool {
 		QUEUE_STARTED,
 		QUEUE_COMPLETED,
 		QUEUE_ERROR,
-		QUEUE_HEARBEAT,
+		QUEUE_HEARTBEAT,
 		QUEUE_JOBS,
 	}
 	return slices.Contains(coordQueues, qname)

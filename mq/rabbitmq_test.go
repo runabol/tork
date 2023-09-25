@@ -61,7 +61,7 @@ func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 	err = b.PublishHeartbeat(ctx, &tork.Node{})
 	assert.NoError(t, err)
 	<-processed
-	// second hearbeat should expire
+	// second heartbeat should expire
 	err = b.PublishHeartbeat(ctx, &tork.Node{})
 	assert.NoError(t, err)
 }
