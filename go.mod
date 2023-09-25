@@ -5,7 +5,7 @@ go 1.21
 retract v0.1.0
 
 require (
-	github.com/antonmedv/expr v1.15.0
+	github.com/antonmedv/expr v1.15.3
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/fatih/color v1.15.0
