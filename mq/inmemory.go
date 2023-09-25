@@ -192,11 +192,11 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 }
 
 func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n *tork.Node) error {
-	return b.publish(QUEUE_HEARBEAT, n.Clone())
+	return b.publish(QUEUE_HEARTBEAT, n.Clone())
 }
 
 func (b *InMemoryBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) error {
-	return b.subscribe(QUEUE_HEARBEAT, func(m any) error {
+	return b.subscribe(QUEUE_HEARTBEAT, func(m any) error {
 		n, ok := m.(*tork.Node)
 		if !ok {
 			return errors.New("can't cast to node")

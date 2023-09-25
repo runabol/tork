@@ -89,8 +89,8 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Queues[mq.QUEUE_STARTED] < 1 {
 		cfg.Queues[mq.QUEUE_STARTED] = 1
 	}
-	if cfg.Queues[mq.QUEUE_HEARBEAT] < 1 {
-		cfg.Queues[mq.QUEUE_HEARBEAT] = 1
+	if cfg.Queues[mq.QUEUE_HEARTBEAT] < 1 {
+		cfg.Queues[mq.QUEUE_HEARTBEAT] = 1
 	}
 	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
@@ -199,7 +199,7 @@ func (c *Coordinator) Start() error {
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					return c.onError(context.Background(), task.StateChange, t)
 				})
-			case mq.QUEUE_HEARBEAT:
+			case mq.QUEUE_HEARTBEAT:
 				err = c.broker.SubscribeForHeartbeats(func(n *tork.Node) error {
 					return c.onHeartbeat(context.Background(), n)
 				})

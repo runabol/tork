@@ -46,7 +46,7 @@ type subscription struct {
 
 type Option = func(b *RabbitMQBroker)
 
-// WithHeartbeatTTL sets the TTL for a hearbeat pending in the queue.
+// WithHeartbeatTTL sets the TTL for a heartbeat pending in the queue.
 // The value of the TTL argument or policy must be a non-negative integer (0 <= n),
 // describing the TTL period in milliseconds.
 func WithHeartbeatTTL(ttl int) Option {
@@ -291,7 +291,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	if !exists {
 		log.Debug().Msgf("declaring queue: %s", qname)
 		args := amqp.Table{}
-		if qname == QUEUE_HEARBEAT {
+		if qname == QUEUE_HEARTBEAT {
 			args["x-message-ttl"] = b.heartbeatTTL
 		}
 		_, err = ch.QueueDeclare(
@@ -316,7 +316,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 }
 
 func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *tork.Node) error {
-	return b.publish(ctx, exchangeDefault, QUEUE_HEARBEAT, n)
+	return b.publish(ctx, exchangeDefault, QUEUE_HEARTBEAT, n)
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg any) error {
@@ -350,7 +350,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 }
 
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) error {
-	return b.subscribe(exchangeDefault, keyDefault, QUEUE_HEARBEAT, func(msg any) error {
+	return b.subscribe(exchangeDefault, keyDefault, QUEUE_HEARTBEAT, func(msg any) error {
 		n, ok := msg.(*tork.Node)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Node but got %T", msg)
