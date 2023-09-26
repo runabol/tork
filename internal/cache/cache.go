@@ -113,6 +113,7 @@ func (c *Cache[V]) Modify(k string, m func(x V) (V, error)) error {
 	v := item.Object
 	v, err := m(v)
 	if err != nil {
+		item.mu.Unlock()
 		return err
 	}
 	item.Object = v

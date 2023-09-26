@@ -15,8 +15,7 @@ import (
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
-	"github.com/runabol/tork/internal/runtime"
-
+	"github.com/runabol/tork/internal/runtime/docker"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/stretchr/testify/assert"
@@ -305,7 +304,7 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 		assert.NoError(t, c.Stop())
 	}()
 
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	mounter, err := mount.NewVolumeMounter()

@@ -255,6 +255,10 @@ func TestModify(t *testing.T) {
 		return 0, errors.New("something bad happened")
 	})
 	assert.Error(t, err)
+	err = tc.Modify("number", func(x int) (int, error) {
+		return 17, nil
+	})
+	assert.NoError(t, err)
 }
 
 func TestModifyObjectConcurrently(t *testing.T) {

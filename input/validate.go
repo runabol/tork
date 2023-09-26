@@ -83,7 +83,6 @@ func validateQueue(fl validator.FieldLevel) bool {
 
 func taskInputValidation(sl validator.StructLevel) {
 	taskTypeValidation(sl)
-	regularTaskValidation(sl)
 	compositeTaskValidation(sl)
 }
 
@@ -147,15 +146,5 @@ func compositeTaskValidation(sl validator.StructLevel) {
 	}
 	if t.Timeout != "" {
 		sl.ReportError(t.Timeout, "timeout", "Timeout", "invalidcompositetask", "")
-	}
-}
-
-func regularTaskValidation(sl validator.StructLevel) {
-	t := sl.Current().Interface().(Task)
-	if t.Parallel != nil || t.Each != nil || t.SubJob != nil {
-		return
-	}
-	if t.Image == "" {
-		sl.ReportError(t.Image, "image", "Image", "required", "")
 	}
 }

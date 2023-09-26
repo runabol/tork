@@ -6,13 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/runabol/tork/internal/runtime"
+	"github.com/runabol/tork/internal/runtime/docker"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_health(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 	api := newAPI(Config{
 		Broker:  mq.NewInMemoryBroker(),
