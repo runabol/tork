@@ -132,22 +132,26 @@ func NewAPI(cfg Config) (*API, error) {
 	}
 
 	// register additional custom endpoints
-	for spec, h := range cfg.Endpoints {
+	for spec, handler := range cfg.Endpoints {
 		parsed := strings.Split(spec, " ")
 		if len(parsed) != 2 {
 			return nil, errors.Errorf("invalid endpoint spec: %s. Expecting: METHOD /path", spec)
 		}
-		r.Add(parsed[0], parsed[1], func(c echo.Context) error {
-			ctx := &Context{ctx: c, api: s}
-			err := h(ctx)
-			if err != nil {
-				return err
+		method := parsed[0]
+		path := parsed[1]
+		r.Add(method, path, func(h web.HandlerFunc) func(c echo.Context) error {
+			return func(c echo.Context) error {
+				ctx := &Context{ctx: c, api: s}
+				err := h(ctx)
+				if err != nil {
+					return err
+				}
+				if ctx.err != nil {
+					return echo.NewHTTPError(ctx.code, ctx.err.Error())
+				}
+				return nil
 			}
-			if ctx.err != nil {
-				return echo.NewHTTPError(ctx.code, ctx.err.Error())
-			}
-			return nil
-		})
+		}(handler))
 	}
 
 	return s, nil
