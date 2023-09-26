@@ -83,3 +83,11 @@ denylist = []   # supports wildcards (*)
 
 [mounts.temp]
 dir = "/tmp"
+
+[runtime]
+type = "docker" # docker | shell
+
+[runtime.shell]
+cmd = ["bash", "-c"]
+uid = "1000"         # requires running the Tork process as root
+gid = "1000"         # requires running the Tork process as root

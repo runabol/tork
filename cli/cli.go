@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/runabol/tork/internal/logging"
+	"github.com/runabol/tork/internal/reexec"
 	ucli "github.com/urfave/cli/v2"
 )
 
@@ -25,6 +26,9 @@ func New() *CLI {
 }
 
 func (c *CLI) Run() error {
+	if reexec.Init() {
+		return nil
+	}
 	return c.app.Run(os.Args)
 }
 

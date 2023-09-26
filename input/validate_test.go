@@ -118,6 +118,19 @@ func TestValidateJobTaskNoName(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestValidateJobTaskNoImage(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name: "some task",
+			},
+		},
+	}
+	err := j.Validate()
+	assert.NoError(t, err)
+}
+
 func TestValidateJobTaskRetry(t *testing.T) {
 	j := Job{
 		Name: "test job",

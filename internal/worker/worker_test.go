@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/runtime"
+	"github.com/runabol/tork/internal/runtime/docker"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mount"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewWorker(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 	w, err := NewWorker(Config{})
 	assert.Error(t, err)
@@ -32,7 +32,7 @@ func TestNewWorker(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
@@ -46,7 +46,7 @@ func TestStart(t *testing.T) {
 }
 
 func Test_handleTaskRun(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -103,7 +103,7 @@ func Test_handleTaskRun(t *testing.T) {
 }
 
 func Test_handleTaskRunOutput(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -136,7 +136,7 @@ func Test_handleTaskRunOutput(t *testing.T) {
 }
 
 func Test_handleTaskRunWithPrePost(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -195,7 +195,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 }
 
 func Test_handleTaskCancel(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -248,7 +248,7 @@ func Test_handleTaskCancel(t *testing.T) {
 }
 
 func Test_handleTaskError(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -287,7 +287,7 @@ func Test_handleTaskError(t *testing.T) {
 }
 
 func Test_handleTaskOutput(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -326,7 +326,7 @@ func Test_handleTaskOutput(t *testing.T) {
 }
 
 func Test_middleware(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -379,7 +379,7 @@ func Test_middleware(t *testing.T) {
 }
 
 func Test_sendHeartbeat(t *testing.T) {
-	rt, err := runtime.NewDockerRuntime()
+	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()

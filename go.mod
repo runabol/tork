@@ -25,8 +25,10 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/exp v0.0.0-20230807204917-050eac23e9de
+	golang.org/x/sys v0.12.0
 	golang.org/x/time v0.3.0
 	gopkg.in/yaml.v3 v3.0.1
+	gotest.tools/v3 v3.5.1
 )
 
 require (
@@ -42,6 +44,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
@@ -69,8 +72,6 @@ require (
 	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
-	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
-	gotest.tools/v3 v3.5.1 // indirect
 )

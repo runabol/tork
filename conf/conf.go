@@ -55,7 +55,7 @@ func LoadConfig() error {
 	if userConfig != "" {
 		return errors.Errorf(errMsg)
 	} else {
-		logger.Warn().Msg(errMsg)
+		logger.Debug().Msg(errMsg)
 	}
 	return nil
 }

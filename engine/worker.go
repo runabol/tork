@@ -4,12 +4,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/runtime"
+	"github.com/runabol/tork/internal/runtime/docker"
+	"github.com/runabol/tork/internal/runtime/shell"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/mount"
 )
 
 func (e *Engine) initWorker() error {
-	rt, err := runtime.NewDockerRuntime()
+	// init the runtime
+	rt, err := initRuntime()
 	if err != nil {
 		return err
 	}
@@ -49,4 +52,20 @@ func (e *Engine) initWorker() error {
 	}
 	e.worker = w
 	return nil
+}
+
+func initRuntime() (runtime.Runtime, error) {
+	runtimeType := conf.StringDefault("runtime.type", "docker")
+	switch runtimeType {
+	case "docker":
+		return docker.NewDockerRuntime()
+	case "shell":
+		return shell.NewShellRuntime(shell.Config{
+			CMD: conf.Strings("runtime.shell.cmd"),
+			UID: conf.StringDefault("runtime.shell.uid", shell.DEFAULT_UID),
+			GID: conf.StringDefault("runtime.shell.gid", shell.DEFAULT_GID),
+		}), nil
+	default:
+		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)
+	}
 }
