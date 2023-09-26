@@ -634,6 +634,46 @@ func Test_middlewareMultiple(t *testing.T) {
 	assert.Equal(t, "OK2", string(body))
 }
 
+func Test_2CustomEndpoints(t *testing.T) {
+	h := func(c web.Context) error {
+		return c.String(http.StatusOK, "OK")
+	}
+	h2 := func(c web.Context) error {
+		return c.String(http.StatusOK, "OK 2")
+	}
+	b := mq.NewInMemoryBroker()
+	api, err := NewAPI(Config{
+		DataStore: datastore.NewInMemoryDatastore(),
+		Broker:    b,
+		Endpoints: map[string]web.HandlerFunc{
+			"GET /myendpoint":       h,
+			"POST /myotherendpoint": h2,
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/myendpoint", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK", string(body))
+
+	req, err = http.NewRequest("POST", "/myotherendpoint", nil)
+	assert.NoError(t, err)
+	api.server.Handler.ServeHTTP(w, req)
+	body, err = io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "OK 2", string(body))
+}
+
 func Test_customEndpoint(t *testing.T) {
 	h := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK")
