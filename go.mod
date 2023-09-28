@@ -5,7 +5,7 @@ go 1.21
 retract v0.1.0
 
 require (
-	github.com/antonmedv/expr v1.15.0
+	github.com/antonmedv/expr v1.15.3
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/fatih/color v1.15.0
@@ -20,7 +20,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pkg/errors v0.9.1
 	github.com/rabbitmq/amqp091-go v1.8.1
-	github.com/rs/zerolog v1.30.0
+	github.com/rs/zerolog v1.31.0
 	github.com/shirou/gopsutil/v3 v3.23.8
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
@@ -69,7 +69,7 @@ require (
 	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
