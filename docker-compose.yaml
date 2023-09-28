@@ -34,7 +34,7 @@ services:
     platform: linux/amd64
     restart: always
     ports:
-      - 8100:3000
+      - 8100:8100
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
