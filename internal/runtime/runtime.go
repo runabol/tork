@@ -6,10 +6,9 @@ import (
 	"github.com/runabol/tork"
 )
 
-type RuntimeType string
-
 const (
-	Docker RuntimeType = "docker"
+	Docker = "docker"
+	Shell  = "shell"
 )
 
 // Runtime is the actual runtime environment that executes a task.

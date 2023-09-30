@@ -55,11 +55,11 @@ func (e *Engine) initWorker() error {
 }
 
 func initRuntime() (runtime.Runtime, error) {
-	runtimeType := conf.StringDefault("runtime.type", "docker")
+	runtimeType := conf.StringDefault("runtime.type", runtime.Docker)
 	switch runtimeType {
-	case "docker":
+	case runtime.Docker:
 		return docker.NewDockerRuntime()
-	case "shell":
+	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
 			CMD: conf.Strings("runtime.shell.cmd"),
 			UID: conf.StringDefault("runtime.shell.uid", shell.DEFAULT_UID),
