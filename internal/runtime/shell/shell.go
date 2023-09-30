@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"strconv"
 	"strings"
-	"syscall"
 
 	"fmt"
 	"os"
@@ -183,27 +181,8 @@ func reexecRun() {
 	flag.StringVar(&gid, "gid", "", "the gid to use when running the process")
 	flag.Parse()
 
-	// set UID
-	if uid != DEFAULT_UID {
-		uidi, err := strconv.Atoi(uid)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("invalid uid: %s", uid)
-		}
-		if err := syscall.Setuid(uidi); err != nil {
-			log.Fatal().Err(err).Msgf("error setting uid: %s", uid)
-		}
-	}
-
-	// set GID
-	if uid != DEFAULT_GID {
-		gidi, err := strconv.Atoi(gid)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("invalid gid: %s", gid)
-		}
-		if err := syscall.Setgid(gidi); err != nil {
-			log.Fatal().Err(err).Msgf("error setting gid: %s", gid)
-		}
-	}
+	SetUID(uid)
+	SetGID(gid)
 
 	workdir := os.Getenv("WORKDIR")
 	if workdir == "" {

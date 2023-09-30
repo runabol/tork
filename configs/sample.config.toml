@@ -89,5 +89,5 @@ type = "docker" # docker | shell
 
 [runtime.shell]
 cmd = ["bash", "-c"]
-uid = "1000"         # requires running the Tork process as root
-gid = "1000"         # requires running the Tork process as root
+uid = ""             # set the uid that executes the process (linux/unix only)
+gid = ""             # set the gid that executed the process (linux/unix only)
