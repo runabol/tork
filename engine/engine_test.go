@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/internal/runtime"
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
@@ -213,7 +214,7 @@ func TestRegisterMounter(t *testing.T) {
 	eng := New(Config{Mode: ModeStandalone})
 	assert.Equal(t, StateIdle, eng.state)
 
-	eng.RegisterMounter("bind2", mount.NewBindMounter(mount.BindConfig{}))
+	eng.RegisterMounter(runtime.Docker, "bind2", mount.NewBindMounter(mount.BindConfig{}))
 
 	err := eng.Start()
 	assert.NoError(t, err)

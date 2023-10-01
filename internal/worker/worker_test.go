@@ -51,13 +51,9 @@ func Test_handleTaskRun(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -108,13 +104,9 @@ func Test_handleTaskRunOutput(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -148,13 +140,9 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -165,7 +153,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
-		CMD:   []string{"ls"},
+		Run:   "cat /somevolume/pre > $TORK_OUTPUT",
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
@@ -175,13 +163,13 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 		Pre: []*tork.Task{
 			{
 				Image: "ubuntu:mantic",
-				CMD:   []string{"echo", "do work"},
+				Run:   "echo -n prestuff > /somevolume/pre",
 			},
 		},
 		Post: []*tork.Task{
 			{
 				Image: "ubuntu:mantic",
-				CMD:   []string{"echo", "do work"},
+				Run:   "echo -n poststuff > /somevolume/post",
 			},
 		},
 	}
@@ -192,6 +180,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
+	assert.Equal(t, "prestuff", t1.Result)
 }
 
 func Test_handleTaskCancel(t *testing.T) {
@@ -200,13 +189,9 @@ func Test_handleTaskCancel(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 
@@ -253,9 +238,6 @@ func Test_handleTaskError(t *testing.T) {
 
 	b := mq.NewInMemoryBroker()
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	errs := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
 		assert.NotEmpty(t, tk.Error)
@@ -267,7 +249,6 @@ func Test_handleTaskError(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -300,13 +281,9 @@ func Test_handleTaskOutput(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
@@ -340,13 +317,9 @@ func Test_middleware(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 		Queues:  map[string]int{"someq": 1},
 		Middleware: []task.MiddlewareFunc{
 			func(next task.HandlerFunc) task.HandlerFunc {

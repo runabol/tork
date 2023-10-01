@@ -15,6 +15,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 type Rexec func(args ...string) *exec.Cmd
@@ -85,6 +86,28 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if len(t.CMD) > 0 {
 		return errors.New("cmd is not supported on shell runtime")
 	}
+	// excute pre-tasks
+	for _, pre := range t.Pre {
+		pre.ID = uuid.NewUUID()
+		if err := r.doRun(ctx, pre); err != nil {
+			return err
+		}
+	}
+	// run the actual task
+	if err := r.doRun(ctx, t); err != nil {
+		return err
+	}
+	// execute post tasks
+	for _, post := range t.Post {
+		post.ID = uuid.NewUUID()
+		if err := r.doRun(ctx, post); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task) error {
 	defer r.cmds.Delete(t.ID)
 
 	workdir, err := os.MkdirTemp("", "tork")

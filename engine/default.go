@@ -32,8 +32,8 @@ func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	defaultEngine.RegisterNodeMiddleware(mw)
 }
 
-func RegisterMounter(mtype string, mounter mount.Mounter) {
-	defaultEngine.RegisterMounter(mtype, mounter)
+func RegisterMounter(runtime, name string, mounter mount.Mounter) {
+	defaultEngine.RegisterMounter(runtime, name, mounter)
 }
 
 func RegisterDatastoreProvider(name string, provider datastore.Provider) {

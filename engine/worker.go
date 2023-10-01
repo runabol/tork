@@ -12,26 +12,10 @@ import (
 
 func (e *Engine) initWorker() error {
 	// init the runtime
-	rt, err := initRuntime()
+	rt, err := e.initRuntime()
 	if err != nil {
 		return err
 	}
-
-	// register bind mounter
-	bm := mount.NewBindMounter(mount.BindConfig{
-		Allowed:   conf.Bool("mounts.bind.allowed"),
-		Allowlist: conf.Strings("mounts.bind.allowlist"),
-		Denylist:  conf.Strings("mounts.bind.denylist"),
-	})
-	e.mounter.RegisterMounter("bind", bm)
-
-	// register volume mounter
-	vm, err := mount.NewVolumeMounter()
-	if err != nil {
-		return err
-	}
-	e.mounter.RegisterMounter("volume", vm)
-
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  e.broker,
 		Runtime: rt,
@@ -41,7 +25,6 @@ func (e *Engine) initWorker() error {
 			DefaultMemoryLimit: conf.String("worker.limits.memory"),
 		},
 		Address:    conf.String("worker.address"),
-		Mounter:    e.mounter,
 		Middleware: e.cfg.Middleware.Task,
 	})
 	if err != nil {
@@ -54,11 +37,28 @@ func (e *Engine) initWorker() error {
 	return nil
 }
 
-func initRuntime() (runtime.Runtime, error) {
+func (e *Engine) initRuntime() (runtime.Runtime, error) {
 	runtimeType := conf.StringDefault("runtime.type", runtime.Docker)
 	switch runtimeType {
 	case runtime.Docker:
-		return docker.NewDockerRuntime()
+		mounter, ok := e.mounters[runtime.Docker]
+		if !ok {
+			mounter = mount.NewMultiMounter()
+		}
+		// register bind mounter
+		bm := mount.NewBindMounter(mount.BindConfig{
+			Allowed:   conf.Bool("mounts.bind.allowed"),
+			Allowlist: conf.Strings("mounts.bind.allowlist"),
+			Denylist:  conf.Strings("mounts.bind.denylist"),
+		})
+		mounter.RegisterMounter("bind", bm)
+		// register volume mounter
+		vm, err := mount.NewVolumeMounter()
+		if err != nil {
+			return nil, err
+		}
+		mounter.RegisterMounter("volume", vm)
+		return docker.NewDockerRuntime(docker.WithMounter(mounter))
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
 			CMD: conf.Strings("runtime.shell.cmd"),

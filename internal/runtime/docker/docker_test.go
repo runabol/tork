@@ -146,31 +146,42 @@ func TestRunTaskWithVolume(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 
-	vm, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
-	vmnt := mount.Mount{
-		Type:   mount.TypeVolume,
-		Target: "/xyz",
-	}
-
 	ctx := context.Background()
-	err = vm.Mount(ctx, &vmnt)
-	assert.NoError(t, err)
-
-	defer func() {
-		err = vm.Unmount(ctx, &vmnt)
-		assert.NoError(t, err)
-	}()
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []mount.Mount{
-			vmnt,
+			{
+				Type:   mount.TypeVolume,
+				Target: "/xyz",
+			},
 		},
 	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
+func TestRunTaskWithCustomMounter(t *testing.T) {
+	mounter := mount.NewMultiMounter()
+	vmounter, err := mount.NewVolumeMounter()
+	assert.NoError(t, err)
+	mounter.RegisterMounter(mount.TypeVolume, vmounter)
+	rt, err := NewDockerRuntime(WithMounter(mounter))
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "echo hello world > /xyz/thing",
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeVolume,
+				Target: "/xyz",
+			},
+		},
+	}
+	ctx := context.Background()
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
 }

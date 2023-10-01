@@ -12,7 +12,6 @@ import (
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
 	"github.com/runabol/tork/internal/runtime/docker"
@@ -307,13 +306,9 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	mounter, err := mount.NewVolumeMounter()
-	assert.NoError(t, err)
-
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  b,
 		Runtime: rt,
-		Mounter: mounter,
 		Queues: map[string]int{
 			"default": 2,
 		},
