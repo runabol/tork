@@ -88,6 +88,6 @@ dir = "/tmp"
 type = "docker" # docker | shell
 
 [runtime.shell]
-cmd = ["bash", "-c"]
-uid = ""             # set the uid that executes the process (linux/unix only)
-gid = ""             # set the gid that executed the process (linux/unix only)
+cmd = ["bash", "-c"] # the shell command used to execute the run script
+uid = ""             # set the uid for the the task process (recommended)
+gid = ""             # set the gid for the the task process (recommended)
