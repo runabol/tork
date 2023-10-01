@@ -38,6 +38,9 @@ func (e *Engine) initWorker() error {
 }
 
 func (e *Engine) initRuntime() (runtime.Runtime, error) {
+	if e.runtime != nil {
+		return e.runtime, nil
+	}
 	runtimeType := conf.StringDefault("runtime.type", runtime.Docker)
 	switch runtimeType {
 	case runtime.Docker:

@@ -52,6 +52,12 @@ func NewShellRuntime(cfg Config) *ShellRuntime {
 	if cfg.Rexec == nil {
 		cfg.Rexec = reexec.Command
 	}
+	if cfg.UID == "" {
+		cfg.UID = DEFAULT_UID
+	}
+	if cfg.GID == "" {
+		cfg.GID = DEFAULT_GID
+	}
 	return &ShellRuntime{
 		cmds:   new(syncx.Map[string, *exec.Cmd]),
 		shell:  cfg.CMD,

@@ -50,6 +50,7 @@ type Engine struct {
 	broker      mq.Broker
 	ds          datastore.Datastore
 	mounters    map[string]*runtime.MultiMounter
+	runtime     runtime.Runtime
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
 	dsProviders map[string]datastore.Provider
@@ -279,6 +280,16 @@ func (e *Engine) RegisterMounter(rt string, name string, mounter runtime.Mounter
 		e.mounters[rt] = mounters
 	}
 	mounters.RegisterMounter(name, mounter)
+}
+
+func (e *Engine) RegisterRuntime(rt runtime.Runtime) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	if e.runtime != nil {
+		panic("engine: RegisterRuntime called twice")
+	}
+	e.runtime = rt
 }
 
 func (e *Engine) RegisterDatastoreProvider(name string, provider datastore.Provider) {
