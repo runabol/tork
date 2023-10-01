@@ -20,7 +20,8 @@ import (
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
-	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork/runtime"
+
 	"github.com/runabol/tork/mq"
 )
 
@@ -48,7 +49,7 @@ type Engine struct {
 	mu          sync.Mutex
 	broker      mq.Broker
 	ds          datastore.Datastore
-	mounters    map[string]*mount.MultiMounter
+	mounters    map[string]*runtime.MultiMounter
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
 	dsProviders map[string]datastore.Provider
@@ -78,7 +79,7 @@ func New(cfg Config) *Engine {
 		terminated:  make(chan any),
 		cfg:         cfg,
 		state:       StateIdle,
-		mounters:    make(map[string]*mount.MultiMounter),
+		mounters:    make(map[string]*runtime.MultiMounter),
 		dsProviders: make(map[string]datastore.Provider),
 		mqProviders: make(map[string]mq.Provider),
 	}
@@ -268,14 +269,14 @@ func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) 
 	e.cfg.Endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }
 
-func (e *Engine) RegisterMounter(runtime string, name string, mounter mount.Mounter) {
+func (e *Engine) RegisterMounter(rt string, name string, mounter runtime.Mounter) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	mounters, ok := e.mounters[runtime]
+	mounters, ok := e.mounters[rt]
 	if !ok {
-		mounters = mount.NewMultiMounter()
-		e.mounters[runtime] = mounters
+		mounters = runtime.NewMultiMounter()
+		e.mounters[rt] = mounters
 	}
 	mounters.RegisterMounter(name, mounter)
 }

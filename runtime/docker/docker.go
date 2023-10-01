@@ -26,7 +26,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
-	tmount "github.com/runabol/tork/mount"
+	"github.com/runabol/tork/runtime"
 )
 
 type DockerRuntime struct {
@@ -34,7 +34,7 @@ type DockerRuntime struct {
 	tasks   *syncx.Map[string, string]
 	images  *syncx.Map[string, bool]
 	pullq   chan *pullRequest
-	mounter tmount.Mounter
+	mounter runtime.Mounter
 }
 
 type printableReader struct {
@@ -54,7 +54,7 @@ type registry struct {
 
 type Option = func(rt *DockerRuntime)
 
-func WithMounter(mounter tmount.Mounter) Option {
+func WithMounter(mounter runtime.Mounter) Option {
 	return func(rt *DockerRuntime) {
 		rt.mounter = mounter
 	}
@@ -76,7 +76,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	// setup a default mounter
 	if rt.mounter == nil {
-		vmounter, err := tmount.NewVolumeMounter()
+		vmounter, err := runtime.NewVolumeMounter()
 		if err != nil {
 			return nil, err
 		}

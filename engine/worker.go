@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/worker"
-	"github.com/runabol/tork/mount"
+
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/runabol/tork/runtime/shell"
@@ -43,17 +43,17 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 	case runtime.Docker:
 		mounter, ok := e.mounters[runtime.Docker]
 		if !ok {
-			mounter = mount.NewMultiMounter()
+			mounter = runtime.NewMultiMounter()
 		}
 		// register bind mounter
-		bm := mount.NewBindMounter(mount.BindConfig{
+		bm := runtime.NewBindMounter(runtime.BindConfig{
 			Allowed:   conf.Bool("mounts.bind.allowed"),
 			Allowlist: conf.Strings("mounts.bind.allowlist"),
 			Denylist:  conf.Strings("mounts.bind.denylist"),
 		})
 		mounter.RegisterMounter("bind", bm)
 		// register volume mounter
-		vm, err := mount.NewVolumeMounter()
+		vm, err := runtime.NewVolumeMounter()
 		if err != nil {
 			return nil, err
 		}
