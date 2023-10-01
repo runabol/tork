@@ -12,8 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/health"
 	"github.com/runabol/tork/internal/httpx"
-	"github.com/runabol/tork/internal/runtime"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/runtime"
 )
 
 const (

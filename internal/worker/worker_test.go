@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/runtime/docker"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/runtime/docker"
 
 	"github.com/stretchr/testify/assert"
 )

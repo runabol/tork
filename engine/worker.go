@@ -3,11 +3,11 @@ package engine
 import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/conf"
-	"github.com/runabol/tork/internal/runtime"
-	"github.com/runabol/tork/internal/runtime/docker"
-	"github.com/runabol/tork/internal/runtime/shell"
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork/runtime"
+	"github.com/runabol/tork/runtime/docker"
+	"github.com/runabol/tork/runtime/shell"
 )
 
 func (e *Engine) initWorker() error {
