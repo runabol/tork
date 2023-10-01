@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/runabol/tork"
 )
 
 type MultiMounter struct {
@@ -18,7 +19,7 @@ func NewMultiMounter() *MultiMounter {
 	}
 }
 
-func (m *MultiMounter) Mount(ctx context.Context, mnt *Mount) error {
+func (m *MultiMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	mounter, ok := m.mounters[mnt.Type]
@@ -28,7 +29,7 @@ func (m *MultiMounter) Mount(ctx context.Context, mnt *Mount) error {
 	return mounter.Mount(ctx, mnt)
 }
 
-func (m *MultiMounter) Unmount(ctx context.Context, mnt *Mount) error {
+func (m *MultiMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	mounter, ok := m.mounters[mnt.Type]

@@ -4,7 +4,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/runabol/tork/mount"
 	"golang.org/x/exp/maps"
 )
 
@@ -47,7 +46,7 @@ type Task struct {
 	Error       string            `json:"error,omitempty"`
 	Pre         []*Task           `json:"pre,omitempty"`
 	Post        []*Task           `json:"post,omitempty"`
-	Mounts      []mount.Mount     `json:"mounts,omitempty"`
+	Mounts      []Mount           `json:"mounts,omitempty"`
 	Networks    []string          `json:"networks,omitempty"`
 	NodeID      string            `json:"nodeId,omitempty"`
 	Retry       *TaskRetry        `json:"retry,omitempty"`

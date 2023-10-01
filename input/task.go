@@ -2,7 +2,6 @@ package input
 
 import (
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/mount"
 	"golang.org/x/exp/maps"
 )
 
@@ -48,8 +47,8 @@ type AuxTask struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
-func (m Mount) toMount() mount.Mount {
-	return mount.Mount{
+func (m Mount) toMount() tork.Mount {
+	return tork.Mount{
 		Type:   m.Type,
 		Source: m.Source,
 		Target: m.Target,
@@ -144,8 +143,8 @@ func (i Task) toTask() *tork.Task {
 	}
 }
 
-func toMounts(ms []Mount) []mount.Mount {
-	result := make([]mount.Mount, len(ms))
+func toMounts(ms []Mount) []tork.Mount {
+	result := make([]tork.Mount, len(ms))
 	for i, m := range ms {
 		result[i] = m.toMount()
 	}

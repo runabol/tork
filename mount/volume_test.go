@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/filters"
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ func TestCreateVolume(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := context.Background()
-	mnt := &Mount{}
+	mnt := &tork.Mount{}
 	err = vm.Mount(ctx, mnt)
 	assert.NoError(t, err)
 
@@ -43,8 +44,8 @@ func Test_createMountVolume(t *testing.T) {
 	m, err := NewVolumeMounter()
 	assert.NoError(t, err)
 
-	mnt := &Mount{
-		Type:   TypeVolume,
+	mnt := &tork.Mount{
+		Type:   tork.MountTypeVolume,
 		Target: "/somevol",
 	}
 

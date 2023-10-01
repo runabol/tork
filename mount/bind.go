@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/wildcard"
 )
 
@@ -23,7 +24,7 @@ func NewBindMounter(cfg BindConfig) *BindMounter {
 	}
 }
 
-func (m *BindMounter) Mount(ctx context.Context, mnt *Mount) error {
+func (m *BindMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 	if !m.cfg.Allowed {
 		return errors.New("bind mounts are not allowed")
 	}
@@ -40,6 +41,6 @@ func (m *BindMounter) Mount(ctx context.Context, mnt *Mount) error {
 	return errors.Errorf("mount point not allowed: %s", mnt.Source)
 }
 
-func (m *BindMounter) Unmount(ctx context.Context, mnt *Mount) error {
+func (m *BindMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
 	return nil
 }

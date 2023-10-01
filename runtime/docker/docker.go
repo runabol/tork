@@ -93,7 +93,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		if err != nil {
 			return err
 		}
-		defer func(m tmount.Mount) {
+		defer func(m tork.Mount) {
 			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
 			if err := d.mounter.Unmount(uctx, &m); err != nil {
@@ -150,12 +150,12 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 	for _, m := range t.Mounts {
 		var mt mount.Type
 		switch m.Type {
-		case tmount.TypeVolume:
+		case tork.MountTypeVolume:
 			mt = mount.TypeVolume
 			if m.Target == "" {
 				return errors.Errorf("volume target is required")
 			}
-		case tmount.TypeBind:
+		case tork.MountTypeBind:
 			mt = mount.TypeBind
 			if m.Target == "" {
 				return errors.Errorf("bind target is required")
@@ -175,7 +175,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 		mounts = append(mounts, mount)
 	}
 	// create the workdir mount
-	workdir := &tmount.Mount{Type: tmount.TypeVolume, Target: "/tork"}
+	workdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
 	if err := d.mounter.Mount(ctx, workdir); err != nil {
 		return err
 	}

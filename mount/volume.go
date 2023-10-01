@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
 )
 
@@ -23,7 +24,7 @@ func NewVolumeMounter() (*VolumeMounter, error) {
 	return &VolumeMounter{client: dc}, nil
 }
 
-func (m *VolumeMounter) Mount(ctx context.Context, mn *Mount) error {
+func (m *VolumeMounter) Mount(ctx context.Context, mn *tork.Mount) error {
 	name := uuid.NewUUID()
 	mn.Source = name
 	v, err := m.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
@@ -35,7 +36,7 @@ func (m *VolumeMounter) Mount(ctx context.Context, mn *Mount) error {
 	return nil
 }
 
-func (m *VolumeMounter) Unmount(ctx context.Context, mn *Mount) error {
+func (m *VolumeMounter) Unmount(ctx context.Context, mn *tork.Mount) error {
 	ls, err := m.client.VolumeList(ctx, filters.NewArgs(filters.Arg("name", mn.Source)))
 	if err != nil {
 		return err

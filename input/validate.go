@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/eval"
-	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 )
 
@@ -43,11 +43,11 @@ func validateMount(sl validator.StructLevel) {
 	mnt := sl.Current().Interface().(Mount)
 	if mnt.Type == "" {
 		sl.ReportError(mnt, "mount", "Mount", "typerequired", "")
-	} else if mnt.Type == mount.TypeVolume && mnt.Source != "" {
+	} else if mnt.Type == tork.MountTypeVolume && mnt.Source != "" {
 		sl.ReportError(mnt, "mount", "Mount", "sourcenotempty", "")
-	} else if mnt.Type == mount.TypeVolume && mnt.Target == "" {
+	} else if mnt.Type == tork.MountTypeVolume && mnt.Target == "" {
 		sl.ReportError(mnt, "mount", "Mount", "targetrequired", "")
-	} else if mnt.Type == mount.TypeBind && mnt.Source == "" {
+	} else if mnt.Type == tork.MountTypeBind && mnt.Source == "" {
 		sl.ReportError(mnt, "mount", "Mount", "sourcerequired", "")
 	} else if mnt.Source != "" && !mountPattern.MatchString(mnt.Source) {
 		sl.ReportError(mnt, "mount", "Mount", "invalidsource", "")
