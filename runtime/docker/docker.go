@@ -76,7 +76,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	// setup a default mounter
 	if rt.mounter == nil {
-		vmounter, err := runtime.NewVolumeMounter()
+		vmounter, err := NewVolumeMounter()
 		if err != nil {
 			return nil, err
 		}
