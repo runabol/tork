@@ -49,14 +49,14 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			mounter = runtime.NewMultiMounter()
 		}
 		// register bind mounter
-		bm := runtime.NewBindMounter(runtime.BindConfig{
+		bm := docker.NewBindMounter(docker.BindConfig{
 			Allowed:   conf.Bool("mounts.bind.allowed"),
 			Allowlist: conf.Strings("mounts.bind.allowlist"),
 			Denylist:  conf.Strings("mounts.bind.denylist"),
 		})
 		mounter.RegisterMounter("bind", bm)
 		// register volume mounter
-		vm, err := runtime.NewVolumeMounter()
+		vm, err := docker.NewVolumeMounter()
 		if err != nil {
 			return nil, err
 		}

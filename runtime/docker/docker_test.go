@@ -166,7 +166,7 @@ func TestRunTaskWithVolume(t *testing.T) {
 
 func TestRunTaskWithCustomMounter(t *testing.T) {
 	mounter := runtime.NewMultiMounter()
-	vmounter, err := runtime.NewVolumeMounter()
+	vmounter, err := NewVolumeMounter()
 	assert.NoError(t, err)
 	mounter.RegisterMounter(tork.MountTypeVolume, vmounter)
 	rt, err := NewDockerRuntime(WithMounter(mounter))
