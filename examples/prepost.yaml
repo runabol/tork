@@ -1,13 +1,16 @@
 name: pre- and post- tasks examples
 tasks:
   - name: simple task
+    run: cat /xyz/pre > $TORK_OUTPUT
     image: ubuntu:mantic
-    run: echo im the actual task
     pre:
       - name: simple task
+        run: echo im a pre task > /xyz/pre
         image: ubuntu:mantic
-        run: echo im a pre task
     post:
       - name: simple task
+        run: echo im a post task > /xyz/post
         image: ubuntu:mantic
-        run: echo im a post task
+    mounts:
+      - type: volume
+        target: /xyz

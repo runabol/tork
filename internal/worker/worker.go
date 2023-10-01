@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 
 	"github.com/runabol/tork/internal/runtime"
@@ -32,7 +31,6 @@ type Worker struct {
 	limits     Limits
 	api        *api
 	taskCount  int32
-	mounter    mount.Mounter
 	middleware []task.MiddlewareFunc
 }
 
@@ -42,7 +40,6 @@ type Config struct {
 	Runtime    runtime.Runtime
 	Queues     map[string]int
 	Limits     Limits
-	Mounter    mount.Mounter
 	Middleware []task.MiddlewareFunc
 }
 
@@ -75,7 +72,6 @@ func NewWorker(cfg Config) (*Worker, error) {
 		limits:     cfg.Limits,
 		api:        newAPI(cfg),
 		stop:       make(chan any),
-		mounter:    cfg.Mounter,
 		middleware: cfg.Middleware,
 	}
 	return w, nil
@@ -133,7 +129,7 @@ func (w *Worker) runTask(t *tork.Task) error {
 	// process can mutate the task without
 	// affecting the original
 	rt := t.Clone()
-	if err := w.executeTask(ctx, rt); err != nil {
+	if err := w.doRunTask(ctx, rt); err != nil {
 		return err
 	}
 	switch rt.State {
@@ -157,7 +153,7 @@ func (w *Worker) runTask(t *tork.Task) error {
 	return nil
 }
 
-func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
+func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 	// prepare limits
 	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
 		t.Limits = &tork.TaskLimits{}
@@ -168,88 +164,6 @@ func (w *Worker) executeTask(ctx context.Context, t *tork.Task) error {
 	if t.Limits != nil && t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
-	// prepare mounts
-	for i, mnt := range t.Mounts {
-		err := w.mounter.Mount(ctx, &mnt)
-		if err != nil {
-			finished := time.Now().UTC()
-			t.State = tork.TaskStateFailed
-			t.Error = err.Error()
-			t.FailedAt = &finished
-			return nil
-		}
-		defer func(m mount.Mount) {
-			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			defer cancel()
-			if err := w.mounter.Unmount(uctx, &m); err != nil {
-				log.Error().
-					Err(err).
-					Msgf("error deleting mount: %s", m)
-			}
-		}(mnt)
-		t.Mounts[i] = mnt
-	}
-
-	// excute pre-tasks
-	for _, pre := range t.Pre {
-		pre.ID = uuid.NewUUID()
-		pre.Mounts = t.Mounts
-		pre.Networks = t.Networks
-		pre.Limits = t.Limits
-		if err := w.doExecuteTask(ctx, pre); err != nil {
-			log.Error().
-				Str("task-id", t.ID).
-				Err(err).
-				Msg("error processing pre-task")
-			// we also want to mark the
-			// actual task as FAILED
-			finished := time.Now().UTC()
-			t.State = tork.TaskStateFailed
-			t.Error = err.Error()
-			t.FailedAt = &finished
-			return nil
-		}
-	}
-	// run the actual task
-	if err := w.doExecuteTask(ctx, t); err != nil {
-		log.Error().
-			Str("task-id", t.ID).
-			Err(err).
-			Msg("error processing task")
-		finished := time.Now().UTC()
-		t.State = tork.TaskStateFailed
-		t.Error = err.Error()
-		t.FailedAt = &finished
-		return nil
-	}
-	// execute post tasks
-	for _, post := range t.Post {
-		post.ID = uuid.NewUUID()
-		post.Mounts = t.Mounts
-		post.Networks = t.Networks
-		post.Limits = t.Limits
-		if err := w.doExecuteTask(ctx, post); err != nil {
-			log.Error().
-				Str("task-id", t.ID).
-				Err(err).
-				Msg("error processing post-task")
-			// we also want to mark the
-			// actual task as FAILED
-			finished := time.Now().UTC()
-			t.State = tork.TaskStateFailed
-			t.Error = err.Error()
-			t.FailedAt = &finished
-			return nil
-		}
-	}
-	finished := time.Now().UTC()
-	t.CompletedAt = &finished
-	t.State = tork.TaskStateCompleted
-	return nil
-}
-
-func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
-	t := o.Clone()
 	// create timeout context -- if timeout is defined
 	rctx := ctx
 	if t.Timeout != "" {
@@ -262,10 +176,18 @@ func (w *Worker) doExecuteTask(ctx context.Context, o *tork.Task) error {
 		rctx = tctx
 	}
 	// run the task
-	if err := w.runtime.Run(rctx, t); err != nil {
-		return err
+	rtTask := t.Clone()
+	if err := w.runtime.Run(rctx, rtTask); err != nil {
+		finished := time.Now().UTC()
+		t.FailedAt = &finished
+		t.State = tork.TaskStateFailed
+		t.Error = err.Error()
+		return nil
 	}
-	o.Result = t.Result
+	finished := time.Now().UTC()
+	t.CompletedAt = &finished
+	t.State = tork.TaskStateCompleted
+	t.Result = rtTask.Result
 	return nil
 }
 

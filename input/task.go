@@ -42,7 +42,7 @@ type AuxTask struct {
 	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
 	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
-	Image       string            `json:"image,omitempty" yaml:"image,omitempty" validate:"required"`
+	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
 	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`

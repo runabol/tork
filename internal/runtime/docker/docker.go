@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/syncx"
+	"github.com/runabol/tork/internal/uuid"
 	tmount "github.com/runabol/tork/mount"
 )
 
@@ -33,7 +34,7 @@ type DockerRuntime struct {
 	tasks   *syncx.Map[string, string]
 	images  *syncx.Map[string, bool]
 	pullq   chan *pullRequest
-	mounter *tmount.VolumeMounter
+	mounter tmount.Mounter
 }
 
 type printableReader struct {
@@ -51,111 +52,86 @@ type registry struct {
 	password string
 }
 
-func (r printableReader) Read(p []byte) (int, error) {
-	buf := make([]byte, len(p))
-	n, err := r.reader.Read(buf)
-	if err != nil {
-		return n, err
+type Option = func(rt *DockerRuntime)
+
+func WithMounter(mounter tmount.Mounter) Option {
+	return func(rt *DockerRuntime) {
+		rt.mounter = mounter
 	}
-	j := 0
-	for i := 0; i < n; i++ {
-		if unicode.IsPrint(rune(buf[i])) {
-			p[j] = buf[i]
-			j++
-		}
-	}
-	if j == 0 {
-		return 0, io.EOF
-	}
-	return j, nil
 }
 
-func NewDockerRuntime() (*DockerRuntime, error) {
+func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
-	mounter, err := tmount.NewVolumeMounter()
-	if err != nil {
-		return nil, err
-	}
 	rt := &DockerRuntime{
-		client:  dc,
-		tasks:   new(syncx.Map[string, string]),
-		images:  new(syncx.Map[string, bool]),
-		pullq:   make(chan *pullRequest, 1),
-		mounter: mounter,
+		client: dc,
+		tasks:  new(syncx.Map[string, string]),
+		images: new(syncx.Map[string, bool]),
+		pullq:  make(chan *pullRequest, 1),
+	}
+	for _, o := range opts {
+		o(rt)
+	}
+	// setup a default mounter
+	if rt.mounter == nil {
+		vmounter, err := tmount.NewVolumeMounter()
+		if err != nil {
+			return nil, err
+		}
+		rt.mounter = vmounter
 	}
 	go rt.puller(context.Background())
 	return rt, nil
 }
 
-func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
-	_, ok := d.images.Get(t.Image)
-	if ok {
-		return nil
+func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
+	// prepare mounts
+	for i, mnt := range t.Mounts {
+		err := d.mounter.Mount(ctx, &mnt)
+		if err != nil {
+			return err
+		}
+		defer func(m tmount.Mount) {
+			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+			if err := d.mounter.Unmount(uctx, &m); err != nil {
+				log.Error().
+					Err(err).
+					Msgf("error deleting mount: %s", m)
+			}
+		}(mnt)
+		t.Mounts[i] = mnt
 	}
-	// let's check if we have the image
-	// locally already
-	images, err := d.client.ImageList(
-		ctx,
-		types.ImageListOptions{All: true},
-	)
-	if err != nil {
+	// excute pre-tasks
+	for _, pre := range t.Pre {
+		pre.ID = uuid.NewUUID()
+		pre.Mounts = t.Mounts
+		pre.Networks = t.Networks
+		pre.Limits = t.Limits
+		if err := d.doRun(ctx, pre); err != nil {
+			return err
+		}
+	}
+	// run the actual task
+	if err := d.doRun(ctx, t); err != nil {
 		return err
 	}
-	for _, img := range images {
-		for _, tag := range img.RepoTags {
-			if tag == t.Image {
-				d.images.Set(tag, true)
-				return nil
-			}
+	// execute post tasks
+	for _, post := range t.Post {
+		post.ID = uuid.NewUUID()
+		post.Mounts = t.Mounts
+		post.Networks = t.Networks
+		post.Limits = t.Limits
+		if err := d.doRun(ctx, post); err != nil {
+			return err
 		}
 	}
-	pr := &pullRequest{
-		image: t.Image,
-		done:  make(chan error),
-	}
-	if t.Registry != nil {
-		pr.registry = registry{
-			username: t.Registry.Username,
-			password: t.Registry.Password,
-		}
-	}
-	d.pullq <- pr
-	return <-pr.done
+	return nil
 }
 
-// puller is a goroutine that serializes all requests
-// to pull images from the docker repo
-func (d *DockerRuntime) puller(ctx context.Context) {
-	for pr := range d.pullq {
-		authConfig := types.AuthConfig{
-			Username: pr.registry.username,
-			Password: pr.registry.password,
-		}
-		encodedJSON, err := json.Marshal(authConfig)
-		if err != nil {
-			pr.done <- err
-			continue
-		}
-		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
-		reader, err := d.client.ImagePull(
-			ctx, pr.image, types.ImagePullOptions{RegistryAuth: authStr})
-		if err != nil {
-			pr.done <- err
-			continue
-		}
-		_, err = io.Copy(os.Stdout, reader)
-		if err != nil {
-			pr.done <- err
-			continue
-		}
-		pr.done <- nil
-	}
-}
-
-func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
+func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 	if t.ID == "" {
 		return errors.New("task id is required")
 	}
@@ -199,7 +175,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		mounts = append(mounts, mount)
 	}
 	// create the workdir mount
-	workdir := &tmount.Mount{Target: "/tork"}
+	workdir := &tmount.Mount{Type: tmount.TypeVolume, Target: "/tork"}
 	if err := d.mounter.Mount(ctx, workdir); err != nil {
 		return err
 	}
@@ -527,4 +503,88 @@ func parseMemory(limits *tork.TaskLimits) (int64, error) {
 		return 0, nil
 	}
 	return units.RAMInBytes(limits.Memory)
+}
+
+func (r printableReader) Read(p []byte) (int, error) {
+	buf := make([]byte, len(p))
+	n, err := r.reader.Read(buf)
+	if err != nil {
+		return n, err
+	}
+	j := 0
+	for i := 0; i < n; i++ {
+		if unicode.IsPrint(rune(buf[i])) {
+			p[j] = buf[i]
+			j++
+		}
+	}
+	if j == 0 {
+		return 0, io.EOF
+	}
+	return j, nil
+}
+
+func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
+	_, ok := d.images.Get(t.Image)
+	if ok {
+		return nil
+	}
+	// let's check if we have the image
+	// locally already
+	images, err := d.client.ImageList(
+		ctx,
+		types.ImageListOptions{All: true},
+	)
+	if err != nil {
+		return err
+	}
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == t.Image {
+				d.images.Set(tag, true)
+				return nil
+			}
+		}
+	}
+	pr := &pullRequest{
+		image: t.Image,
+		done:  make(chan error),
+	}
+	if t.Registry != nil {
+		pr.registry = registry{
+			username: t.Registry.Username,
+			password: t.Registry.Password,
+		}
+	}
+	d.pullq <- pr
+	return <-pr.done
+}
+
+// puller is a goroutine that serializes all requests
+// to pull images from the docker repo
+func (d *DockerRuntime) puller(ctx context.Context) {
+	for pr := range d.pullq {
+		authConfig := types.AuthConfig{
+			Username: pr.registry.username,
+			Password: pr.registry.password,
+		}
+		encodedJSON, err := json.Marshal(authConfig)
+		if err != nil {
+			pr.done <- err
+			continue
+		}
+		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
+		reader, err := d.client.ImagePull(
+			ctx, pr.image, types.ImagePullOptions{RegistryAuth: authStr})
+		if err != nil {
+			pr.done <- err
+			continue
+		}
+		_, err = io.Copy(os.Stdout, reader)
+		if err != nil {
+			pr.done <- err
+			continue
+		}
+		pr.done <- nil
+	}
 }

@@ -48,7 +48,7 @@ type Engine struct {
 	mu          sync.Mutex
 	broker      mq.Broker
 	ds          datastore.Datastore
-	mounter     *mount.MultiMounter
+	mounters    map[string]*mount.MultiMounter
 	coordinator *coordinator.Coordinator
 	worker      *worker.Worker
 	dsProviders map[string]datastore.Provider
@@ -78,7 +78,7 @@ func New(cfg Config) *Engine {
 		terminated:  make(chan any),
 		cfg:         cfg,
 		state:       StateIdle,
-		mounter:     mount.NewMultiMounter(),
+		mounters:    make(map[string]*mount.MultiMounter),
 		dsProviders: make(map[string]datastore.Provider),
 		mqProviders: make(map[string]mq.Provider),
 	}
@@ -268,11 +268,16 @@ func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) 
 	e.cfg.Endpoints[fmt.Sprintf("%s %s", method, path)] = handler
 }
 
-func (e *Engine) RegisterMounter(mtype string, mounter mount.Mounter) {
+func (e *Engine) RegisterMounter(runtime string, name string, mounter mount.Mounter) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
-	e.mounter.RegisterMounter(mtype, mounter)
+	mounters, ok := e.mounters[runtime]
+	if !ok {
+		mounters = mount.NewMultiMounter()
+		e.mounters[runtime] = mounters
+	}
+	mounters.RegisterMounter(name, mounter)
 }
 
 func (e *Engine) RegisterDatastoreProvider(name string, provider datastore.Provider) {
