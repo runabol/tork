@@ -10,7 +10,8 @@ import (
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
-	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork/runtime"
+
 	"github.com/runabol/tork/mq"
 )
 
@@ -32,7 +33,7 @@ func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	defaultEngine.RegisterNodeMiddleware(mw)
 }
 
-func RegisterMounter(runtime, name string, mounter mount.Mounter) {
+func RegisterMounter(runtime, name string, mounter runtime.Mounter) {
 	defaultEngine.RegisterMounter(runtime, name, mounter)
 }
 

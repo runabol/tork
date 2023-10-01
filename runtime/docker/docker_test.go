@@ -13,7 +13,8 @@ import (
 	"github.com/runabol/tork"
 
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork/runtime"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -164,8 +165,8 @@ func TestRunTaskWithVolume(t *testing.T) {
 }
 
 func TestRunTaskWithCustomMounter(t *testing.T) {
-	mounter := mount.NewMultiMounter()
-	vmounter, err := mount.NewVolumeMounter()
+	mounter := runtime.NewMultiMounter()
+	vmounter, err := runtime.NewVolumeMounter()
 	assert.NoError(t, err)
 	mounter.RegisterMounter(tork.MountTypeVolume, vmounter)
 	rt, err := NewDockerRuntime(WithMounter(mounter))
