@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/runabol/tork/mount"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -378,7 +378,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeVolume,
+						Type:   tork.MountTypeVolume,
 						Target: "/some/target",
 					},
 				},
@@ -416,7 +416,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "", // missing
 						Target: "/some/target",
 					},
@@ -436,7 +436,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "/some/source",
 						Target: "/some/target",
 					},
@@ -456,7 +456,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "../some/source", // invalid
 						Target: "/some/target",
 					},
@@ -476,7 +476,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "/some#/source", // invalid
 						Target: "/some/target",
 					},
@@ -496,7 +496,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "/some/source",
 						Target: "/some:/target", // invalid
 					},
@@ -516,7 +516,7 @@ func TestValidateMounts(t *testing.T) {
 				Run:   "some script",
 				Mounts: []Mount{
 					{
-						Type:   mount.TypeBind,
+						Type:   tork.MountTypeBind,
 						Source: "/some/source",
 						Target: "/tork",
 					},

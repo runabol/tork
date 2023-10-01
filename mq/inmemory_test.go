@@ -9,7 +9,6 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,9 +25,9 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID: uuid.NewUUID(),
-		Mounts: []mount.Mount{
+		Mounts: []tork.Mount{
 			{
-				Type:   mount.TypeVolume,
+				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
 			},
 		},

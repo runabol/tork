@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/mount"
 )
 
 type PostgresDatastore struct {
@@ -160,7 +159,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")
 		}
 	}
-	var mounts []mount.Mount
+	var mounts []tork.Mount
 	if r.Mounts != nil {
 		if err := json.Unmarshal(r.Mounts, &mounts); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")

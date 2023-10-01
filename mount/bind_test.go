@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,8 +13,8 @@ func Test_createMountBindNotAllowed(t *testing.T) {
 		Allowed: false,
 	}}
 
-	err := m.Mount(context.Background(), &Mount{
-		Type:   TypeBind,
+	err := m.Mount(context.Background(), &tork.Mount{
+		Type:   tork.MountTypeBind,
 		Source: "/tmp",
 		Target: "/somevol",
 	})
@@ -25,8 +26,8 @@ func Test_createMountBindDenylist(t *testing.T) {
 		Allowed:  true,
 		Denylist: []string{"/tmp"},
 	}}
-	err := m.Mount(context.Background(), &Mount{
-		Type:   TypeBind,
+	err := m.Mount(context.Background(), &tork.Mount{
+		Type:   tork.MountTypeBind,
 		Source: "/tmp",
 		Target: "/somevol",
 	})
@@ -38,8 +39,8 @@ func Test_createMountBindAllowlist(t *testing.T) {
 		Allowed:   true,
 		Allowlist: []string{"/tmp"},
 	}}
-	mnt := Mount{
-		Type:   TypeBind,
+	mnt := tork.Mount{
+		Type:   tork.MountTypeBind,
 		Source: "/tmp",
 		Target: "/somevol",
 	}
@@ -51,5 +52,5 @@ func Test_createMountBindAllowlist(t *testing.T) {
 	}()
 	assert.Equal(t, "/somevol", mnt.Target)
 	assert.Equal(t, "/tmp", mnt.Source)
-	assert.Equal(t, TypeBind, mnt.Type)
+	assert.Equal(t, tork.MountTypeBind, mnt.Type)
 }

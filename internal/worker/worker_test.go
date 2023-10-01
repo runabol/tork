@@ -9,7 +9,6 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mount"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime/docker"
 
@@ -81,9 +80,9 @@ func Test_handleTaskRun(t *testing.T) {
 		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
-		Mounts: []mount.Mount{
+		Mounts: []tork.Mount{
 			{
-				Type:   mount.TypeVolume,
+				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
 			},
 		},
@@ -154,9 +153,9 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		Run:   "cat /somevolume/pre > $TORK_OUTPUT",
-		Mounts: []mount.Mount{
+		Mounts: []tork.Mount{
 			{
-				Type:   mount.TypeVolume,
+				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
 			},
 		},

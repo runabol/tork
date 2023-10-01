@@ -152,9 +152,9 @@ func TestRunTaskWithVolume(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []mount.Mount{
+		Mounts: []tork.Mount{
 			{
-				Type:   mount.TypeVolume,
+				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
 			},
 		},
@@ -167,16 +167,16 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 	mounter := mount.NewMultiMounter()
 	vmounter, err := mount.NewVolumeMounter()
 	assert.NoError(t, err)
-	mounter.RegisterMounter(mount.TypeVolume, vmounter)
+	mounter.RegisterMounter(tork.MountTypeVolume, vmounter)
 	rt, err := NewDockerRuntime(WithMounter(mounter))
 	assert.NoError(t, err)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []mount.Mount{
+		Mounts: []tork.Mount{
 			{
-				Type:   mount.TypeVolume,
+				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
 			},
 		},
