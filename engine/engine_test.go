@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/runtime/shell"
 
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
@@ -215,6 +216,20 @@ func TestRegisterMounter(t *testing.T) {
 	assert.Equal(t, StateIdle, eng.state)
 
 	eng.RegisterMounter(runtime.Docker, "bind2", runtime.NewBindMounter(runtime.BindConfig{}))
+
+	err := eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	err = eng.Terminate()
+	assert.NoError(t, err)
+}
+
+func TestRegisterRuntime(t *testing.T) {
+	eng := New(Config{Mode: ModeStandalone})
+	assert.Equal(t, StateIdle, eng.state)
+
+	eng.RegisterRuntime(shell.NewShellRuntime(shell.Config{}))
 
 	err := eng.Start()
 	assert.NoError(t, err)

@@ -37,6 +37,10 @@ func RegisterMounter(runtime, name string, mounter runtime.Mounter) {
 	defaultEngine.RegisterMounter(runtime, name, mounter)
 }
 
+func RegisterRuntime(rt runtime.Runtime) {
+	defaultEngine.RegisterRuntime(rt)
+}
+
 func RegisterDatastoreProvider(name string, provider datastore.Provider) {
 	defaultEngine.RegisterDatastoreProvider(name, provider)
 }
