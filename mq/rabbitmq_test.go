@@ -1,4 +1,4 @@
-package mq_test
+package mq
 
 import (
 	"context"
@@ -9,16 +9,15 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := make(chan any)
-	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
 		processed <- 1
 		return nil
@@ -31,9 +30,9 @@ func TestRabbitMQPublishAndSubsribeForTask(t *testing.T) {
 
 func TestRabbitMQGetQueues(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
-	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err = b.PublishTask(ctx, qname, &tork.Task{})
 	assert.NoError(t, err)
 	qis, err := b.Queues(ctx)
@@ -49,7 +48,7 @@ func TestRabbitMQGetQueues(t *testing.T) {
 
 func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", mq.WithHeartbeatTTL(10))
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithHeartbeatTTL(10))
 	assert.NoError(t, err)
 	processed := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
@@ -68,7 +67,7 @@ func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 
 func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := make(chan any)
 	err = b.SubscribeForJobs(func(j *tork.Job) error {
@@ -83,9 +82,9 @@ func TestRabbitMQPublishAndSubsribeForJob(t *testing.T) {
 
 func TestRabbitMQPublishConcurrent(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
-	testq := fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, "test")
+	testq := fmt.Sprintf("%s%s", QUEUE_EXCLUSIVE_PREFIX, "test")
 	processed := make(chan any, 300)
 	err = b.SubscribeForTasks(testq, func(t *tork.Task) error {
 		processed <- 1
@@ -112,10 +111,10 @@ func TestRabbitMQPublishConcurrent(t *testing.T) {
 
 func TestRabbitMQShutdown(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	mu := sync.Mutex{}
-	qname := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err = b.SubscribeForTasks(qname, func(t1 *tork.Task) error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -139,7 +138,7 @@ func TestRabbitMQShutdown(t *testing.T) {
 
 func TestRabbitMQSubsribeForEvent(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	defer func() {
 		// cleanly shutdown
@@ -152,12 +151,12 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 	}
 	processed1 := make(chan any, 30)
 	processed2 := make(chan any, 10)
-	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {
+	err = b.SubscribeForEvents(ctx, TOPIC_JOB, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
 		processed1 <- 1
 	})
-	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err = b.SubscribeForEvents(ctx, TOPIC_JOB_COMPLETED, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
 		processed2 <- 1
@@ -165,8 +164,8 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j1)
-		err = b.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j1)
+		err = b.PublishEvent(ctx, TOPIC_JOB_COMPLETED, j1)
+		err = b.PublishEvent(ctx, TOPIC_JOB_FAILED, j1)
 		err = b.PublishEvent(ctx, "job.x.y.z", j1)
 		assert.NoError(t, err)
 	}
@@ -183,25 +182,48 @@ func TestRabbitMQSubsribeForEvent(t *testing.T) {
 
 func TestRabbitMQPublishUnknownEvent(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	defer func() {
 		// cleanly shutdown
 		err = b.Shutdown(ctx)
 		assert.NoError(t, err)
 	}()
-	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {})
+	err = b.SubscribeForEvents(ctx, TOPIC_JOB, func(event any) {})
 	assert.NoError(t, err)
 
-	err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, "not a thing")
+	err = b.PublishEvent(ctx, TOPIC_JOB_COMPLETED, "not a thing")
 	assert.Error(t, err)
 }
 
 func TestRabbitMQHealthChech(t *testing.T) {
 	ctx := context.Background()
-	b, err := mq.NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	assert.NoError(t, b.HealthCheck(ctx))
 	assert.NoError(t, b.Shutdown(ctx))
 	assert.Error(t, b.HealthCheck(ctx))
+}
+
+func TestRabbitMQPublishAndSubsribe(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithConsumerTimeoutMS(time.Minute))
+	assert.NoError(t, err)
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		return nil
+	})
+	assert.NoError(t, err)
+	qs, err := b.rabbitQueues(ctx)
+	assert.NoError(t, err)
+	found := false
+	for _, q := range qs {
+		if q.Name == qname {
+			found = true
+			timeout := q.Arguments["x-consumer-timeout"].(float64)
+			assert.Equal(t, float64(60000), timeout)
+			break
+		}
+	}
+	assert.True(t, found)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/env"
@@ -78,6 +79,14 @@ func StringMap(key string) map[string]string {
 
 func Strings(key string) []string {
 	return konf.Strings(key)
+}
+
+func DurationDefault(key string, dv time.Duration) time.Duration {
+	v := konf.Get(key)
+	if v == nil {
+		return dv
+	}
+	return konf.Duration(key)
 }
 
 func StringsDefault(key string, dv []string) []string {
