@@ -3,6 +3,7 @@ package conf_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/runabol/tork/conf"
 	"github.com/stretchr/testify/assert"
@@ -160,6 +161,23 @@ func TestBoolDefault(t *testing.T) {
 	assert.False(t, conf.BoolDefault("main.enabled", true))
 	assert.False(t, conf.BoolDefault("main.enabled", false))
 	assert.True(t, conf.BoolDefault("main.other", true))
+}
+
+func TestDurationDefault(t *testing.T) {
+	konf := `
+	[main]
+	some.duration = "5m"
+	`
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+	err = conf.LoadConfig()
+
+	assert.NoError(t, err)
+	assert.Equal(t, time.Minute*5, conf.DurationDefault("main.some.duration", time.Minute))
+	assert.Equal(t, time.Minute, conf.DurationDefault("main.other.duration", time.Minute))
 }
 
 func TestBoolMap(t *testing.T) {

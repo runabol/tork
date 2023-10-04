@@ -19,6 +19,10 @@ import (
 )
 
 const (
+	RABBITMQ_DEFAULT_CONSUMER_TIMEOUT = time.Minute * 30
+)
+
+const (
 	exchangeTopic       = "amq.topic"
 	exchangeDefault     = ""
 	keyDefault          = ""
@@ -26,15 +30,16 @@ const (
 )
 
 type RabbitMQBroker struct {
-	connPool      []*amqp.Connection
-	nextConn      int
-	queues        *syncx.Map[string, string]
-	topics        *syncx.Map[string, string]
-	subscriptions []*subscription
-	mu            sync.RWMutex
-	url           string
-	shuttingDown  bool
-	heartbeatTTL  int
+	connPool        []*amqp.Connection
+	nextConn        int
+	queues          *syncx.Map[string, string]
+	topics          *syncx.Map[string, string]
+	subscriptions   []*subscription
+	mu              sync.RWMutex
+	url             string
+	shuttingDown    bool
+	heartbeatTTL    int
+	consumerTimeout int
 }
 
 type subscription struct {
@@ -42,6 +47,14 @@ type subscription struct {
 	ch    *amqp.Channel
 	name  string
 	done  chan int
+}
+
+type rabbitq struct {
+	Name      string         `json:"name"`
+	Messages  int            `json:"messages"`
+	Consumers int            `json:"consumers"`
+	Unacked   int            `json:"messages_unacknowledged"`
+	Arguments map[string]any `json:"arguments"`
 }
 
 type Option = func(b *RabbitMQBroker)
@@ -55,6 +68,16 @@ func WithHeartbeatTTL(ttl int) Option {
 	}
 }
 
+// WithConsumerTimeout sets the maximum amount of time in
+// RabbitMQ will wait for a message ack before from a consumer
+// before deeming the message undelivered and shuting down the
+// connection. Default: 30 minutes
+func WithConsumerTimeoutMS(consumerTimeout time.Duration) Option {
+	return func(b *RabbitMQBroker) {
+		b.consumerTimeout = int(consumerTimeout.Milliseconds())
+	}
+}
+
 func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 	connPool := make([]*amqp.Connection, 3)
 	for i := 0; i < len(connPool); i++ {
@@ -65,12 +88,13 @@ func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 		connPool[i] = conn
 	}
 	b := &RabbitMQBroker{
-		queues:        new(syncx.Map[string, string]),
-		topics:        new(syncx.Map[string, string]),
-		url:           url,
-		connPool:      connPool,
-		subscriptions: make([]*subscription, 0),
-		heartbeatTTL:  defaultHeartbeatTTL,
+		queues:          new(syncx.Map[string, string]),
+		topics:          new(syncx.Map[string, string]),
+		url:             url,
+		connPool:        connPool,
+		subscriptions:   make([]*subscription, 0),
+		heartbeatTTL:    defaultHeartbeatTTL,
+		consumerTimeout: int(RABBITMQ_DEFAULT_CONSUMER_TIMEOUT.Milliseconds()),
 	}
 	for _, o := range opts {
 		o(b)
@@ -79,6 +103,23 @@ func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 }
 
 func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
+	rqs, err := b.rabbitQueues(ctx)
+	if err != nil {
+		return nil, err
+	}
+	qis := make([]QueueInfo, len(rqs))
+	for i, rq := range rqs {
+		qis[i] = QueueInfo{
+			Name:        rq.Name,
+			Size:        rq.Messages,
+			Subscribers: rq.Consumers,
+			Unacked:     rq.Unacked,
+		}
+	}
+	return qis, nil
+}
+
+func (b *RabbitMQBroker) rabbitQueues(ctx context.Context) ([]rabbitq, error) {
 	u, err := url.Parse(b.url)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to parse url: %s", b.url)
@@ -95,31 +136,12 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting rabbitmq queues from the API")
 	}
-
-	type rabbitq struct {
-		Name      string `json:"name"`
-		Messages  int    `json:"messages"`
-		Consumers int    `json:"consumers"`
-		Unacked   int    `json:"messages_unacknowledged"`
-	}
-
 	rqs := make([]rabbitq, 0)
 	err = json.NewDecoder(resp.Body).Decode(&rqs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling API response")
 	}
-
-	qis := make([]QueueInfo, len(rqs))
-	for i, rq := range rqs {
-		qis[i] = QueueInfo{
-			Name:        rq.Name,
-			Size:        rq.Messages,
-			Subscribers: rq.Consumers,
-			Unacked:     rq.Unacked,
-		}
-	}
-
-	return qis, nil
+	return rqs, nil
 }
 
 func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.Task) error {
@@ -294,6 +316,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 		if qname == QUEUE_HEARTBEAT {
 			args["x-message-ttl"] = b.heartbeatTTL
 		}
+		args["x-consumer-timeout"] = b.consumerTimeout
 		_, err = ch.QueueDeclare(
 			qname,
 			false, // durable

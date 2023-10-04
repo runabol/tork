@@ -213,7 +213,7 @@ func Test_imagePull(t *testing.T) {
 	assert.NotNil(t, rt)
 
 	images, err := rt.client.ImageList(ctx, types.ImageListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:*")),
+		Filters: filters.NewArgs(filters.Arg("reference", "busybox:*")),
 	})
 	assert.NoError(t, err)
 
@@ -231,7 +231,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err := rt.imagePull(ctx, &tork.Task{Image: "alpine:3.18.3"})
+			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:1.36"})
 			assert.NoError(t, err)
 		}()
 	}
