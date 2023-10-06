@@ -218,8 +218,8 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 		if posi != posj {
 			return posi < posj
 		}
-		ci := execution[i].CreatedAt
-		cj := execution[j].CreatedAt
+		ci := execution[i].StartedAt
+		cj := execution[j].StartedAt
 		if ci == nil {
 			return true
 		}

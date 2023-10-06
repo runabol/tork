@@ -725,7 +725,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	q := `SELECT * 
 	      FROM tasks 
 		  where job_id = $1 
-		  ORDER BY position asc,created_at asc`
+		  ORDER BY position asc,started_at asc`
 	if err := ds.select_(&rs, q, id); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
