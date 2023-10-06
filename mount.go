@@ -3,6 +3,7 @@ package tork
 const (
 	MountTypeVolume string = "volume"
 	MountTypeBind   string = "bind"
+	MountTypeTmpfs  string = "tmpfs"
 )
 
 type Mount struct {

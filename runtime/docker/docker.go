@@ -163,6 +163,8 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 			if m.Source == "" {
 				return errors.Errorf("bind source is required")
 			}
+		case tork.MountTypeTmpfs:
+			mt = mount.TypeTmpfs
 		default:
 			return errors.Errorf("unknown mount type: %s", m.Type)
 		}
