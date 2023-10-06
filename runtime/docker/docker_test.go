@@ -164,6 +164,29 @@ func TestRunTaskWithVolume(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRunTaskWithTempfs(t *testing.T) {
+	rt, err := NewDockerRuntime(
+		WithMounter(NewTmpfsMounter()),
+	)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "echo hello world > /xyz/thing",
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeTmpfs,
+				Target: "/xyz",
+			},
+		},
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
 func TestRunTaskWithCustomMounter(t *testing.T) {
 	mounter := runtime.NewMultiMounter()
 	vmounter, err := NewVolumeMounter()
