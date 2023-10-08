@@ -37,6 +37,7 @@ type Job struct {
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Defaults    *JobDefaults      `json:"defaults,omitempty"`
+	Webhooks    []*Webhook        `json:"webhook,omitempty"`
 }
 
 type JobSummary struct {
@@ -68,6 +69,11 @@ type JobDefaults struct {
 	Queue   string      `json:"queue,omitempty"`
 }
 
+type Webhook struct {
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
 func (j *Job) Clone() *Job {
 	var defaults *JobDefaults
 	if j.Defaults != nil {
@@ -93,6 +99,7 @@ func (j *Job) Clone() *Job {
 		Result:      j.Result,
 		Error:       j.Error,
 		Defaults:    defaults,
+		Webhooks:    CloneWebhooks(j.Webhooks),
 	}
 }
 
@@ -139,5 +146,20 @@ func NewJobSummary(j *Job) *JobSummary {
 		Output:      j.Output,
 		Result:      j.Result,
 		Error:       j.Error,
+	}
+}
+
+func CloneWebhooks(webhooks []*Webhook) []*Webhook {
+	copy := make([]*Webhook, len(webhooks))
+	for i, w := range webhooks {
+		copy[i] = w.Clone()
+	}
+	return copy
+}
+
+func (w Webhook) Clone() *Webhook {
+	return &Webhook{
+		URL:     w.URL,
+		Headers: maps.Clone(w.Headers),
 	}
 }

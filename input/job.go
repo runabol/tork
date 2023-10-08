@@ -5,6 +5,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
+	"golang.org/x/exp/maps"
 )
 
 type Job struct {
@@ -15,6 +16,7 @@ type Job struct {
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	Webhooks    []Webhook         `json:"webhook,omitempty" yaml:"webhook,omitempty" validate:"dive"`
 }
 
 type Defaults struct {
@@ -22,6 +24,11 @@ type Defaults struct {
 	Limits  *Limits `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout string  `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 	Queue   string  `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
+}
+
+type Webhook struct {
+	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"url"`
+	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 }
 
 func (ji *Job) ID() string {
@@ -52,6 +59,11 @@ func (ji *Job) ToJob() *tork.Job {
 	if ji.Defaults != nil {
 		j.Defaults = ji.Defaults.ToJobDefaults()
 	}
+	webhooks := make([]*tork.Webhook, len(ji.Webhooks))
+	for i, wh := range ji.Webhooks {
+		webhooks[i] = wh.toWebhook()
+	}
+	j.Webhooks = webhooks
 	return j
 }
 
@@ -66,4 +78,11 @@ func (d Defaults) ToJobDefaults() *tork.JobDefaults {
 	jd.Timeout = d.Timeout
 	jd.Queue = d.Queue
 	return &jd
+}
+
+func (w Webhook) toWebhook() *tork.Webhook {
+	return &tork.Webhook{
+		URL:     w.URL,
+		Headers: maps.Clone(w.Headers),
+	}
 }

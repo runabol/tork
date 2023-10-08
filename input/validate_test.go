@@ -527,3 +527,35 @@ func TestValidateMounts(t *testing.T) {
 	err = j.Validate()
 	assert.Error(t, err)
 }
+
+func TestValidateWebhook(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Webhooks: []Webhook{{
+			URL: "http://example.com",
+		}},
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+			},
+		},
+	}
+	err := j.Validate()
+	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Webhooks: []Webhook{{
+			URL: "not_a_url",
+		}},
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+			},
+		},
+	}
+	err = j.Validate()
+	assert.Error(t, err)
+}

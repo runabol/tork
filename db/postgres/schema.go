@@ -33,7 +33,8 @@ CREATE TABLE jobs (
     output_       text,
     result        text,
     error_        text,
-    defaults      jsonb
+    defaults      jsonb,
+    webhooks      jsonb
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);

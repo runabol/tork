@@ -45,6 +45,9 @@ func (e *Engine) initCoordinator() error {
 		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact)
 	}
 
+	// webhook middleware
+	cfg.Middleware.Job = append(cfg.Middleware.Job, job.Webhook)
+
 	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
 		return errors.Wrap(err, "error creating the coordinator")
