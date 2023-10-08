@@ -393,6 +393,20 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 				Memory: "10MB",
 			},
 		},
+		Webhooks: []*tork.Webhook{
+			{
+				URL: "http://example.com/1",
+				Headers: map[string]string{
+					"header1": "value1",
+				},
+			},
+			{
+				URL: "http://example.com/2",
+				Headers: map[string]string{
+					"header1": "value1",
+				},
+			},
+		},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -404,6 +418,9 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 	assert.Equal(t, 2, j2.Defaults.Retry.Limit)
 	assert.Equal(t, ".5", j2.Defaults.Limits.CPUs)
 	assert.Equal(t, "10MB", j2.Defaults.Limits.Memory)
+	assert.Len(t, j2.Webhooks, 2)
+	assert.Equal(t, j1.Webhooks[0], j2.Webhooks[0])
+	assert.Equal(t, j1.Webhooks[1], j2.Webhooks[1])
 }
 
 func TestPostgresUpdateJob(t *testing.T) {

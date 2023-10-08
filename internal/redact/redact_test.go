@@ -103,6 +103,18 @@ func TestRedactJob(t *testing.T) {
 				"task2":  "helloworld",
 			},
 		},
+		Webhooks: []*tork.Webhook{
+			{
+				URL: "http://example.com/1",
+			},
+			{
+				URL: "http://example.com/2",
+				Headers: map[string]string{
+					"my-header": "my-value",
+					"my-secret": "secret",
+				},
+			},
+		},
 	}
 	j := o.Clone()
 	Job(j)
@@ -122,4 +134,7 @@ func TestRedactJob(t *testing.T) {
 		"task2":  "helloworld",
 	}, j.Context.Tasks)
 	assert.Equal(t, "[REDACTED]", j.Execution[0].Env["secret_1"])
+	assert.Equal(t, "http://example.com/1", j.Webhooks[0].URL)
+	assert.Equal(t, "http://example.com/2", j.Webhooks[1].URL)
+	assert.Equal(t, map[string]string{"my-header": "my-value", "my-secret": "[REDACTED]"}, j.Webhooks[1].Headers)
 }

@@ -52,6 +52,12 @@ func Job(j *tork.Job) {
 	redacted := j
 	// redact inputs
 	redacted.Inputs = redactVars(redacted.Inputs)
+	// redact webhook headers
+	for _, w := range j.Webhooks {
+		if w.Headers != nil {
+			w.Headers = redactVars(w.Headers)
+		}
+	}
 	// redact context
 	redacted.Context.Inputs = redactVars(redacted.Context.Inputs)
 	redacted.Context.Tasks = redactVars(redacted.Context.Tasks)

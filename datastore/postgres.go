@@ -78,6 +78,7 @@ type jobRecord struct {
 	Error       string     `db:"error_"`
 	TS          string     `db:"ts"`
 	Defaults    []byte     `db:"defaults"`
+	Webhooks    []byte     `db:"webhooks"`
 }
 
 type nodeRecord struct {
@@ -239,6 +240,10 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
 			return nil, errors.Wrapf(err, "error deserializing job.defaults")
 		}
 	}
+	var webhooks []*tork.Webhook
+	if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
+		return nil, errors.Wrapf(err, "error deserializing job.webhook")
+	}
 	return &tork.Job{
 		ID:          r.ID,
 		Name:        r.Name,
@@ -259,6 +264,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
 		Result:      r.Result,
 		Error:       r.Error,
 		Defaults:    defaults,
+		Webhooks:    webhooks,
 	}, nil
 }
 
@@ -657,13 +663,17 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		s := string(b)
 		defaults = &s
 	}
+	webhooks, err := json.Marshal(j.Webhooks)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize job.webhooks")
+	}
 	q := `insert into jobs 
 	       (id,name,description,state,created_at,started_at,tasks,position,
-			inputs,context,parent_id,task_count,output_,result,error_,defaults) 
+			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`
 	_, err = ds.exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
-		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults)
+		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
