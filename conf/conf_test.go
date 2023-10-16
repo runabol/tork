@@ -104,6 +104,33 @@ func TestLoadConfigCustomPath(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestLoadConfigWithOverridingEnv(t *testing.T) {
+	konf := `
+	[main]
+	key1 = "value1"
+	key3 = "value3"
+	`
+	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config.toml"))
+	}()
+	assert.NoError(t, os.Setenv("TORK_HELLO", "world"))
+	defer func() {
+		assert.NoError(t, os.Unsetenv("TORK_HELLO"))
+	}()
+	assert.NoError(t, os.Setenv("TORK_KEY1", "VALUE2"))
+	defer func() {
+		assert.NoError(t, os.Unsetenv("TORK_KEY1"))
+	}()
+	err = conf.LoadConfig()
+	assert.NoError(t, err)
+
+	assert.Equal(t, "value2", conf.String("main.key1"))
+	assert.Equal(t, "value3", conf.String("main.key3"))
+	assert.Equal(t, "world", conf.String("hello"))
+}
+
 func TestLoadConfigEnv(t *testing.T) {
 	assert.NoError(t, os.Setenv("TORK_HELLO", "world"))
 	defer func() {
