@@ -34,6 +34,7 @@ func LoadConfig() error {
 		paths = defaultConfigPaths
 	}
 	// load configs from file paths
+	var loaded bool
 	for _, f := range paths {
 		err := konf.Load(file.Provider(f), toml.Parser())
 		if errors.Is(err, os.ErrNotExist) {
@@ -43,7 +44,11 @@ func LoadConfig() error {
 			return errors.Wrapf(err, "error loading config from %s", f)
 		}
 		logger.Info().Msgf("Config loaded from %s", f)
-		return nil
+		loaded = true
+		break
+	}
+	if !loaded && userConfig != "" {
+		return errors.Errorf(fmt.Sprintf("could not find config file in: %s", userConfig))
 	}
 	// load configs from env vars
 	if err := konf.Load(env.Provider("TORK_", ".", func(s string) string {
@@ -51,12 +56,6 @@ func LoadConfig() error {
 			strings.TrimPrefix(s, "TORK_")), "_", ".", -1)
 	}), nil); err != nil {
 		return errors.Wrapf(err, "error loading config from env")
-	}
-	errMsg := fmt.Sprintf("could not find config file in any of the following paths: %s", strings.Join(paths, ","))
-	if userConfig != "" {
-		return errors.Errorf(errMsg)
-	} else {
-		logger.Debug().Msg(errMsg)
 	}
 	return nil
 }

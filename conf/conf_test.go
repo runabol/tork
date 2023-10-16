@@ -21,6 +21,7 @@ func TestLoadConfigNotExistUserDefined(t *testing.T) {
 	}()
 	err := conf.LoadConfig()
 	assert.Error(t, err)
+	assert.ErrorContains(t, err, "could not find config file in: no.such.thing")
 }
 
 func TestLoadConfigBadContents(t *testing.T) {
@@ -110,25 +111,24 @@ func TestLoadConfigWithOverridingEnv(t *testing.T) {
 	key1 = "value1"
 	key3 = "value3"
 	`
-	err := os.WriteFile("config.toml", []byte(konf), os.ModePerm)
+	err := os.WriteFile("config_with_override.toml", []byte(konf), os.ModePerm)
 	assert.NoError(t, err)
 	defer func() {
-		assert.NoError(t, os.Remove("config.toml"))
+		assert.NoError(t, os.Remove("config_with_override.toml"))
 	}()
-	assert.NoError(t, os.Setenv("TORK_HELLO", "world"))
+	os.Setenv("TORK_CONFIG", "config_with_override.toml")
 	defer func() {
-		assert.NoError(t, os.Unsetenv("TORK_HELLO"))
+		os.Unsetenv("TORK_CONFIG")
 	}()
-	assert.NoError(t, os.Setenv("TORK_KEY1", "VALUE2"))
+	assert.NoError(t, os.Setenv("TORK_MAIN_KEY1", "value2"))
 	defer func() {
-		assert.NoError(t, os.Unsetenv("TORK_KEY1"))
+		assert.NoError(t, os.Unsetenv("TORK_MAIN_KEY1"))
 	}()
 	err = conf.LoadConfig()
 	assert.NoError(t, err)
 
 	assert.Equal(t, "value2", conf.String("main.key1"))
 	assert.Equal(t, "value3", conf.String("main.key3"))
-	assert.Equal(t, "world", conf.String("hello"))
 }
 
 func TestLoadConfigEnv(t *testing.T) {
