@@ -60,6 +60,35 @@ func TestString(t *testing.T) {
 	assert.Equal(t, "value1", conf.String("main.key1"))
 }
 
+func TestStrings(t *testing.T) {
+	konf := `
+	[main]
+	keys = ["value1"]
+	`
+	err := os.WriteFile("config_strings.toml", []byte(konf), os.ModePerm)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, os.Remove("config_strings.toml"))
+	}()
+	os.Setenv("TORK_CONFIG", "config_strings.toml")
+	defer func() {
+		os.Unsetenv("TORK_CONFIG")
+	}()
+	err = conf.LoadConfig()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"value1"}, conf.Strings("main.keys"))
+}
+
+func TestStringsEnv(t *testing.T) {
+	os.Setenv("TORK_MAIN_STRINGS_KEYS", "a,b,c")
+	defer func() {
+		os.Unsetenv("TORK_MAIN_STRINGS_KEYS")
+	}()
+	err := conf.LoadConfig()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b", "c"}, conf.Strings("main.strings.keys"))
+}
+
 func TestStringDefault(t *testing.T) {
 	konf := `
 	[main]

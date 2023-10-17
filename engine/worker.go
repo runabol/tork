@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/middleware/task"
 
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/runtime/docker"
@@ -16,6 +17,12 @@ func (e *Engine) initWorker() error {
 	if err != nil {
 		return err
 	}
+	// register host env middleware
+	hostenv, err := task.NewHostEnv(conf.Strings("middleware.task.hostenv.vars")...)
+	if err != nil {
+		return err
+	}
+	e.cfg.Middleware.Task = append(e.cfg.Middleware.Task, hostenv.Execute)
 	w, err := worker.NewWorker(worker.Config{
 		Broker:  e.broker,
 		Runtime: rt,
