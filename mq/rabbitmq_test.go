@@ -46,6 +46,24 @@ func TestRabbitMQGetQueues(t *testing.T) {
 	assert.True(t, found)
 }
 
+func TestRabbitMQGetQueuesMgmtURL(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithManagementURL("http://localhost:15672"))
+	assert.NoError(t, err)
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	err = b.PublishTask(ctx, qname, &tork.Task{})
+	assert.NoError(t, err)
+	qis, err := b.Queues(ctx)
+	assert.NoError(t, err)
+	found := false
+	for _, qi := range qis {
+		if qi.Name == qname {
+			found = true
+		}
+	}
+	assert.True(t, found)
+}
+
 func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 	ctx := context.Background()
 	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithHeartbeatTTL(10))
