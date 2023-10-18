@@ -40,6 +40,7 @@ type RabbitMQBroker struct {
 	shuttingDown    bool
 	heartbeatTTL    int
 	consumerTimeout int
+	managementURL   string
 }
 
 type subscription struct {
@@ -75,6 +76,12 @@ func WithHeartbeatTTL(ttl int) Option {
 func WithConsumerTimeoutMS(consumerTimeout time.Duration) Option {
 	return func(b *RabbitMQBroker) {
 		b.consumerTimeout = int(consumerTimeout.Milliseconds())
+	}
+}
+
+func WithManagementURL(url string) Option {
+	return func(b *RabbitMQBroker) {
+		b.managementURL = url
 	}
 }
 
@@ -124,9 +131,14 @@ func (b *RabbitMQBroker) rabbitQueues(ctx context.Context) ([]rabbitq, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to parse url: %s", b.url)
 	}
-	manager := fmt.Sprintf("http://%s:15672/api/queues/", u.Hostname())
+	var endpoint string
+	if b.managementURL != "" {
+		endpoint = fmt.Sprintf("%s/api/queues/", b.managementURL)
+	} else {
+		endpoint = fmt.Sprintf("http://%s:15672/api/queues/", u.Hostname())
+	}
 	client := &http.Client{}
-	req, err := http.NewRequestWithContext(ctx, "GET", manager, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to build get queues request")
 	}
