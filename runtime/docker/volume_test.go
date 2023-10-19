@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func TestCreateVolume(t *testing.T) {
 	err = vm.Mount(ctx, mnt)
 	assert.NoError(t, err)
 
-	ls, err := vm.client.VolumeList(ctx, filters.Args{})
+	ls, err := vm.client.VolumeList(ctx, volume.ListOptions{})
 	assert.NoError(t, err)
 	found := false
 	for _, v := range ls.Volumes {
@@ -32,7 +32,7 @@ func TestCreateVolume(t *testing.T) {
 	err = vm.Unmount(ctx, mnt)
 	assert.NoError(t, err)
 
-	ls, err = vm.client.VolumeList(ctx, filters.Args{})
+	ls, err = vm.client.VolumeList(ctx, volume.ListOptions{})
 	assert.NoError(t, err)
 
 	for _, v := range ls.Volumes {

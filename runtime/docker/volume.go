@@ -37,7 +37,7 @@ func (m *VolumeMounter) Mount(ctx context.Context, mn *tork.Mount) error {
 }
 
 func (m *VolumeMounter) Unmount(ctx context.Context, mn *tork.Mount) error {
-	ls, err := m.client.VolumeList(ctx, filters.NewArgs(filters.Arg("name", mn.Source)))
+	ls, err := m.client.VolumeList(ctx, volume.ListOptions{Filters: filters.NewArgs(filters.Arg("name", mn.Source))})
 	if err != nil {
 		return err
 	}
