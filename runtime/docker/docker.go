@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
@@ -566,7 +567,7 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 // to pull images from the docker repo
 func (d *DockerRuntime) puller(ctx context.Context) {
 	for pr := range d.pullq {
-		authConfig := types.AuthConfig{
+		authConfig := regtypes.AuthConfig{
 			Username: pr.registry.username,
 			Password: pr.registry.password,
 		}
