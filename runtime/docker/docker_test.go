@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +32,14 @@ func TestParseCPUs(t *testing.T) {
 	parsed, err = parseCPUs(&tork.TaskLimits{CPUs: "0.5"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(500000000), parsed)
+}
+
+func TestPrintableReader(t *testing.T) {
+	s := []byte{0, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}
+	pr := printableReader{reader: bytes.NewReader(s)}
+	b, err := io.ReadAll(pr)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world", string(b))
 }
 
 func TestParseMemory(t *testing.T) {
@@ -245,7 +255,7 @@ func Test_imagePull(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = rt.imagePull(ctx, &tork.Task{Image: "localhost:5000/no/suchthing"})
+	err = rt.imagePull(ctx, &tork.Task{Image: "localhost:5001/no/suchthing"})
 	assert.Error(t, err)
 
 	wg := sync.WaitGroup{}
@@ -278,15 +288,15 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
 
-	err = rt.client.ImageTag(ctx, "alpine:3.18.3", "localhost:5000/tork/alpine:3.18.3")
+	err = rt.client.ImageTag(ctx, "alpine:3.18.3", "localhost:5001/tork/alpine:3.18.3")
 	assert.NoError(t, err)
 
-	r2, err := rt.client.ImagePush(ctx, "localhost:5000/tork/alpine:3.18.3", types.ImagePushOptions{RegistryAuth: "noauth"})
+	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/alpine:3.18.3", types.ImagePushOptions{RegistryAuth: "noauth"})
 	assert.NoError(t, err)
 	assert.NoError(t, r2.Close())
 
 	err = rt.imagePull(ctx, &tork.Task{
-		Image: "localhost:5000/tork/alpine:3.18.3",
+		Image: "localhost:5001/tork/alpine:3.18.3",
 		Registry: &tork.Registry{
 			Username: "username",
 			Password: "password",
