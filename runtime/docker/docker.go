@@ -248,6 +248,9 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 		return err
 	}
 
+	// create a mapping between task id and container id
+	d.tasks.Set(t.ID, resp.ID)
+
 	log.Debug().Msgf("created container %s", resp.ID)
 
 	// remove the container
@@ -266,9 +269,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 	if err := d.initWorkdir(ctx, resp.ID, t); err != nil {
 		return errors.Wrapf(err, "error initializing container")
 	}
-
-	// create a mapping between task id and container id
-	d.tasks.Set(t.ID, resp.ID)
 
 	// start the container
 	log.Debug().Msgf("Starting container %s", resp.ID)
@@ -472,7 +472,7 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
 		return nil
 	}
 	d.tasks.Delete(t.ID)
-	log.Printf("Attempting to stop and remove container %v", containerID)
+	log.Debug().Msgf("Attempting to stop and remove container %v", containerID)
 	return d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
 		RemoveLinks:   false,

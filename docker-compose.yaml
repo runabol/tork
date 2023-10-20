@@ -28,7 +28,7 @@ services:
     image: registry:2
     restart: always
     ports:
-      - 5000:5000
+      - 5001:5001
   web:
     image: runabol/tork-web
     platform: linux/amd64
