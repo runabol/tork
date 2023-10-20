@@ -46,6 +46,37 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, map[string]string{"myfile": "hello world"}, t2.Files)
 	assert.Equal(t, "me", t2.Registry.Username)
 	assert.Equal(t, "secret", t2.Registry.Password)
+	assert.Nil(t, t2.Parallel)
+}
+
+func TestPostgresCreateAndGetParallelTask(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+		Parallel: &tork.ParallelTask{
+			Tasks: []*tork.Task{{
+				Name: "parallel task1",
+			}, {
+				Name: "parallel task2",
+			}},
+		},
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.NotNil(t, t2.Parallel)
 }
 
 func TestPostgresCreateTaskBadOutput(t *testing.T) {

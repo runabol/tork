@@ -328,9 +328,14 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		s := string(b)
 		limits = &s
 	}
-	parallel, err := json.Marshal(t.Parallel)
-	if err != nil {
-		return errors.Wrapf(err, "failed to serialize task.parallel")
+	var parallel *string
+	if t.Parallel != nil {
+		b, err := json.Marshal(t.Parallel)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.parallel")
+		}
+		s := string(b)
+		parallel = &s
 	}
 	var each *string
 	if t.Each != nil {
