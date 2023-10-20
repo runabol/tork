@@ -521,9 +521,6 @@ func (r printableReader) Read(p []byte) (int, error) {
 			j++
 		}
 	}
-	if j == 0 {
-		return 0, io.EOF
-	}
 	return j, nil
 }
 
