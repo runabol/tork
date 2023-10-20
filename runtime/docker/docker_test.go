@@ -35,7 +35,11 @@ func TestParseCPUs(t *testing.T) {
 }
 
 func TestPrintableReader(t *testing.T) {
-	s := []byte{0, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}
+	s := []byte{}
+	for i := 0; i < 1000; i++ {
+		s = append(s, 0)
+	}
+	s = append(s, []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}...)
 	pr := printableReader{reader: bytes.NewReader(s)}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
@@ -89,6 +93,20 @@ func TestRunTaskWithTimeout(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
+	})
+	assert.Error(t, err)
+}
+
+func TestRunTaskWithError(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err = rt.Run(ctx, &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "not_a_thing",
 	})
 	assert.Error(t, err)
 }
