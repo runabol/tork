@@ -1,4 +1,4 @@
-package worker
+package host
 
 import (
 	"testing"
@@ -7,6 +7,6 @@ import (
 )
 
 func TestGetStats(t *testing.T) {
-	cpuPercent := getCPUPercent()
+	cpuPercent := GetCPUPercent()
 	assert.GreaterOrEqual(t, cpuPercent, float64(0))
 }

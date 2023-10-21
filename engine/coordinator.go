@@ -23,6 +23,7 @@ func (e *Engine) initCoordinator() error {
 	queues := conf.IntMap("coordinator.queues")
 
 	cfg := coordinator.Config{
+		Name:      conf.StringDefault("coordinator.name", "Coordinator"),
 		Broker:    e.broker,
 		DataStore: e.ds,
 		Queues:    queues,
