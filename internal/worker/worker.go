@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 
+	"github.com/runabol/tork/internal/host"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/runtime"
 
@@ -22,6 +23,7 @@ import (
 
 type Worker struct {
 	id         string
+	name       string
 	startTime  time.Time
 	runtime    runtime.Runtime
 	broker     mq.Broker
@@ -35,6 +37,7 @@ type Worker struct {
 }
 
 type Config struct {
+	Name       string
 	Address    string
 	Broker     mq.Broker
 	Runtime    runtime.Runtime
@@ -64,6 +67,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 	}
 	w := &Worker{
 		id:         uuid.NewUUID(),
+		name:       cfg.Name,
 		startTime:  time.Now().UTC(),
 		broker:     cfg.Broker,
 		runtime:    cfg.Runtime,
@@ -204,11 +208,12 @@ func (w *Worker) sendHeartbeats() {
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to get hostname for worker %s", w.id)
 		}
-		cpuPercent := getCPUPercent()
+		cpuPercent := host.GetCPUPercent()
 		err = w.broker.PublishHeartbeat(
 			context.Background(),
 			&tork.Node{
 				ID:              w.id,
+				Name:            w.name,
 				StartedAt:       w.startTime,
 				CPUPercent:      cpuPercent,
 				Queue:           fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),

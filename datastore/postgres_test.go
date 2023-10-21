@@ -279,6 +279,7 @@ func TestPostgresCreateAndGetNode(t *testing.T) {
 	assert.NoError(t, err)
 	n1 := &tork.Node{
 		ID:       uuid.NewUUID(),
+		Name:     "some node",
 		Hostname: "some-name",
 		Version:  "1.0.0",
 	}
@@ -289,6 +290,7 @@ func TestPostgresCreateAndGetNode(t *testing.T) {
 	assert.Equal(t, n1.ID, n2.ID)
 	assert.Equal(t, "some-name", n2.Hostname)
 	assert.Equal(t, "1.0.0", n2.Version)
+	assert.Equal(t, "some node", n2.Name)
 }
 
 func TestPostgresUpdateNode(t *testing.T) {

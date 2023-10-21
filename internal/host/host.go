@@ -1,11 +1,11 @@
-package worker
+package host
 
 import (
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
 )
 
-func getCPUPercent() float64 {
+func GetCPUPercent() float64 {
 	perc, err := cpu.Percent(0, false)
 	if err != nil {
 		log.Warn().

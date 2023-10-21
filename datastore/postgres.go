@@ -83,6 +83,7 @@ type jobRecord struct {
 
 type nodeRecord struct {
 	ID              string    `db:"id"`
+	Name            string    `db:"name"`
 	StartedAt       time.Time `db:"started_at"`
 	LastHeartbeatAt time.Time `db:"last_heartbeat_at"`
 	CPUPercent      float64   `db:"cpu_percent"`
@@ -207,6 +208,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 func (r nodeRecord) toNode() *tork.Node {
 	n := tork.Node{
 		ID:              r.ID,
+		Name:            r.Name,
 		StartedAt:       r.StartedAt,
 		CPUPercent:      r.CPUPercent,
 		LastHeartbeatAt: r.LastHeartbeatAt,
@@ -576,10 +578,10 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *tork.Node) error {
 	q := `insert into nodes 
-	       (id,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_) 
+	       (id,name,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
-	_, err := ds.exec(q, n.ID, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount, n.Version)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
+	_, err := ds.exec(q, n.ID, n.Name, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount, n.Version)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}
