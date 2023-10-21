@@ -24,6 +24,7 @@ func (e *Engine) initWorker() error {
 	}
 	e.cfg.Middleware.Task = append(e.cfg.Middleware.Task, hostenv.Execute)
 	w, err := worker.NewWorker(worker.Config{
+		Name:    conf.StringDefault("worker.name", "Worker"),
 		Broker:  e.broker,
 		Runtime: rt,
 		Queues:  conf.IntMap("worker.queues"),

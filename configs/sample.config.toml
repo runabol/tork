@@ -24,6 +24,7 @@ dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disa
 
 [coordinator]
 address = "localhost:8000"
+name = "Coordinator"
 
 [coordinator.api]
 endpoints.health = true  # turn on|off the /health endpoint
@@ -76,6 +77,7 @@ vars = [
 
 [worker]
 address = "localhost:8001"
+name = "Worker"
 
 # default task limits
 [worker.limits]

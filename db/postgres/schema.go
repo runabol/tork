@@ -3,6 +3,7 @@ package postgres
 const SCHEMA = `
 CREATE TABLE nodes (
     id                 varchar(32)  not null primary key,
+    name               varchar(64)  not null,
     queue              varchar(64)  not null,
     started_at         timestamp    not null,
     last_heartbeat_at  timestamp    not null,

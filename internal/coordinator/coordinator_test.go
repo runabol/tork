@@ -3,6 +3,8 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -244,15 +246,43 @@ func TestNodeMiddlewareModify(t *testing.T) {
 }
 
 func TestStartCoordinator(t *testing.T) {
+	address := fmt.Sprintf(":%d", rand.Int31n(60000)+5000)
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
 		DataStore: datastore.NewInMemoryDatastore(),
-		Address:   ":4444",
+		Address:   address,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	err = c.Start()
 	assert.NoError(t, err)
+}
+
+func Test_sendHeartbeat(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+
+	heartbeats := make(chan any)
+	err := b.SubscribeForHeartbeats(func(n *tork.Node) error {
+		assert.Contains(t, n.Version, tork.Version)
+		close(heartbeats)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	address := fmt.Sprintf(":%d", rand.Int31n(60000)+5000)
+
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: datastore.NewInMemoryDatastore(),
+		Address:   address,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+	err = c.Start()
+	assert.NoError(t, err)
+
+	<-heartbeats
+	assert.NoError(t, c.Stop())
 }
 
 func TestRunHelloWorldJob(t *testing.T) {
