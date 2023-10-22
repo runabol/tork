@@ -260,11 +260,10 @@ func TestStartCoordinator(t *testing.T) {
 
 func Test_sendHeartbeat(t *testing.T) {
 	b := mq.NewInMemoryBroker()
-
 	heartbeats := make(chan any)
 	err := b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		assert.Contains(t, n.Version, tork.Version)
-		close(heartbeats)
+		heartbeats <- 1
 		return nil
 	})
 	assert.NoError(t, err)
