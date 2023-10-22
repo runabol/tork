@@ -83,6 +83,29 @@ func TestRunTaskCMD(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRunTaskConcurrently(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	wg := sync.WaitGroup{}
+	c := 10
+	wg.Add(10)
+	for i := 0; i < c; i++ {
+		go func() {
+			defer wg.Done()
+			tk := &tork.Task{
+				ID:    uuid.NewUUID(),
+				Image: "ubuntu:mantic",
+				Run:   "echo -n hello > $TORK_OUTPUT",
+			}
+			err := rt.Run(context.Background(), tk)
+			assert.NoError(t, err)
+			assert.Equal(t, "hello", tk.Result)
+		}()
+	}
+	wg.Wait()
+}
+
 func TestRunTaskWithTimeout(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
