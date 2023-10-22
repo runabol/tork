@@ -70,7 +70,7 @@ func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
 	assert.NoError(t, err)
 	processed := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
-		close(processed)
+		processed <- 1
 		time.Sleep(time.Millisecond * 100)
 		return nil
 	})
