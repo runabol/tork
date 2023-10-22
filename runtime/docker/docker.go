@@ -11,7 +11,6 @@ import (
 	"io"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 	"unicode"
 
@@ -320,12 +319,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 				log.Error().Err(err).Msg("error tailing the log")
 				return errors.Errorf("exit code %d", status.StatusCode)
 			}
-			bufout := new(strings.Builder)
-			_, err = io.Copy(bufout, printableReader{reader: out})
+			buf, err := io.ReadAll(printableReader{reader: out})
 			if err != nil {
 				log.Error().Err(err).Msg("error copying the output")
 			}
-			return errors.Errorf("exit code %d: %s", status.StatusCode, bufout.String())
+			return errors.Errorf("exit code %d: %s", status.StatusCode, string(buf))
 		} else {
 			stdout, err := d.readOutput(ctx, resp.ID)
 			if err != nil {
@@ -512,7 +510,7 @@ func (r printableReader) Read(p []byte) (int, error) {
 	buf := make([]byte, len(p))
 	n, err := r.reader.Read(buf)
 	if err != nil {
-		return n, err
+		return 0, err
 	}
 	j := 0
 	for i := 0; i < n; i++ {
