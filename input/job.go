@@ -16,7 +16,7 @@ type Job struct {
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
-	Webhooks    []Webhook         `json:"webhook,omitempty" yaml:"webhook,omitempty" validate:"dive"`
+	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhook,omitempty" validate:"dive"`
 }
 
 type Defaults struct {
