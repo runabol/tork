@@ -37,7 +37,7 @@ type Job struct {
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Defaults    *JobDefaults      `json:"defaults,omitempty"`
-	Webhooks    []*Webhook        `json:"webhook,omitempty"`
+	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
 }
 
 type JobSummary struct {
