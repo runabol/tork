@@ -23,7 +23,7 @@ type Task struct {
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
 	Limits      *Limits           `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
-	Var         string            `json:"var,omitempty" yaml:"var,omitempty"`
+	Var         string            `json:"var,omitempty" yaml:"var,omitempty" validate:"max=64"`
 	If          string            `json:"if,omitempty" yaml:"if,omitempty" validate:"expr"`
 	Parallel    *Parallel         `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
