@@ -79,7 +79,7 @@ CREATE TABLE tasks (
     limits        jsonb,
     timeout       varchar(8),
     result        text,
-    var           varchar(16),
+    var           varchar(64),
     parallel      jsonb,
     parent_id     varchar(32),
     each_         jsonb,
