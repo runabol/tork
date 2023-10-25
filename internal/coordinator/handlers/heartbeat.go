@@ -34,13 +34,6 @@ func (h *heartbeatHandler) handle(ctx context.Context, n *tork.Node) error {
 		if u.LastHeartbeatAt.After(n.LastHeartbeatAt) {
 			return nil
 		}
-		log.Debug().
-			Str("node-id", n.ID).
-			Float64("cpu-percent", n.CPUPercent).
-			Str("hostname", n.Hostname).
-			Str("status", string(n.Status)).
-			Time("heartbeat-time", n.LastHeartbeatAt).
-			Msg("received heartbeat")
 		u.LastHeartbeatAt = n.LastHeartbeatAt
 		u.CPUPercent = n.CPUPercent
 		u.Status = n.Status

@@ -632,7 +632,7 @@ func (ds *PostgresDatastore) GetActiveNodes(ctx context.Context) ([]*tork.Node, 
 	q := `SELECT * 
 	      FROM nodes 
 		  where last_heartbeat_at > $1 
-		  ORDER BY last_heartbeat_at DESC`
+		  ORDER BY name ASC`
 	timeout := time.Now().UTC().Add(-tork.LAST_HEARTBEAT_TIMEOUT)
 	if err := ds.select_(&nrs, q, timeout); err != nil {
 		return nil, errors.Wrapf(err, "error getting active nodes from db")
