@@ -35,6 +35,7 @@ type DockerRuntime struct {
 	images  *syncx.Map[string, bool]
 	pullq   chan *pullRequest
 	mounter runtime.Mounter
+	config  string
 }
 
 type printableReader struct {
@@ -57,6 +58,12 @@ type Option = func(rt *DockerRuntime)
 func WithMounter(mounter runtime.Mounter) Option {
 	return func(rt *DockerRuntime) {
 		rt.mounter = mounter
+	}
+}
+
+func WithConfig(config string) Option {
+	return func(rt *DockerRuntime) {
+		rt.config = config
 	}
 }
 
@@ -562,10 +569,31 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 // to pull images from the docker repo
 func (d *DockerRuntime) puller(ctx context.Context) {
 	for pr := range d.pullq {
-		authConfig := regtypes.AuthConfig{
-			Username: pr.registry.username,
-			Password: pr.registry.password,
+		var authConfig regtypes.AuthConfig
+		if pr.registry.username != "" {
+			authConfig = regtypes.AuthConfig{
+				Username: pr.registry.username,
+				Password: pr.registry.password,
+			}
+		} else {
+			ref, err := parseRef(pr.image)
+			if err != nil {
+				pr.done <- err
+				continue
+			}
+			if ref.domain != "" {
+				username, password, err := getRegistryCredentials(d.config, ref.domain)
+				if err != nil {
+					pr.done <- err
+					continue
+				}
+				authConfig = regtypes.AuthConfig{
+					Username: username,
+					Password: password,
+				}
+			}
 		}
+
 		encodedJSON, err := json.Marshal(authConfig)
 		if err != nil {
 			pr.done <- err
