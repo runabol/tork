@@ -71,7 +71,10 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		mounter.RegisterMounter("volume", vm)
 		// register tmpfs mounter
 		mounter.RegisterMounter("tmpfs", docker.NewTmpfsMounter())
-		return docker.NewDockerRuntime(docker.WithMounter(mounter))
+		return docker.NewDockerRuntime(
+			docker.WithMounter(mounter),
+			docker.WithConfig(conf.String("runtime.docker.config")),
+		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
 			CMD: conf.Strings("runtime.shell.cmd"),
