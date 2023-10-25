@@ -79,6 +79,9 @@ vars = [
 address = "localhost:8001"
 name = "Worker"
 
+[worker.queues]
+default = 1
+
 # default task limits
 [worker.limits]
 cpus = ""   # supports fractions
