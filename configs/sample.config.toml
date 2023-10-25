@@ -80,7 +80,7 @@ address = "localhost:8001"
 name = "Worker"
 
 [worker.queues]
-default = 1
+default = 1 # numbers of concurrent subscribers
 
 # default task limits
 [worker.limits]
