@@ -517,7 +517,9 @@ func (r printableReader) Read(p []byte) (int, error) {
 	buf := make([]byte, len(p))
 	n, err := r.reader.Read(buf)
 	if err != nil {
-		return 0, err
+		if err != io.EOF {
+			return 0, err
+		}
 	}
 	j := 0
 	for i := 0; i < n; i++ {
@@ -526,7 +528,7 @@ func (r printableReader) Read(p []byte) (int, error) {
 			j++
 		}
 	}
-	return j, nil
+	return j, err
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
