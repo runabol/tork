@@ -46,6 +46,22 @@ func TestPrintableReader(t *testing.T) {
 	assert.Equal(t, "hello world", string(b))
 }
 
+type eofReader struct {
+}
+
+func (r eofReader) Read(p []byte) (int, error) {
+	data := []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}
+	copy(p, data)
+	return len(data), io.EOF
+}
+
+func TestPrintableReaderEOF(t *testing.T) {
+	pr := printableReader{reader: eofReader{}}
+	b, err := io.ReadAll(pr)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world", string(b))
+}
+
 func TestParseMemory(t *testing.T) {
 	parsed, err := parseMemory(&tork.TaskLimits{Memory: "1MB"})
 	assert.NoError(t, err)
