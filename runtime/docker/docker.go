@@ -233,7 +233,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 
 	cmd := t.CMD
 	if len(cmd) == 0 {
-		cmd = []string{"./entrypoint"}
+		cmd = []string{fmt.Sprintf("%s/entrypoint", workdir.Target)}
 	}
 	entrypoint := t.Entrypoint
 	if len(entrypoint) == 0 && t.Run != "" {
@@ -244,7 +244,12 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 		Env:        env,
 		Cmd:        cmd,
 		Entrypoint: entrypoint,
-		WorkingDir: workdir.Target,
+	}
+	// we want to override the default
+	// image WORKDIR only if the task
+	// introduces work files
+	if len(t.Files) > 0 {
+		cc.WorkingDir = workdir.Target
 	}
 
 	nc := network.NetworkingConfig{
