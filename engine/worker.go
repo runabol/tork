@@ -58,9 +58,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		}
 		// register bind mounter
 		bm := docker.NewBindMounter(docker.BindConfig{
-			Allowed:   conf.Bool("mounts.bind.allowed"),
-			Allowlist: conf.Strings("mounts.bind.allowlist"),
-			Denylist:  conf.Strings("mounts.bind.denylist"),
+			Allowed: conf.Bool("mounts.bind.allowed"),
 		})
 		mounter.RegisterMounter("bind", bm)
 		// register volume mounter
