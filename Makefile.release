@@ -55,9 +55,9 @@ ifeq ($(GITHUB_ACCESS_TOKEN),)
 	$(error "Please set the GITHUB_ACCESS_TOKEN environment variable")
 else
 	@echo Releasing: $(VERSION)
-	@$(eval RELEASE:=$(shell curl -s -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" "https://api.github.com/repos/$(GITHUB)/$(NAME)/releases/tags/$(VERSION)" | grep -m 1 '"id"' | tr -cd '[[:digit:]]'))
+	@$(eval RELEASE:=$(shell curl -s -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" "https://api.github.com/repos/$(GITHUB)/$(NAME)/releases" | jq '.[0]' | grep -m 1 '"id"' | tr -cd '[[:digit:]]'))
 	@echo ReleaseID: $(RELEASE)
-	@( cd release; for asset in `ls -A .release/*tgz`; do \
+	@( cd .release; for asset in `ls -A *tgz`; do \
 	    echo $$asset; \
 	    curl -o /dev/null -X POST \
           -H "Content-Type: application/gzip" \
@@ -65,10 +65,10 @@ else
           --data-binary "@$$asset" \
           "https://uploads.github.com/repos/$(GITHUB)/$(NAME)/releases/$(RELEASE)/assets?name=$${asset}" ; \
 	done )
-	@( cd release; for asset in `ls -A .release/*tgz`; do \
+	@( cd .release; for asset in `ls -A *tgz`; do \
 	    sha256sum $$asset > $$asset.sha256; \
 	done )
-	@( cd release; for asset in `ls -A .release/*sha256`; do \
+	@( cd .release; for asset in `ls -A *sha256`; do \
 	    echo $$asset; \
 	    curl -o /dev/null -X POST \
 	      -H "Content-Type: text/plain" \
