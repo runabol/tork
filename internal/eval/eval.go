@@ -82,6 +82,15 @@ func EvaluateTask(t *tork.Task, c map[string]any) error {
 		}
 		t.Parallel.Tasks = parallel
 	}
+	// evaluate cmd
+	cmd := t.CMD
+	for i, v := range cmd {
+		result, err := EvaluateTemplate(v, c)
+		if err != nil {
+			return err
+		}
+		cmd[i] = result
+	}
 	return nil
 }
 

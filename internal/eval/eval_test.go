@@ -190,6 +190,20 @@ func TestEvalParallel(t *testing.T) {
 	assert.Equal(t, "SOME DATA", t1.Parallel.Tasks[0].Env["HELLO"])
 }
 
+func TestEvalCMD(t *testing.T) {
+	t1 := &tork.Task{
+		CMD: []string{"{{ inputs.VAR1 }}", "{{ inputs.VAR2 }}", "VAL3"},
+	}
+	err := eval.EvaluateTask(t1, map[string]any{
+		"inputs": map[string]string{
+			"VAR1": "VAL1",
+			"VAR2": "VAL2",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"VAL1", "VAL2", "VAL3"}, t1.CMD)
+}
+
 func TestEvalExpr(t *testing.T) {
 	v, err := eval.EvaluateExpr("1+1", map[string]any{})
 	assert.NoError(t, err)
