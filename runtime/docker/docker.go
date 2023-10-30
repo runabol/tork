@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode"
 
+	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -211,13 +212,23 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 		return errors.Wrapf(err, "invalid memory value")
 	}
 
+	resources := container.Resources{
+		NanoCPUs: cpus,
+		Memory:   mem,
+	}
+
+	if t.GPUs != "" {
+		gpuOpts := cliopts.GpuOpts{}
+		if err := gpuOpts.Set(t.GPUs); err != nil {
+			return errors.Wrapf(err, "error setting GPUs")
+		}
+		resources.DeviceRequests = gpuOpts.Value()
+	}
+
 	hc := container.HostConfig{
 		PublishAllPorts: true,
 		Mounts:          mounts,
-		Resources: container.Resources{
-			NanoCPUs: cpus,
-			Memory:   mem,
-		},
+		Resources:       resources,
 	}
 
 	cmd := t.CMD

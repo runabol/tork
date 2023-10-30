@@ -58,6 +58,7 @@ type Task struct {
 	Parallel    *ParallelTask     `json:"parallel,omitempty"`
 	Each        *EachTask         `json:"each,omitempty"`
 	SubJob      *SubJobTask       `json:"subjob,omitempty"`
+	GPUs        string            `json:"gpus,omitempty"`
 }
 
 type SubJobTask struct {
@@ -163,6 +164,7 @@ func (t *Task) Clone() *Task {
 		Each:        each,
 		Description: t.Description,
 		SubJob:      subjob,
+		GPUs:        t.GPUs,
 	}
 }
 

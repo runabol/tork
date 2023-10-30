@@ -28,6 +28,7 @@ type Task struct {
 	Parallel    *Parallel         `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
+	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
 }
 type Mount struct {
 	Type   string `json:"type,omitempty" yaml:"type,omitempty"`
@@ -140,6 +141,7 @@ func (i Task) toTask() *tork.Task {
 		Parallel:    parallel,
 		Each:        each,
 		SubJob:      subjob,
+		GPUs:        i.GPUs,
 	}
 }
 
