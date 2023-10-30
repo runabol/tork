@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/wildcard"
 )
 
 type BindMounter struct {
@@ -13,9 +12,7 @@ type BindMounter struct {
 }
 
 type BindConfig struct {
-	Allowed   bool
-	Allowlist []string
-	Denylist  []string
+	Allowed bool
 }
 
 func NewBindMounter(cfg BindConfig) *BindMounter {
@@ -28,17 +25,7 @@ func (m *BindMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 	if !m.cfg.Allowed {
 		return errors.New("bind mounts are not allowed")
 	}
-	for _, deny := range m.cfg.Denylist {
-		if wildcard.Match(deny, mnt.Source) {
-			return errors.Errorf("mount point not allowed: %s", mnt.Source)
-		}
-	}
-	for _, allow := range m.cfg.Allowlist {
-		if wildcard.Match(allow, mnt.Source) {
-			return nil
-		}
-	}
-	return errors.Errorf("mount point not allowed: %s", mnt.Source)
+	return nil
 }
 
 func (m *BindMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
