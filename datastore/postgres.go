@@ -56,6 +56,7 @@ type taskRecord struct {
 	Each        []byte         `db:"each_"`
 	SubJob      []byte         `db:"subjob"`
 	SubJobID    string         `db:"subjob_id"`
+	GPUs        string         `db:"gpus"`
 }
 
 type jobRecord struct {
@@ -202,6 +203,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Each:        each,
 		Description: r.Description,
 		SubJob:      subjob,
+		GPUs:        r.GPUs,
 	}, nil
 }
 
@@ -409,12 +411,13 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 			subjob, -- $31
 			networks, -- $32
 			files_, -- $33
-			registry -- $34
+			registry, -- $34
+			gpus -- $35
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32,$33,$34)`
+			$27,$28,$29,$30,$31,$32,$33,$34,$35)`
 	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -450,6 +453,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		pq.StringArray(t.Networks),   // $32
 		files,                        // $33
 		registry,                     // $34
+		t.GPUs,                       // $35
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
