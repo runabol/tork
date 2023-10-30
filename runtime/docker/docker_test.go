@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -226,6 +228,30 @@ func TestRunTaskWithVolume(t *testing.T) {
 				Target: "/xyz",
 			},
 		},
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
+func TestRunTaskWithBind(t *testing.T) {
+	mm := runtime.NewMultiMounter()
+	vm, err := NewVolumeMounter()
+	assert.NoError(t, err)
+	mm.RegisterMounter("bind", NewBindMounter(BindConfig{Allowed: true}))
+	mm.RegisterMounter("volume", vm)
+	rt, err := NewDockerRuntime(WithMounter(mm))
+	assert.NoError(t, err)
+	ctx := context.Background()
+	dir := path.Join(os.TempDir(), uuid.NewUUID())
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "echo hello world > /xyz/thing",
+		Mounts: []tork.Mount{{
+			Type:   tork.MountTypeBind,
+			Target: "/xyz",
+			Source: dir,
+		}},
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
