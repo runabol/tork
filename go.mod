@@ -7,11 +7,11 @@ retract v0.1.0
 require (
 	github.com/antonmedv/expr v1.15.3
 	github.com/docker/cli v24.0.7+incompatible
-	github.com/docker/docker v24.0.6+incompatible
+	github.com/docker/docker v24.0.7+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/fatih/color v1.15.0
 	github.com/go-playground/validator/v10 v10.15.5
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/knadh/koanf/parsers/toml v0.1.0
 	github.com/knadh/koanf/providers/env v0.1.0
