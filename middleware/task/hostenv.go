@@ -31,13 +31,23 @@ func NewHostEnv(vars ...string) (*HostEnv, error) {
 func (m *HostEnv) Execute(next HandlerFunc) HandlerFunc {
 	return func(ctx context.Context, et EventType, t *tork.Task) error {
 		if et == StateChange && t.State == tork.TaskStateScheduled {
-			if t.Env == nil {
-				t.Env = make(map[string]string)
-			}
-			for name, alias := range m.vars {
-				t.Env[alias] = os.Getenv(name)
-			}
+			m.setHostVars(t)
 		}
 		return next(ctx, et, t)
+	}
+}
+
+func (m *HostEnv) setHostVars(t *tork.Task) {
+	if t.Env == nil {
+		t.Env = make(map[string]string)
+	}
+	for name, alias := range m.vars {
+		t.Env[alias] = os.Getenv(name)
+	}
+	for _, pre := range t.Pre {
+		m.setHostVars(pre)
+	}
+	for _, post := range t.Post {
+		m.setHostVars(post)
 	}
 }
