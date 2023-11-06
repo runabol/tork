@@ -228,6 +228,18 @@ func TestEvalExpr(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 	assert.Equal(t, map[string]any(map[string]any{"hello": "world"}), v)
+
+	v, err = eval.EvaluateExpr("{{ split( inputs.lines, ',' ) }}", map[string]any{"inputs": map[string]string{
+		"lines": "a,b,c",
+	}})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b", "c"}, v)
+
+	v, err = eval.EvaluateExpr("{{ split( inputs.lines, '\\n' ) }}", map[string]any{"inputs": map[string]string{
+		"lines": "a\nb\nc",
+	}})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b", "c"}, v)
 }
 
 func TestValidExpr(t *testing.T) {
