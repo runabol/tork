@@ -41,7 +41,7 @@ func TestWebhookOK(t *testing.T) {
 		}},
 	}
 
-	assert.NoError(t, hm(context.Background(), Read, j))
+	assert.NoError(t, hm(context.Background(), StateChange, j))
 	<-received
 }
 
@@ -80,7 +80,7 @@ func TestWebhookRetry(t *testing.T) {
 		}},
 	}
 
-	assert.NoError(t, hm(context.Background(), Read, j))
+	assert.NoError(t, hm(context.Background(), StateChange, j))
 	<-received
 }
 
@@ -118,6 +118,11 @@ func TestWebhookOKWithHeaders(t *testing.T) {
 		}},
 	}
 
-	assert.NoError(t, hm(context.Background(), Read, j))
+	assert.NoError(t, hm(context.Background(), StateChange, j))
 	<-received
+}
+
+func TestWebhookIgnored(t *testing.T) {
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
+	assert.NoError(t, hm(context.Background(), Read, nil))
 }
