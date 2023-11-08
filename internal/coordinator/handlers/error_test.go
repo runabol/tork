@@ -40,9 +40,10 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	j1 := &tork.Job{
-		ID:       uuid.NewUUID(),
-		State:    tork.JobStateRunning,
-		Position: 1,
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		CreatedAt: now,
+		Position:  1,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -102,6 +103,7 @@ func Test_handleFailedTask(t *testing.T) {
 	actives, err = ds.GetActiveTasks(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, actives, 0)
+	assert.True(t, j2.FailedAt.After(j1.CreatedAt))
 }
 
 func Test_handleFailedTaskRetry(t *testing.T) {

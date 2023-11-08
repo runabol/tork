@@ -38,6 +38,9 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 		Str("task-state", string(t.State)).
 		Msg("received task failure")
 
+	now := time.Now().UTC()
+	t.FailedAt = &now
+
 	// mark the task as FAILED
 	if err := h.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		if u.State.IsActive() {
@@ -90,9 +93,8 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 			if err != nil {
 				return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
 			}
-			now := time.Now().UTC()
 			parent.State = tork.TaskStateFailed
-			parent.FailedAt = &now
+			parent.FailedAt = t.FailedAt
 			parent.Error = t.Error
 			return h.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
 		}
