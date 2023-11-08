@@ -23,6 +23,9 @@ func Webhook(next HandlerFunc) HandlerFunc {
 		if err := next(ctx, et, j); err != nil {
 			return err
 		}
+		if et != StateChange {
+			return nil
+		}
 		if len(j.Webhooks) == 0 {
 			return nil
 		}
