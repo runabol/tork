@@ -10,6 +10,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
 )
@@ -17,12 +18,14 @@ import (
 type errorHandler struct {
 	ds     datastore.Datastore
 	broker mq.Broker
+	onJob  job.HandlerFunc
 }
 
-func NewErrorHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
+func NewErrorHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
 	h := &errorHandler{
 		ds:     ds,
 		broker: b,
+		onJob:  job.ApplyMiddleware(NewJobHandler(ds, b), mw),
 	}
 	return h.handle
 }
@@ -74,41 +77,9 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 			log.Error().Err(err).Msg("error publishing retry task")
 		}
 	} else {
-		// mark the job as FAILED
-		if err := h.ds.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
-			// we only want to make the job as FAILED
-			// if it's actually running as opposed to
-			// possibly being CANCELLED
-			if u.State == tork.JobStateRunning {
-				u.State = tork.JobStateFailed
-				u.FailedAt = t.FailedAt
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrapf(err, "error marking the job as failed in the datastore")
-		}
-		// if this is a sub-job -- FAIL the parent task
-		if j.ParentID != "" {
-			parent, err := h.ds.GetTaskByID(ctx, j.ParentID)
-			if err != nil {
-				return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
-			}
-			parent.State = tork.TaskStateFailed
-			parent.FailedAt = t.FailedAt
-			parent.Error = t.Error
-			return h.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
-		}
-		// cancel all currently running tasks
-		if err := cancelActiveTasks(ctx, h.ds, h.broker, j.ID); err != nil {
-			return err
-		}
-		j, err := h.ds.GetJobByID(ctx, t.JobID)
-		if err != nil {
-			return errors.Wrapf(err, "unknown job: %s", t.JobID)
-		}
-		if j.State == tork.JobStateFailed {
-			return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
-		}
+		j.State = tork.JobStateFailed
+		j.FailedAt = t.FailedAt
+		return h.onJob(ctx, job.StateChange, j)
 	}
 	return nil
 }

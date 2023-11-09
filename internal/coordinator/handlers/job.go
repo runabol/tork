@@ -18,7 +18,6 @@ import (
 type jobHandler struct {
 	ds        datastore.Datastore
 	broker    mq.Broker
-	onError   task.HandlerFunc
 	onPending task.HandlerFunc
 	onCancel  job.HandlerFunc
 }
@@ -27,7 +26,6 @@ func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFun
 	h := &jobHandler{
 		ds:        ds,
 		broker:    b,
-		onError:   task.ApplyMiddleware(NewErrorHandler(ds, b), mw),
 		onPending: task.ApplyMiddleware(NewPendingHandler(ds, b), mw),
 		onCancel:  NewCancelHandler(ds, b),
 	}
@@ -44,6 +42,8 @@ func (h *jobHandler) handle(ctx context.Context, et job.EventType, j *tork.Job) 
 		return h.restartJob(ctx, j)
 	case tork.JobStateCompleted:
 		return h.completeJob(ctx, j)
+	case tork.JobStateFailed:
+		return h.failJob(ctx, j)
 	default:
 		return errors.Errorf("invalud job state: %s", j.State)
 	}
@@ -76,7 +76,10 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 		return err
 	}
 	if t.State == tork.TaskStateFailed {
-		return h.onError(ctx, task.StateChange, t)
+		n := time.Now().UTC()
+		j.FailedAt = &n
+		j.State = tork.JobStateFailed
+		return h.handle(ctx, job.StateChange, j)
 	}
 	return h.onPending(ctx, task.StateChange, t)
 }
@@ -161,4 +164,43 @@ func (h *jobHandler) restartJob(ctx context.Context, j *tork.Job) error {
 		return err
 	}
 	return h.broker.PublishTask(ctx, mq.QUEUE_PENDING, t)
+}
+
+func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
+	// mark the job as FAILED
+	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
+		// we only want to make the job as FAILED
+		// if it's actually running as opposed to
+		// possibly being CANCELLED
+		if u.State == tork.JobStateRunning {
+			u.State = tork.JobStateFailed
+			u.FailedAt = j.FailedAt
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error marking the job as failed in the datastore")
+	}
+	// if this is a sub-job -- FAIL the parent task
+	if j.ParentID != "" {
+		parent, err := h.ds.GetTaskByID(ctx, j.ParentID)
+		if err != nil {
+			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
+		}
+		parent.State = tork.TaskStateFailed
+		parent.FailedAt = j.FailedAt
+		parent.Error = j.Error
+		return h.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
+	}
+	// cancel all currently running tasks
+	if err := cancelActiveTasks(ctx, h.ds, h.broker, j.ID); err != nil {
+		return err
+	}
+	j, err := h.ds.GetJobByID(ctx, j.ID)
+	if err != nil {
+		return errors.Wrapf(err, "unknown job: %s", j.ID)
+	}
+	if j.State == tork.JobStateFailed {
+		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
+	}
+	return nil
 }
