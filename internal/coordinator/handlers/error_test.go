@@ -27,6 +27,7 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	ds := datastore.NewInMemoryDatastore()
+
 	handler := NewErrorHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -118,6 +119,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 
 	ds := datastore.NewInMemoryDatastore()
+
 	handler := NewErrorHandler(ds, b)
 	assert.NotNil(t, handler)
 
