@@ -159,7 +159,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	)
 
 	return &Coordinator{
-		id:          uuid.NewUUID(),
+		id:          uuid.NewShortUUID(),
 		startTime:   time.Now(),
 		Name:        cfg.Name,
 		api:         api,

@@ -66,7 +66,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		return nil, errors.New("must provide runtime")
 	}
 	w := &Worker{
-		id:         uuid.NewUUID(),
+		id:         uuid.NewShortUUID(),
 		name:       cfg.Name,
 		startTime:  time.Now().UTC(),
 		broker:     cfg.Broker,
