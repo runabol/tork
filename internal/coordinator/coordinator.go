@@ -260,7 +260,7 @@ func (c *Coordinator) sendHeartbeats() {
 				CPUPercent:      cpuPercent,
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
-				Version:         tork.FormattedVersion(),
+				Version:         tork.Version,
 			},
 		)
 		if err != nil {
