@@ -53,12 +53,12 @@ func (b *HealthCheck) Do(ctx context.Context) HealthCheckResult {
 			log.Error().Err(err).Msgf("failed %s healthcheck", name)
 			return HealthCheckResult{
 				Status:  StatusDown,
-				Version: tork.FormattedVersion(),
+				Version: tork.Version,
 			}
 		}
 	}
 	return HealthCheckResult{
 		Status:  StatusUp,
-		Version: tork.FormattedVersion(),
+		Version: tork.Version,
 	}
 }

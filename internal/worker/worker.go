@@ -221,7 +221,7 @@ func (w *Worker) sendHeartbeats() {
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
 				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
-				Version:         tork.FormattedVersion(),
+				Version:         tork.Version,
 			},
 		)
 		if err != nil {
