@@ -86,7 +86,7 @@ func (w *Worker) handleTask(t *tork.Task) error {
 		Str("task-id", t.ID).
 		Msg("received task")
 	switch t.State {
-	case tork.TaskStateScheduled:
+	case tork.TaskStateRunning:
 		return w.runTask(t)
 	case tork.TaskStateCancelled:
 		return w.cancelTask(t)
@@ -107,6 +107,19 @@ func (w *Worker) cancelTask(t *tork.Task) error {
 	return nil
 }
 
+func (w *Worker) onTask(t *tork.Task) error {
+	t.State = tork.TaskStateRunning
+	started := time.Now().UTC()
+	t.StartedAt = &started
+	t.State = tork.TaskStateRunning
+	t.NodeID = w.id
+	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
+		return w.handleTask(t)
+	}
+	mw := task.ApplyMiddleware(adapter, w.middleware)
+	return mw(context.Background(), task.StateChange, t)
+}
+
 func (w *Worker) runTask(t *tork.Task) error {
 	atomic.AddInt32(&w.taskCount, 1)
 	defer func() {
@@ -122,10 +135,6 @@ func (w *Worker) runTask(t *tork.Task) error {
 	})
 	defer w.tasks.Delete(t.ID)
 	// let the coordinator know that the task started executing
-	started := time.Now().UTC()
-	t.StartedAt = &started
-	t.State = tork.TaskStateRunning
-	t.NodeID = w.id
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
 	}
@@ -246,18 +255,13 @@ func (w *Worker) Start() error {
 	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
-	onTask := task.ApplyMiddleware(func(ctx context.Context, et task.EventType, t *tork.Task) error {
-		return w.handleTask(t)
-	}, w.middleware)
 	// subscribe to shared work queues
 	for qname, concurrency := range w.queues {
 		if !mq.IsWorkerQueue(qname) {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
-			err := w.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-				return onTask(context.Background(), task.StateChange, t)
-			})
+			err := w.broker.SubscribeForTasks(qname, w.onTask)
 			if err != nil {
 				return errors.Wrapf(err, "error subscribing for queue: %s", qname)
 			}

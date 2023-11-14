@@ -77,7 +77,7 @@ func Test_handleTaskRun(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
 		Mounts: []tork.Mount{
@@ -112,7 +112,7 @@ func Test_handleTaskRunOutput(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "alpine:3.18.3",
 		Run:   "echo -n hello world > $TORK_OUTPUT",
 	}
@@ -150,7 +150,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		Run:   "cat /somevolume/pre > $TORK_OUTPUT",
 		Mounts: []tork.Mount{
@@ -222,7 +222,7 @@ func Test_handleTaskCancel(t *testing.T) {
 
 	err = w.handleTask(&tork.Task{
 		ID:    tid,
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "10"},
 	})
@@ -256,7 +256,7 @@ func Test_handleTaskError(t *testing.T) {
 
 	err = w.handleTask(&tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"no_such_thing"},
 	})
@@ -291,7 +291,7 @@ func Test_handleTaskOutput(t *testing.T) {
 
 	err = w.handleTask(&tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		Run:   "echo -n 'hello world' >> $TORK_OUTPUT",
 	})
