@@ -204,7 +204,7 @@ func (c *Coordinator) Start() error {
 				})
 			case mq.QUEUE_STARTED:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					return c.onStarted(context.Background(), task.StateChange, t)
+					return c.onStarted(context.Background(), task.Started, t)
 				})
 			case mq.QUEUE_ERROR:
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
