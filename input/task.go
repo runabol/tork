@@ -91,6 +91,7 @@ func (i Task) toTask() *tork.Task {
 	var each *tork.EachTask
 	if i.Each != nil {
 		each = &tork.EachTask{
+			Var:  i.Each.Var,
 			List: i.Each.List,
 			Task: i.Each.Task.toTask(),
 		}
@@ -192,6 +193,7 @@ type SubJob struct {
 }
 
 type Each struct {
+	Var  string `json:"var,omitempty" yaml:"var,omitempty" `
 	List string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
 	Task Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
 }

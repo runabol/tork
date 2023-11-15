@@ -299,7 +299,7 @@ func TestRunParallelJob(t *testing.T) {
 func TestRunEachJob(t *testing.T) {
 	j1 := doRunJob(t, "../../examples/each.yaml")
 	assert.Equal(t, tork.JobStateCompleted, j1.State)
-	assert.Equal(t, 7, len(j1.Execution))
+	assert.Equal(t, 12, len(j1.Execution))
 }
 
 func TestRunSubjobJob(t *testing.T) {
