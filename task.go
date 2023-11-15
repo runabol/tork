@@ -193,6 +193,7 @@ func (l *TaskLimits) Clone() *TaskLimits {
 
 func (e *EachTask) Clone() *EachTask {
 	return &EachTask{
+		Var:         e.Var,
 		List:        e.List,
 		Task:        e.Task.Clone(),
 		Size:        e.Size,

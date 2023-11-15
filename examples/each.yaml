@@ -16,6 +16,18 @@ tasks:
           ITEM: "{{item.value}}"
         run: echo -n $ITEM > $TORK_OUTPUT
 
+  - name: sample each task with custom var
+    each:
+      list: "{{ sequence(1,5) }}"
+      var: "myitem"
+      task:
+        name: output task item
+        var: eachTask{{myitem.index}}
+        image: ubuntu:mantic
+        env:
+          ITEM: "{{myitem.value}}"
+        run: echo -n $ITEM > $TORK_OUTPUT
+
   - name: bye task
     image: ubuntu:mantic
     run: echo end of job
