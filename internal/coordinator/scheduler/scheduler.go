@@ -152,7 +152,11 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	// schedule a task for each elements in the list
 	for ix, item := range list {
 		cx := j.Context.Clone().AsMap()
-		cx["item"] = map[string]any{
+		eachVar := t.Each.Var
+		if eachVar == "" {
+			eachVar = "item"
+		}
+		cx[eachVar] = map[string]any{
 			"index": fmt.Sprintf("%d", ix),
 			"value": item,
 		}

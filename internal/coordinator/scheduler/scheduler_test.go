@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -159,10 +160,11 @@ func Test_scheduleEachTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := 0
+	processed := make(chan any, 2)
 	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
-		processed = processed + 1
 		assert.Equal(t, "test-queue", tk.Queue)
+		assert.Equal(t, fmt.Sprintf("%d", len(processed)), tk.Env["ITEM_INDEX"])
+		processed <- 1
 		return nil
 	})
 	assert.NoError(t, err)
@@ -187,6 +189,10 @@ func Test_scheduleEachTask(t *testing.T) {
 			List: "{{ sequence (1,3) }}",
 			Task: &tork.Task{
 				Queue: "test-queue",
+				Env: map[string]string{
+					"ITEM_INDEX": "{{item.index}}",
+					"ITEM_VAL":   "{{item.value}}",
+				},
 			},
 		},
 	}
@@ -204,7 +210,65 @@ func Test_scheduleEachTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
-	assert.Equal(t, 2, processed)
+	assert.Len(t, processed, 2)
+}
+
+func Test_scheduleEachTaskCustomVar(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	processed := make(chan any, 2)
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+		assert.Equal(t, "test-queue", tk.Queue)
+		assert.Equal(t, fmt.Sprintf("%d", len(processed)), tk.Env["ITEM_INDEX"])
+		processed <- 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+
+	err = ds.CreateJob(ctx, j)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j.ID,
+		Each: &tork.EachTask{
+			Var:  "myItem",
+			List: "{{ sequence (1,3) }}",
+			Task: &tork.Task{
+				Queue: "test-queue",
+				Env: map[string]string{
+					"ITEM_INDEX": "{{myItem.index}}",
+					"ITEM_VAL":   "{{myItem.value}}",
+				},
+			},
+		},
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleEachTask(ctx, tk)
+	assert.NoError(t, err)
+
+	// wait for the task to get processed
+	time.Sleep(time.Millisecond * 100)
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateRunning, tk.State)
+	// task should only be processed once
+	assert.Len(t, processed, 2)
 }
 
 func Test_scheduleSubJobTask(t *testing.T) {

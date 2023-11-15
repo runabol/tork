@@ -76,6 +76,7 @@ type ParallelTask struct {
 }
 
 type EachTask struct {
+	Var         string `json:"var,omitempty"`
 	List        string `json:"list,omitempty"`
 	Task        *Task  `json:"task,omitempty"`
 	Size        int    `json:"size,omitempty"`
