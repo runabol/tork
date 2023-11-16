@@ -42,6 +42,23 @@ func TestEvalVar(t *testing.T) {
 	assert.Equal(t, "SOME DATA", t1.Env["HELLO"])
 }
 
+func TestEvalMapVal(t *testing.T) {
+	t1 := &tork.Task{
+		Env: map[string]string{
+			"HELLO": `{{inputs.SOMEMAP.somekey}}`,
+		},
+	}
+	err := eval.EvaluateTask(t1, map[string]any{
+		"inputs": map[string]any{
+			"SOMEMAP": map[string]string{
+				"somekey": "someval",
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "someval", t1.Env["HELLO"])
+}
+
 func TestEvalName(t *testing.T) {
 	t1 := &tork.Task{
 		Name: "{{ inputs.SOMENAME }}y",
