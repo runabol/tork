@@ -13,6 +13,10 @@ func TestClone(t *testing.T) {
 			Inputs: map[string]string{
 				"INPUT1": "VAL1",
 			},
+			Job: map[string]string{
+				"id":   "some-id",
+				"name": "my job",
+			},
 		},
 		Tasks: []*tork.Task{
 			{
@@ -33,6 +37,7 @@ func TestClone(t *testing.T) {
 	j2 := j1.Clone()
 
 	assert.Equal(t, j1.Context.Inputs, j2.Context.Inputs)
+	assert.Equal(t, j1.Context.Job, j2.Context.Job)
 	assert.Equal(t, j1.Tasks[0].Env, j2.Tasks[0].Env)
 	assert.Equal(t, j1.Execution[0].Env, j2.Execution[0].Env)
 

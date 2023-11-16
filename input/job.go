@@ -54,6 +54,10 @@ func (ji *Job) ToJob() *tork.Job {
 	j.CreatedAt = n
 	j.Context = tork.JobContext{}
 	j.Context.Inputs = ji.Inputs
+	j.Context.Job = map[string]string{
+		"id":   j.ID,
+		"name": j.Name,
+	}
 	j.TaskCount = len(tasks)
 	j.Output = ji.Output
 	if ji.Defaults != nil {

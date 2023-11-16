@@ -58,6 +58,7 @@ type JobSummary struct {
 }
 
 type JobContext struct {
+	Job    map[string]string `json:"job,omitempty"`
 	Inputs map[string]string `json:"inputs,omitempty"`
 	Tasks  map[string]string `json:"tasks,omitempty"`
 }
@@ -107,6 +108,7 @@ func (c JobContext) Clone() JobContext {
 	return JobContext{
 		Inputs: maps.Clone(c.Inputs),
 		Tasks:  maps.Clone(c.Tasks),
+		Job:    maps.Clone(c.Job),
 	}
 }
 
@@ -114,6 +116,7 @@ func (c JobContext) AsMap() map[string]any {
 	return map[string]any{
 		"inputs": c.Inputs,
 		"tasks":  c.Tasks,
+		"job":    c.Job,
 	}
 }
 
