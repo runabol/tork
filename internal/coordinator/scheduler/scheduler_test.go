@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -161,10 +162,12 @@ func Test_scheduleEachTask(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := make(chan any, 2)
+	var counter atomic.Int32
 	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
 		assert.Equal(t, "test-queue", tk.Queue)
-		assert.Equal(t, fmt.Sprintf("%d", len(processed)), tk.Env["ITEM_INDEX"])
+		assert.Equal(t, fmt.Sprintf("%d", counter.Load()), tk.Env["ITEM_INDEX"])
 		processed <- 1
+		counter.Add(1)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -203,14 +206,58 @@ func Test_scheduleEachTask(t *testing.T) {
 	err = s.scheduleEachTask(ctx, tk)
 	assert.NoError(t, err)
 
-	// wait for the task to get processed
-	time.Sleep(time.Millisecond * 100)
+	// wait for the tasks to get processed
+	<-processed
+	<-processed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
-	assert.Len(t, processed, 2)
+	assert.Equal(t, int32(2), counter.Load())
+}
+
+func Test_scheduleEachTaskBadExpression(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	processed := make(chan any, 1)
+	err := b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+		processed <- 1
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+
+	err = ds.CreateJob(ctx, j)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j.ID,
+		State: tork.TaskStatePending,
+		Each: &tork.EachTask{
+			List: "{{ bad_expression }}",
+			Task: &tork.Task{},
+		},
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleEachTask(ctx, tk)
+	assert.NoError(t, err)
+
+	assert.Equal(t, tork.TaskStateFailed, tk.State)
 }
 
 func Test_scheduleEachTaskCustomVar(t *testing.T) {

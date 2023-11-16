@@ -128,7 +128,9 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	// evaluate the list expression
 	lraw, err := eval.EvaluateExpr(t.Each.List, j.Context.AsMap())
 	if err != nil {
-		return errors.Wrapf(err, "error evaluating each.list expression: %s", t.Each.List)
+		t.Error = err.Error()
+		t.State = tork.TaskStateFailed
+		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 	}
 	var list []any
 	rlist := reflect.ValueOf(lraw)
@@ -137,7 +139,9 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 			list = append(list, rlist.Index(i).Interface())
 		}
 	} else {
-		return errors.Wrapf(err, "each.list expression does not evaluate to a list: %s", t.Each.List)
+		t.Error = err.Error()
+		t.State = tork.TaskStateFailed
+		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 	}
 	// mark the task as running
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
