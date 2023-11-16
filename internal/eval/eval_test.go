@@ -204,6 +204,27 @@ func TestEvalCMD(t *testing.T) {
 	assert.Equal(t, []string{"VAL1", "VAL2", "VAL3"}, t1.CMD)
 }
 
+func TestEvalSubjob(t *testing.T) {
+	t1 := &tork.Task{
+		SubJob: &tork.SubJobTask{
+			Name: "some name {{ inputs.VAR1 }}",
+			Inputs: map[string]string{
+				"input1": "{{inputs.VAR1}}",
+				"input2": "{{inputs.VAR2}}",
+			},
+		},
+	}
+	err := eval.EvaluateTask(t1, map[string]any{
+		"inputs": map[string]string{
+			"VAR1": "VAL1",
+			"VAR2": "VAL2",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "some name VAL1", t1.SubJob.Name)
+	assert.Equal(t, "VAL1", t1.SubJob.Inputs["input1"])
+}
+
 func TestEvalExpr(t *testing.T) {
 	v, err := eval.EvaluateExpr("1+1", map[string]any{})
 	assert.NoError(t, err)

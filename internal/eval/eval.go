@@ -91,6 +91,25 @@ func EvaluateTask(t *tork.Task, c map[string]any) error {
 		}
 		cmd[i] = result
 	}
+	// evaluate sub-job
+	if t.SubJob != nil {
+		name, err := EvaluateTemplate(t.SubJob.Name, c)
+		if err != nil {
+			return err
+		}
+		t.SubJob.Name = name
+		inputs := t.SubJob.Inputs
+		if inputs == nil {
+			inputs = make(map[string]string)
+		}
+		for k, v := range inputs {
+			result, err := EvaluateTemplate(v, c)
+			if err != nil {
+				return err
+			}
+			inputs[k] = result
+		}
+	}
 	return nil
 }
 
