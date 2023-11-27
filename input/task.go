@@ -30,6 +30,42 @@ type Task struct {
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
 }
+
+type SubJob struct {
+	ID          string            `json:"id,omitempty"`
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
+	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
+	Detached    bool              `json:"detached,omitempty" yaml:"detached,omitempty"`
+	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
+}
+
+type Each struct {
+	Var  string `json:"var,omitempty" yaml:"var,omitempty" `
+	List string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
+	Task Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
+}
+
+type Parallel struct {
+	Tasks []Task `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
+}
+
+type Retry struct {
+	Limit int `json:"limit,omitempty" yaml:"limit,omitempty" validate:"required,min=1,max=10"`
+}
+
+type Limits struct {
+	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
+	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
+}
+
+type Registry struct {
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+}
+
 type Mount struct {
 	Type   string `json:"type,omitempty" yaml:"type,omitempty"`
 	Source string `json:"source,omitempty" yaml:"source,omitempty"`
@@ -98,6 +134,10 @@ func (i Task) toTask() *tork.Task {
 	}
 	var subjob *tork.SubJobTask
 	if i.SubJob != nil {
+		webhooks := make([]*tork.Webhook, len(i.SubJob.Webhooks))
+		for i, wh := range i.SubJob.Webhooks {
+			webhooks[i] = wh.toWebhook()
+		}
 		subjob = &tork.SubJobTask{
 			Name:        i.SubJob.Name,
 			Description: i.SubJob.Description,
@@ -105,6 +145,7 @@ func (i Task) toTask() *tork.Task {
 			Inputs:      maps.Clone(i.SubJob.Inputs),
 			Output:      i.SubJob.Output,
 			Detached:    i.SubJob.Detached,
+			Webhooks:    webhooks,
 		}
 	}
 	var parallel *tork.ParallelTask
@@ -182,38 +223,4 @@ func (r *Retry) toTaskRetry() *tork.TaskRetry {
 	return &tork.TaskRetry{
 		Limit: r.Limit,
 	}
-}
-
-type SubJob struct {
-	ID          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
-	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
-	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
-	Detached    bool              `json:"detached,omitempty" yaml:"detached,omitempty"`
-}
-
-type Each struct {
-	Var  string `json:"var,omitempty" yaml:"var,omitempty" `
-	List string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
-	Task Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
-}
-
-type Parallel struct {
-	Tasks []Task `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
-}
-
-type Retry struct {
-	Limit int `json:"limit,omitempty" yaml:"limit,omitempty" validate:"required,min=1,max=10"`
-}
-
-type Limits struct {
-	CPUs   string `json:"cpus,omitempty" yaml:"cpus,omitempty"`
-	Memory string `json:"memory,omitempty" yaml:"memory,omitempty"`
-}
-
-type Registry struct {
-	Username string `json:"username,omitempty" yaml:"username,omitempty"`
-	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 }

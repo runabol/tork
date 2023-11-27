@@ -27,7 +27,7 @@ type Defaults struct {
 }
 
 type Webhook struct {
-	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"url"`
+	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"required"`
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 }
 

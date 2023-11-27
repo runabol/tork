@@ -98,16 +98,32 @@ func EvaluateTask(t *tork.Task, c map[string]any) error {
 			return err
 		}
 		t.SubJob.Name = name
-		inputs := t.SubJob.Inputs
-		if inputs == nil {
-			inputs = make(map[string]string)
+		if t.SubJob.Inputs == nil {
+			t.SubJob.Inputs = make(map[string]string)
 		}
-		for k, v := range inputs {
+		for k, v := range t.SubJob.Inputs {
 			result, err := EvaluateTemplate(v, c)
 			if err != nil {
 				return err
 			}
-			inputs[k] = result
+			t.SubJob.Inputs[k] = result
+		}
+		for _, wh := range t.SubJob.Webhooks {
+			url, err := EvaluateTemplate(wh.URL, c)
+			if err != nil {
+				return err
+			}
+			wh.URL = url
+			if wh.Headers == nil {
+				wh.Headers = make(map[string]string)
+			}
+			for k, v := range wh.Headers {
+				result, err := EvaluateTemplate(v, c)
+				if err != nil {
+					return err
+				}
+				wh.Headers[k] = result
+			}
 		}
 	}
 	return nil
