@@ -217,6 +217,52 @@ func TestValidateJobTaskTimeout(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestValidateSubJob(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name: "test task",
+				SubJob: &SubJob{
+					Name: "test sub job",
+					Webhooks: []Webhook{{
+						URL: "http://example.com",
+					}},
+					Tasks: []Task{{
+						Name:  "test task",
+						Image: "some task",
+					}},
+				},
+			},
+		},
+	}
+	err := j.Validate()
+	assert.NoError(t, err)
+}
+
+func TestValidateSubJobBadWebhook(t *testing.T) {
+	j := Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name: "test task",
+				SubJob: &SubJob{
+					Name: "test sub job",
+					Webhooks: []Webhook{{
+						URL: "",
+					}},
+					Tasks: []Task{{
+						Name:  "test task",
+						Image: "some task",
+					}},
+				},
+			},
+		},
+	}
+	err := j.Validate()
+	assert.Error(t, err)
+}
+
 func TestValidateParallelOrEachTaskType(t *testing.T) {
 	j := Job{
 		Name: "test job",
@@ -586,7 +632,7 @@ func TestValidateWebhook(t *testing.T) {
 	j = Job{
 		Name: "test job",
 		Webhooks: []Webhook{{
-			URL: "not_a_url",
+			URL: "",
 		}},
 		Tasks: []Task{
 			{

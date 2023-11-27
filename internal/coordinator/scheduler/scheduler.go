@@ -109,6 +109,7 @@ func (s *Scheduler) scheduleAttachedSubJob(ctx context.Context, t *tork.Task) er
 		Context:     tork.JobContext{Inputs: t.SubJob.Inputs},
 		TaskCount:   len(t.SubJob.Tasks),
 		Output:      t.SubJob.Output,
+		Webhooks:    t.SubJob.Webhooks,
 	}
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
 		u.State = tork.TaskStateRunning
@@ -138,6 +139,7 @@ func (s *Scheduler) scheduleDetachedSubJob(ctx context.Context, t *tork.Task) er
 		Context:     tork.JobContext{Inputs: t.SubJob.Inputs},
 		TaskCount:   len(t.SubJob.Tasks),
 		Output:      t.SubJob.Output,
+		Webhooks:    t.SubJob.Webhooks,
 	}
 	if err := s.ds.CreateJob(ctx, subjob); err != nil {
 		return errors.Wrapf(err, "error creating subjob")

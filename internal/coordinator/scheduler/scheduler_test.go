@@ -377,6 +377,7 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
 		assert.Empty(t, j.ParentID)
+		assert.Equal(t, "http://example.com/callback", j.Webhooks[0].URL)
 		close(processed)
 		return nil
 	})
@@ -413,6 +414,9 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 					Name: "some task",
 				},
 			},
+			Webhooks: []*tork.Webhook{{
+				URL: "http://example.com/callback",
+			}},
 		},
 	}
 

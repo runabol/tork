@@ -69,6 +69,7 @@ type SubJobTask struct {
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty"`
 	Detached    bool              `json:"detached,omitempty"`
+	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
 }
 
 type ParallelTask struct {
@@ -211,6 +212,7 @@ func (s *SubJobTask) Clone() *SubJobTask {
 		Tasks:       CloneTasks(s.Tasks),
 		Output:      s.Output,
 		Detached:    s.Detached,
+		Webhooks:    CloneWebhooks(s.Webhooks),
 	}
 }
 
