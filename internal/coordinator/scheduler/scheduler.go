@@ -89,6 +89,13 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 }
 
 func (s *Scheduler) scheduleSubJob(ctx context.Context, t *tork.Task) error {
+	if t.SubJob.Detached {
+		return s.scheduleDetachedSubJob(ctx, t)
+	}
+	return s.scheduleAttachedSubJob(ctx, t)
+}
+
+func (s *Scheduler) scheduleAttachedSubJob(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
 	subjob := &tork.Job{
 		ID:          uuid.NewUUID(),
@@ -116,6 +123,40 @@ func (s *Scheduler) scheduleSubJob(ctx context.Context, t *tork.Task) error {
 		return errors.Wrapf(err, "error creating subjob")
 	}
 	return s.broker.PublishJob(ctx, subjob)
+}
+
+func (s *Scheduler) scheduleDetachedSubJob(ctx context.Context, t *tork.Task) error {
+	now := time.Now().UTC()
+	subjob := &tork.Job{
+		ID:          uuid.NewUUID(),
+		CreatedAt:   now,
+		Name:        t.SubJob.Name,
+		Description: t.SubJob.Description,
+		State:       tork.JobStatePending,
+		Tasks:       t.SubJob.Tasks,
+		Inputs:      t.SubJob.Inputs,
+		Context:     tork.JobContext{Inputs: t.SubJob.Inputs},
+		TaskCount:   len(t.SubJob.Tasks),
+		Output:      t.SubJob.Output,
+	}
+	if err := s.ds.CreateJob(ctx, subjob); err != nil {
+		return errors.Wrapf(err, "error creating subjob")
+	}
+	if err := s.broker.PublishJob(ctx, subjob); err != nil {
+		return errors.Wrapf(err, "error publishing subjob")
+	}
+	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
+		u.State = tork.TaskStateRunning
+		u.ScheduledAt = &now
+		u.StartedAt = &now
+		u.SubJob.ID = subjob.ID
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error updating task in datastore")
+	}
+	t.CompletedAt = &now
+	t.State = tork.TaskStateCompleted
+	return s.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
 }
 
 func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {

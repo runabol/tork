@@ -68,6 +68,7 @@ type SubJobTask struct {
 	Tasks       []*Task           `json:"tasks,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty"`
+	Detached    bool              `json:"detached,omitempty"`
 }
 
 type ParallelTask struct {
@@ -209,6 +210,7 @@ func (s *SubJobTask) Clone() *SubJobTask {
 		Inputs:      maps.Clone(s.Inputs),
 		Tasks:       CloneTasks(s.Tasks),
 		Output:      s.Output,
+		Detached:    s.Detached,
 	}
 }
 

@@ -104,6 +104,7 @@ func (i Task) toTask() *tork.Task {
 			Tasks:       toTasks(i.SubJob.Tasks),
 			Inputs:      maps.Clone(i.SubJob.Inputs),
 			Output:      i.SubJob.Output,
+			Detached:    i.SubJob.Detached,
 		}
 	}
 	var parallel *tork.ParallelTask
@@ -190,6 +191,7 @@ type SubJob struct {
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
+	Detached    bool              `json:"detached,omitempty" yaml:"detached,omitempty"`
 }
 
 type Each struct {

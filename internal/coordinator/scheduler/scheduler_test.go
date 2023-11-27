@@ -324,6 +324,7 @@ func Test_scheduleSubJobTask(t *testing.T) {
 
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
+		assert.NotEmpty(t, j.ParentID)
 		close(processed)
 		return nil
 	})
@@ -363,6 +364,69 @@ func Test_scheduleSubJobTask(t *testing.T) {
 
 	// wait for the task to get processed
 	<-processed
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateRunning, tk.State)
+}
+
+func Test_scheduleDetachedSubJobTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	processed := make(chan any)
+	err := b.SubscribeForJobs(func(j *tork.Job) error {
+		assert.Empty(t, j.ParentID)
+		close(processed)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	completed := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+		close(completed)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := datastore.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+
+	err = ds.CreateJob(ctx, j)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j.ID,
+		SubJob: &tork.SubJobTask{
+			Name:     "my sub job",
+			Detached: true,
+			Tasks: []*tork.Task{
+				{
+					Name: "some task",
+				},
+			},
+		},
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleSubJob(ctx, tk)
+	assert.NoError(t, err)
+
+	// wait for the task to get processed
+	<-processed
+
+	// wait for the completion task
+	<-completed
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
