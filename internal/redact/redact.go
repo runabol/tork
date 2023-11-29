@@ -4,42 +4,62 @@ import (
 	"strings"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/wildcard"
 )
 
 const (
 	redactedStr = "[REDACTED]"
 )
 
-type matcher func(string) bool
-
-var matchers = []matcher{
-	contains("SECRET"),
-	contains("PASSWORD"),
-	contains("ACCESS_KEY"),
+type Redacter struct {
+	matchers []Matcher
 }
 
-func contains(substr string) func(s string) bool {
-	return func(s string) bool {
-		return strings.Contains(strings.ToUpper(s), substr)
+func NewRedacter(matchers ...Matcher) *Redacter {
+	if len(matchers) == 0 {
+		matchers = defaultMatchers
+	}
+	return &Redacter{
+		matchers: matchers,
 	}
 }
 
-func Task(t *tork.Task) {
+type Matcher func(string) bool
+
+var defaultMatchers = []Matcher{
+	Contains("SECRET"),
+	Contains("PASSWORD"),
+	Contains("ACCESS_KEY"),
+}
+
+func Contains(substr string) func(s string) bool {
+	return func(s string) bool {
+		return strings.Contains(strings.ToUpper(s), strings.ToUpper(substr))
+	}
+}
+
+func Wildcard(pattern string) func(s string) bool {
+	return func(s string) bool {
+		return wildcard.Match(pattern, s)
+	}
+}
+
+func (r *Redacter) RedactTask(t *tork.Task) {
 	redacted := t
 	// redact env vars
-	redacted.Env = redactVars(redacted.Env)
+	redacted.Env = r.redactVars(redacted.Env)
 	// redact pre tasks
 	for _, p := range redacted.Pre {
-		Task(p)
+		r.RedactTask(p)
 	}
 	// redact post tasks
 	for _, p := range redacted.Post {
-		Task(p)
+		r.RedactTask(p)
 	}
 	// redact parallel tasks
 	if redacted.Parallel != nil {
 		for _, p := range redacted.Parallel.Tasks {
-			Task(p)
+			r.RedactTask(p)
 		}
 	}
 	// registry creds
@@ -48,33 +68,33 @@ func Task(t *tork.Task) {
 	}
 }
 
-func Job(j *tork.Job) {
+func (r *Redacter) RedactJob(j *tork.Job) {
 	redacted := j
 	// redact inputs
-	redacted.Inputs = redactVars(redacted.Inputs)
+	redacted.Inputs = r.redactVars(redacted.Inputs)
 	// redact webhook headers
 	for _, w := range j.Webhooks {
 		if w.Headers != nil {
-			w.Headers = redactVars(w.Headers)
+			w.Headers = r.redactVars(w.Headers)
 		}
 	}
 	// redact context
-	redacted.Context.Inputs = redactVars(redacted.Context.Inputs)
-	redacted.Context.Tasks = redactVars(redacted.Context.Tasks)
+	redacted.Context.Inputs = r.redactVars(redacted.Context.Inputs)
+	redacted.Context.Tasks = r.redactVars(redacted.Context.Tasks)
 	// redact tasks
 	for _, t := range redacted.Tasks {
-		Task(t)
+		r.RedactTask(t)
 	}
 	// redact execution
 	for _, t := range redacted.Execution {
-		Task(t)
+		r.RedactTask(t)
 	}
 }
 
-func redactVars(m map[string]string) map[string]string {
+func (r *Redacter) redactVars(m map[string]string) map[string]string {
 	redacted := make(map[string]string)
 	for k, v := range m {
-		for _, m := range matchers {
+		for _, m := range r.matchers {
 			if m(k) {
 				v = redactedStr
 				break

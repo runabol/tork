@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/redact"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedactOnRead(t *testing.T) {
-	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact})
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter())})
 	j := &tork.Job{
 		Inputs: map[string]string{
 			"secret": "1234",
@@ -20,7 +21,7 @@ func TestRedactOnRead(t *testing.T) {
 }
 
 func TestNoRedact(t *testing.T) {
-	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact})
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter())})
 	j := &tork.Job{
 		Inputs: map[string]string{
 			"secret": "1234",

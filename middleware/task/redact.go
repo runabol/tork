@@ -7,11 +7,13 @@ import (
 	"github.com/runabol/tork/internal/redact"
 )
 
-func Redact(next HandlerFunc) HandlerFunc {
-	return func(ctx context.Context, et EventType, t *tork.Task) error {
-		if et == Read {
-			redact.Task(t)
+func Redact(redacter *redact.Redacter) MiddlewareFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(ctx context.Context, et EventType, t *tork.Task) error {
+			if et == Read {
+				redacter.RedactTask(t)
+			}
+			return next(ctx, et, t)
 		}
-		return next(ctx, et, t)
 	}
 }

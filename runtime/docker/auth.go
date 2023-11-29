@@ -22,7 +22,7 @@ var (
 )
 
 // This is used by the docker CLI in casses where an oauth identity token is used.
-// In that case the username is stored litterally as `<token>`
+// In that case the username is stored literally as `<token>`
 // When fetching the credentials we check for this value to determine if
 const tokenUsername = "<token>"
 
