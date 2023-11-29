@@ -51,6 +51,7 @@ func callWebhook(webhook *tork.Webhook, body []byte) {
 	for attempts <= webhookDefaultMaxAttempts {
 		log.Debug().Msgf("Calling webhook %s (attempt: %d)", webhook.URL, attempts)
 		req, err := http.NewRequest("POST", webhook.URL, bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json; charset=UTF-8")
 		if err != nil {
 			log.Error().Err(err).Msg("error creating webhook request")
 			return

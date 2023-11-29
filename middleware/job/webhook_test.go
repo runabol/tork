@@ -99,6 +99,8 @@ func TestWebhookOKWithHeaders(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		ctype := r.Header.Get("Content-Type")
+		assert.Equal(t, "application/json; charset=UTF-8", ctype)
 		val := r.Header.Get("my-header")
 		assert.Equal(t, "my-value", val)
 		assert.Equal(t, "1234", js.ID)
