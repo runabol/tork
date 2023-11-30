@@ -85,8 +85,6 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 }
 
 func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
-	var result string
-	var jobErr error
 	// mark the job as completed
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
 		if u.State != tork.JobStateRunning {
@@ -94,16 +92,20 @@ func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 		}
 		now := time.Now().UTC()
 		// evaluate the job's output
-		result, jobErr = eval.EvaluateTemplate(j.Output, j.Context.AsMap())
+		result, jobErr := eval.EvaluateTemplate(j.Output, j.Context.AsMap())
 		if jobErr != nil {
 			log.Error().Err(jobErr).Msgf("error evaluating job %s output", j.ID)
 			j.State = tork.JobStateFailed
+			u.State = tork.JobStateFailed
 			u.FailedAt = &now
 			u.Error = jobErr.Error()
+			j.Error = jobErr.Error()
 		} else {
+			j.State = tork.JobStateCompleted
 			u.State = tork.JobStateCompleted
 			u.CompletedAt = &now
 			u.Result = result
+			j.Result = result
 		}
 		return nil
 	}); err != nil {
@@ -116,19 +118,19 @@ func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 			return errors.Wrapf(err, "could not find parent task for subtask: %s", j.ParentID)
 		}
 		now := time.Now().UTC()
-		if jobErr != nil {
+		if j.State == tork.JobStateFailed {
 			parent.State = tork.TaskStateFailed
 			parent.FailedAt = &now
-			parent.Error = jobErr.Error()
+			parent.Error = j.Error
 		} else {
 			parent.State = tork.TaskStateCompleted
 			parent.CompletedAt = &now
-			parent.Result = result
+			parent.Result = j.Result
 		}
 		return h.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
 	}
 	// publish job completd/failed event
-	if jobErr != nil {
+	if j.State == tork.JobStateFailed {
 		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
 	} else {
 		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j)
