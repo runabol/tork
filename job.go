@@ -41,19 +41,20 @@ type Job struct {
 }
 
 type JobSummary struct {
-	ID          string     `json:"id,omitempty"`
-	ParentID    string     `json:"parentId,omitempty"`
-	Name        string     `json:"name,omitempty"`
-	Description string     `json:"description,omitempty"`
-	State       JobState   `json:"state,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt,omitempty"`
-	StartedAt   *time.Time `json:"startedAt,omitempty"`
-	CompletedAt *time.Time `json:"completedAt,omitempty"`
-	FailedAt    *time.Time `json:"failedAt,omitempty"`
-	Position    int        `json:"position"`
-	TaskCount   int        `json:"taskCount,omitempty"`
-	Result      string     `json:"result,omitempty"`
-	Error       string     `json:"error,omitempty"`
+	ID          string            `json:"id,omitempty"`
+	ParentID    string            `json:"parentId,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	State       JobState          `json:"state,omitempty"`
+	CreatedAt   time.Time         `json:"createdAt,omitempty"`
+	StartedAt   *time.Time        `json:"startedAt,omitempty"`
+	CompletedAt *time.Time        `json:"completedAt,omitempty"`
+	FailedAt    *time.Time        `json:"failedAt,omitempty"`
+	Position    int               `json:"position"`
+	TaskCount   int               `json:"taskCount,omitempty"`
+	Result      string            `json:"result,omitempty"`
+	Error       string            `json:"error,omitempty"`
 }
 
 type JobContext struct {
@@ -91,7 +92,7 @@ func (j *Job) Clone() *Job {
 		Tasks:       CloneTasks(j.Tasks),
 		Execution:   CloneTasks(j.Execution),
 		Position:    j.Position,
-		Inputs:      j.Inputs,
+		Inputs:      maps.Clone(j.Inputs),
 		Context:     j.Context.Clone(),
 		ParentID:    j.ParentID,
 		TaskCount:   j.TaskCount,
@@ -138,6 +139,7 @@ func NewJobSummary(j *Job) *JobSummary {
 		ParentID:    j.ParentID,
 		Name:        j.Name,
 		Description: j.Description,
+		Inputs:      maps.Clone(j.Inputs),
 		State:       j.State,
 		CreatedAt:   j.CreatedAt,
 		StartedAt:   j.StartedAt,
