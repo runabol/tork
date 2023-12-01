@@ -12,6 +12,11 @@ func (e *Engine) initBroker() error {
 	if err != nil {
 		return err
 	}
+	for _, cb := range e.onBrokerInit {
+		if err := cb(broker); err != nil {
+			return err
+		}
+	}
 	e.broker = broker
 	return nil
 }

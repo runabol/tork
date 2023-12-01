@@ -57,6 +57,10 @@ func SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener)
 	return defaultEngine.SubmitJob(ctx, ij, listeners...)
 }
 
+func OnBrokerInit(fn func(b mq.Broker) error) {
+	defaultEngine.OnBrokerInit(fn)
+}
+
 func Start() error {
 	return defaultEngine.Start()
 }

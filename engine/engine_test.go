@@ -255,3 +255,24 @@ func TestRegisterDatastoreProvider(t *testing.T) {
 	err = eng.Terminate()
 	assert.NoError(t, err)
 }
+
+func TestOnBrokerInit(t *testing.T) {
+	eng := New(Config{Mode: ModeStandalone})
+	assert.Equal(t, StateIdle, eng.state)
+
+	c := make(chan any)
+	eng.OnBrokerInit(func(b mq.Broker) error {
+		assert.NotNil(t, b)
+		close(c)
+		return nil
+	})
+
+	err := eng.Start()
+	assert.NoError(t, err)
+	assert.Equal(t, StateRunning, eng.state)
+
+	<-c
+
+	err = eng.Terminate()
+	assert.NoError(t, err)
+}
