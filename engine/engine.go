@@ -41,20 +41,21 @@ const (
 )
 
 type Engine struct {
-	quit        chan os.Signal
-	terminate   chan any
-	terminated  chan any
-	cfg         Config
-	state       string
-	mu          sync.Mutex
-	broker      mq.Broker
-	ds          datastore.Datastore
-	mounters    map[string]*runtime.MultiMounter
-	runtime     runtime.Runtime
-	coordinator *coordinator.Coordinator
-	worker      *worker.Worker
-	dsProviders map[string]datastore.Provider
-	mqProviders map[string]mq.Provider
+	quit         chan os.Signal
+	terminate    chan any
+	terminated   chan any
+	cfg          Config
+	state        string
+	mu           sync.Mutex
+	broker       mq.Broker
+	ds           datastore.Datastore
+	mounters     map[string]*runtime.MultiMounter
+	runtime      runtime.Runtime
+	coordinator  *coordinator.Coordinator
+	worker       *worker.Worker
+	dsProviders  map[string]datastore.Provider
+	mqProviders  map[string]mq.Provider
+	onBrokerInit []func(b mq.Broker) error
 }
 
 type Config struct {
@@ -335,6 +336,13 @@ func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.
 		return nil, err
 	}
 	return job.Clone(), nil
+}
+
+func (e *Engine) OnBrokerInit(fn func(b mq.Broker) error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	e.onBrokerInit = append(e.onBrokerInit, fn)
 }
 
 func (e *Engine) awaitTerm() {
