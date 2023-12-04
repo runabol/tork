@@ -260,8 +260,15 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 		nc.EndpointsConfig[nw] = &network.EndpointSettings{NetworkID: nw}
 	}
 
+	// we want to create the container using a background context
+	// in case the task is being cancelled while the container is
+	// being created. This could lead to a situation where the
+	// container is created in a "zombie" state leading to a situation
+	// where the attached volumes can't be removed and cleaned up.
+	createCtx, createCancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer createCancel()
 	resp, err := d.client.ContainerCreate(
-		ctx, &cc, &hc, &nc, nil, "")
+		createCtx, &cc, &hc, &nc, nil, "")
 	if err != nil {
 		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
