@@ -311,41 +311,29 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	if ok {
 		return nil
 	}
-	// get a list of existing queues
-	qs, err := b.Queues(context.Background())
+	log.Debug().Msgf("declaring queue: %s", qname)
+	args := amqp.Table{}
+	if qname == QUEUE_HEARTBEAT {
+		args["x-message-ttl"] = b.heartbeatTTL
+	}
+	args["x-consumer-timeout"] = b.consumerTimeout
+	_, err := ch.QueueDeclare(
+		qname,
+		false, // durable
+		false, // delete when unused
+		strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
+		false, // no-wait
+		args,  // arguments
+	)
 	if err != nil {
 		return err
 	}
-	exists := false
-	for _, q := range qs {
-		if q.Name == qname {
-			exists = true
-		}
-	}
-	if !exists {
-		log.Debug().Msgf("declaring queue: %s", qname)
-		args := amqp.Table{}
-		if qname == QUEUE_HEARTBEAT {
-			args["x-message-ttl"] = b.heartbeatTTL
-		}
-		args["x-consumer-timeout"] = b.consumerTimeout
-		_, err = ch.QueueDeclare(
-			qname,
-			false, // durable
-			false, // delete when unused
-			strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
-			false, // no-wait
-			args,  // arguments
-		)
-		if err != nil {
+	if exchange != exchangeDefault {
+		if err := ch.QueueBind(qname, key, exchange, false, nil); err != nil {
 			return err
 		}
-		if exchange != exchangeDefault {
-			if err := ch.QueueBind(qname, key, exchange, false, nil); err != nil {
-				return err
-			}
-		}
 	}
+
 	b.queues.Set(qname, qname)
 	return nil
 }
