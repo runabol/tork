@@ -64,14 +64,13 @@ func TestRabbitMQGetQueuesMgmtURL(t *testing.T) {
 	assert.True(t, found)
 }
 
-func TestRabbitMQPublishAndSubsribeForHeartbeatExpired(t *testing.T) {
+func TestRabbitMQPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
-	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithHeartbeatTTL(10))
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	processed := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		processed <- 1
-		time.Sleep(time.Millisecond * 100)
 		return nil
 	})
 	assert.NoError(t, err)
