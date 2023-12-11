@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
@@ -47,8 +48,10 @@ func (h *startedHandler) handle(ctx context.Context, et task.EventType, t *tork.
 		// if an out-of-order task completion/failure
 		// arrived earlier
 		if u.State == tork.TaskStateScheduled {
+			now := time.Now().UTC()
+			t.StartedAt = &now
 			u.State = tork.TaskStateRunning
-			u.StartedAt = t.StartedAt
+			u.StartedAt = &now
 			u.NodeID = t.NodeID
 		}
 		return nil
