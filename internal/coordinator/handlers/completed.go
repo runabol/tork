@@ -32,6 +32,8 @@ func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.Middlewa
 }
 
 func (h *completedHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
+	now := time.Now().UTC()
+	t.CompletedAt = &now
 	return h.completeTask(ctx, t)
 }
 
