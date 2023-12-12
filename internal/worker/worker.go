@@ -49,6 +49,7 @@ type Config struct {
 type Limits struct {
 	DefaultCPUsLimit   string
 	DefaultMemoryLimit string
+	DefaultTimeout     string
 }
 
 type runningTask struct {
@@ -176,6 +177,9 @@ func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 	}
 	if t.Limits != nil && t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
+	}
+	if t.Timeout == "" {
+		t.Timeout = w.limits.DefaultTimeout
 	}
 	// create timeout context -- if timeout is defined
 	rctx := ctx

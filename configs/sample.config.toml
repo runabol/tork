@@ -84,8 +84,9 @@ default = 1 # numbers of concurrent subscribers
 
 # default task limits
 [worker.limits]
-cpus = ""   # supports fractions
-memory = "" # e.g. 100m 
+cpus = ""    # supports fractions
+memory = ""  # e.g. 100m 
+timeout = "" # e.g. 3h
 
 
 [mounts.bind]

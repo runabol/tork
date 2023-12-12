@@ -374,3 +374,116 @@ func Test_sendHeartbeat(t *testing.T) {
 	<-heartbeats
 	assert.NoError(t, w.Stop())
 }
+
+func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
+	rt, err := docker.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		Limits: Limits{
+			DefaultTimeout: "1s",
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	errors := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+		assert.Contains(t, tk.Error, "context deadline exceeded")
+		close(errors)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	starts := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
+		close(starts)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = w.Start()
+	assert.NoError(t, err)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateRunning,
+		Image: "ubuntu:mantic",
+		CMD:   []string{"sleep", "5"},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/somevolume",
+			},
+		},
+	}
+
+	err = w.handleTask(t1)
+
+	<-starts
+	<-errors
+
+	assert.NoError(t, err)
+	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
+}
+
+func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
+	rt, err := docker.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		Limits: Limits{
+			DefaultTimeout: "5s",
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	completions := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+		close(completions)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	starts := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
+		close(starts)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	err = w.Start()
+	assert.NoError(t, err)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateRunning,
+		Image: "ubuntu:mantic",
+		CMD:   []string{"sleep", "1"},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/somevolume",
+			},
+		},
+	}
+
+	err = w.handleTask(t1)
+
+	<-starts
+	<-completions
+
+	assert.NoError(t, err)
+	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
+}
