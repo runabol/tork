@@ -169,9 +169,6 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 		return errors.Wrapf(err, "error creating channel")
 	}
 	defer ch.Close()
-	if err := b.declareQueue(exchangeDefault, keyDefault, qname, ch); err != nil {
-		return errors.Wrapf(err, "error (re)declaring queue")
-	}
 	return b.publish(ctx, exchangeDefault, qname, t)
 }
 

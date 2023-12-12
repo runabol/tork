@@ -33,7 +33,9 @@ func TestRabbitMQGetQueues(t *testing.T) {
 	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
 	assert.NoError(t, err)
 	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err = b.PublishTask(ctx, qname, &tork.Task{})
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		return nil
+	})
 	assert.NoError(t, err)
 	qis, err := b.Queues(ctx)
 	assert.NoError(t, err)
@@ -51,7 +53,9 @@ func TestRabbitMQGetQueuesMgmtURL(t *testing.T) {
 	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/", WithManagementURL("http://localhost:15672"))
 	assert.NoError(t, err)
 	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	err = b.PublishTask(ctx, qname, &tork.Task{})
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		return nil
+	})
 	assert.NoError(t, err)
 	qis, err := b.Queues(ctx)
 	assert.NoError(t, err)
