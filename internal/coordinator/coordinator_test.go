@@ -206,7 +206,7 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 	j2, err := ds.GetJobByID(context.Background(), j.ID)
 	assert.NoError(t, err)
 
-	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Equal(t, tork.JobStateScheduled, j2.State)
 }
 
 func TestNodeMiddlewareModify(t *testing.T) {
@@ -367,7 +367,7 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 	assert.NoError(t, err)
 
 	iter := 0
-	for j2.State == tork.JobStateRunning && iter < 10 {
+	for (j2.State == tork.JobStateRunning || j2.State == tork.JobStateScheduled) && iter < 10 {
 		time.Sleep(time.Second)
 		j2, err = ds.GetJobByID(ctx, j2.ID)
 		assert.NoError(t, err)

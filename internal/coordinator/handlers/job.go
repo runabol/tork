@@ -44,8 +44,10 @@ func (h *jobHandler) handle(ctx context.Context, et job.EventType, j *tork.Job) 
 		return h.completeJob(ctx, j)
 	case tork.JobStateFailed:
 		return h.failJob(ctx, j)
+	case tork.JobStateRunning:
+		return h.markJobAsRunning(ctx, j)
 	default:
-		return errors.Errorf("invalud job state: %s", j.State)
+		return errors.Errorf("invalid job state: %s", j.State)
 	}
 }
 
@@ -68,7 +70,7 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 	}
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
 		n := time.Now().UTC()
-		u.State = tork.JobStateRunning
+		u.State = tork.JobStateScheduled
 		u.StartedAt = &n
 		u.Position = 1
 		return nil
@@ -87,7 +89,7 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 	// mark the job as completed
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
-		if u.State != tork.JobStateRunning {
+		if u.State != tork.JobStateRunning && u.State != tork.JobStateScheduled {
 			return errors.Errorf("job %s is %s and can not be completed", u.ID, u.State)
 		}
 		now := time.Now().UTC()
@@ -137,6 +139,17 @@ func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 	}
 }
 
+func (h *jobHandler) markJobAsRunning(ctx context.Context, j *tork.Job) error {
+	return h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
+		if u.State != tork.JobStateScheduled {
+			return nil
+		}
+		u.State = tork.JobStateRunning
+		u.FailedAt = nil
+		return nil
+	})
+}
+
 func (h *jobHandler) restartJob(ctx context.Context, j *tork.Job) error {
 	// mark the job as running
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
@@ -174,7 +187,7 @@ func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
 		// we only want to make the job as FAILED
 		// if it's actually running as opposed to
 		// possibly being CANCELLED
-		if u.State == tork.JobStateRunning {
+		if u.State == tork.JobStateRunning || u.State == tork.JobStateScheduled {
 			u.State = tork.JobStateFailed
 			u.FailedAt = j.FailedAt
 		}
