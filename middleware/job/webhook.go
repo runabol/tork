@@ -8,7 +8,6 @@ import (
 
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 )
@@ -29,11 +28,7 @@ func Webhook(next HandlerFunc) HandlerFunc {
 		if len(j.Webhooks) == 0 {
 			return nil
 		}
-		summary, err := json.Marshal(tork.NewJobSummary(j))
-		if err != nil {
-			log.Err(err).Msgf(" error serializing")
-			return errors.Wrapf(err, "error serializing job summary")
-		}
+		summary := tork.NewJobSummary(j)
 		for _, webhook := range j.Webhooks {
 			go func(w *tork.Webhook) {
 				callWebhook(w, summary)
@@ -43,17 +38,21 @@ func Webhook(next HandlerFunc) HandlerFunc {
 	}
 }
 
-func callWebhook(webhook *tork.Webhook, body []byte) {
+func callWebhook(webhook *tork.Webhook, summary *tork.JobSummary) {
 	attempts := 1
 	client := http.Client{
 		Timeout: webhookDefaultTimeout,
 	}
+	body, err := json.Marshal(summary)
+	if err != nil {
+		log.Err(err).Msgf("[Webhook] error serializing job summary")
+	}
 	for attempts <= webhookDefaultMaxAttempts {
-		log.Debug().Msgf("Calling webhook %s (attempt: %d)", webhook.URL, attempts)
+		log.Debug().Msgf("[Webhook] Calling %s for job %s %s (attempt: %d)", webhook.URL, summary.ID, summary.State, attempts)
 		req, err := http.NewRequest("POST", webhook.URL, bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json; charset=UTF-8")
 		if err != nil {
-			log.Error().Err(err).Msg("error creating webhook request")
+			log.Error().Err(err).Msgf("[Webhook] error creating webhook request: %s", webhook.URL)
 			return
 		}
 		if webhook.Headers != nil {
@@ -63,16 +62,16 @@ func callWebhook(webhook *tork.Webhook, body []byte) {
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Error().Err(err).Msg("error submitting webhook")
+			log.Error().Err(err).Msgf("[Webhook] error submitting webhook %s", webhook.URL)
 			return
 		}
 		if resp.StatusCode == http.StatusOK {
 			return
 		}
-		log.Warn().Msgf("webhook to %s failed with %d", webhook.URL, resp.StatusCode)
+		log.Warn().Msgf("[Webhook] request to %s failed with %d", webhook.URL, resp.StatusCode)
 		// sleep a little before retrying
 		time.Sleep(time.Second * time.Duration(attempts*2))
 		attempts = attempts + 1
 	}
-	log.Error().Msgf("failed to call webhook %s. max attempts: %d)", webhook.URL, webhookDefaultMaxAttempts)
+	log.Error().Msgf("[Webhook] failed to call webhook %s. max attempts: %d)", webhook.URL, webhookDefaultMaxAttempts)
 }
