@@ -56,7 +56,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 		return errors.Wrapf(err, "error marking task %s as FAILED", t.ID)
 	}
 	// eligible for retry?
-	if j.State == tork.JobStateRunning &&
+	if (j.State == tork.JobStateRunning || j.State == tork.JobStateScheduled) &&
 		t.Retry != nil &&
 		t.Retry.Attempts < t.Retry.Limit {
 		// create a new retry task

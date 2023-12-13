@@ -10,6 +10,7 @@ type JobState string
 
 const (
 	JobStatePending   JobState = "PENDING"
+	JobStateScheduled JobState = "SCHEDULED"
 	JobStateRunning   JobState = "RUNNING"
 	JobStateCancelled JobState = "CANCELLED"
 	JobStateCompleted JobState = "COMPLETED"

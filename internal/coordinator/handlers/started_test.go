@@ -25,7 +25,7 @@ func Test_handleStartedTask(t *testing.T) {
 
 	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
-		State: tork.JobStateRunning,
+		State: tork.JobStateScheduled,
 	}
 	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
@@ -49,6 +49,11 @@ func Test_handleStartedTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateRunning, t2.State)
 	assert.Equal(t, t1.StartedAt, t2.StartedAt)
 	assert.Equal(t, t1.NodeID, t2.NodeID)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, tork.JobStateRunning, j2.State)
 }
 
 func Test_handleStartedTaskOfFailedJob(t *testing.T) {

@@ -122,7 +122,11 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	)
 
 	onStarted := task.ApplyMiddleware(
-		handlers.NewStartedHandler(cfg.DataStore, cfg.Broker),
+		handlers.NewStartedHandler(
+			cfg.DataStore,
+			cfg.Broker,
+			cfg.Middleware.Job...,
+		),
 		cfg.Middleware.Task,
 	)
 

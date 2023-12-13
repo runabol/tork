@@ -71,7 +71,7 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
 	}
-	// mark job state as scheduled
+	// mark task state as scheduled
 	t.State = tork.TaskStateScheduled
 	t.ScheduledAt = &now
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {

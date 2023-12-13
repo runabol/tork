@@ -382,6 +382,74 @@ func Test_cancelRunningJob(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func Test_cancelScheduledJob(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateScheduled,
+		CreatedAt: time.Now().UTC(),
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	tasks := []tork.Task{{
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStatePending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateScheduled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateRunning,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateCancelled,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateCompleted,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateFailed,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, &ta)
+		assert.NoError(t, err)
+	}
+
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/jobs/%s/cancel", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 func Test_restartJob(t *testing.T) {
 	ctx := context.Background()
 	ds := datastore.NewInMemoryDatastore()

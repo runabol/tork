@@ -39,7 +39,7 @@ func Test_handleJobs(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Equal(t, tork.JobStateScheduled, j2.State)
 }
 
 func Test_handleCancelJob(t *testing.T) {
@@ -103,7 +103,7 @@ func Test_handleCancelJob(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Equal(t, tork.JobStateScheduled, j2.State)
 
 	j1.State = tork.JobStateCancelled
 	// cancel the job
@@ -146,7 +146,7 @@ func Test_handleRestartJob(t *testing.T) {
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Equal(t, tork.JobStateScheduled, j2.State)
 
 	// cancel the job
 	j1.State = tork.JobStateCancelled

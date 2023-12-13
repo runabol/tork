@@ -444,7 +444,7 @@ func (s *API) cancelJob(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	if j.State != tork.JobStateRunning {
+	if j.State != tork.JobStateRunning && j.State != tork.JobStateScheduled {
 		return echo.NewHTTPError(http.StatusBadRequest, "job is not running")
 	}
 	j.State = tork.JobStateCancelled
