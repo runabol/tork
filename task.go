@@ -62,6 +62,23 @@ type Task struct {
 	Tags        []string          `json:"tags,omitempty"`
 }
 
+type TaskSummary struct {
+	ID          string     `json:"id,omitempty"`
+	JobID       string     `json:"jobId,omitempty"`
+	Position    int        `json:"position,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Description string     `json:"description,omitempty"`
+	State       TaskState  `json:"state,omitempty"`
+	CreatedAt   *time.Time `json:"createdAt,omitempty"`
+	ScheduledAt *time.Time `json:"scheduledAt,omitempty"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+	Error       string     `json:"error,omitempty"`
+	Result      string     `json:"result,omitempty"`
+	Var         string     `json:"var,omitempty"`
+	Tags        []string   `json:"tags,omitempty"`
+}
+
 type SubJobTask struct {
 	ID          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty"`
@@ -229,5 +246,24 @@ func (r *Registry) Clone() *Registry {
 	return &Registry{
 		Username: r.Username,
 		Password: r.Password,
+	}
+}
+
+func NewTaskSummary(t *Task) *TaskSummary {
+	return &TaskSummary{
+		ID:          t.ID,
+		JobID:       t.JobID,
+		Position:    t.Position,
+		Name:        t.Name,
+		Description: t.Description,
+		State:       t.State,
+		CreatedAt:   t.CreatedAt,
+		ScheduledAt: t.ScheduledAt,
+		StartedAt:   t.StartedAt,
+		CompletedAt: t.CompletedAt,
+		Error:       t.Error,
+		Result:      t.Result,
+		Var:         t.Var,
+		Tags:        t.Tags,
 	}
 }

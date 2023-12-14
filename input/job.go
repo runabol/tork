@@ -29,6 +29,7 @@ type Defaults struct {
 type Webhook struct {
 	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"required"`
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	Event   string            `json:"event,omitempty" yaml:"event,omitempty"`
 }
 
 func (ji *Job) ID() string {
@@ -88,5 +89,6 @@ func (w Webhook) toWebhook() *tork.Webhook {
 	return &tork.Webhook{
 		URL:     w.URL,
 		Headers: maps.Clone(w.Headers),
+		Event:   w.Event,
 	}
 }

@@ -444,6 +444,7 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 				Headers: map[string]string{
 					"header1": "value1",
 				},
+				Event: "job.StatusChange",
 			},
 		},
 	}
