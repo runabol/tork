@@ -87,7 +87,8 @@ CREATE TABLE tasks (
     subjob        jsonb,
     networks      text[],
     gpus          text,
-    if_           text
+    if_           text,
+    tags          text[]
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
