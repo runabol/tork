@@ -59,6 +59,7 @@ type Task struct {
 	Each        *EachTask         `json:"each,omitempty"`
 	SubJob      *SubJobTask       `json:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
 }
 
 type SubJobTask struct {
@@ -168,6 +169,7 @@ func (t *Task) Clone() *Task {
 		Description: t.Description,
 		SubJob:      subjob,
 		GPUs:        t.GPUs,
+		Tags:        t.Tags,
 	}
 }
 

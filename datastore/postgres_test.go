@@ -37,6 +37,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 		Registry:    &tork.Registry{Username: "me", Password: "secret"},
 		GPUs:        "all",
 		If:          "true",
+		Tags:        []string{"tag1", "tag2"},
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
@@ -51,6 +52,7 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, "all", t2.GPUs)
 	assert.Equal(t, "true", t2.If)
 	assert.Nil(t, t2.Parallel)
+	assert.Equal(t, []string([]string{"tag1", "tag2"}), t2.Tags)
 }
 
 func TestPostgresCreateAndGetParallelTask(t *testing.T) {

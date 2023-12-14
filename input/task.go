@@ -29,6 +29,7 @@ type Task struct {
 	Each        *Each             `json:"each,omitempty" yaml:"each,omitempty"`
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
+	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 type SubJob struct {
@@ -185,6 +186,7 @@ func (i Task) toTask() *tork.Task {
 		Each:        each,
 		SubJob:      subjob,
 		GPUs:        i.GPUs,
+		Tags:        i.Tags,
 	}
 }
 
