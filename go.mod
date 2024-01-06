@@ -17,18 +17,18 @@ require (
 	github.com/knadh/koanf/providers/env v0.1.0
 	github.com/knadh/koanf/providers/file v0.1.0
 	github.com/knadh/koanf/v2 v2.0.1
-	github.com/labstack/echo/v4 v4.11.2
+	github.com/labstack/echo/v4 v4.11.3
 	github.com/lib/pq v1.10.9
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/rs/zerolog v1.31.0
-	github.com/shirou/gopsutil/v3 v3.23.10
+	github.com/shirou/gopsutil/v3 v3.23.11
 	github.com/stretchr/testify v1.8.4
-	github.com/urfave/cli/v2 v2.25.7
+	github.com/urfave/cli/v2 v2.26.0
 	golang.org/x/exp v0.0.0-20230807204917-050eac23e9de
-	golang.org/x/sys v0.14.0
-	golang.org/x/time v0.4.0
+	golang.org/x/sys v0.15.0
+	golang.org/x/time v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.1
 )
