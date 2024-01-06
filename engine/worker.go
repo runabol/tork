@@ -73,12 +73,14 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		return docker.NewDockerRuntime(
 			docker.WithMounter(mounter),
 			docker.WithConfig(conf.String("runtime.docker.config")),
+			docker.WithBroker(e.broker),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
-			CMD: conf.Strings("runtime.shell.cmd"),
-			UID: conf.StringDefault("runtime.shell.uid", shell.DEFAULT_UID),
-			GID: conf.StringDefault("runtime.shell.gid", shell.DEFAULT_GID),
+			CMD:    conf.Strings("runtime.shell.cmd"),
+			UID:    conf.StringDefault("runtime.shell.uid", shell.DEFAULT_UID),
+			GID:    conf.StringDefault("runtime.shell.gid", shell.DEFAULT_GID),
+			Broker: e.broker,
 		}), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)

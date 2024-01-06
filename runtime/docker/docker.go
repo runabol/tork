@@ -25,8 +25,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -36,10 +38,11 @@ type DockerRuntime struct {
 	images  *syncx.Map[string, bool]
 	pullq   chan *pullRequest
 	mounter runtime.Mounter
+	broker  mq.Broker
 	config  string
 }
 
-type printableReader struct {
+type asciiReader struct {
 	reader io.Reader
 }
 
@@ -59,6 +62,12 @@ type Option = func(rt *DockerRuntime)
 func WithMounter(mounter runtime.Mounter) Option {
 	return func(rt *DockerRuntime) {
 		rt.mounter = mounter
+	}
+}
+
+func WithBroker(broker mq.Broker) Option {
+	return func(rt *DockerRuntime) {
+		rt.broker = broker
 	}
 }
 
@@ -112,18 +121,27 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		}(mnt)
 		t.Mounts[i] = mnt
 	}
+	var logger io.Writer
+	if d.broker != nil {
+		logger = &logging.Forwarder{
+			Broker: d.broker,
+			TaskID: t.ID,
+		}
+	} else {
+		logger = os.Stdout
+	}
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.ID = uuid.NewUUID()
 		pre.Mounts = t.Mounts
 		pre.Networks = t.Networks
 		pre.Limits = t.Limits
-		if err := d.doRun(ctx, pre); err != nil {
+		if err := d.doRun(ctx, pre, logger); err != nil {
 			return err
 		}
 	}
 	// run the actual task
-	if err := d.doRun(ctx, t); err != nil {
+	if err := d.doRun(ctx, t, logger); err != nil {
 		return err
 	}
 	// execute post tasks
@@ -132,14 +150,14 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		post.Mounts = t.Mounts
 		post.Networks = t.Networks
 		post.Limits = t.Limits
-		if err := d.doRun(ctx, post); err != nil {
+		if err := d.doRun(ctx, post, logger); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
+func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer) error {
 	if t.ID == "" {
 		return errors.New("task id is required")
 	}
@@ -324,7 +342,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
 		}
 	}()
-	_, err = io.Copy(os.Stdout, out)
+	_, err = io.Copy(logger, asciiReader{reader: out})
 	if err != nil {
 		return errors.Wrapf(err, "error reading the std out")
 	}
@@ -349,7 +367,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task) error {
 				log.Error().Err(err).Msg("error tailing the log")
 				return errors.Errorf("exit code %d", status.StatusCode)
 			}
-			buf, err := io.ReadAll(printableReader{reader: out})
+			buf, err := io.ReadAll(asciiReader{reader: out})
 			if err != nil {
 				log.Error().Err(err).Msg("error copying the output")
 			}
@@ -536,7 +554,10 @@ func parseMemory(limits *tork.TaskLimits) (int64, error) {
 	return units.RAMInBytes(limits.Memory)
 }
 
-func (r printableReader) Read(p []byte) (int, error) {
+func (r asciiReader) Read(p []byte) (int, error) {
+	const MAX_ASCII = 127
+	const FORM_FEED = 12
+	const CARRIAGE_RETURN = 13
 	buf := make([]byte, len(p))
 	n, err := r.reader.Read(buf)
 	if err != nil {
@@ -546,7 +567,8 @@ func (r printableReader) Read(p []byte) (int, error) {
 	}
 	j := 0
 	for i := 0; i < n; i++ {
-		if unicode.IsPrint(rune(buf[i])) {
+		r := rune(buf[i])
+		if r <= MAX_ASCII && r != FORM_FEED && r != CARRIAGE_RETURN && (unicode.IsSpace(r) || unicode.IsPrint(r)) {
 			p[j] = buf[i]
 			j++
 		}

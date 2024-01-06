@@ -355,3 +355,88 @@ func TestInMemoryExpiredJob(t *testing.T) {
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, datastore.ErrTaskNotFound)
 }
+
+func TestInMemoryCreateAndGetTaskLogs(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	t1 := tork.Task{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+		Number:   1,
+		TaskID:   t1.ID,
+		Contents: "line 1",
+	})
+	assert.NoError(t, err)
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, "line 1", logs.Items[0].Contents)
+	assert.Equal(t, 1, logs.TotalPages)
+}
+
+func TestInMemoryCreateAndGetTaskLogsMultiParts(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	t1 := tork.Task{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	parts := 10
+
+	wg := sync.WaitGroup{}
+	wg.Add(parts)
+
+	for i := 1; i <= parts; i++ {
+		go func(n int) {
+			defer wg.Done()
+			err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+				Number:   n,
+				TaskID:   t1.ID,
+				Contents: fmt.Sprintf("line %d", n),
+			})
+			assert.NoError(t, err)
+		}(i)
+	}
+
+	wg.Wait()
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 10)
+	assert.Equal(t, "line 10", logs.Items[0].Contents)
+	assert.Equal(t, "line 1", logs.Items[9].Contents)
+}
+
+func TestInMemoryCreateAndGetTaskLogsLarge(t *testing.T) {
+	ctx := context.Background()
+	ds := datastore.NewInMemoryDatastore()
+	t1 := tork.Task{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 10)
+	assert.Equal(t, "line 100", logs.Items[0].Contents)
+	assert.Equal(t, "line 91", logs.Items[9].Contents)
+	assert.Equal(t, 10, logs.Size)
+	assert.Equal(t, 10, logs.TotalPages)
+}

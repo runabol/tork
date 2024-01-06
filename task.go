@@ -79,6 +79,13 @@ type TaskSummary struct {
 	Tags        []string   `json:"tags,omitempty"`
 }
 
+type TaskLogPart struct {
+	Number    int        `json:"number,omitempty"`
+	TaskID    string     `json:"taskId,omitempty"`
+	Contents  string     `json:"contents,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+}
+
 type SubJobTask struct {
 	ID          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty"`

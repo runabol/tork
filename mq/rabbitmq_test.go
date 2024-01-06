@@ -248,3 +248,17 @@ func TestRabbitMQPublishAndSubsribe(t *testing.T) {
 	}
 	assert.True(t, found)
 }
+
+func TestRabbitMQPublishAndSubsribeTaskLogPart(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	processed := make(chan any)
+	err = b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+		processed <- 1
+	})
+	assert.NoError(t, err)
+	err = b.PublishTaskLogPart(ctx, &tork.TaskLogPart{})
+	assert.NoError(t, err)
+	<-processed
+}

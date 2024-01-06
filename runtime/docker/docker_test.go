@@ -17,6 +17,7 @@ import (
 	"github.com/runabol/tork"
 
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -36,16 +37,28 @@ func TestParseCPUs(t *testing.T) {
 	assert.Equal(t, int64(500000000), parsed)
 }
 
-func TestPrintableReader(t *testing.T) {
+func TestASCIIReader(t *testing.T) {
 	s := []byte{}
 	for i := 0; i < 1000; i++ {
 		s = append(s, 0)
 	}
 	s = append(s, []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}...)
-	pr := printableReader{reader: bytes.NewReader(s)}
+	pr := asciiReader{reader: bytes.NewReader(s)}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(b))
+}
+
+func TestASCIIReaderNewLine(t *testing.T) {
+	s := []byte{}
+	for i := 0; i < 1000; i++ {
+		s = append(s, 0)
+	}
+	s = append(s, []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 10}...)
+	pr := asciiReader{reader: bytes.NewReader(s)}
+	b, err := io.ReadAll(pr)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world\n", string(b))
 }
 
 type eofReader struct {
@@ -57,8 +70,8 @@ func (r eofReader) Read(p []byte) (int, error) {
 	return len(data), io.EOF
 }
 
-func TestPrintableReaderEOF(t *testing.T) {
-	pr := printableReader{reader: eofReader{}}
+func TestASCIIReaderEOF(t *testing.T) {
+	pr := asciiReader{reader: eofReader{}}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(b))
@@ -99,6 +112,26 @@ func TestRunTaskCMD(t *testing.T) {
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
+}
+
+func TestRunTaskCMDLogger(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+	processed := make(chan any)
+	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+		close(processed)
+	})
+	assert.NoError(t, err)
+	rt, err := NewDockerRuntime(WithBroker(b))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	err = rt.Run(context.Background(), &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		CMD:   []string{"ls"},
+	})
+	assert.NoError(t, err)
+	<-processed
 }
 
 func TestRunTaskConcurrently(t *testing.T) {

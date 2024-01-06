@@ -241,3 +241,16 @@ func TestInMemoryHealthChech(t *testing.T) {
 	assert.NoError(t, b.Shutdown(ctx))
 	assert.Error(t, b.HealthCheck(ctx))
 }
+
+func TestInMemoryPublishAndSubsribeTaskLogPart(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	processed := make(chan any)
+	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+		close(processed)
+	})
+	assert.NoError(t, err)
+	err = b.PublishTaskLogPart(ctx, &tork.TaskLogPart{})
+	<-processed
+	assert.NoError(t, err)
+}
