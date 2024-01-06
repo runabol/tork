@@ -278,3 +278,18 @@ func (b *InMemoryBroker) HealthCheck(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (b *InMemoryBroker) PublishTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error {
+	return b.publish(QUEUE_LOGS, p)
+}
+
+func (b *InMemoryBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart)) error {
+	return b.subscribe(QUEUE_LOGS, func(m any) error {
+		p, ok := m.(*tork.TaskLogPart)
+		if !ok {
+			return errors.New("can't cast to log part")
+		}
+		handler(p)
+		return nil
+	})
+}

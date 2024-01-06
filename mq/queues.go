@@ -22,6 +22,9 @@ const (
 	// The queue used by for job creation
 	// and job-related state changes (e.g. cancellation)
 	QUEUE_JOBS = "jobs"
+	// The queue used by workers to send task
+	// logs to the Coordinator
+	QUEUE_LOGS = "logs"
 	// The prefix used for queues that
 	// are exclusive
 	QUEUE_EXCLUSIVE_PREFIX = "x-"
@@ -42,6 +45,7 @@ func IsCoordinatorQueue(qname string) bool {
 		QUEUE_ERROR,
 		QUEUE_HEARTBEAT,
 		QUEUE_JOBS,
+		QUEUE_LOGS,
 	}
 	return slices.Contains(coordQueues, qname)
 }

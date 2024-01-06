@@ -1,9 +1,9 @@
 package shell
 
 import (
-	"bufio"
 	"context"
 	"flag"
+	"io"
 	"strings"
 
 	"fmt"
@@ -13,9 +13,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/mq"
 )
 
 type Rexec func(args ...string) *exec.Cmd
@@ -36,13 +38,15 @@ type ShellRuntime struct {
 	uid    string
 	gid    string
 	reexec Rexec
+	broker mq.Broker
 }
 
 type Config struct {
-	CMD   []string
-	UID   string
-	GID   string
-	Rexec Rexec
+	CMD    []string
+	UID    string
+	GID    string
+	Rexec  Rexec
+	Broker mq.Broker
 }
 
 func NewShellRuntime(cfg Config) *ShellRuntime {
@@ -64,6 +68,7 @@ func NewShellRuntime(cfg Config) *ShellRuntime {
 		uid:    cfg.UID,
 		gid:    cfg.GID,
 		reexec: cfg.Rexec,
+		broker: cfg.Broker,
 	}
 }
 
@@ -92,28 +97,37 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if len(t.CMD) > 0 {
 		return errors.New("cmd is not supported on shell runtime")
 	}
+	var logger io.Writer
+	if r.broker != nil {
+		logger = &logging.Forwarder{
+			Broker: r.broker,
+			TaskID: t.ID,
+		}
+	} else {
+		logger = os.Stdout
+	}
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.ID = uuid.NewUUID()
-		if err := r.doRun(ctx, pre); err != nil {
+		if err := r.doRun(ctx, pre, logger); err != nil {
 			return err
 		}
 	}
 	// run the actual task
-	if err := r.doRun(ctx, t); err != nil {
+	if err := r.doRun(ctx, t, logger); err != nil {
 		return err
 	}
 	// execute post tasks
 	for _, post := range t.Post {
 		post.ID = uuid.NewUUID()
-		if err := r.doRun(ctx, post); err != nil {
+		if err := r.doRun(ctx, post, logger); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task) error {
+func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer) error {
 	defer r.cmds.Delete(t.ID)
 
 	workdir, err := os.MkdirTemp("", "tork")
@@ -165,11 +179,9 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task) error {
 	r.cmds.Set(t.ID, cmd)
 
 	go func() {
-		reader := bufio.NewReader(stdout)
-		line, err := reader.ReadString('\n')
-		for err == nil {
-			fmt.Println(line)
-			line, err = reader.ReadString('\n')
+		_, err := io.Copy(logger, stdout)
+		if err != nil {
+			log.Error().Err(err).Msgf("[shell] error logging stdout")
 		}
 	}()
 
@@ -237,7 +249,6 @@ func reexecRun() {
 	cmd.Env = env
 	cmd.Dir = workdir
 
-	log.Debug().Msgf("reexecing: %s as %s:%s", strings.Join(flag.Args(), " "), uid, gid)
 	if err := cmd.Run(); err != nil {
 		log.Fatal().Err(err).Msgf("error reexecing: %s", strings.Join(flag.Args(), " "))
 	}

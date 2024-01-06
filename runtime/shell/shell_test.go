@@ -8,6 +8,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -141,4 +142,28 @@ func TestShellRuntimeStop(t *testing.T) {
 	err := rt.Stop(context.Background(), tk)
 	assert.NoError(t, err)
 	<-ch
+}
+
+func TestRunTaskCMDLogger(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+	processed := make(chan any)
+	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+		close(processed)
+	})
+	assert.NoError(t, err)
+	rt := NewShellRuntime(Config{
+		UID: DEFAULT_UID,
+		GID: DEFAULT_GID,
+		Rexec: func(args ...string) *exec.Cmd {
+			cmd := exec.Command(args[5], args[6:]...)
+			return cmd
+		},
+		Broker: b,
+	})
+	err = rt.Run(context.Background(), &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "echo hello",
+	})
+	assert.NoError(t, err)
+	<-processed
 }

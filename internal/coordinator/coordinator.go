@@ -43,6 +43,7 @@ type Coordinator struct {
 	onJob       job.HandlerFunc
 	onHeartbeat node.HandlerFunc
 	onCompleted task.HandlerFunc
+	onLogPart   func(*tork.TaskLogPart)
 	stop        chan any
 }
 
@@ -98,6 +99,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}
 	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
 		cfg.Queues[mq.QUEUE_JOBS] = 1
+	}
+	if cfg.Queues[mq.QUEUE_LOGS] < 1 {
+		cfg.Queues[mq.QUEUE_LOGS] = 1
 	}
 	api, err := api.NewAPI(api.Config{
 		Broker:    cfg.Broker,
@@ -162,6 +166,8 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Middleware.Node,
 	)
 
+	onLogPart := handlers.NewLogHandler(cfg.DataStore)
+
 	return &Coordinator{
 		id:          uuid.NewShortUUID(),
 		startTime:   time.Now(),
@@ -176,6 +182,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		onJob:       onJob,
 		onHeartbeat: onHeartbeat,
 		onCompleted: onCompleted,
+		onLogPart:   onLogPart,
 		stop:        make(chan any),
 	}, nil
 }
@@ -221,6 +228,10 @@ func (c *Coordinator) Start() error {
 			case mq.QUEUE_JOBS:
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
 					return c.onJob(context.Background(), job.StateChange, j)
+				})
+			case mq.QUEUE_LOGS:
+				err = c.broker.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+					c.onLogPart(p)
 				})
 			}
 			if err != nil {

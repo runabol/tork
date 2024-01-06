@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 type PostgresDatastore struct {
@@ -95,6 +96,13 @@ type nodeRecord struct {
 	Hostname        string    `db:"hostname"`
 	TaskCount       int       `db:"task_count"`
 	Version         string    `db:"version_"`
+}
+type taskLogPartRecord struct {
+	ID       string    `db:"id"`
+	Number   int       `db:"number_"`
+	TaskID   string    `db:"task_id"`
+	CreateAt time.Time `db:"created_at"`
+	Contents string    `db:"contents"`
 }
 
 func (r taskRecord) toTask() (*tork.Task, error) {
@@ -230,6 +238,15 @@ func (r nodeRecord) toNode() *tork.Node {
 		n.Status = tork.NodeStatusOffline
 	}
 	return &n
+}
+
+func (r taskLogPartRecord) toTaskLogPart() *tork.TaskLogPart {
+	return &tork.TaskLogPart{
+		Number:    r.Number,
+		TaskID:    r.TaskID,
+		Contents:  r.Contents,
+		CreatedAt: &r.CreateAt,
+	}
 }
 
 func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
@@ -477,7 +494,7 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*tork.
 	r := taskRecord{}
 	if err := ds.get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrNodeNotFound
+			return nil, ErrTaskNotFound
 		}
 		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
@@ -791,6 +808,57 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	}
 
 	return actives, nil
+}
+
+func (ds *PostgresDatastore) CreateTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error {
+	if p.TaskID == "" {
+		return errors.Errorf("must provide task id")
+	}
+	if p.Number < 1 {
+		return errors.Errorf("part number must be > 0")
+	}
+	q := `insert into tasks_log_parts 
+	       (id,number_,task_id,created_at,contents) 
+	      values
+	       ($1,$2,$3,$4,$5)`
+	_, err := ds.exec(q, uuid.NewUUID(), p.Number, p.TaskID, time.Now().UTC(), p.Contents)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting task log part to the db")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*Page[*tork.TaskLogPart], error) {
+	offset := (page - 1) * size
+	rs := []taskLogPartRecord{}
+	q := fmt.Sprintf(`SELECT * 
+	      FROM tasks_log_parts 
+		  where task_id = $1
+		  ORDER BY number_ DESC
+		  OFFSET %d LIMIT %d`, offset, size)
+
+	if err := ds.select_(&rs, q, taskID); err != nil {
+		return nil, errors.Wrapf(err, "error task log parts from db")
+	}
+	items := make([]*tork.TaskLogPart, len(rs))
+	for i, r := range rs {
+		items[i] = r.toTaskLogPart()
+	}
+	var count *int
+	if err := ds.get(&count, `select count(*) from tasks_log_parts where task_id = $1`, taskID); err != nil {
+		return nil, errors.Wrapf(err, "error getting the task log parts count")
+	}
+	totalPages := *count / size
+	if *count%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &Page[*tork.TaskLogPart]{
+		Items:      items,
+		Number:     page,
+		Size:       len(items),
+		TotalPages: totalPages,
+		TotalItems: *count,
+	}, nil
 }
 
 func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error) {

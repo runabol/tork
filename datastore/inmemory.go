@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"sort"
 	"time"
@@ -30,6 +31,8 @@ type InMemoryDatastore struct {
 	tasks           *cache.Cache[*tork.Task]
 	nodes           *cache.Cache[*tork.Node]
 	jobs            *cache.Cache[*tork.Job]
+	logs            *cache.Cache[[]*tork.TaskLogPart]
+	logsMu          sync.RWMutex
 	nodeExpiration  *time.Duration
 	jobExpiration   *time.Duration
 	cleanupInterval *time.Duration
@@ -70,6 +73,7 @@ func NewInMemoryDatastore(opts ...Option) *InMemoryDatastore {
 	}
 	ds.nodes = cache.New[*tork.Node](nodeExp, ci)
 	ds.jobs = cache.New[*tork.Job](cache.NoExpiration, ci)
+	ds.logs = cache.New[[]*tork.TaskLogPart](cache.NoExpiration, ci)
 	ds.jobs.OnEvicted(ds.onJobEviction)
 	return ds
 }
@@ -269,6 +273,63 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 		Size:       len(result),
 		TotalPages: totalPages,
 		TotalItems: len(filtered),
+	}, nil
+}
+
+func (ds *InMemoryDatastore) CreateTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error {
+	if p.TaskID == "" {
+		return errors.Errorf("must provide task id")
+	}
+	if p.Number < 1 {
+		return errors.Errorf("part number must be > 0")
+	}
+	now := time.Now().UTC()
+	p.CreatedAt = &now
+	ds.logsMu.Lock()
+	defer ds.logsMu.Unlock()
+	logs, ok := ds.logs.Get(p.TaskID)
+	if !ok {
+		logs = make([]*tork.TaskLogPart, 0)
+	}
+	logs = append(logs, p)
+	ds.logs.Set(p.TaskID, logs)
+	return nil
+}
+
+func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*Page[*tork.TaskLogPart], error) {
+	_, err := ds.GetTaskByID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	parts, ok := ds.logs.Get(taskID)
+	if !ok {
+		return &Page[*tork.TaskLogPart]{
+			Items:      make([]*tork.TaskLogPart, 0),
+			Number:     1,
+			Size:       0,
+			TotalPages: 0,
+			TotalItems: 0,
+		}, nil
+	}
+	sort.Slice(parts, func(i, j int) bool {
+		return parts[i].Number > parts[j].Number
+	})
+	offset := (page - 1) * size
+	result := make([]*tork.TaskLogPart, 0)
+	for i := offset; i < (offset+size) && i < len(parts); i++ {
+		p := parts[i]
+		result = append(result, p)
+	}
+	totalPages := len(parts) / size
+	if len(parts)%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &Page[*tork.TaskLogPart]{
+		Items:      result,
+		Number:     page,
+		Size:       len(result),
+		TotalPages: totalPages,
+		TotalItems: len(parts),
 	}, nil
 }
 

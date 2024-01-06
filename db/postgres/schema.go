@@ -93,4 +93,14 @@ CREATE TABLE tasks (
 
 CREATE INDEX idx_tasks_state ON tasks (state);
 CREATE INDEX idx_tasks_job_id ON tasks (job_id);
+
+CREATE TABLE tasks_log_parts (
+    id         varchar(32) not null primary key,
+    number_    int         not null,
+    task_id    varchar(32) not null references tasks(id),
+    created_at timestamp   not null,
+    contents   text        not null
+);
+
+CREATE INDEX idx_tasks_log_parts_task_id ON tasks_log_parts (task_id);
 `
