@@ -25,7 +25,7 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/shirou/gopsutil/v3 v3.23.11
 	github.com/stretchr/testify v1.8.4
-	github.com/urfave/cli/v2 v2.26.0
+	github.com/urfave/cli/v2 v2.27.1
 	golang.org/x/exp v0.0.0-20230807204917-050eac23e9de
 	golang.org/x/sys v0.15.0
 	golang.org/x/time v0.5.0
