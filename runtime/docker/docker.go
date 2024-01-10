@@ -563,7 +563,7 @@ func (r dockerLogsReader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 	}
-	count := binary.BigEndian.Uint32(hdr[4:])
+	count := binary.BigEndian.Uint32(hdr[4:8])
 	data := make([]byte, count)
 	_, err = r.reader.Read(data)
 	if err != nil {
@@ -571,8 +571,8 @@ func (r dockerLogsReader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 	}
-	copy(p, data)
-	return len(data), err
+	n := copy(p, data)
+	return n, err
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {
