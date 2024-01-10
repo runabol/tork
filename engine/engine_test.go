@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/runabol/tork/runtime/shell"
@@ -245,7 +246,7 @@ func TestRegisterDatastoreProvider(t *testing.T) {
 	assert.Equal(t, StateIdle, eng.state)
 
 	eng.RegisterDatastoreProvider("inmem2", func() (datastore.Datastore, error) {
-		return datastore.NewInMemoryDatastore(), nil
+		return inmemory.NewInMemoryDatastore(), nil
 	})
 
 	err := eng.Start()

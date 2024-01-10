@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,7 +13,7 @@ import (
 func Test_handleLog(t *testing.T) {
 	ctx := context.Background()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewLogHandler(ds)
 	assert.NotNil(t, handler)
 

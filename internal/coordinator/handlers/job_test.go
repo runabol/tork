@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/mq"
@@ -17,7 +17,7 @@ func Test_handleJobs(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -46,7 +46,7 @@ func Test_handleCancelJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -119,7 +119,7 @@ func Test_handleRestartJob(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -176,7 +176,7 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -217,7 +217,7 @@ func Test_handleCompleteJob(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -264,7 +264,7 @@ func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 

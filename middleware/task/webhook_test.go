@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/webhook"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookOK(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 
@@ -62,7 +62,7 @@ func TestWebhookOK(t *testing.T) {
 }
 
 func TestWebhookNoEvent(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 
@@ -90,7 +90,7 @@ func TestWebhookNoEvent(t *testing.T) {
 }
 
 func TestWebhookIgnored(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	assert.NoError(t, hm(context.Background(), Read, nil))
 }
