@@ -31,7 +31,9 @@ func (e *Engine) createDatastore(dstype string) (datastore.Datastore, error) {
 			"datastore.postgres.dsn",
 			"host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
 		)
-		return postgres.NewPostgresDataStore(dsn)
+		return postgres.NewPostgresDataStore(dsn,
+			postgres.WithTaskLogRetentionPeriod(conf.DurationDefault("datastore.postgres.task.logs.interval", postgres.DefaultTaskLogsRetentionPeriod)),
+		)
 	default:
 		return nil, errors.Errorf("unknown datastore type: %s", dstype)
 	}
