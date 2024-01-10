@@ -6,13 +6,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"os"
 	"time"
-	"unicode"
 
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/docker/api/types"
@@ -42,7 +42,7 @@ type DockerRuntime struct {
 	config  string
 }
 
-type asciiReader struct {
+type dockerLogsReader struct {
 	reader io.Reader
 }
 
@@ -342,7 +342,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
 		}
 	}()
-	_, err = io.Copy(logger, asciiReader{reader: out})
+	_, err = io.Copy(logger, dockerLogsReader{reader: out})
 	if err != nil {
 		return errors.Wrapf(err, "error reading the std out")
 	}
@@ -367,7 +367,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 				log.Error().Err(err).Msg("error tailing the log")
 				return errors.Errorf("exit code %d", status.StatusCode)
 			}
-			buf, err := io.ReadAll(asciiReader{reader: out})
+			buf, err := io.ReadAll(dockerLogsReader{reader: out})
 			if err != nil {
 				log.Error().Err(err).Msg("error copying the output")
 			}
@@ -554,26 +554,24 @@ func parseMemory(limits *tork.TaskLimits) (int64, error) {
 	return units.RAMInBytes(limits.Memory)
 }
 
-func (r asciiReader) Read(p []byte) (int, error) {
-	const MAX_ASCII = 127
-	const FORM_FEED = 12
-	const CARRIAGE_RETURN = 13
-	buf := make([]byte, len(p))
-	n, err := r.reader.Read(buf)
+func (r dockerLogsReader) Read(p []byte) (int, error) {
+	hdr := make([]byte, 8)
+	_, err := r.reader.Read(hdr)
 	if err != nil {
 		if err != io.EOF {
 			return 0, err
 		}
 	}
-	j := 0
-	for i := 0; i < n; i++ {
-		r := rune(buf[i])
-		if r <= MAX_ASCII && r != FORM_FEED && r != CARRIAGE_RETURN && (unicode.IsSpace(r) || unicode.IsPrint(r)) {
-			p[j] = buf[i]
-			j++
+	count := binary.BigEndian.Uint32(hdr[4:])
+	data := make([]byte, count)
+	_, err = r.reader.Read(data)
+	if err != nil {
+		if err != io.EOF {
+			return 0, err
 		}
 	}
-	return j, err
+	copy(p, data)
+	return len(data), err
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {

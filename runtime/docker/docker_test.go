@@ -37,41 +37,51 @@ func TestParseCPUs(t *testing.T) {
 	assert.Equal(t, int64(500000000), parsed)
 }
 
-func TestASCIIReader(t *testing.T) {
+func TestDockerLogsReader(t *testing.T) {
 	s := []byte{}
 	for i := 0; i < 1000; i++ {
 		s = append(s, 0)
 	}
-	s = append(s, []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}...)
-	pr := asciiReader{reader: bytes.NewReader(s)}
+	s = append(s, []byte{1, 0, 0, 0, 0, 0, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}...)
+	pr := dockerLogsReader{reader: bytes.NewReader(s)}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(b))
 }
 
-func TestASCIIReaderNewLine(t *testing.T) {
+func TestDockerLogsReaderNewLine(t *testing.T) {
 	s := []byte{}
 	for i := 0; i < 1000; i++ {
 		s = append(s, 0)
 	}
-	s = append(s, []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 10}...)
-	pr := asciiReader{reader: bytes.NewReader(s)}
+	s = append(s, []byte{1, 0, 0, 0, 0, 0, 0, 12, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 10}...)
+	pr := dockerLogsReader{reader: bytes.NewReader(s)}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world\n", string(b))
 }
 
 type eofReader struct {
+	hdr     []byte
+	data    []byte
+	hdrRead bool
 }
 
-func (r eofReader) Read(p []byte) (int, error) {
-	data := []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}
-	copy(p, data)
-	return len(data), io.EOF
+func (r *eofReader) Read(p []byte) (int, error) {
+	if !r.hdrRead {
+		r.hdrRead = true
+		copy(p, r.hdr)
+		return len(r.hdr), nil
+	}
+	copy(p, r.data)
+	return len(r.data), io.EOF
 }
 
-func TestASCIIReaderEOF(t *testing.T) {
-	pr := asciiReader{reader: eofReader{}}
+func TestDockerLogsReaderEOF(t *testing.T) {
+	pr := dockerLogsReader{reader: &eofReader{
+		hdr:  []byte{1, 0, 0, 0, 0, 0, 0, 11},
+		data: []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100},
+	}}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(b))
@@ -118,7 +128,7 @@ func TestRunTaskCMDLogger(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
-		close(processed)
+		processed <- 1
 	})
 	assert.NoError(t, err)
 	rt, err := NewDockerRuntime(WithBroker(b))
