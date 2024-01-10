@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
@@ -23,7 +23,7 @@ func Test_handlePendingTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewPendingHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -65,7 +65,7 @@ func Test_handleConditionalTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewPendingHandler(ds, b)
 	assert.NotNil(t, handler)
 

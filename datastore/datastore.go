@@ -3,10 +3,18 @@ package datastore
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 )
 
 type Provider func() (Datastore, error)
+
+var (
+	ErrTaskNotFound    = errors.New("task not found")
+	ErrNodeNotFound    = errors.New("node not found")
+	ErrJobNotFound     = errors.New("job not found")
+	ErrContextNotFound = errors.New("context not found")
+)
 
 const (
 	DATASTORE_INMEMORY = "inmemory"

@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/mq"
@@ -17,7 +18,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 
 	now := time.Now().UTC()
@@ -78,7 +79,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -167,7 +168,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -224,7 +225,7 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -276,7 +277,7 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -382,7 +383,7 @@ func Test_handleCompletedEachTask(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -483,7 +484,7 @@ func Test_handleCompletedEachTask(t *testing.T) {
 func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -534,7 +535,7 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	b := mq.NewInMemoryBroker()
@@ -588,7 +589,7 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 func Test_completeParallelTaskWithTx(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	handler := NewCompletedHandler(ds, mq.NewInMemoryBroker())
@@ -638,7 +639,7 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 func Test_completeEachTaskWithTx(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-	ds, err := datastore.NewPostgresDataStore(dsn)
+	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
 	handler := NewCompletedHandler(ds, mq.NewInMemoryBroker())

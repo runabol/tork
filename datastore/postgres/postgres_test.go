@@ -1,4 +1,4 @@
-package datastore
+package postgres
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
 
 	"github.com/runabol/tork/internal/uuid"
@@ -727,7 +728,7 @@ func TestPostgresWithTxCreateTask(t *testing.T) {
 	j1 := tork.Job{
 		ID: uuid.NewUUID(),
 	}
-	err = ds.WithTx(ctx, func(tx Datastore) error {
+	err = ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		err = tx.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
 		t1 := tork.Task{}
@@ -760,7 +761,7 @@ func TestPostgresWithTxUpdateTask(t *testing.T) {
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
-	err = ds.WithTx(ctx, func(tx Datastore) error {
+	err = ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		return tx.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
 			u.State = tork.TaskStateFailed
 			u.State = tork.TaskState(strings.Repeat("x", 100)) // invalid state

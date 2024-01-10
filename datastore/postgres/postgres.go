@@ -1,4 +1,4 @@
-package datastore
+package postgres
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
 )
 
@@ -494,7 +495,7 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*tork.
 	r := taskRecord{}
 	if err := ds.get(&r, `SELECT * FROM tasks where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrTaskNotFound
+			return nil, datastore.ErrTaskNotFound
 		}
 		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
@@ -502,7 +503,7 @@ func (ds *PostgresDatastore) GetTaskByID(ctx context.Context, id string) (*tork.
 }
 
 func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify func(t *tork.Task) error) error {
-	return ds.WithTx(ctx, func(tx Datastore) error {
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
 			return errors.New("unable to cast to a postgres datastore")
@@ -618,7 +619,7 @@ func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *tork.Node) error
 }
 
 func (ds *PostgresDatastore) UpdateNode(ctx context.Context, id string, modify func(u *tork.Node) error) error {
-	return ds.WithTx(ctx, func(tx Datastore) error {
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
 			return errors.New("unable to cast to a postgres datastore")
@@ -649,7 +650,7 @@ func (ds *PostgresDatastore) GetNodeByID(ctx context.Context, id string) (*tork.
 	nr := nodeRecord{}
 	if err := ds.get(&nr, `SELECT * FROM nodes where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrNodeNotFound
+			return nil, datastore.ErrNodeNotFound
 		}
 		return nil, errors.Wrapf(err, "error fetching task from db")
 	}
@@ -716,7 +717,7 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	return nil
 }
 func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error {
-	return ds.WithTx(ctx, func(tx Datastore) error {
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
 			return errors.New("unable to cast to a postgres datastore")
@@ -759,7 +760,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	r := jobRecord{}
 	if err := ds.get(&r, `SELECT * FROM jobs where id = $1`, id); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrJobNotFound
+			return nil, datastore.ErrJobNotFound
 		}
 		return nil, errors.Wrapf(err, "error fetching job from db")
 	}
@@ -828,7 +829,7 @@ func (ds *PostgresDatastore) CreateTaskLogPart(ctx context.Context, p *tork.Task
 	return nil
 }
 
-func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*Page[*tork.TaskLogPart], error) {
+func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	q := fmt.Sprintf(`SELECT * 
@@ -852,7 +853,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 	if *count%size != 0 {
 		totalPages = totalPages + 1
 	}
-	return &Page[*tork.TaskLogPart]{
+	return &datastore.Page[*tork.TaskLogPart]{
 		Items:      items,
 		Number:     page,
 		Size:       len(items),
@@ -861,7 +862,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 	}, nil
 }
 
-func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error) {
+func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
@@ -899,7 +900,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 		totalPages = totalPages + 1
 	}
 
-	return &Page[*tork.JobSummary]{
+	return &datastore.Page[*tork.JobSummary]{
 		Items:      result,
 		Number:     page,
 		Size:       len(result),
@@ -954,7 +955,7 @@ func (ds *PostgresDatastore) exec(query string, args ...any) (sql.Result, error)
 	}
 }
 
-func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx Datastore) error) error {
+func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx datastore.Datastore) error) error {
 	var tx *sqlx.Tx
 	var err error
 	var owner bool

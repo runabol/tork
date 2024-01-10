@@ -5,7 +5,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/db/postgres"
+	"github.com/runabol/tork/datastore/postgres"
+	schema "github.com/runabol/tork/db/postgres"
 	ucli "github.com/urfave/cli/v2"
 )
 
@@ -25,11 +26,11 @@ func migration(ctx *ucli.Context) error {
 			"datastore.postgres.dsn",
 			"host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable",
 		)
-		pg, err := datastore.NewPostgresDataStore(dsn)
+		pg, err := postgres.NewPostgresDataStore(dsn)
 		if err != nil {
 			return err
 		}
-		if err := pg.ExecScript(postgres.SCHEMA); err != nil {
+		if err := pg.ExecScript(schema.SCHEMA); err != nil {
 			return errors.Wrapf(err, "error when trying to create db schema")
 		}
 	default:

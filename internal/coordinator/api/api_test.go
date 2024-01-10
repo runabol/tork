@@ -16,6 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/middleware/web"
 
 	"github.com/runabol/tork/mq"
@@ -31,7 +33,7 @@ func Test_getQueues(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 	})
 	assert.NoError(t, err)
@@ -54,7 +56,7 @@ func Test_getQueues(t *testing.T) {
 
 func Test_listJobs(t *testing.T) {
 	b := mq.NewInMemoryBroker()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	api, err := NewAPI(Config{
 		DataStore: ds,
 		Broker:    b,
@@ -120,7 +122,7 @@ func Test_listJobs(t *testing.T) {
 }
 
 func Test_getActiveNodes(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	active := &tork.Node{
 		ID:              "1234",
 		LastHeartbeatAt: time.Now().UTC(),
@@ -157,7 +159,7 @@ func Test_getActiveNodes(t *testing.T) {
 
 func Test_healthOK(t *testing.T) {
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -176,7 +178,7 @@ func Test_healthOK(t *testing.T) {
 func Test_healthNotOK(t *testing.T) {
 	schemaName := fmt.Sprintf("tork%d", rand.Int())
 	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
-	ds, err := datastore.NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	ds, err := postgres.NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
@@ -197,7 +199,7 @@ func Test_healthNotOK(t *testing.T) {
 
 func Test_getUnknownTask(t *testing.T) {
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -212,7 +214,7 @@ func Test_getUnknownTask(t *testing.T) {
 }
 
 func Test_getTask(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	ta := tork.Task{
 		ID:   "1234",
 		Name: "test task",
@@ -241,7 +243,7 @@ func Test_getTask(t *testing.T) {
 
 func Test_createJob(t *testing.T) {
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -268,7 +270,7 @@ func Test_createJob(t *testing.T) {
 
 func Test_createJobInvalidProperty(t *testing.T) {
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -287,7 +289,7 @@ func Test_createJobInvalidProperty(t *testing.T) {
 }
 
 func Test_getJob(t *testing.T) {
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	err := ds.CreateJob(context.Background(), &tork.Job{
 		ID:    "1234",
 		State: tork.JobStatePending,
@@ -316,7 +318,7 @@ func Test_getJob(t *testing.T) {
 
 func Test_cancelRunningJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateRunning,
@@ -384,7 +386,7 @@ func Test_cancelRunningJob(t *testing.T) {
 
 func Test_cancelScheduledJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateScheduled,
@@ -452,7 +454,7 @@ func Test_cancelScheduledJob(t *testing.T) {
 
 func Test_restartJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateCancelled,
@@ -501,7 +503,7 @@ func Test_restartJob(t *testing.T) {
 
 func Test_restartRunningJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateRunning,
@@ -547,7 +549,7 @@ func Test_restartRunningJob(t *testing.T) {
 
 func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 	ctx := context.Background()
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateFailed,
@@ -602,7 +604,7 @@ func Test_middleware(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw},
@@ -625,7 +627,7 @@ func Test_middleware(t *testing.T) {
 func Test_echoMiddleware(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Middleware: Middleware{
 			Echo: []echo.MiddlewareFunc{
@@ -670,7 +672,7 @@ func Test_middlewareMultiple(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw1, mw2},
@@ -711,7 +713,7 @@ func Test_2CustomEndpoints(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint":       h,
@@ -748,7 +750,7 @@ func Test_customEndpoint(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
@@ -774,7 +776,7 @@ func Test_customEndpointInvalidSpec(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	_, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"xyz": h,
@@ -790,7 +792,7 @@ func Test_customEndpointError(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
@@ -823,7 +825,7 @@ func Test_customEndpointBind(t *testing.T) {
 	}
 	b := mq.NewInMemoryBroker()
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"POST /myendpoint": h,
@@ -846,7 +848,7 @@ func Test_customEndpointBind(t *testing.T) {
 
 func Test_disableEndpoint(t *testing.T) {
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 		Enabled:   map[string]bool{"health": false},
 	})
@@ -874,7 +876,7 @@ func TestShutdown(t *testing.T) {
 	}
 
 	api, err := NewAPI(Config{
-		DataStore: datastore.NewInMemoryDatastore(),
+		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    mq.NewInMemoryBroker(),
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw},

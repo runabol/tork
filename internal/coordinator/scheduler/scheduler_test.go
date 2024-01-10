@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ func Test_scheduleRegularTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -60,7 +60,7 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 
 	j1 := &tork.Job{
@@ -115,7 +115,7 @@ func Test_scheduleParallelTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -172,7 +172,7 @@ func Test_scheduleEachTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -228,7 +228,7 @@ func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -273,7 +273,7 @@ func Test_scheduleEachTaskCustomVar(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -330,7 +330,7 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -390,7 +390,7 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := datastore.NewInMemoryDatastore()
+	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
