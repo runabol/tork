@@ -381,7 +381,7 @@ func Test_imagePull(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = rt.imagePull(ctx, &tork.Task{Image: "localhost:5001/no/suchthing"})
+	err = rt.imagePull(ctx, &tork.Task{Image: "localhost:5001/no/suchthing"}, os.Stdout)
 	assert.Error(t, err)
 
 	wg := sync.WaitGroup{}
@@ -390,7 +390,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:1.36"})
+			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:1.36"}, os.Stdout)
 			assert.NoError(t, err)
 		}()
 	}
@@ -427,7 +427,7 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 			Username: "username",
 			Password: "password",
 		},
-	})
+	}, os.Stdout)
 
 	assert.NoError(t, err)
 }

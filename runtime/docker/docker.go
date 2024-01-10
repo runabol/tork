@@ -48,6 +48,7 @@ type dockerLogsReader struct {
 
 type pullRequest struct {
 	image    string
+	logger   io.Writer
 	registry registry
 	done     chan error
 }
@@ -161,7 +162,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if t.ID == "" {
 		return errors.New("task id is required")
 	}
-	if err := d.imagePull(ctx, t); err != nil {
+	if err := d.imagePull(ctx, t, logger); err != nil {
 		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
 
@@ -574,7 +575,7 @@ func (r dockerLogsReader) Read(p []byte) (int, error) {
 	return len(data), err
 }
 
-func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
+func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {
 	_, ok := d.images.Get(t.Image)
 	if ok {
 		return nil
@@ -597,8 +598,9 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task) error {
 		}
 	}
 	pr := &pullRequest{
-		image: t.Image,
-		done:  make(chan error),
+		image:  t.Image,
+		logger: logger,
+		done:   make(chan error),
 	}
 	if t.Registry != nil {
 		pr.registry = registry{
@@ -651,7 +653,7 @@ func (d *DockerRuntime) puller(ctx context.Context) {
 			pr.done <- err
 			continue
 		}
-		_, err = io.Copy(os.Stdout, reader)
+		_, err = io.Copy(pr.logger, reader)
 		if err != nil {
 			pr.done <- err
 			continue
