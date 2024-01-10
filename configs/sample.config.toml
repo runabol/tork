@@ -21,6 +21,7 @@ type = "inmemory" # inmemory | postgres
 
 [datastore.postgres]
 dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+task.logs.interval = "168h"
 
 [coordinator]
 address = "localhost:8000"

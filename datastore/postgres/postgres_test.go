@@ -912,3 +912,99 @@ func TestPostgresCreateAndGetTaskLogsLarge(t *testing.T) {
 	assert.Equal(t, 10, logs.Size)
 	assert.Equal(t, 10, logs.TotalPages)
 }
+
+func TestPostgresCreateAndExpungeTaskLogs(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	n, err := ds.expungeExpiredTaskLogPart()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n)
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 100, logs.TotalItems)
+
+	retentionPeriod := time.Microsecond
+	ds.taskLogsRetentionPeriod = &retentionPeriod
+
+	n, err = ds.expungeExpiredTaskLogPart()
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, n, 100)
+
+	logs, err = ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, logs.TotalItems)
+}
+
+func Test_cleanup(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn, WithDisableCleanup(true))
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	err = ds.cleanup()
+	assert.NoError(t, err)
+	assert.Equal(t, time.Minute*2, *ds.cleanupInterval)
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 100, logs.TotalItems)
+
+	retentionPeriod := time.Microsecond
+	ds.taskLogsRetentionPeriod = &retentionPeriod
+
+	err = ds.cleanup()
+	assert.NoError(t, err)
+	assert.Equal(t, time.Minute, *ds.cleanupInterval)
+
+	logs, err = ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, logs.TotalItems)
+}
