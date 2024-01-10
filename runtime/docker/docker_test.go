@@ -38,15 +38,18 @@ func TestParseCPUs(t *testing.T) {
 }
 
 func TestDockerLogsReader(t *testing.T) {
-	s := []byte{}
-	for i := 0; i < 1000; i++ {
-		s = append(s, 0)
+	bs := []byte{}
+	for i := 0; i < 100; i++ {
+		bs = append(bs, []byte{1, 0, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111}...)
 	}
-	s = append(s, []byte{1, 0, 0, 0, 0, 0, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100}...)
-	pr := dockerLogsReader{reader: bytes.NewReader(s)}
+	s := ""
+	for i := 0; i < 100; i++ {
+		s = s + "hello"
+	}
+	pr := dockerLogsReader{reader: bytes.NewReader(bs)}
 	b, err := io.ReadAll(pr)
 	assert.NoError(t, err)
-	assert.Equal(t, "hello world", string(b))
+	assert.Equal(t, s, string(b))
 }
 
 func TestDockerLogsReaderNewLine(t *testing.T) {
