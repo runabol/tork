@@ -55,7 +55,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 
 ## Documentation
 
-See [https://www.tork.run](https://tork.run) for the full documentation.
+See [tork.run](https://tork.run) for the full documentation.
 
 ## Quick Start
 
