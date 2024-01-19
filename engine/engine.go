@@ -71,6 +71,8 @@ type Middleware struct {
 	Node []node.MiddlewareFunc
 }
 
+type JobListener func(j *tork.Job)
+
 func New(cfg Config) *Engine {
 	if cfg.Endpoints == nil {
 		cfg.Endpoints = make(map[string]web.HandlerFunc)
@@ -313,7 +315,7 @@ func (e *Engine) RegisterBrokerProvider(name string, provider mq.Provider) {
 	e.mqProviders[name] = provider
 }
 
-func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...web.JobListener) (*tork.Job, error) {
+func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobListener) (*tork.Job, error) {
 	e.mustState(StateRunning)
 	if e.cfg.Mode != ModeStandalone && e.cfg.Mode != ModeCoordinator {
 		panic(errors.Errorf("engine not in coordinator/standalone mode"))
