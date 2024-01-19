@@ -2,15 +2,11 @@ package web
 
 import (
 	"net/http"
-
-	"github.com/runabol/tork"
 )
 
 type MiddlewareFunc func(next HandlerFunc) HandlerFunc
 
 type HandlerFunc func(c Context) error
-
-type JobListener func(j *tork.Job)
 
 type Context interface {
 	// Request returns `*http.Request`.
