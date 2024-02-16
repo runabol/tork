@@ -85,6 +85,13 @@ func echoMiddleware() []echo.MiddlewareFunc {
 		mw = append(mw, basicAuth(username, password))
 	}
 
+	// key auth
+	keyAuthEnabled := conf.Bool("middleware.web.keyauth.enabled")
+	if keyAuthEnabled {
+		key := conf.StringDefault("middleware.web.keyauth.key", "")
+		mw = append(mw, keyAuth(key))
+	}
+
 	// rate limit
 	rateLimitEnabled := conf.Bool("middleware.web.ratelimit.enabled")
 	if rateLimitEnabled {
@@ -116,6 +123,21 @@ func basicAuth(username, password string) echo.MiddlewareFunc {
 		}
 		return false, nil
 	})
+}
+
+func keyAuth(key string) echo.MiddlewareFunc {
+	if key == "" {
+		key = uuid.NewUUID()
+		log.Debug().Msgf("Key Auth Key: %s", key)
+	}
+	cfg := middleware.DefaultKeyAuthConfig
+	cfg.Skipper = func(c echo.Context) bool {
+		return c.Request().URL.Path == "/health"
+	}
+	cfg.Validator = func(ukey string, c echo.Context) (bool, error) {
+		return ukey == key, nil
+	}
+	return middleware.KeyAuthWithConfig(cfg)
 }
 
 func logger() echo.MiddlewareFunc {
