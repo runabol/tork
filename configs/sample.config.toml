@@ -57,6 +57,11 @@ enabled = false
 username = "tork"
 password = ""     # if left blank, it will auto-generate a password and print it to the logs on startup
 
+[middleware.web.keyauth]
+enabled = false
+key = ""        # if left blank, it will auto-generate a key and print it to the logs on startup
+
+
 # rate limiter middleware
 [middleware.web.ratelimit]
 enabled = false
