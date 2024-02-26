@@ -217,20 +217,12 @@ func Test_scheduleEachTask(t *testing.T) {
 	assert.Equal(t, int32(2), counter.Load())
 }
 
-func Test_scheduleEachTaskListOneElement(t *testing.T) {
+func Test_scheduleEachTaskNotaList(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
 
-	processed := make(chan any, 1)
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
-		processed <- 1
-		return nil
-	})
-	assert.NoError(t, err)
-
 	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
-	assert.NoError(t, err)
 	assert.NotNil(t, s)
 
 	j := &tork.Job{
@@ -238,7 +230,7 @@ func Test_scheduleEachTaskListOneElement(t *testing.T) {
 		Name: "test job",
 	}
 
-	err = ds.CreateJob(ctx, j)
+	err := ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
 	tk := &tork.Task{
@@ -246,7 +238,7 @@ func Test_scheduleEachTaskListOneElement(t *testing.T) {
 		JobID: j.ID,
 		State: tork.TaskStatePending,
 		Each: &tork.EachTask{
-			List: "{{ 1 }}",
+			List: "1",
 			Task: &tork.Task{},
 		},
 	}
@@ -257,12 +249,7 @@ func Test_scheduleEachTaskListOneElement(t *testing.T) {
 	err = s.scheduleEachTask(ctx, tk)
 	assert.NoError(t, err)
 
-	// wait for the tasks to get processed
-	<-processed
-
-	tk, err = ds.GetTaskByID(ctx, tk.ID)
-	assert.NoError(t, err)
-	assert.Equal(t, tork.TaskStateRunning, tk.State)
+	assert.Equal(t, tork.TaskStateFailed, tk.State)
 }
 
 func Test_scheduleEachTaskBadExpression(t *testing.T) {
