@@ -182,9 +182,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 			list = append(list, rlist.Index(i).Interface())
 		}
 	} else {
-		t.Error = err.Error()
-		t.State = tork.TaskStateFailed
-		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+		list = append(list, rlist.Interface())
 	}
 	// mark the task as running
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
