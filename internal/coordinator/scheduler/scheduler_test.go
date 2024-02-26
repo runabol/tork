@@ -217,6 +217,41 @@ func Test_scheduleEachTask(t *testing.T) {
 	assert.Equal(t, int32(2), counter.Load())
 }
 
+func Test_scheduleEachTaskNotaList(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := inmemory.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+
+	err := ds.CreateJob(ctx, j)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j.ID,
+		State: tork.TaskStatePending,
+		Each: &tork.EachTask{
+			List: "1",
+			Task: &tork.Task{},
+		},
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleEachTask(ctx, tk)
+	assert.NoError(t, err)
+
+	assert.Equal(t, tork.TaskStateFailed, tk.State)
+}
+
 func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()

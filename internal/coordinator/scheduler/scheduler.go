@@ -182,7 +182,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 			list = append(list, rlist.Index(i).Interface())
 		}
 	} else {
-		t.Error = err.Error()
+		t.Error = "each.list does not evaluate to a list"
 		t.State = tork.TaskStateFailed
 		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 	}
