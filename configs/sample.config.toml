@@ -15,6 +15,7 @@ type = "inmemory" # inmemory | rabbitmq
 url = "amqp://guest:guest@localhost:5672/"
 consumer.timeout = "30m"
 management.url = ""                        # default: http://{rabbit_host}:15672/
+durable.queues = false
 
 [datastore]
 type = "inmemory" # inmemory | postgres
