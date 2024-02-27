@@ -88,9 +88,9 @@ func WithManagementURL(url string) Option {
 
 // WithDurableQueues sets the durable flag upon queue creation.
 // Durable queues can survive broker restarts.
-func WithDurableQueues(vak bool) Option {
+func WithDurableQueues(val bool) Option {
 	return func(b *RabbitMQBroker) {
-		b.durable = vak
+		b.durable = val
 	}
 }
 
