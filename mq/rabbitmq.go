@@ -41,6 +41,7 @@ type RabbitMQBroker struct {
 	heartbeatTTL    int
 	consumerTimeout int
 	managementURL   string
+	durable         bool
 }
 
 type subscription struct {
@@ -82,6 +83,14 @@ func WithConsumerTimeoutMS(consumerTimeout time.Duration) Option {
 func WithManagementURL(url string) Option {
 	return func(b *RabbitMQBroker) {
 		b.managementURL = url
+	}
+}
+
+// WithDurableQueues sets the durable flag upon queue creation.
+// Durable queues can survive broker restarts.
+func WithDurableQueues(val bool) Option {
+	return func(b *RabbitMQBroker) {
+		b.durable = val
 	}
 }
 
@@ -322,7 +331,7 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	args["x-consumer-timeout"] = b.consumerTimeout
 	_, err := ch.QueueDeclare(
 		qname,
-		false, // durable
+		b.durable,
 		false, // delete when unused
 		strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
 		false, // no-wait
