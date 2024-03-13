@@ -63,7 +63,9 @@ func (h *completedHandler) completeEachTask(ctx context.Context, t *tork.Task) e
 	err := h.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update actual task
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
 			u.State = t.State
@@ -117,7 +119,9 @@ func (h *completedHandler) completeParallelTask(ctx context.Context, t *tork.Tas
 	var isLast bool
 	err := h.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
 			u.State = t.State
@@ -171,7 +175,9 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update task in DB
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
 			u.State = t.State

@@ -90,7 +90,7 @@ func Test_handleSkippedTask(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:          uuid.NewUUID(),
-		State:       tork.TaskStateRunning,
+		State:       tork.TaskStateSkipped,
 		StartedAt:   &now,
 		CompletedAt: &now,
 		NodeID:      uuid.NewUUID(),
