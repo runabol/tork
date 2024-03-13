@@ -39,15 +39,53 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
-	err = b.SubscribeForJobs(func(j *tork.Job) error {
-		// the cancellation for the parent job
-		assert.Equal(t, j1.ID, j.ID)
-		// verify that the job was marked
-		// as COMPLETED
-		assert.Equal(t, j1.ID, j.ID)
-		assert.Equal(t, tork.JobStateCompleted, j.State)
-		return nil
-	})
+	t1 := &tork.Task{
+		ID:          uuid.NewUUID(),
+		State:       tork.TaskStateRunning,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    2,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t1.State = tork.TaskStateCompleted
+
+	err = handler(ctx, task.StateChange, t1)
+	assert.NoError(t, err)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
+	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+}
+
+func Test_handleSkippedTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := inmemory.NewInMemoryDatastore()
+	handler := NewCompletedHandler(ds, b)
+
+	now := time.Now().UTC()
+
+	j1 := &tork.Job{
+		ID:       uuid.NewUUID(),
+		State:    tork.JobStateRunning,
+		Position: 2,
+		Tasks: []*tork.Task{
+			{
+				Name: "task-1",
+			},
+			{
+				Name: "task-2",
+			},
+		},
+	}
+	err := ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
@@ -63,15 +101,14 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	t1.State = tork.TaskStateSkipped
+
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
-	// wait for the job itself to complete
-	time.Sleep(time.Millisecond * 100)
-
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, tork.TaskStateCompleted, t2.State)
+	assert.Equal(t, tork.TaskStateSkipped, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
 }
 
@@ -146,6 +183,8 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	t1.State = tork.TaskStateCompleted
+
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
@@ -203,6 +242,8 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	t1.State = tork.TaskStateCompleted
+
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
 
@@ -256,6 +297,8 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
+
+	t1.State = tork.TaskStateCompleted
 
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
@@ -356,8 +399,12 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t5)
 	assert.NoError(t, err)
 
+	t1.State = tork.TaskStateCompleted
+
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
+
+	t5.State = tork.TaskStateCompleted
 
 	err = handler(ctx, task.StateChange, t5)
 	assert.NoError(t, err)
@@ -455,8 +502,12 @@ func Test_handleCompletedEachTask(t *testing.T) {
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
 
+	t1.State = tork.TaskStateCompleted
+
 	err = ds.CreateTask(ctx, t5)
 	assert.NoError(t, err)
+
+	t5.State = tork.TaskStateCompleted
 
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)
@@ -577,6 +628,8 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 
 	err = ds.CreateTask(ctx, t1)
 	assert.NoError(t, err)
+
+	t1.State = tork.TaskStateCompleted
 
 	err = handler(ctx, task.StateChange, t1)
 	assert.NoError(t, err)

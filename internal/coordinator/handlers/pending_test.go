@@ -86,5 +86,5 @@ func Test_handleConditionalTask(t *testing.T) {
 
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+	assert.Equal(t, tork.TaskStateSkipped, tk.State)
 }

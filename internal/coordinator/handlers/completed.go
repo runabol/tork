@@ -33,6 +33,9 @@ func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.Middlewa
 
 func (h *completedHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	now := time.Now().UTC()
+	if t.State != tork.TaskStateCompleted && t.State != tork.TaskStateSkipped {
+		return errors.Errorf("invalid completion state: %s", t.State)
+	}
 	t.CompletedAt = &now
 	return h.completeTask(ctx, t)
 }
@@ -63,7 +66,7 @@ func (h *completedHandler) completeEachTask(ctx context.Context, t *tork.Task) e
 			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -117,7 +120,7 @@ func (h *completedHandler) completeParallelTask(ctx context.Context, t *tork.Tas
 			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -171,7 +174,7 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil

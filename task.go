@@ -19,6 +19,7 @@ const (
 	TaskStateStopped   TaskState = "STOPPED"
 	TaskStateCompleted TaskState = "COMPLETED"
 	TaskStateFailed    TaskState = "FAILED"
+	TaskStateSkipped   TaskState = "SKIPPED"
 )
 
 // Task is the basic unit of work that a Worker can handle.
