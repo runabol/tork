@@ -33,6 +33,9 @@ func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.Middlewa
 
 func (h *completedHandler) handle(ctx context.Context, et task.EventType, t *tork.Task) error {
 	now := time.Now().UTC()
+	if t.State != tork.TaskStateCompleted && t.State != tork.TaskStateSkipped {
+		return errors.Errorf("invalid completion state: %s", t.State)
+	}
 	t.CompletedAt = &now
 	return h.completeTask(ctx, t)
 }
@@ -60,10 +63,12 @@ func (h *completedHandler) completeEachTask(ctx context.Context, t *tork.Task) e
 	err := h.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update actual task
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -114,10 +119,12 @@ func (h *completedHandler) completeParallelTask(ctx context.Context, t *tork.Tas
 	var isLast bool
 	err := h.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil
@@ -168,10 +175,12 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 	err := c.ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		// update task in DB
 		if err := tx.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-			if u.State != tork.TaskStateRunning && u.State != tork.TaskStateScheduled {
+			if u.State != tork.TaskStateRunning &&
+				u.State != tork.TaskStateScheduled &&
+				u.State != tork.TaskStateSkipped {
 				return errors.Errorf("can't complete task %s because it's %s", t.ID, u.State)
 			}
-			u.State = tork.TaskStateCompleted
+			u.State = t.State
 			u.CompletedAt = t.CompletedAt
 			u.Result = t.Result
 			return nil

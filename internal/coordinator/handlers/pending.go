@@ -42,7 +42,7 @@ func (h *pendingHandler) handle(ctx context.Context, et task.EventType, t *tork.
 
 func (h *pendingHandler) skipTask(ctx context.Context, t *tork.Task) error {
 	now := time.Now().UTC()
-	t.State = tork.TaskStateScheduled
+	t.State = tork.TaskStateSkipped
 	t.ScheduledAt = &now
 	t.StartedAt = &now
 	t.CompletedAt = &now
