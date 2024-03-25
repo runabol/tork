@@ -327,6 +327,53 @@ func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 	}, nil
 }
 
+func (ds *InMemoryDatastore) GetJobLogParts(ctx context.Context, jobID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
+	execution := ds.getExecution(jobID)
+	allParts := make([]*tork.TaskLogPart, 0)
+	for _, task := range execution {
+		parts, ok := ds.logs.Get(task.ID)
+		if ok {
+			allParts = append(allParts, parts...)
+		}
+	}
+	if (len(allParts)) == 0 {
+		return &datastore.Page[*tork.TaskLogPart]{
+			Items:      make([]*tork.TaskLogPart, 0),
+			Number:     1,
+			Size:       0,
+			TotalPages: 0,
+			TotalItems: 0,
+		}, nil
+	}
+	sort.Slice(allParts, func(i, j int) bool {
+		ti, _ := ds.tasks.Get(allParts[i].TaskID)
+		tj, _ := ds.tasks.Get(allParts[j].TaskID)
+		if ti.Position > tj.Position {
+			return true
+		} else if ti.Position < tj.Position {
+			return false
+		}
+		return allParts[i].Number > allParts[j].Number
+	})
+	offset := (page - 1) * size
+	result := make([]*tork.TaskLogPart, 0)
+	for i := offset; i < (offset+size) && i < len(allParts); i++ {
+		p := allParts[i]
+		result = append(result, p)
+	}
+	totalPages := len(allParts) / size
+	if len(allParts)%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &datastore.Page[*tork.TaskLogPart]{
+		Items:      result,
+		Number:     page,
+		Size:       len(result),
+		TotalPages: totalPages,
+		TotalItems: len(allParts),
+	}, nil
+}
+
 func (ds *InMemoryDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, error) {
 	s := &tork.Metrics{}
 

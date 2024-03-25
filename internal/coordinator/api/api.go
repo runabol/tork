@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	MIN_PORT = 8000
-	MAX_PORT = 8100
+	MIN_PORT          = 8000
+	MAX_PORT          = 8100
+	MAX_LOG_PAGE_SIZE = 100
 )
 
 type HealthResponse struct {
@@ -124,6 +125,7 @@ func NewAPI(cfg Config) (*API, error) {
 	if v, ok := cfg.Enabled["jobs"]; !ok || v {
 		r.POST("/jobs", s.createJob)
 		r.GET("/jobs/:id", s.getJob)
+		r.GET("/jobs/:id/log", s.getJobLog)
 		r.GET("/jobs", s.listJobs)
 		r.PUT("/jobs/:id/cancel", s.cancelJob)
 		r.PUT("/jobs/:id/restart", s.restartJob)
@@ -326,6 +328,52 @@ func (s *API) getJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, j)
 }
 
+// getJobLog
+// @Summary Get a jobs's log
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {object} []tork.TaskLogPart
+// @Router /jobs/{id}/log [get]
+// @Param id path string true "Job ID"
+// @Param page query int false "page number"
+// @Param size query int false "page size"
+func (s *API) getJobLog(c echo.Context) error {
+	id := c.Param("id")
+	ps := c.QueryParam("page")
+	if ps == "" {
+		ps = "1"
+	}
+	page, err := strconv.Atoi(ps)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid page number: %s", ps))
+	}
+	if page < 1 {
+		page = 1
+	}
+	si := c.QueryParam("size")
+	if si == "" {
+		si = "25"
+	}
+	size, err := strconv.Atoi(si)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid size: %s", ps))
+	}
+	if size < 1 {
+		size = 1
+	} else if size > MAX_LOG_PAGE_SIZE {
+		size = MAX_LOG_PAGE_SIZE
+	}
+	_, err = s.ds.GetJobByID(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	l, err := s.ds.GetJobLogParts(c.Request().Context(), id, page, size)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	return c.JSON(http.StatusOK, l)
+}
+
 // listJobs
 // @Summary Show a list of jobs
 // @Tags jobs
@@ -425,8 +473,8 @@ func (s *API) getTaskLog(c echo.Context) error {
 	}
 	if size < 1 {
 		size = 1
-	} else if size > 50 {
-		size = 50
+	} else if size > MAX_LOG_PAGE_SIZE {
+		size = MAX_LOG_PAGE_SIZE
 	}
 	_, err = s.ds.GetTaskByID(c.Request().Context(), id)
 	if err != nil {

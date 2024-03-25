@@ -654,11 +654,11 @@ func (ds *PostgresDatastore) expungeExpiredTaskLogPart() (int, error) {
 func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
-	q := fmt.Sprintf(`SELECT * 
-	      FROM tasks_log_parts 
+	q := fmt.Sprintf(`select * 
+	      from tasks_log_parts 
 		  where task_id = $1
-		  ORDER BY number_ DESC
-		  OFFSET %d LIMIT %d`, offset, size)
+		  order by number_ DESC
+		  offset %d limit %d`, offset, size)
 
 	if err := ds.select_(&rs, q, taskID); err != nil {
 		return nil, errors.Wrapf(err, "error task log parts from db")
@@ -669,6 +669,45 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 	}
 	var count *int
 	if err := ds.get(&count, `select count(*) from tasks_log_parts where task_id = $1`, taskID); err != nil {
+		return nil, errors.Wrapf(err, "error getting the task log parts count")
+	}
+	totalPages := *count / size
+	if *count%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &datastore.Page[*tork.TaskLogPart]{
+		Items:      items,
+		Number:     page,
+		Size:       len(items),
+		TotalPages: totalPages,
+		TotalItems: *count,
+	}, nil
+}
+
+func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
+	offset := (page - 1) * size
+	rs := []taskLogPartRecord{}
+	q := fmt.Sprintf(`select tlp.* 
+	      from tasks_log_parts tlp
+		  join tasks t
+		  on t.id = tlp.task_id
+		  where t.job_id = $1
+		  order by t.position desc, t.created_at desc, tlp.number_ desc, tlp.created_at DESC
+		  offset %d limit %d`, offset, size)
+
+	if err := ds.select_(&rs, q, jobID); err != nil {
+		return nil, errors.Wrapf(err, "error task log parts from db")
+	}
+	items := make([]*tork.TaskLogPart, len(rs))
+	for i, r := range rs {
+		items[i] = r.toTaskLogPart()
+	}
+	var count *int
+	if err := ds.get(&count, `select count(*) 
+	                          from   tasks_log_parts tlp
+							  join   tasks t
+		                      on     t.id = tlp.task_id
+							  where  t.job_id = $1`, jobID); err != nil {
 		return nil, errors.Wrapf(err, "error getting the task log parts count")
 	}
 	totalPages := *count / size
