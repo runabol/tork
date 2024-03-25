@@ -32,7 +32,7 @@ import (
 const (
 	MIN_PORT          = 8000
 	MAX_PORT          = 8100
-	MAX_LOG_PAGE_SIZE = 50
+	MAX_LOG_PAGE_SIZE = 100
 )
 
 type HealthResponse struct {
