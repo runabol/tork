@@ -441,3 +441,45 @@ func TestInMemoryCreateAndGetTaskLogsLarge(t *testing.T) {
 	assert.Equal(t, 10, logs.Size)
 	assert.Equal(t, 10, logs.TotalPages)
 }
+
+func TestInMemoryGetJobLogParts(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	jid := uuid.NewUUID()
+	t1 := tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: jid,
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	logs, err := ds.GetJobLogParts(ctx, jid, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 0)
+
+	err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+		Number:   1,
+		TaskID:   t1.ID,
+		Contents: "line 1",
+	})
+	assert.NoError(t, err)
+
+	logs, err = ds.GetJobLogParts(ctx, jid, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, "line 1", logs.Items[0].Contents)
+	assert.Equal(t, 1, logs.TotalPages)
+
+	err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+		Number:   2,
+		TaskID:   t1.ID,
+		Contents: "line 2",
+	})
+	assert.NoError(t, err)
+
+	logs, err = ds.GetJobLogParts(ctx, jid, 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 2)
+	assert.Equal(t, "line 2", logs.Items[0].Contents)
+	assert.Equal(t, 1, logs.TotalPages)
+}
