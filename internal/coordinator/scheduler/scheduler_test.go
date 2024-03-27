@@ -56,6 +56,51 @@ func Test_scheduleRegularTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
 }
 
+func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	processed := make(chan any)
+	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
+		close(processed)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := inmemory.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	j1 := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+		Defaults: &tork.JobDefaults{
+			Queue: "somequeue",
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Queue: "test-queue",
+		JobID: j1.ID,
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleRegularTask(ctx, tk)
+	assert.NoError(t, err)
+
+	<-processed
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+}
+
 func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	ctx := context.Background()
 	b := mq.NewInMemoryBroker()
