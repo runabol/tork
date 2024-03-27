@@ -383,8 +383,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 				parallel = $12,
 				limits = $13,
 				timeout = $14,
-				retry = $15
-			  where id = $16`
+				retry = $15,
+				queue = $16
+			  where id = $17`
 		_, err = ptx.exec(q,
 			t.Position,               // $1
 			t.State,                  // $2
@@ -401,7 +402,8 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			limits,                   // $13
 			t.Timeout,                // $14
 			retry,                    // $15
-			t.ID,                     // $16
+			t.Queue,                  // $16
+			t.ID,                     // $17
 		)
 		if err != nil {
 			return errors.Wrapf(err, "error updating task %s", t.ID)

@@ -192,6 +192,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 	err = ds.UpdateTask(ctx, t1.ID, func(u *tork.Task) error {
 		u.State = tork.TaskStateScheduled
 		u.Result = "my result"
+		u.Queue = "somequeue"
 		return nil
 	})
 	assert.NoError(t, err)
@@ -200,6 +201,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 	assert.Equal(t, "my result", t2.Result)
+	assert.Equal(t, "somequeue", t2.Queue)
 }
 
 func TestPostgresUpdateTaskConcurrently(t *testing.T) {
