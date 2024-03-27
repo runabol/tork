@@ -42,7 +42,7 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 		return err
 	}
 	if job.Defaults != nil {
-		if job.Defaults.Queue != "" {
+		if t.Queue == "" {
 			t.Queue = job.Defaults.Queue
 		}
 		if job.Defaults.Limits != nil {
