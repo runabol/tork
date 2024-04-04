@@ -342,7 +342,7 @@ func TestRunTaskWithVolumeAndWorkdir(t *testing.T) {
 				Target: "/xyz",
 			},
 		},
-		WorkingDir: "/xyz",
+		WorkDir: "/xyz",
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
@@ -364,7 +364,7 @@ func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
 				Target: "/xyz",
 			},
 		},
-		WorkingDir: "/xyz",
+		WorkDir: "/xyz",
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
