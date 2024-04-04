@@ -186,6 +186,49 @@
                 }
             }
         },
+        "/jobs/{id}/log": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Get a jobs's log",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/tork.TaskLogPart"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/jobs/{id}/restart": {
             "put": {
                 "produces": [
@@ -297,6 +340,49 @@
                     }
                 }
             }
+        },
+        "/tasks/{id}/log": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tasks"
+                ],
+                "summary": "Get a task's log",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/tork.TaskLogPart"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -314,24 +400,9 @@
                 "message": {}
             }
         },
-        "github_com_runabol_tork_mount.Mount": {
-            "type": "object",
-            "properties": {
-                "source": {
-                    "type": "string"
-                },
-                "target": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
         "input.AuxTask": {
             "type": "object",
             "required": [
-                "image",
                 "name"
             ],
             "properties": {
@@ -402,6 +473,9 @@
                 },
                 "task": {
                     "$ref": "#/definitions/input.Task"
+                },
+                "var": {
+                    "type": "string"
                 }
             }
         },
@@ -435,6 +509,12 @@
                     "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/input.Task"
+                    }
+                },
+                "webhooks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/input.Webhook"
                     }
                 }
             }
@@ -513,6 +593,9 @@
                 "description": {
                     "type": "string"
                 },
+                "detached": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -532,6 +615,12 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/input.Task"
+                    }
+                },
+                "webhooks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/input.Webhook"
                     }
                 }
             }
@@ -571,6 +660,9 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "gpus": {
+                    "type": "string"
                 },
                 "if": {
                     "type": "string"
@@ -626,10 +718,37 @@
                 "subjob": {
                     "$ref": "#/definitions/input.SubJob"
                 },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "timeout": {
                     "type": "string"
                 },
                 "var": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "input.Webhook": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "event": {
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "url": {
                     "type": "string"
                 }
             }
@@ -665,6 +784,9 @@
                 },
                 "task": {
                     "$ref": "#/definitions/tork.Task"
+                },
+                "var": {
+                    "type": "string"
                 }
             }
         },
@@ -736,6 +858,12 @@
                     "items": {
                         "$ref": "#/definitions/tork.Task"
                     }
+                },
+                "webhooks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tork.Webhook"
+                    }
                 }
             }
         },
@@ -743,6 +871,12 @@
             "type": "object",
             "properties": {
                 "inputs": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "job": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
@@ -777,6 +911,7 @@
             "type": "string",
             "enum": [
                 "PENDING",
+                "SCHEDULED",
                 "RUNNING",
                 "CANCELLED",
                 "COMPLETED",
@@ -785,6 +920,7 @@
             ],
             "x-enum-varnames": [
                 "JobStatePending",
+                "JobStateScheduled",
                 "JobStateRunning",
                 "JobStateCancelled",
                 "JobStateCompleted",
@@ -813,10 +949,13 @@
                 "id": {
                     "type": "string"
                 },
-                "name": {
-                    "type": "string"
+                "inputs": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
-                "output": {
+                "name": {
                     "type": "string"
                 },
                 "parentId": {
@@ -839,6 +978,20 @@
                 }
             }
         },
+        "tork.Mount": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "tork.Node": {
             "type": "object",
             "properties": {
@@ -852,6 +1005,9 @@
                     "type": "string"
                 },
                 "lastHeartbeatAt": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "queue": {
@@ -915,6 +1071,9 @@
                 "description": {
                     "type": "string"
                 },
+                "detached": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -934,6 +1093,12 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/tork.Task"
+                    }
+                },
+                "webhooks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tork.Webhook"
                     }
                 }
             }
@@ -983,6 +1148,9 @@
                         "type": "string"
                     }
                 },
+                "gpus": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -1001,7 +1169,7 @@
                 "mounts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_runabol_tork_mount.Mount"
+                        "$ref": "#/definitions/tork.Mount"
                     }
                 },
                 "name": {
@@ -1064,10 +1232,19 @@
                 "subjob": {
                     "$ref": "#/definitions/tork.SubJobTask"
                 },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "timeout": {
                     "type": "string"
                 },
                 "var": {
+                    "type": "string"
+                },
+                "workingDir": {
                     "type": "string"
                 }
             }
@@ -1079,6 +1256,23 @@
                     "type": "string"
                 },
                 "memory": {
+                    "type": "string"
+                }
+            }
+        },
+        "tork.TaskLogPart": {
+            "type": "object",
+            "properties": {
+                "contents": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "number": {
+                    "type": "integer"
+                },
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -1103,7 +1297,8 @@
                 "CANCELLED",
                 "STOPPED",
                 "COMPLETED",
-                "FAILED"
+                "FAILED",
+                "SKIPPED"
             ],
             "x-enum-varnames": [
                 "TaskStatePending",
@@ -1112,8 +1307,26 @@
                 "TaskStateCancelled",
                 "TaskStateStopped",
                 "TaskStateCompleted",
-                "TaskStateFailed"
+                "TaskStateFailed",
+                "TaskStateSkipped"
             ]
+        },
+        "tork.Webhook": {
+            "type": "object",
+            "properties": {
+                "event": {
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
         }
     }
 }
