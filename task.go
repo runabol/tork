@@ -196,6 +196,7 @@ func (t *Task) Clone() *Task {
 		SubJob:      subjob,
 		GPUs:        t.GPUs,
 		Tags:        t.Tags,
+		WorkingDir:  t.WorkingDir,
 	}
 }
 
