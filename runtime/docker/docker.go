@@ -2,7 +2,6 @@ package docker
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -203,22 +202,21 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
 		mounts = append(mounts, mount)
 	}
-	// create the workdir mount
-	workdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
-	if err := d.mounter.Mount(ctx, workdir); err != nil {
+	torkdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
+	if err := d.mounter.Mount(ctx, torkdir); err != nil {
 		return err
 	}
 	defer func() {
 		uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
-		if err := d.mounter.Unmount(uctx, workdir); err != nil {
+		if err := d.mounter.Unmount(uctx, torkdir); err != nil {
 			log.Error().Err(err).Msgf("error unmounting workdir")
 		}
 	}()
 	mounts = append(mounts, mount.Mount{
 		Type:   mount.TypeVolume,
-		Source: workdir.Source,
-		Target: workdir.Target,
+		Source: torkdir.Source,
+		Target: torkdir.Target,
 	})
 
 	// parse task limits
@@ -252,7 +250,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	cmd := t.CMD
 	if len(cmd) == 0 {
-		cmd = []string{fmt.Sprintf("%s/entrypoint", workdir.Target)}
+		cmd = []string{fmt.Sprintf("%s/entrypoint", torkdir.Target)}
 	}
 	entrypoint := t.Entrypoint
 	if len(entrypoint) == 0 && t.Run != "" {
@@ -268,11 +266,8 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	// image WORKDIR only if the task
 	// introduces work files _or_ if the
 	// user specifies a WORKDIR
-	switch {
-	case t.WorkingDir != "":
-		cc.WorkingDir = t.WorkingDir
-	case len(t.Files) > 0:
-		cc.WorkingDir = workdir.Target
+	if t.WorkDir != "" || len(t.Files) > 0 {
+		cc.WorkingDir = t.Workdir()
 	}
 
 	nc := network.NetworkingConfig{
@@ -317,8 +312,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		}
 	}()
 
-	// initialize the work directory
-	if err := d.initWorkdir(ctx, resp.ID, t); err != nil {
+	// initialize the tork and, optionally, the work directory
+	if err := d.initTorkdir(ctx, resp.ID, t); err != nil {
+		return errors.Wrapf(err, "error initializing container")
+	}
+	if err := d.initWorkDir(ctx, resp.ID, t); err != nil {
 		return errors.Wrapf(err, "error initializing container")
 	}
 
@@ -421,100 +419,64 @@ func (d *DockerRuntime) readOutput(ctx context.Context, containerID string) (str
 	return buf.String(), nil
 }
 
-func (d *DockerRuntime) initWorkdir(ctx context.Context, containerID string, t *tork.Task) error {
-	log.Debug().Msgf("initialize the workdir for container %s", containerID)
-	// create the archive
-	filename, err := createArchive(t)
+func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *tork.Task) (err error) {
+	log.Debug().Msgf("initialize the torkdir for container %s", containerID)
+
+	archive, err := createTorkArchive(t)
 	if err != nil {
-		return err
+		return
 	}
-	// clean up the archive
-	defer func() {
-		err := os.Remove(filename)
-		if err != nil {
-			log.Error().Err(err).Msgf("error removing archive: %s", filename)
-		}
-	}()
-	// open the archive for reading by the container
-	ar, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	// close the archive
-	defer func() {
-		err := ar.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("error closing archive file")
-		}
-	}()
-	r := bufio.NewReader(ar)
-	if err := d.client.CopyToContainer(ctx, containerID, "/tork", r, types.CopyToContainerOptions{}); err != nil {
-		return err
-	}
-	return nil
+
+	return d.copyArchive(ctx, archive, containerID, "/tork")
 }
 
-func createArchive(t *tork.Task) (string, error) {
-	// create an archive file
-	ar, err := os.CreateTemp("", "archive-*.tar")
+func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *tork.Task) (err error) {
+	if len(t.Files) == 0 {
+		return
+	}
+
+	log.Debug().Msgf("initialize the workdir for container %s", containerID)
+
+	archive, err := createWorkDirArchive(t)
 	if err != nil {
-		return "", errors.Wrapf(err, "error creating tar file")
+		return
 	}
-	defer func() {
-		if err := ar.Close(); err != nil {
-			log.Error().Err(err).Msg("error closing archive.tar file")
-		}
-	}()
-	// write the run script as an entrypoint
-	buf := bufio.NewWriter(ar)
-	tw := tar.NewWriter(buf)
+
+	return d.copyArchive(ctx, archive, containerID, t.Workdir())
+}
+
+func createTorkArchive(t *tork.Task) (*os.File, error) {
+	afs := []archiveFile{
+		{
+			name:     "stdout",
+			mode:     0222,
+			contents: nil,
+		},
+	}
+
 	if t.Run != "" {
-		hdr := &tar.Header{
-			Name: "entrypoint",
-			Mode: 0111, // execute only
-			Size: int64(len(t.Run)),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return "", err
-		}
-		if _, err := tw.Write([]byte(t.Run)); err != nil {
-			return "", err
-		}
+		afs = append(afs, archiveFile{
+			name:     "entrypoint",
+			mode:     0111,
+			contents: []byte(t.Run),
+		})
 	}
-	// write an stdout placeholder file
-	hdr := &tar.Header{
-		Name: "stdout",
-		Mode: 0222, // write-only
-		Size: int64(0),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return "", err
-	}
-	if _, err := tw.Write([]byte{}); err != nil {
-		return "", err
-	}
-	// write all other files specified on the task
+
+	return createArchive(afs)
+}
+
+func createWorkDirArchive(t *tork.Task) (*os.File, error) {
+	afs := make([]archiveFile, 0)
+
 	for filename, contents := range t.Files {
-		hdr := &tar.Header{
-			Name: filename,
-			Mode: 0444, // read-only
-			Size: int64(len(contents)),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return "", err
-		}
-		if _, err := tw.Write([]byte(contents)); err != nil {
-			return "", err
-		}
+		afs = append(afs, archiveFile{
+			name:     filename,
+			mode:     0444,
+			contents: []byte(contents),
+		})
 	}
-	if err := buf.Flush(); err != nil {
-		return "", err
-	}
-	// close the tar writer
-	if err := tw.Close(); err != nil {
-		return "", err
-	}
-	return ar.Name(), nil
+
+	return createArchive(afs)
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
