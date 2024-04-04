@@ -61,6 +61,7 @@ type Task struct {
 	SubJob      *SubJobTask       `json:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
+	WorkingDir  string            `json:"workingDir,omitempty"`
 }
 
 type TaskSummary struct {

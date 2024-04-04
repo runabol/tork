@@ -266,8 +266,12 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 	// we want to override the default
 	// image WORKDIR only if the task
-	// introduces work files
-	if len(t.Files) > 0 {
+	// introduces work files _or_ if the
+	// user specifies a WORKDIR
+	switch {
+	case t.WorkingDir != "":
+		cc.WorkingDir = t.WorkingDir
+	case len(t.Files) > 0:
 		cc.WorkingDir = workdir.Target
 	}
 

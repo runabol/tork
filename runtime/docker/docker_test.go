@@ -326,6 +326,68 @@ func TestRunTaskWithTempfs(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRunTaskWithVolumeAndWorkdir(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "echo hello world > ./thing",
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeTmpfs,
+				Target: "/xyz",
+			},
+		},
+		WorkingDir: "/xyz",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
+func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "echo hello world > ./thing",
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/xyz",
+			},
+		},
+		WorkingDir: "/xyz",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
+func TestRunTaskInitWorkdir(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "cat hello.txt > $TORK_OUTPUT",
+		Files: map[string]string{
+			"hello.txt": "hello world",
+			"large.txt": strings.Repeat("a", 100_000),
+		},
+	}
+	ctx := context.Background()
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world", t1.Result)
+}
+
 func TestRunTaskWithCustomMounter(t *testing.T) {
 	mounter := runtime.NewMultiMounter()
 	vmounter, err := NewVolumeMounter()
@@ -347,24 +409,6 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 	ctx := context.Background()
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
-}
-
-func TestRunTaskInitWorkdir(t *testing.T) {
-	rt, err := NewDockerRuntime()
-	assert.NoError(t, err)
-	t1 := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
-		Run:   "cat hello.txt > $TORK_OUTPUT",
-		Files: map[string]string{
-			"hello.txt": "hello world",
-			"large.txt": strings.Repeat("a", 100_000),
-		},
-	}
-	ctx := context.Background()
-	err = rt.Run(ctx, t1)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello world", t1.Result)
 }
 
 func Test_imagePull(t *testing.T) {
