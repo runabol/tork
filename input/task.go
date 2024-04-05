@@ -30,7 +30,7 @@ type Task struct {
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
-	WorkDir     string            `json:"workDir,omitempty" yaml:"workingDir,omitempty"`
+	WorkDir     string            `json:"workDir,omitempty" yaml:"workDir,omitempty"`
 }
 
 type SubJob struct {
