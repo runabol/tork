@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/docker/docker/api/types"
+	"github.com/rs/zerolog/log"
 )
 
 type archiveFile struct {
@@ -16,17 +17,11 @@ type archiveFile struct {
 	contents []byte
 }
 
-func createArchive(afs []archiveFile) (archive *os.File, err error) {
-	archive, err = os.CreateTemp("", "archive-*.tar")
+func createArchive(afs []archiveFile) (archivePath string, err error) {
+	archive, err := os.CreateTemp("", "archive-*.tar")
 	if err != nil {
 		return
 	}
-
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, archive.Close())
-		}
-	}()
 
 	buf := bufio.NewWriter(archive)
 	tw := tar.NewWriter(buf)
@@ -52,10 +47,20 @@ func createArchive(afs []archiveFile) (archive *os.File, err error) {
 		return
 	}
 
-	return archive, tw.Close()
+	err = tw.Close()
+	if err != nil {
+		return
+	}
+
+	return archive.Name(), archive.Close()
 }
 
-func (d *DockerRuntime) copyArchive(ctx context.Context, archive *os.File, containerID, destination string) (err error) {
+func (d *DockerRuntime) copyArchive(ctx context.Context, archivePath, containerID, destination string) (err error) {
+	archive, err := os.Open(archivePath)
+	if err != nil {
+		return
+	}
+
 	defer func() {
 		for _, e := range []error{
 			archive.Close(),
@@ -66,5 +71,12 @@ func (d *DockerRuntime) copyArchive(ctx context.Context, archive *os.File, conta
 	}()
 
 	r := bufio.NewReader(archive)
+
+	log.Debug().Msgf("Copying %q to container ID %q, destination %q",
+		archive.Name(),
+		containerID,
+		destination,
+	)
+
 	return d.client.CopyToContainer(ctx, containerID, destination, r, types.CopyToContainerOptions{})
 }

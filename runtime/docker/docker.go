@@ -445,7 +445,7 @@ func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *
 	return d.copyArchive(ctx, archive, containerID, t.Workdir())
 }
 
-func createTorkArchive(t *tork.Task) (*os.File, error) {
+func createTorkArchive(t *tork.Task) (string, error) {
 	afs := []archiveFile{
 		{
 			name:     "stdout",
@@ -465,7 +465,7 @@ func createTorkArchive(t *tork.Task) (*os.File, error) {
 	return createArchive(afs)
 }
 
-func createWorkDirArchive(t *tork.Task) (*os.File, error) {
+func createWorkDirArchive(t *tork.Task) (string, error) {
 	afs := make([]archiveFile, 0)
 
 	for filename, contents := range t.Files {
