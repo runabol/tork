@@ -22,12 +22,6 @@ const (
 	TaskStateSkipped   TaskState = "SKIPPED"
 )
 
-var (
-	// DefaultWorkDir is the directory where `Task.File`s are
-	// written by default, should `Task.WorkDir` not be set
-	DefaultWorkDir = "/tork/workdir"
-)
-
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {
 	ID          string            `json:"id,omitempty"`
@@ -67,7 +61,7 @@ type Task struct {
 	SubJob      *SubJobTask       `json:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
-	WorkDir     string            `json:"workDir,omitempty"`
+	Workdir     string            `json:"workdir,omitempty"`
 }
 
 type TaskSummary struct {
@@ -202,19 +196,8 @@ func (t *Task) Clone() *Task {
 		SubJob:      subjob,
 		GPUs:        t.GPUs,
 		Tags:        t.Tags,
-		WorkDir:     t.WorkDir,
+		Workdir:     t.Workdir,
 	}
-}
-
-// Workdir will return the correct value to set a container's
-// working directory to when necessary, such as when a task
-// specifically requests it, or when a task contains files
-func (t *Task) Workdir() string {
-	if t.WorkDir != "" {
-		return t.WorkDir
-	}
-
-	return DefaultWorkDir
 }
 
 func CloneTasks(tasks []*Task) []*Task {
