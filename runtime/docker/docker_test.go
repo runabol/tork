@@ -279,6 +279,30 @@ func TestRunTaskWithVolume(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRunTaskWithVolumeAndCustomWorkdir(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run: `echo hello world > /xyz/thing
+              ls > $TORK_OUTPUT`,
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/xyz",
+			},
+		},
+		Workdir: "/xyz",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "thing\n", t1.Result)
+}
+
 func TestRunTaskWithBind(t *testing.T) {
 	mm := runtime.NewMultiMounter()
 	vm, err := NewVolumeMounter()
@@ -388,6 +412,24 @@ func TestRunTaskInitWorkdir(t *testing.T) {
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", t1.Result)
+}
+
+func TestRunTaskInitWorkdirLs(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "ls > $TORK_OUTPUT",
+		Files: map[string]string{
+			"hello.txt": "hello world",
+			"large.txt": strings.Repeat("a", 100_000),
+		},
+	}
+	ctx := context.Background()
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello.txt\nlarge.txt\n", t1.Result)
 }
 
 func TestRunTaskWithCustomMounter(t *testing.T) {
