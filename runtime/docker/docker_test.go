@@ -338,18 +338,20 @@ func TestRunTaskWithVolumeAndWorkdir(t *testing.T) {
 		Run:   "echo hello world > ./thing",
 		Mounts: []tork.Mount{
 			{
-				Type:   tork.MountTypeTmpfs,
+				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
 			},
 		},
-		WorkDir: "/xyz",
+		Workdir: "/xyz",
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)
 }
 
 func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
-	rt, err := NewDockerRuntime()
+	rt, err := NewDockerRuntime(
+		WithMounter(NewTmpfsMounter()),
+	)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -360,11 +362,11 @@ func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
 		Run:   "echo hello world > ./thing",
 		Mounts: []tork.Mount{
 			{
-				Type:   tork.MountTypeVolume,
+				Type:   tork.MountTypeTmpfs,
 				Target: "/xyz",
 			},
 		},
-		WorkDir: "/xyz",
+		Workdir: "/xyz",
 	}
 	err = rt.Run(ctx, t1)
 	assert.NoError(t, err)

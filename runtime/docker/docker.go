@@ -31,6 +31,10 @@ import (
 	"github.com/runabol/tork/runtime"
 )
 
+// defaultWorkdir is the directory where `Task.File`s are
+// written to by default, should `Task.Workdir` not be set
+const defaultWorkdir = "/tork/workdir"
+
 type DockerRuntime struct {
 	client  *client.Client
 	tasks   *syncx.Map[string, string]
@@ -256,7 +260,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if len(entrypoint) == 0 && t.Run != "" {
 		entrypoint = []string{"sh", "-c"}
 	}
-	cc := container.Config{
+	containerConf := container.Config{
 		Image:      t.Image,
 		Env:        env,
 		Cmd:        cmd,
@@ -266,8 +270,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	// image WORKDIR only if the task
 	// introduces work files _or_ if the
 	// user specifies a WORKDIR
-	if t.WorkDir != "" || len(t.Files) > 0 {
-		cc.WorkingDir = t.Workdir()
+	if t.Workdir != "" {
+		containerConf.WorkingDir = t.Workdir
+	} else if len(t.Files) > 0 {
+		t.Workdir = defaultWorkdir
+		containerConf.WorkingDir = t.Workdir
 	}
 
 	nc := network.NetworkingConfig{
@@ -286,7 +293,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	createCtx, createCancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer createCancel()
 	resp, err := d.client.ContainerCreate(
-		createCtx, &cc, &hc, &nc, nil, "")
+		createCtx, &containerConf, &hc, &nc, nil, "")
 	if err != nil {
 		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
@@ -314,10 +321,10 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// initialize the tork and, optionally, the work directory
 	if err := d.initTorkdir(ctx, resp.ID, t); err != nil {
-		return errors.Wrapf(err, "error initializing container")
+		return errors.Wrapf(err, "error initializing torkdir")
 	}
 	if err := d.initWorkDir(ctx, resp.ID, t); err != nil {
-		return errors.Wrapf(err, "error initializing container")
+		return errors.Wrapf(err, "error initializing workdir")
 	}
 
 	// start the container
@@ -419,15 +426,33 @@ func (d *DockerRuntime) readOutput(ctx context.Context, containerID string) (str
 	return buf.String(), nil
 }
 
-func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *tork.Task) (err error) {
-	log.Debug().Msgf("initialize the torkdir for container %s", containerID)
-
-	archive, err := createTorkArchive(t)
+func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *tork.Task) error {
+	ar, err := NewTempArchive()
 	if err != nil {
-		return
+		return err
 	}
 
-	return d.copyArchive(ctx, archive, containerID, "/tork")
+	defer func() {
+		if err := ar.Remove(); err != nil {
+			log.Error().Err(err).Msgf("error removing temp archive: %s", ar.Name())
+		}
+	}()
+
+	if err := ar.WriteFile("stdout", 0222, []byte{}); err != nil {
+		return err
+	}
+
+	if t.Run != "" {
+		if err := ar.WriteFile("entrypoint", 0111, []byte(t.Run)); err != nil {
+			return err
+		}
+	}
+
+	if err := d.client.CopyToContainer(ctx, containerID, "/tork", ar, types.CopyToContainerOptions{}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *tork.Task) (err error) {
@@ -435,48 +460,26 @@ func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *
 		return
 	}
 
-	log.Debug().Msgf("initialize the workdir for container %s", containerID)
-
-	archive, err := createWorkDirArchive(t)
+	ar, err := NewTempArchive()
 	if err != nil {
-		return
+		return err
 	}
 
-	return d.copyArchive(ctx, archive, containerID, t.Workdir())
-}
-
-func createTorkArchive(t *tork.Task) (string, error) {
-	afs := []archiveFile{
-		{
-			name:     "stdout",
-			mode:     0222,
-			contents: nil,
-		},
-	}
-
-	if t.Run != "" {
-		afs = append(afs, archiveFile{
-			name:     "entrypoint",
-			mode:     0111,
-			contents: []byte(t.Run),
-		})
-	}
-
-	return createArchive(afs)
-}
-
-func createWorkDirArchive(t *tork.Task) (string, error) {
-	afs := make([]archiveFile, 0)
+	defer func() {
+		if err := ar.Remove(); err != nil {
+			log.Error().Err(err).Msgf("error removing temp archive: %s", ar.Name())
+		}
+	}()
 
 	for filename, contents := range t.Files {
-		afs = append(afs, archiveFile{
-			name:     filename,
-			mode:     0444,
-			contents: []byte(contents),
-		})
+		ar.WriteFile(filename, 0444, []byte(contents))
 	}
 
-	return createArchive(afs)
+	if err := d.client.CopyToContainer(ctx, containerID, t.Workdir, ar, types.CopyToContainerOptions{}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {

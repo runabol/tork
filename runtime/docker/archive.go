@@ -3,80 +3,69 @@ package docker
 import (
 	"archive/tar"
 	"bufio"
-	"context"
-	"errors"
 	"os"
 
-	"github.com/docker/docker/api/types"
-	"github.com/rs/zerolog/log"
+	"github.com/pkg/errors"
 )
 
-type archiveFile struct {
-	name     string
-	mode     int64
-	contents []byte
+type archive struct {
+	f      *os.File
+	reader *bufio.Reader
+	writer *tar.Writer
 }
 
-func createArchive(afs []archiveFile) (archivePath string, err error) {
-	archive, err := os.CreateTemp("", "archive-*.tar")
+func NewTempArchive() (*archive, error) {
+	f, err := os.CreateTemp("", "archive-*.tar")
 	if err != nil {
-		return
+		return nil, errors.Wrapf(err, "error creating temp archive file")
 	}
-
-	buf := bufio.NewWriter(archive)
-	tw := tar.NewWriter(buf)
-
-	for _, af := range afs {
-		err = tw.WriteHeader(&tar.Header{
-			Name: af.name,
-			Mode: af.mode,
-			Size: int64(len(af.contents)),
-		})
-		if err != nil {
-			return
-		}
-
-		_, err = tw.Write(af.contents)
-		if err != nil {
-			return
-		}
+	a := &archive{
+		f:      f,
+		writer: tar.NewWriter(f),
 	}
-
-	err = buf.Flush()
-	if err != nil {
-		return
-	}
-
-	err = tw.Close()
-	if err != nil {
-		return
-	}
-
-	return archive.Name(), archive.Close()
+	return a, nil
 }
 
-func (d *DockerRuntime) copyArchive(ctx context.Context, archivePath, containerID, destination string) (err error) {
-	archive, err := os.Open(archivePath)
-	if err != nil {
-		return
-	}
-
-	defer func() {
-		for _, e := range []error{
-			archive.Close(),
-			os.Remove(archive.Name()),
-		} {
-			err = errors.Join(err, e)
+func (a *archive) Read(p []byte) (int, error) {
+	if a.reader == nil {
+		if err := a.f.Close(); err != nil {
+			return 0, err
 		}
-	}()
+		f, err := os.Open(a.f.Name())
+		if err != nil {
+			return 0, err
+		}
+		a.f = f
+		a.reader = bufio.NewReader(f)
+	}
+	n, err := a.reader.Read(p)
+	if err != nil {
+		if err := a.f.Close(); err != nil {
+			return 0, err
+		}
+	}
+	return n, err
+}
 
-	r := bufio.NewReader(archive)
+func (a *archive) Name() string {
+	return a.f.Name()
+}
 
-	log.Debug().Msgf("Copying %q to container ID %q, destination %q",
-		archive.Name(),
-		containerID,
-		destination,
-	)
+func (a *archive) Remove() error {
+	return os.Remove(a.f.Name())
+}
 
-	return d.client.CopyToContainer(ctx, containerID, destination, r, types.CopyToContainerOptions{})
+func (a *archive) WriteFile(name string, mode int64, contents []byte) error {
+	hdr := &tar.Header{
+		Name: name,
+		Mode: mode,
+		Size: int64(len(contents)),
+	}
+	if err := a.writer.WriteHeader(hdr); err != nil {
+		return err
+	}
+	if _, err := a.writer.Write(contents); err != nil {
+		return err
+	}
+	return nil
 }
