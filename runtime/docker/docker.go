@@ -472,7 +472,9 @@ func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *
 	}()
 
 	for filename, contents := range t.Files {
-		ar.WriteFile(filename, 0444, []byte(contents))
+		if err := ar.WriteFile(filename, 0444, []byte(contents)); err != nil {
+			return err
+		}
 	}
 
 	if err := d.client.CopyToContainer(ctx, containerID, t.Workdir, ar, types.CopyToContainerOptions{}); err != nil {
