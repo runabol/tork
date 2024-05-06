@@ -127,10 +127,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if d.broker != nil {
-		logger = &logging.Forwarder{
-			Broker: d.broker,
-			TaskID: t.ID,
-		}
+		logger = logging.NewForwarder(d.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}

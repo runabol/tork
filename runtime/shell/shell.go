@@ -99,10 +99,7 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if r.broker != nil {
-		logger = &logging.Forwarder{
-			Broker: r.broker,
-			TaskID: t.ID,
-		}
+		logger = logging.NewForwarder(r.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}
