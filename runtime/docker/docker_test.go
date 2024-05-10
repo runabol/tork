@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 
 	"github.com/runabol/tork"
 
@@ -462,13 +462,13 @@ func Test_imagePull(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 
-	images, err := rt.client.ImageList(ctx, types.ImageListOptions{
+	images, err := rt.client.ImageList(ctx, image.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("reference", "busybox:*")),
 	})
 	assert.NoError(t, err)
 
 	for _, img := range images {
-		_, err = rt.client.ImageRemove(ctx, img.ID, types.ImageRemoveOptions{Force: true})
+		_, err = rt.client.ImageRemove(ctx, img.ID, image.RemoveOptions{Force: true})
 		assert.NoError(t, err)
 	}
 
@@ -495,11 +495,11 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 
-	r1, err := rt.client.ImagePull(ctx, "alpine:3.18.3", types.ImagePullOptions{})
+	r1, err := rt.client.ImagePull(ctx, "alpine:3.18.3", image.PullOptions{})
 	assert.NoError(t, err)
 	assert.NoError(t, r1.Close())
 
-	images, err := rt.client.ImageList(ctx, types.ImageListOptions{
+	images, err := rt.client.ImageList(ctx, image.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
 	})
 	assert.NoError(t, err)
@@ -508,7 +508,7 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 	err = rt.client.ImageTag(ctx, "alpine:3.18.3", "localhost:5001/tork/alpine:3.18.3")
 	assert.NoError(t, err)
 
-	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/alpine:3.18.3", types.ImagePushOptions{RegistryAuth: "noauth"})
+	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/alpine:3.18.3", image.PushOptions{RegistryAuth: "noauth"})
 	assert.NoError(t, err)
 	assert.NoError(t, r2.Close())
 
