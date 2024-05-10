@@ -67,6 +67,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 		rt.Retry.Attempts = rt.Retry.Attempts + 1
 		rt.State = tork.TaskStatePending
 		rt.Error = ""
+		rt.FailedAt = nil
 		if err := eval.EvaluateTask(rt, j.Context.AsMap()); err != nil {
 			return errors.Wrapf(err, "error evaluating task")
 		}
