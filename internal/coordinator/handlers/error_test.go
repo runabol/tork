@@ -112,7 +112,8 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	b := mq.NewInMemoryBroker()
 
 	processed := make(chan any)
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(t *tork.Task) error {
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+		assert.Nil(t, tk.FailedAt)
 		close(processed)
 		return nil
 	})
