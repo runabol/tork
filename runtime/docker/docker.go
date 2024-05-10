@@ -16,6 +16,7 @@ import (
 	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	regtypes "github.com/docker/docker/api/types/registry"
@@ -327,7 +328,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	// start the container
 	log.Debug().Msgf("Starting container %s", resp.ID)
 	err = d.client.ContainerStart(
-		ctx, resp.ID, types.ContainerStartOptions{})
+		ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
 	}
@@ -335,7 +336,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	out, err := d.client.ContainerLogs(
 		ctx,
 		resp.ID,
-		types.ContainerLogsOptions{
+		container.LogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
@@ -364,7 +365,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 			out, err := d.client.ContainerLogs(
 				ctx,
 				resp.ID,
-				types.ContainerLogsOptions{
+				container.LogsOptions{
 					ShowStdout: true,
 					ShowStderr: true,
 					Tail:       "10",
@@ -488,7 +489,7 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
 	}
 	d.tasks.Delete(t.ID)
 	log.Debug().Msgf("Attempting to stop and remove container %v", containerID)
-	return d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+	return d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
 		RemoveVolumes: true,
 		RemoveLinks:   false,
 		Force:         true,
@@ -496,7 +497,7 @@ func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
 }
 
 func (d *DockerRuntime) HealthCheck(ctx context.Context) error {
-	_, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
+	_, err := d.client.ContainerList(ctx, container.ListOptions{})
 	return err
 }
 
@@ -552,7 +553,7 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.W
 	// locally already
 	images, err := d.client.ImageList(
 		ctx,
-		types.ImageListOptions{All: true},
+		image.ListOptions{All: true},
 	)
 	if err != nil {
 		return err
@@ -616,7 +617,7 @@ func (d *DockerRuntime) puller(ctx context.Context) {
 		}
 		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
 		reader, err := d.client.ImagePull(
-			ctx, pr.image, types.ImagePullOptions{RegistryAuth: authStr})
+			ctx, pr.image, image.PullOptions{RegistryAuth: authStr})
 		if err != nil {
 			pr.done <- err
 			continue
