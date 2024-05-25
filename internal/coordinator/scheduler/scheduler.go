@@ -67,6 +67,9 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 				t.Retry.Limit = job.Defaults.Retry.Limit
 			}
 		}
+		if t.Priority == 0 {
+			t.Priority = job.Defaults.Priority
+		}
 	}
 	if t.Queue == "" {
 		t.Queue = mq.QUEUE_DEFAULT
@@ -81,6 +84,7 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 		u.Limits = t.Limits
 		u.Timeout = t.Timeout
 		u.Retry = t.Retry
+		u.Priority = t.Priority
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")

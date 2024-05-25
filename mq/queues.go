@@ -1,6 +1,10 @@
 package mq
 
-import "golang.org/x/exp/slices"
+import (
+	"strings"
+
+	"golang.org/x/exp/slices"
+)
 
 const (
 	// The queue used by the API to insert new tasks into
@@ -52,4 +56,8 @@ func IsCoordinatorQueue(qname string) bool {
 
 func IsWorkerQueue(qname string) bool {
 	return !IsCoordinatorQueue(qname)
+}
+
+func IsTaskQueue(qname string) bool {
+	return !IsCoordinatorQueue(qname) && !strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX)
 }

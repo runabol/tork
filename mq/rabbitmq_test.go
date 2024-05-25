@@ -262,3 +262,41 @@ func TestRabbitMQPublishAndSubsribeTaskLogPart(t *testing.T) {
 	assert.NoError(t, err)
 	<-processed
 }
+
+func TestRabbitMQTaskPriority(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	var wg sync.WaitGroup
+	wg.Add(4)
+	tasks := make(chan *tork.Task, 4)
+	qname := fmt.Sprintf("test-%s", uuid.NewUUID())
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		time.Sleep(time.Millisecond * 100)
+		wg.Done()
+		tasks <- t
+		return nil
+	})
+	assert.NoError(t, err)
+	err = b.PublishTask(ctx, qname, &tork.Task{
+		Priority: 0,
+	})
+	assert.NoError(t, err)
+	err = b.PublishTask(ctx, qname, &tork.Task{
+		Priority: 1,
+	})
+	assert.NoError(t, err)
+	err = b.PublishTask(ctx, qname, &tork.Task{
+		Priority: 2,
+	})
+	assert.NoError(t, err)
+	err = b.PublishTask(ctx, qname, &tork.Task{
+		Priority: 3,
+	})
+	assert.NoError(t, err)
+	wg.Wait()
+	assert.Equal(t, 0, (<-tasks).Priority)
+	assert.Equal(t, 3, (<-tasks).Priority)
+	assert.Equal(t, 2, (<-tasks).Priority)
+	assert.Equal(t, 1, (<-tasks).Priority)
+}
