@@ -20,10 +20,11 @@ type Job struct {
 }
 
 type Defaults struct {
-	Retry   *Retry  `json:"retry,omitempty" yaml:"retry,omitempty"`
-	Limits  *Limits `json:"limits,omitempty" yaml:"limits,omitempty"`
-	Timeout string  `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
-	Queue   string  `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
+	Retry    *Retry  `json:"retry,omitempty" yaml:"retry,omitempty"`
+	Limits   *Limits `json:"limits,omitempty" yaml:"limits,omitempty"`
+	Timeout  string  `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
+	Queue    string  `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
+	Priority int     `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
 }
 
 type Webhook struct {
@@ -82,6 +83,7 @@ func (d Defaults) ToJobDefaults() *tork.JobDefaults {
 	}
 	jd.Timeout = d.Timeout
 	jd.Queue = d.Queue
+	jd.Priority = d.Priority
 	return &jd
 }
 

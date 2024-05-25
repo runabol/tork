@@ -120,7 +120,8 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 				CPUs:   ".5",
 				Memory: "10m",
 			},
-			Timeout: "5s",
+			Timeout:  "5s",
+			Priority: 3,
 		},
 	}
 
@@ -146,6 +147,7 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	assert.Equal(t, ".5", tk.Limits.CPUs)
 	assert.Equal(t, "10m", tk.Limits.Memory)
 	assert.Equal(t, "5s", tk.Timeout)
+	assert.Equal(t, 3, tk.Priority)
 }
 
 func Test_scheduleParallelTask(t *testing.T) {

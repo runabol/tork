@@ -73,7 +73,7 @@ CREATE TABLE tasks (
     error_        text,
     pre_tasks     jsonb,
     post_tasks    jsonb,
-    mounts       jsonb,
+    mounts        jsonb,
     node_id       varchar(32),
     retry         jsonb,
     limits        jsonb,
@@ -88,7 +88,8 @@ CREATE TABLE tasks (
     networks      text[],
     gpus          text,
     if_           text,
-    tags          text[]
+    tags          text[],
+    priority      int
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

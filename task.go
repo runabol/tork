@@ -62,6 +62,7 @@ type Task struct {
 	GPUs        string            `json:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty"`
+	Priority    int               `json:"priority,omitempty"`
 }
 
 type TaskSummary struct {
@@ -197,6 +198,7 @@ func (t *Task) Clone() *Task {
 		GPUs:        t.GPUs,
 		Tags:        t.Tags,
 		Workdir:     t.Workdir,
+		Priority:    t.Priority,
 	}
 }
 

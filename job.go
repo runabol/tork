@@ -65,10 +65,11 @@ type JobContext struct {
 }
 
 type JobDefaults struct {
-	Retry   *TaskRetry  `json:"retry,omitempty"`
-	Limits  *TaskLimits `json:"limits,omitempty"`
-	Timeout string      `json:"timeout,omitempty"`
-	Queue   string      `json:"queue,omitempty"`
+	Retry    *TaskRetry  `json:"retry,omitempty"`
+	Limits   *TaskLimits `json:"limits,omitempty"`
+	Timeout  string      `json:"timeout,omitempty"`
+	Queue    string      `json:"queue,omitempty"`
+	Priority int         `json:"priority,omitempty"`
 }
 
 type Webhook struct {
@@ -132,6 +133,7 @@ func (d *JobDefaults) Clone() *JobDefaults {
 	}
 	clone.Queue = d.Queue
 	clone.Timeout = d.Timeout
+	clone.Priority = d.Priority
 	return &clone
 }
 

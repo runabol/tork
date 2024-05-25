@@ -27,6 +27,8 @@ const (
 	exchangeDefault     = ""
 	keyDefault          = ""
 	defaultHeartbeatTTL = 60000
+	defaultPriority     = uint8(0)
+	maxPriority         = uint8(9)
 )
 
 type RabbitMQBroker struct {
@@ -328,6 +330,9 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	if qname == QUEUE_HEARTBEAT {
 		args["x-message-ttl"] = b.heartbeatTTL
 	}
+	if IsTaskQueue(qname) {
+		args["x-max-priority"] = maxPriority
+	}
 	args["x-consumer-timeout"] = b.consumerTimeout
 	_, err := ch.QueueDeclare(
 		qname,
@@ -355,6 +360,11 @@ func (b *RabbitMQBroker) PublishHeartbeat(ctx context.Context, n *tork.Node) err
 }
 
 func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg any) error {
+	var priority = defaultPriority
+	task, ok := msg.(*tork.Task)
+	if ok {
+		priority = uint8(task.Priority)
+	}
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -377,6 +387,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 			Type:        fmt.Sprintf("%T", msg),
 			ContentType: "application/json",
 			Body:        []byte(body),
+			Priority:    priority,
 		})
 	if err != nil {
 		return errors.Wrapf(err, "unable to publish message")

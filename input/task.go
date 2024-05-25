@@ -31,6 +31,7 @@ type Task struct {
 	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty" yaml:"workdir,omitempty"`
+	Priority    int               `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
 }
 
 type SubJob struct {
@@ -189,6 +190,7 @@ func (i Task) toTask() *tork.Task {
 		GPUs:        i.GPUs,
 		Tags:        i.Tags,
 		Workdir:     i.Workdir,
+		Priority:    i.Priority,
 	}
 }
 
