@@ -49,6 +49,7 @@ type taskRecord struct {
 	IF          string         `db:"if_"`
 	Tags        pq.StringArray `db:"tags"`
 	Priority    int            `db:"priority"`
+	Workdir     string         `db:"workdir"`
 }
 
 type jobRecord struct {
@@ -206,6 +207,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		If:          r.IF,
 		Tags:        r.Tags,
 		Priority:    r.Priority,
+		Workdir:     r.Workdir,
 	}, nil
 }
 

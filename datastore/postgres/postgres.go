@@ -241,12 +241,14 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 			gpus, -- $35
 			if_, -- $36
 			tags, -- $37
-			priority -- $38
+			priority, -- $38
+			workdir -- $39
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-			$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)`
+			$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
+			$39)`
 	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -286,6 +288,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		t.If,                         // $36
 		pq.StringArray(t.Tags),       // $37
 		t.Priority,                   // $38
+		t.Workdir,                    // $39
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
