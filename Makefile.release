@@ -15,7 +15,7 @@ endif
 NAME:=tork
 VERSION:=$(shell grep 'Version' version.go | awk '{ print $$3 }' | head -n1 | tr -d '"')
 GITHUB:=runabol
-LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x mips riscv64
+LINUX_ARCH:=amd64 arm arm64
 
 all:
 	@echo Use the 'release' target to build a release
