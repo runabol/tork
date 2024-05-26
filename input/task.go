@@ -30,7 +30,7 @@ type Task struct {
 	SubJob      *SubJob           `json:"subjob,omitempty" yaml:"subjob,omitempty"`
 	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Workdir     string            `json:"workdir,omitempty" yaml:"workdir,omitempty"`
+	Workdir     string            `json:"workdir,omitempty" yaml:"workdir,omitempty" validate:"max=256"`
 	Priority    int               `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
 }
 

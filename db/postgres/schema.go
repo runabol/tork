@@ -89,7 +89,8 @@ CREATE TABLE tasks (
     gpus          text,
     if_           text,
     tags          text[],
-    priority      int
+    priority      int,
+    workdir       varchar(256)
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);
