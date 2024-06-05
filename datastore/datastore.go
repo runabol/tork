@@ -13,6 +13,7 @@ var (
 	ErrTaskNotFound    = errors.New("task not found")
 	ErrNodeNotFound    = errors.New("node not found")
 	ErrJobNotFound     = errors.New("job not found")
+	ErrUserNotFound    = errors.New("user not found")
 	ErrContextNotFound = errors.New("context not found")
 )
 
@@ -39,6 +40,9 @@ type Datastore interface {
 	GetJobByID(ctx context.Context, id string) (*tork.Job, error)
 	GetJobLogParts(ctx context.Context, jobID string, page, size int) (*Page[*tork.TaskLogPart], error)
 	GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error)
+
+	CreateUser(ctx context.Context, u *tork.User) error
+	GetUser(ctx context.Context, username string) (*tork.User, error)
 
 	GetMetrics(ctx context.Context) (*tork.Metrics, error)
 

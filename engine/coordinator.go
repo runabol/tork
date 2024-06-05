@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"crypto/subtle"
 	"fmt"
 	"strings"
@@ -10,8 +11,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork"
 	"github.com/runabol/tork/conf"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator"
+	"github.com/runabol/tork/internal/hash"
 	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/internal/wildcard"
@@ -34,7 +38,7 @@ func (e *Engine) initCoordinator() error {
 			Task: e.cfg.Middleware.Task,
 			Job:  e.cfg.Middleware.Job,
 			Node: e.cfg.Middleware.Node,
-			Echo: echoMiddleware(),
+			Echo: echoMiddleware(e.ds),
 		},
 		Endpoints: e.cfg.Endpoints,
 		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
@@ -70,7 +74,7 @@ func (e *Engine) initCoordinator() error {
 	return nil
 }
 
-func echoMiddleware() []echo.MiddlewareFunc {
+func echoMiddleware(ds datastore.Datastore) []echo.MiddlewareFunc {
 	mw := make([]echo.MiddlewareFunc, 0)
 	// cors
 	corsEnabled := conf.Bool("middleware.web.cors.enabled")
@@ -80,9 +84,7 @@ func echoMiddleware() []echo.MiddlewareFunc {
 	// basic auth
 	basicAuthEnabled := conf.Bool("middleware.web.basicauth.enabled")
 	if basicAuthEnabled {
-		username := conf.StringDefault("middleware.web.basicauth.username", "tork")
-		password := conf.String("middleware.web.basicauth.password")
-		mw = append(mw, basicAuth(username, password))
+		mw = append(mw, basicAuth(ds))
 	}
 
 	// key auth
@@ -111,14 +113,15 @@ func rateLimit(rps int) echo.MiddlewareFunc {
 	return middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(rate.Limit(rps)))
 }
 
-func basicAuth(username, password string) echo.MiddlewareFunc {
-	if password == "" {
-		password = uuid.NewUUID()
-		log.Debug().Msgf("Basic Auth Password: %s", password)
-	}
+func basicAuth(ds datastore.Datastore) echo.MiddlewareFunc {
 	return middleware.BasicAuth(func(user, pass string, ctx echo.Context) (bool, error) {
-		if subtle.ConstantTimeCompare([]byte(user), []byte(username)) == 1 &&
-			subtle.ConstantTimeCompare([]byte(pass), []byte(password)) == 1 {
+		u, err := ds.GetUser(ctx.Request().Context(), user)
+		if err != nil {
+			return false, nil
+		}
+		if subtle.ConstantTimeCompare([]byte(user), []byte(u.Username)) == 1 &&
+			hash.CheckPasswordHash(pass, u.PasswordHash) {
+			ctx.SetRequest(ctx.Request().WithContext(context.WithValue(ctx.Request().Context(), tork.USERNAME, user)))
 			return true, nil
 		}
 		return false, nil

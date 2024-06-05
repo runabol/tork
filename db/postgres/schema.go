@@ -16,11 +16,23 @@ CREATE TABLE nodes (
 
 CREATE INDEX idx_nodes_heartbeat ON nodes (last_heartbeat_at);
 
+CREATE TABLE users (
+    id          varchar(32)  not null primary key,
+    name        varchar(64)  not null,
+    username_   varchar(64)  not null unique,
+    password_   varchar(256) not null,
+    created_at  timestamp    not null,
+    is_disabled boolean      not null default false
+);
+
+insert into users (SELECT REPLACE(gen_random_uuid()::text, '-', ''),'Guest','guest','',current_timestamp,true);
+
 CREATE TABLE jobs (
     id            varchar(32) not null primary key,
     name          varchar(256),
     state         varchar(10) not null,
     created_at    timestamp   not null,
+	created_by    varchar(32) not null references users(id),
     started_at    timestamp,
     completed_at  timestamp,
     failed_at     timestamp,

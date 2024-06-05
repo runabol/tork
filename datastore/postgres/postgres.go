@@ -490,6 +490,13 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	if j.ID == "" {
 		return errors.Errorf("job id must not be empty")
 	}
+	if j.CreatedBy == nil {
+		guest, err := ds.GetUser(ctx, tork.USER_GUEST)
+		if err != nil {
+			return err
+		}
+		j.CreatedBy = guest
+	}
 	tasks, err := json.Marshal(j.Tasks)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize job.tasks")
@@ -517,11 +524,11 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	}
 	q := `insert into jobs 
 	       (id,name,description,state,created_at,started_at,tasks,position,
-			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks) 
+			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`
 	_, err = ds.exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
-		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks)
+		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
@@ -541,7 +548,11 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
 			return errors.Wrapf(err, "error desiralizing job.tasks")
 		}
-		j, err := r.toJob(tasks, []*tork.Task{})
+		createdBy, err := ds.GetUser(ctx, r.CreatedBy)
+		if err != nil {
+			return err
+		}
+		j, err := r.toJob(tasks, []*tork.Task{}, createdBy)
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert jobRecord")
 		}
@@ -595,8 +606,12 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 		}
 		exec[i] = t
 	}
+	u, err := ds.GetUser(ctx, r.CreatedBy)
+	if err != nil {
+		return nil, err
+	}
 
-	return r.toJob(tasks, exec)
+	return r.toJob(tasks, exec, u)
 }
 
 func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
@@ -745,7 +760,11 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	}
 	result := make([]*tork.JobSummary, len(rs))
 	for i, r := range rs {
-		j, err := r.toJob([]*tork.Task{}, []*tork.Task{})
+		createdBy, err := ds.GetUser(ctx, r.CreatedBy)
+		if err != nil {
+			return nil, err
+		}
+		j, err := r.toJob([]*tork.Task{}, []*tork.Task{}, createdBy)
 		if err != nil {
 			return nil, err
 		}
@@ -775,6 +794,29 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 		TotalPages: totalPages,
 		TotalItems: *count,
 	}, nil
+}
+
+func (ds *PostgresDatastore) GetUser(ctx context.Context, uid string) (*tork.User, error) {
+	r := userRecord{}
+	if err := ds.get(&r, `SELECT * FROM users where (username_ = $1 or id = $1)`, uid); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, datastore.ErrUserNotFound
+		}
+		return nil, errors.Wrapf(err, "error fetching user from db")
+	}
+	return r.toUser(), nil
+}
+
+func (ds *PostgresDatastore) CreateUser(ctx context.Context, u *tork.User) error {
+	q := `insert into users 
+	       (id,name,username_,password_,created_at) 
+	      values
+	       ($1,$2,$3,$4,$5)`
+	_, err := ds.exec(q, u.ID, u.Name, u.Username, u.PasswordHash, u.CreatedAt)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting user to the db")
+	}
+	return nil
 }
 
 func (ds *PostgresDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, error) {

@@ -11,6 +11,8 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/internal/hash"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/runabol/tork/runtime/shell"
 
@@ -80,9 +82,21 @@ func TestStartWorker(t *testing.T) {
 }
 
 func Test_basicAuthWrongPassword(t *testing.T) {
-	mw := basicAuth("tork", "")
+	ds := inmemory.NewInMemoryDatastore()
+	password := uuid.NewShortUUID()
+	hashedPassword, err := hash.Password(password)
+	assert.NoError(t, err)
+	u := &tork.User{
+		ID:           uuid.NewUUID(),
+		Username:     uuid.NewShortUUID(),
+		Name:         "Tester",
+		PasswordHash: hashedPassword,
+	}
+	err = ds.CreateUser(context.Background(), u)
+	assert.NoError(t, err)
+	mw := basicAuth(ds)
 	req, err := http.NewRequest("GET", "/health", nil)
-	req.SetBasicAuth("tork", "password")
+	req.SetBasicAuth(u.Username, "wrong")
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	ctx := echo.New().NewContext(req, w)
@@ -95,9 +109,21 @@ func Test_basicAuthWrongPassword(t *testing.T) {
 }
 
 func Test_basicCorrectPassword(t *testing.T) {
-	mw := basicAuth("tork", "password")
+	ds := inmemory.NewInMemoryDatastore()
+	password := uuid.NewShortUUID()
+	hashedPassword, err := hash.Password(password)
+	assert.NoError(t, err)
+	u := &tork.User{
+		ID:           uuid.NewUUID(),
+		Username:     uuid.NewShortUUID(),
+		Name:         "Tester",
+		PasswordHash: hashedPassword,
+	}
+	err = ds.CreateUser(context.Background(), u)
+	assert.NoError(t, err)
+	mw := basicAuth(ds)
 	req, err := http.NewRequest("GET", "/health", nil)
-	req.SetBasicAuth("tork", "password")
+	req.SetBasicAuth(u.Username, password)
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	ctx := echo.New().NewContext(req, w)

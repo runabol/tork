@@ -100,10 +100,15 @@ func (s *Scheduler) scheduleSubJob(ctx context.Context, t *tork.Task) error {
 }
 
 func (s *Scheduler) scheduleAttachedSubJob(ctx context.Context, t *tork.Task) error {
+	job, err := s.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 	subjob := &tork.Job{
 		ID:          uuid.NewUUID(),
 		CreatedAt:   now,
+		CreatedBy:   job.CreatedBy,
 		ParentID:    t.ID,
 		Name:        t.SubJob.Name,
 		Description: t.SubJob.Description,
@@ -131,9 +136,14 @@ func (s *Scheduler) scheduleAttachedSubJob(ctx context.Context, t *tork.Task) er
 }
 
 func (s *Scheduler) scheduleDetachedSubJob(ctx context.Context, t *tork.Task) error {
+	job, err := s.ds.GetJobByID(ctx, t.JobID)
+	if err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 	subjob := &tork.Job{
 		ID:          uuid.NewUUID(),
+		CreatedBy:   job.CreatedBy,
 		CreatedAt:   now,
 		Name:        t.SubJob.Name,
 		Description: t.SubJob.Description,

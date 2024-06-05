@@ -28,6 +28,12 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
+	assert.Equal(t, tork.USER_GUEST, j1.CreatedBy.Username)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.USER_GUEST, j2.CreatedBy.Username)
+
 	t1 := tork.Task{
 		ID:          uuid.NewUUID(),
 		CreatedAt:   &now,
@@ -58,6 +64,33 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, []string([]string{"tag1", "tag2"}), t2.Tags)
 	assert.Equal(t, "/some/dir", t2.Workdir)
 	assert.Equal(t, 2, t2.Priority)
+}
+
+func TestPostgresCreateJob(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
+	}
+	err = ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		CreatedBy: u,
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j1.CreatedBy.Username)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j2.CreatedBy.Username)
 }
 
 func TestPostgresCreateAndGetParallelTask(t *testing.T) {
