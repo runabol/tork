@@ -35,6 +35,7 @@ endpoints.tasks = true   # turn on|off the /tasks endpoints
 endpoints.nodes = true   # turn on|off the /nodes endpoint
 endpoints.queues = true  # turn on|off the /queues endpoint
 endpoints.metrics = true # turn on|off the /metrics endpoint
+endpoints.users = true   # turn on|off the /users endpoints
 
 [coordinator.queues]
 completed = 1 # completed queue consumers
@@ -55,8 +56,6 @@ headers = "*"
 # basic auth middleware
 [middleware.web.basicauth]
 enabled = false
-username = "tork"
-password = ""     # if left blank, it will auto-generate a password and print it to the logs on startup
 
 [middleware.web.keyauth]
 enabled = false

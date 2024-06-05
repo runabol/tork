@@ -21,10 +21,19 @@ const (
 	defaultJobExpiration   = time.Hour
 )
 
+var guestUser = &tork.User{
+	ID:       "guest",
+	Name:     "Guest",
+	Username: "Guest",
+	Disabled: true,
+}
+
 type InMemoryDatastore struct {
 	tasks           *cache.Cache[*tork.Task]
 	nodes           *cache.Cache[*tork.Node]
 	jobs            *cache.Cache[*tork.Job]
+	usersByID       *cache.Cache[*tork.User]
+	usersByUsername *cache.Cache[*tork.User]
 	logs            *cache.Cache[[]*tork.TaskLogPart]
 	logsMu          sync.RWMutex
 	nodeExpiration  *time.Duration
@@ -68,6 +77,8 @@ func NewInMemoryDatastore(opts ...Option) *InMemoryDatastore {
 	ds.nodes = cache.New[*tork.Node](nodeExp, ci)
 	ds.jobs = cache.New[*tork.Job](cache.NoExpiration, ci)
 	ds.logs = cache.New[[]*tork.TaskLogPart](cache.NoExpiration, ci)
+	ds.usersByID = cache.New[*tork.User](cache.NoExpiration, ci)
+	ds.usersByUsername = cache.New[*tork.User](cache.NoExpiration, ci)
 	ds.jobs.OnEvicted(ds.onJobEviction)
 	return ds
 }
@@ -153,6 +164,9 @@ func (ds *InMemoryDatastore) GetActiveNodes(ctx context.Context) ([]*tork.Node, 
 }
 
 func (ds *InMemoryDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
+	if j.CreatedBy == nil {
+		j.CreatedBy = guestUser
+	}
 	ds.jobs.Set(j.ID, j.Clone())
 	return nil
 }
@@ -401,6 +415,33 @@ func (ds *InMemoryDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, err
 	}
 
 	return s, nil
+}
+
+func (ds *InMemoryDatastore) GetUser(ctx context.Context, uid string) (*tork.User, error) {
+	if uid == tork.USER_GUEST {
+		return guestUser, nil
+	}
+	user, ok := ds.usersByID.Get(uid)
+	if ok {
+		return user, nil
+	}
+	user, ok = ds.usersByUsername.Get(uid)
+	if ok {
+		return user, nil
+	}
+	return nil, datastore.ErrUserNotFound
+}
+
+func (ds *InMemoryDatastore) CreateUser(ctx context.Context, u *tork.User) error {
+	if _, ok := ds.usersByID.Get(u.ID); ok {
+		return errors.New("user already exists")
+	}
+	if _, ok := ds.usersByUsername.Get(u.Username); ok {
+		return errors.New("user already exists")
+	}
+	ds.usersByID.Set(u.ID, u)
+	ds.usersByUsername.Set(u.Username, u)
+	return nil
 }
 
 func (ds *InMemoryDatastore) WithTx(ctx context.Context, f func(tx datastore.Datastore) error) error {

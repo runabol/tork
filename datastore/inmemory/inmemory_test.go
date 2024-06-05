@@ -29,6 +29,31 @@ func TestInMemoryCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, t1.ID, t2.ID)
 }
 
+func TestInMemoryCreateJob(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	now := time.Now().UTC()
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
+	}
+	err := ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		CreatedBy: u,
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j1.CreatedBy.Username)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j2.CreatedBy.Username)
+}
+
 func TestInMemoryGetActiveTasks(t *testing.T) {
 	ctx := context.Background()
 	ds := inmemory.NewInMemoryDatastore()

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"syscall"
+	"time"
 
 	"net/http"
 	"strings"
@@ -19,7 +20,9 @@ import (
 	"github.com/runabol/tork/health"
 
 	"github.com/runabol/tork/input"
+	"github.com/runabol/tork/internal/hash"
 	"github.com/runabol/tork/internal/httpx"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
@@ -132,6 +135,9 @@ func NewAPI(cfg Config) (*API, error) {
 	}
 	if v, ok := cfg.Enabled["metrics"]; !ok || v {
 		r.GET("/metrics", s.getMetrics)
+	}
+	if v, ok := cfg.Enabled["users"]; !ok || v {
+		r.POST("/users", s.createUser)
 	}
 
 	// register additional custom endpoints
@@ -269,6 +275,18 @@ func (s *API) SubmitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
 		return nil, err
 	}
 	j := ji.ToJob()
+	currentUser := ctx.Value(tork.USERNAME)
+	if currentUser != nil {
+		cu, ok := currentUser.(string)
+		if !ok {
+			return nil, errors.Errorf("error casting current user")
+		}
+		u, err := s.ds.GetUser(ctx, cu)
+		if err != nil {
+			return nil, err
+		}
+		j.CreatedBy = u
+	}
 	if err := s.ds.CreateJob(ctx, j); err != nil {
 		return nil, err
 	}
@@ -548,6 +566,53 @@ func (s *API) cancelJob(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
+}
+
+// createUser
+// @Summary Create a new user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Success 200 {object} tork.User
+// @Router /users [post]
+// @Param request body tork.User true "body"
+func (s *API) createUser(c echo.Context) error {
+	var u tork.User
+	body, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(body, &u); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	u.ID = uuid.NewUUID()
+	u.Username = strings.TrimSpace(u.Username)
+	if u.Username == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "must provide username")
+	}
+	u.Password = strings.TrimSpace(u.Password)
+	if u.Password == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "must provide password")
+	}
+	passwordHash, err := hash.Password(u.Password)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid password")
+	}
+	u.PasswordHash = passwordHash
+	u.Password = ""
+	now := time.Now().UTC()
+	u.CreatedAt = &now
+	_, err = s.ds.GetUser(c.Request().Context(), u.Username)
+	if err == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "user already exists")
+	} else if !errors.Is(err, datastore.ErrUserNotFound) {
+		return err
+	}
+	if err := s.ds.CreateUser(c.Request().Context(), &u); err != nil {
+		return err
+	} else {
+		return c.JSON(http.StatusOK, u)
+	}
 }
 
 func (s *API) Start() error {

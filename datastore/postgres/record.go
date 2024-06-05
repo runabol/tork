@@ -58,6 +58,7 @@ type jobRecord struct {
 	Description string     `db:"description"`
 	State       string     `db:"state"`
 	CreatedAt   time.Time  `db:"created_at"`
+	CreatedBy   string     `db:"created_by"`
 	StartedAt   *time.Time `db:"started_at"`
 	CompletedAt *time.Time `db:"completed_at"`
 	FailedAt    *time.Time `db:"failed_at"`
@@ -87,12 +88,22 @@ type nodeRecord struct {
 	TaskCount       int       `db:"task_count"`
 	Version         string    `db:"version_"`
 }
+
 type taskLogPartRecord struct {
 	ID       string    `db:"id"`
 	Number   int       `db:"number_"`
 	TaskID   string    `db:"task_id"`
 	CreateAt time.Time `db:"created_at"`
 	Contents string    `db:"contents"`
+}
+
+type userRecord struct {
+	ID        string    `db:"id"`
+	Name      string    `db:"name"`
+	Username  string    `db:"username_"`
+	Password  string    `db:"password_"`
+	CreatedAt time.Time `db:"created_at"`
+	Disabled  bool      `db:"is_disabled"`
 }
 
 func (r taskRecord) toTask() (*tork.Task, error) {
@@ -241,7 +252,7 @@ func (r taskLogPartRecord) toTaskLogPart() *tork.TaskLogPart {
 	}
 }
 
-func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
+func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User) (*tork.Job, error) {
 	var c tork.JobContext
 	if err := json.Unmarshal(r.Context, &c); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.context")
@@ -266,6 +277,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
 		Name:        r.Name,
 		State:       tork.JobState(r.State),
 		CreatedAt:   r.CreatedAt,
+		CreatedBy:   createdBy,
 		StartedAt:   r.StartedAt,
 		CompletedAt: r.CompletedAt,
 		FailedAt:    r.FailedAt,
@@ -283,4 +295,16 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task) (*tork.Job, error) {
 		Defaults:    defaults,
 		Webhooks:    webhooks,
 	}, nil
+}
+
+func (r userRecord) toUser() *tork.User {
+	n := tork.User{
+		ID:           r.ID,
+		Name:         r.Name,
+		Username:     r.Username,
+		PasswordHash: r.Password,
+		CreatedAt:    &r.CreatedAt,
+		Disabled:     r.Disabled,
+	}
+	return &n
 }
