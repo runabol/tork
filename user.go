@@ -2,11 +2,9 @@ package tork
 
 import "time"
 
-type UsernameKey string
-
 const (
-	USER_GUEST string      = "guest"
-	USERNAME   UsernameKey = "username"
+	USER_GUEST string = "guest"
+	USERNAME   string = "username"
 )
 
 type User struct {
