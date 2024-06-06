@@ -61,6 +61,10 @@ func OnBrokerInit(fn func(b mq.Broker) error) {
 	defaultEngine.OnBrokerInit(fn)
 }
 
+func OnDatastoreInit(fn func(ds datastore.Datastore) error) {
+	defaultEngine.OnDatastoreInit(fn)
+}
+
 func Start() error {
 	return defaultEngine.Start()
 }

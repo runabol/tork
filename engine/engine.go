@@ -56,6 +56,7 @@ type Engine struct {
 	dsProviders  map[string]datastore.Provider
 	mqProviders  map[string]mq.Provider
 	onBrokerInit []func(b mq.Broker) error
+	onDsInit     []func(ds datastore.Datastore) error
 }
 
 type Config struct {
@@ -345,6 +346,13 @@ func (e *Engine) OnBrokerInit(fn func(b mq.Broker) error) {
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
 	e.onBrokerInit = append(e.onBrokerInit, fn)
+}
+
+func (e *Engine) OnDatastoreInit(fn func(ds datastore.Datastore) error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	e.onDsInit = append(e.onDsInit, fn)
 }
 
 func (e *Engine) awaitTerm() {
