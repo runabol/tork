@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -25,8 +26,8 @@ func (c *Context) Get(key string) any {
 	return c.ctx.Get(key)
 }
 
-func (c *Context) Set(key string, val any) {
-	c.ctx.Set(key, val)
+func (c *Context) Set(key any, val any) {
+	c.ctx.SetRequest(c.ctx.Request().WithContext(context.WithValue(c.ctx.Request().Context(), key, val)))
 }
 
 func (c *Context) NoContent(code int) error {
