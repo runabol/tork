@@ -14,6 +14,11 @@ func (e *Engine) initDatastore() error {
 	if err != nil {
 		return err
 	}
+	for _, cb := range e.onDsInit {
+		if err := cb(ds); err != nil {
+			return err
+		}
+	}
 	e.ds = ds
 	return nil
 }
