@@ -13,7 +13,7 @@ type Context interface {
 	Request() *http.Request
 
 	// Get retrieves data from the context.
-	Get(key string) any
+	Get(key any) any
 
 	// Set saves data in the context.
 	Set(key any, val any)
