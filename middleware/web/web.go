@@ -15,6 +15,9 @@ type Context interface {
 	// Get retrieves data from the context.
 	Get(key string) any
 
+	// Set saves data in the context.
+	Set(key string, val any)
+
 	// Response returns `http.ResponseWriter`.
 	Response() http.ResponseWriter
 

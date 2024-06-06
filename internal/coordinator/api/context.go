@@ -25,6 +25,10 @@ func (c *Context) Get(key string) any {
 	return c.ctx.Get(key)
 }
 
+func (c *Context) Set(key string, val any) {
+	c.ctx.Set(key, val)
+}
+
 func (c *Context) NoContent(code int) error {
 	return c.ctx.NoContent(code)
 }
