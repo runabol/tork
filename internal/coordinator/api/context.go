@@ -22,8 +22,8 @@ func (c *Context) Response() http.ResponseWriter {
 	return c.ctx.Response().Unwrap()
 }
 
-func (c *Context) Get(key string) any {
-	return c.ctx.Get(key)
+func (c *Context) Get(key any) any {
+	return c.ctx.Request().Context().Value(key)
 }
 
 func (c *Context) Set(key any, val any) {
