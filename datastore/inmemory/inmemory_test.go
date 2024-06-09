@@ -508,3 +508,67 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 	assert.Equal(t, "line 2", logs.Items[0].Contents)
 	assert.Equal(t, 1, logs.TotalPages)
 }
+
+func TestInMemorySearchJobs(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	for i := 0; i < 101; i++ {
+		j1 := tork.Job{
+			ID:    uuid.NewUUID(),
+			Name:  fmt.Sprintf("Job %d", (i + 1)),
+			State: tork.JobStateRunning,
+			Tasks: []*tork.Task{
+				{
+					Name: "some task",
+				},
+			},
+			Tags: []string{fmt.Sprintf("tag-%d", i)},
+		}
+		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+
+		now := time.Now().UTC()
+		err = ds.CreateTask(ctx, &tork.Task{
+			ID:        uuid.NewUUID(),
+			JobID:     j1.ID,
+			State:     tork.TaskStateRunning,
+			CreatedAt: &now,
+		})
+		assert.NoError(t, err)
+	}
+
+	p1, err := ds.GetJobs(ctx, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "101", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tag:tag-1", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tag:not-a-tag", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, p1.Size)
+	assert.Equal(t, 0, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tags:not-a-tag,tag-1", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "Job", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "running", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+}

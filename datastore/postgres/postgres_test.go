@@ -83,6 +83,7 @@ func TestPostgresCreateJob(t *testing.T) {
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		CreatedBy: u,
+		Tags:      []string{"tag-a", "tag-b"},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -91,6 +92,7 @@ func TestPostgresCreateJob(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, u.Username, j2.CreatedBy.Username)
+	assert.Equal(t, []string{"tag-a", "tag-b"}, j2.Tags)
 }
 
 func TestPostgresCreateAndGetParallelTask(t *testing.T) {
@@ -655,6 +657,7 @@ func TestPostgresSearchJobs(t *testing.T) {
 					Name: "some task",
 				},
 			},
+			Tags: []string{fmt.Sprintf("tag-%d", i)},
 		}
 		err := ds.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
@@ -668,7 +671,33 @@ func TestPostgresSearchJobs(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	}
-	p1, err := ds.GetJobs(ctx, "101", 1, 10)
+
+	p1, err := ds.GetJobs(ctx, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "101", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tag:tag-1", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tag:not-a-tag", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, p1.Size)
+	assert.Equal(t, 0, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tags:not-a-tag,tag-1", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, "tags:tag-1", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p1.Size)
 	assert.Equal(t, 1, p1.TotalItems)

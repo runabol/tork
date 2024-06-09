@@ -13,6 +13,7 @@ import (
 
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/cache"
+	"github.com/runabol/tork/internal/slices"
 )
 
 const (
@@ -255,11 +256,36 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
+	parseQuery := func(query string) (string, []string) {
+		terms := []string{}
+		tags := []string{}
+		parts := strings.Fields(query)
+		for _, part := range parts {
+			if strings.HasPrefix(part, "tag:") {
+				tags = append(tags, strings.TrimPrefix(part, "tag:"))
+			} else if strings.HasPrefix(part, "tags:") {
+				tags = append(tags, strings.Split(strings.TrimPrefix(part, "tag:"), ",")...)
+			} else {
+				terms = append(terms, part)
+			}
+		}
+		return strings.Join(terms, " "), tags
+	}
+
+	searchTerm, tags := parseQuery(q)
 	offset := (page - 1) * size
 	filtered := make([]*tork.Job, 0)
 	ds.jobs.Iterate(func(_ string, j *tork.Job) {
-		if strings.Contains(strings.ToLower(j.Name), strings.ToLower(q)) ||
-			strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(q)) {
+		if searchTerm != "" {
+			if strings.Contains(strings.ToLower(j.Name), strings.ToLower(searchTerm)) ||
+				strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(searchTerm)) {
+				filtered = append(filtered, j)
+			}
+		} else if len(tags) > 0 {
+			if slices.Intersect(j.Tags, tags) {
+				filtered = append(filtered, j)
+			}
+		} else {
 			filtered = append(filtered, j)
 		}
 	})

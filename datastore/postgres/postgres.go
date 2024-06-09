@@ -522,13 +522,16 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize job.webhooks")
 	}
+	if j.Tags == nil {
+		j.Tags = make([]string, 0)
+	}
 	q := `insert into jobs 
 	       (id,name,description,state,created_at,started_at,tasks,position,
-			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by) 
+			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by,tags) 
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
 	_, err = ds.exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
-		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID)
+		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID, pq.StringArray(j.Tags))
 	if err != nil {
 		return errors.Wrapf(err, "error inserting job to the db")
 	}
@@ -746,16 +749,36 @@ func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID string, p
 }
 
 func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
+	parseQuery := func(query string) (string, []string) {
+		terms := []string{}
+		tags := []string{}
+		parts := strings.Fields(query)
+		for _, part := range parts {
+			if strings.HasPrefix(part, "tag:") {
+				tags = append(tags, strings.TrimPrefix(part, "tag:"))
+			} else if strings.HasPrefix(part, "tags:") {
+				tags = append(tags, strings.Split(strings.TrimPrefix(part, "tags:"), ",")...)
+			} else {
+				terms = append(terms, part)
+			}
+		}
+		return strings.Join(terms, " "), tags
+	}
+
+	searchTerm, tags := parseQuery(q)
+
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
 	  SELECT * 
 	  FROM jobs 
-	  where 
-	    case when $1 != '' then ts @@ plainto_tsquery('english', $1) else true end
+	  WHERE 
+	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE END
+	  AND 
+	    CASE WHEN array_length($2::text[], 1) > 0 THEN tags && $2 ELSE TRUE END
 	  ORDER BY created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.select_(&rs, qry, q); err != nil {
+	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags)); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
 	result := make([]*tork.JobSummary, len(rs))
@@ -773,12 +796,13 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 
 	var count *int
 	if err := ds.get(&count, `
-	  select count(*) 
-	  from jobs
-	  where case when $1 != '' 
-	    then ts @@ plainto_tsquery('english', $1) 
-		else true 
-	  end`, q); err != nil {
+	  SELECT count(*) 
+	  FROM jobs
+	  WHERE 
+	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE 
+	  AND 
+	    CASE WHEN array_length($2::text[], 1) > 0 THEN tags && $2 ELSE TRUE END
+	  END`, searchTerm, pq.StringArray(tags)); err != nil {
 		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 

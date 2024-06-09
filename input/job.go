@@ -12,6 +12,7 @@ type Job struct {
 	id          string
 	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
@@ -46,6 +47,7 @@ func (ji *Job) ToJob() *tork.Job {
 	j.ID = ji.ID()
 	j.Description = ji.Description
 	j.Inputs = ji.Inputs
+	j.Tags = ji.Tags
 	j.Name = ji.Name
 	tasks := make([]*tork.Task, len(ji.Tasks))
 	for i, ti := range ji.Tasks {

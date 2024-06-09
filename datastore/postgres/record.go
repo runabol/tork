@@ -53,27 +53,28 @@ type taskRecord struct {
 }
 
 type jobRecord struct {
-	ID          string     `db:"id"`
-	Name        string     `db:"name"`
-	Description string     `db:"description"`
-	State       string     `db:"state"`
-	CreatedAt   time.Time  `db:"created_at"`
-	CreatedBy   string     `db:"created_by"`
-	StartedAt   *time.Time `db:"started_at"`
-	CompletedAt *time.Time `db:"completed_at"`
-	FailedAt    *time.Time `db:"failed_at"`
-	Tasks       []byte     `db:"tasks"`
-	Position    int        `db:"position"`
-	Inputs      []byte     `db:"inputs"`
-	Context     []byte     `db:"context"`
-	ParentID    string     `db:"parent_id"`
-	TaskCount   int        `db:"task_count"`
-	Output      string     `db:"output_"`
-	Result      string     `db:"result"`
-	Error       string     `db:"error_"`
-	TS          string     `db:"ts"`
-	Defaults    []byte     `db:"defaults"`
-	Webhooks    []byte     `db:"webhooks"`
+	ID          string         `db:"id"`
+	Name        string         `db:"name"`
+	Description string         `db:"description"`
+	Tags        pq.StringArray `db:"tags"`
+	State       string         `db:"state"`
+	CreatedAt   time.Time      `db:"created_at"`
+	CreatedBy   string         `db:"created_by"`
+	StartedAt   *time.Time     `db:"started_at"`
+	CompletedAt *time.Time     `db:"completed_at"`
+	FailedAt    *time.Time     `db:"failed_at"`
+	Tasks       []byte         `db:"tasks"`
+	Position    int            `db:"position"`
+	Inputs      []byte         `db:"inputs"`
+	Context     []byte         `db:"context"`
+	ParentID    string         `db:"parent_id"`
+	TaskCount   int            `db:"task_count"`
+	Output      string         `db:"output_"`
+	Result      string         `db:"result"`
+	Error       string         `db:"error_"`
+	TS          string         `db:"ts"`
+	Defaults    []byte         `db:"defaults"`
+	Webhooks    []byte         `db:"webhooks"`
 }
 
 type nodeRecord struct {
@@ -275,6 +276,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User) (*
 	return &tork.Job{
 		ID:          r.ID,
 		Name:        r.Name,
+		Tags:        r.Tags,
 		State:       tork.JobState(r.State),
 		CreatedAt:   r.CreatedAt,
 		CreatedBy:   createdBy,
