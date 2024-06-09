@@ -30,6 +30,7 @@ insert into users (SELECT REPLACE(gen_random_uuid()::text, '-', ''),'Guest','gue
 CREATE TABLE jobs (
     id            varchar(32) not null primary key,
     name          varchar(256),
+    tags          text[]      not null default '{}',
     state         varchar(10) not null,
     created_at    timestamp   not null,
 	created_by    varchar(32) not null references users(id),
@@ -62,6 +63,7 @@ ALTER TABLE jobs ADD COLUMN ts tsvector NOT NULL
 
 CREATE INDEX jobs_ts_idx ON jobs USING GIN (ts);
 
+create index jobs_tags_idx on jobs using gin (tags);
 
 CREATE TABLE tasks (
     id            varchar(32) not null primary key,

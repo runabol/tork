@@ -23,6 +23,7 @@ type Job struct {
 	ParentID    string            `json:"parentId,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
 	State       JobState          `json:"state,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt,omitempty"`
 	CreatedBy   *User             `json:"createdBy,omitempty"`
@@ -49,6 +50,7 @@ type JobSummary struct {
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
 	State       JobState          `json:"state,omitempty"`
 	CreatedAt   time.Time         `json:"createdAt,omitempty"`
 	StartedAt   *time.Time        `json:"startedAt,omitempty"`
@@ -93,6 +95,7 @@ func (j *Job) Clone() *Job {
 		ID:          j.ID,
 		Name:        j.Name,
 		Description: j.Description,
+		Tags:        j.Tags,
 		State:       j.State,
 		CreatedAt:   j.CreatedAt,
 		CreatedBy:   createdBy,
@@ -151,6 +154,7 @@ func NewJobSummary(j *Job) *JobSummary {
 		ParentID:    j.ParentID,
 		Name:        j.Name,
 		Description: j.Description,
+		Tags:        j.Tags,
 		Inputs:      maps.Clone(j.Inputs),
 		State:       j.State,
 		CreatedAt:   j.CreatedAt,
