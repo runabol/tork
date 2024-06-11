@@ -818,35 +818,41 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
-	  SELECT j.* 
-	  FROM jobs j 
-	  WHERE 
-	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE END
-	  AND 
-	    CASE WHEN array_length($2::text[], 1) > 0 THEN tags && $2 ELSE TRUE END
-	  AND
-	    CASE WHEN $3 != '' AND exists (select 1 from jobs_perms jp where jp.job_id = j.id) THEN exists (
-		   select 1
-		   from jobs_perms jp
-		   where jp.job_id = j.id
-		   and (
-		     jp.user_id = (
-		       select id 
-			   from   users u
-			   where  username_ = $3
-             ) or 
-			 jp.role_id in (
-			   select role_id
-			   from users_roles ur
-			   where ur.user_id = (
-		         select id 
-			     from   users u
-			     where  username_ = $3
-               )
-			 )
-		   )
+      WITH user_info AS (
+        SELECT id AS user_id
+        FROM users
+        WHERE username_ = $3
+      ),
+      role_info AS (
+        SELECT role_id
+        FROM users_roles ur
+        JOIN user_info ui ON ur.user_id = ui.user_id
+      ),
+      job_perms_info AS (
+        SELECT job_id
+        FROM jobs_perms jp
+        WHERE jp.user_id = (SELECT user_id FROM user_info)
+        OR jp.role_id IN (SELECT role_id FROM role_info)
+      ),
+      no_job_perms AS (
+        SELECT j.id as job_id
+        FROM jobs j
+        where not exists (
+		  select 1 from jobs_perms jp where j.id = jp.job_id
 		)
-		ELSE TRUE END
+      )
+      SELECT j.*
+      FROM jobs j
+      WHERE 
+        ($1 = '' OR ts @@ plainto_tsquery('english', $1))
+      AND 
+        (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
+      AND
+        ($3 = '' OR EXISTS (select 1 from no_job_perms njp where njp.job_id=j.id) OR EXISTS (
+           SELECT 1
+           FROM job_perms_info jpi
+           WHERE jpi.job_id = j.id
+        ))
 	  ORDER BY created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
 	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
