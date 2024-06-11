@@ -648,13 +648,17 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	for i, rp := range rsp {
 		p := &tork.Permission{}
 		if rp.RoleID != nil {
-			p.Role = &tork.Role{
-				ID: *rp.RoleID,
+			role, err := ds.GetRole(ctx, *rp.RoleID)
+			if err != nil {
+				return nil, err
 			}
+			p.Role = role
 		} else {
-			p.User = &tork.User{
-				ID: *rp.UserID,
+			user, err := ds.GetUser(ctx, *rp.UserID)
+			if err != nil {
+				return nil, err
 			}
+			p.User = user
 		}
 		perms[i] = p
 	}
