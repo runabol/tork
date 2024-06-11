@@ -489,6 +489,11 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 				Event: "job.StatusChange",
 			},
 		},
+		Permissions: []*tork.Permission{{
+			User: &tork.User{
+				Username: tork.USER_GUEST,
+			},
+		}},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -503,6 +508,21 @@ func TestPostgresCreateAndGetJob(t *testing.T) {
 	assert.Len(t, j2.Webhooks, 2)
 	assert.Equal(t, j1.Webhooks[0], j2.Webhooks[0])
 	assert.Equal(t, j1.Webhooks[1], j2.Webhooks[1])
+	assert.Equal(t, "guest", j2.Permissions[0].User.Username)
+
+	j3 := tork.Job{
+		ID: uuid.NewUUID(),
+		Permissions: []*tork.Permission{{
+			Role: &tork.Role{
+				Slug: tork.ROLE_PUBLIC,
+			},
+		}},
+	}
+	err = ds.CreateJob(ctx, &j3)
+	assert.NoError(t, err)
+	j4, err := ds.GetJobByID(ctx, j3.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, "public", j4.Permissions[0].Role.Slug)
 }
 
 func TestPostgresUpdateJob(t *testing.T) {
