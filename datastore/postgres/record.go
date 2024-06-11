@@ -77,6 +77,14 @@ type jobRecord struct {
 	Webhooks    []byte         `db:"webhooks"`
 }
 
+type jobPermRecord struct {
+	ID        string    `db:"id"`
+	JobID     string    `db:"job_id"`
+	UserID    *string   `db:"user_id"`
+	RoleID    *string   `db:"role_id"`
+	CreatedAt time.Time `db:"created_at"`
+}
+
 type nodeRecord struct {
 	ID              string    `db:"id"`
 	Name            string    `db:"name"`
@@ -105,6 +113,13 @@ type userRecord struct {
 	Password  string    `db:"password_"`
 	CreatedAt time.Time `db:"created_at"`
 	Disabled  bool      `db:"is_disabled"`
+}
+
+type roleRecord struct {
+	ID        string    `db:"id"`
+	Slug      string    `db:"slug"`
+	Name      string    `db:"name"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func (r taskRecord) toTask() (*tork.Task, error) {
@@ -253,7 +268,7 @@ func (r taskLogPartRecord) toTaskLogPart() *tork.TaskLogPart {
 	}
 }
 
-func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User) (*tork.Job, error) {
+func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, perms []*tork.Permission) (*tork.Job, error) {
 	var c tork.JobContext
 	if err := json.Unmarshal(r.Context, &c); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.context")
@@ -296,6 +311,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User) (*
 		Error:       r.Error,
 		Defaults:    defaults,
 		Webhooks:    webhooks,
+		Permissions: perms,
 	}, nil
 }
 
@@ -307,6 +323,16 @@ func (r userRecord) toUser() *tork.User {
 		PasswordHash: r.Password,
 		CreatedAt:    &r.CreatedAt,
 		Disabled:     r.Disabled,
+	}
+	return &n
+}
+
+func (r roleRecord) toRole() *tork.Role {
+	n := tork.Role{
+		ID:        r.ID,
+		Slug:      r.Slug,
+		Name:      r.Name,
+		CreatedAt: &r.CreatedAt,
 	}
 	return &n
 }

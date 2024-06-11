@@ -18,6 +18,7 @@ type Job struct {
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
+	Permissions []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty" validate:"dive"`
 }
 
 type Defaults struct {
@@ -32,6 +33,11 @@ type Webhook struct {
 	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"required"`
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 	Event   string            `json:"event,omitempty" yaml:"event,omitempty"`
+}
+
+type Permission struct {
+	User string `json:"user,omitempty" yaml:"user,omitempty"`
+	Role string `json:"role,omitempty" yaml:"role,omitempty"`
 }
 
 func (ji *Job) ID() string {
@@ -72,6 +78,11 @@ func (ji *Job) ToJob() *tork.Job {
 		webhooks[i] = wh.toWebhook()
 	}
 	j.Webhooks = webhooks
+	perms := make([]*tork.Permission, len(ji.Permissions))
+	for i, p := range ji.Permissions {
+		perms[i] = p.toPermission()
+	}
+	j.Permissions = perms
 	return j
 }
 
@@ -95,4 +106,18 @@ func (w Webhook) toWebhook() *tork.Webhook {
 		Headers: maps.Clone(w.Headers),
 		Event:   w.Event,
 	}
+}
+
+func (p Permission) toPermission() *tork.Permission {
+	tp := &tork.Permission{}
+	if p.Role != "" {
+		tp.Role = &tork.Role{
+			Slug: p.Role,
+		}
+	} else {
+		tp.User = &tork.User{
+			Username: p.User,
+		}
+	}
+	return tp
 }

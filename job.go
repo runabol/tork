@@ -41,6 +41,7 @@ type Job struct {
 	Error       string            `json:"error,omitempty"`
 	Defaults    *JobDefaults      `json:"defaults,omitempty"`
 	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
+	Permissions []*Permission     `json:"permissions,omitempty"`
 }
 
 type JobSummary struct {
@@ -60,6 +61,11 @@ type JobSummary struct {
 	TaskCount   int               `json:"taskCount,omitempty"`
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
+}
+
+type Permission struct {
+	Role *Role `json:"role,omitempty"`
+	User *User `json:"user,omitempty"`
 }
 
 type JobContext struct {
@@ -114,6 +120,7 @@ func (j *Job) Clone() *Job {
 		Error:       j.Error,
 		Defaults:    defaults,
 		Webhooks:    CloneWebhooks(j.Webhooks),
+		Permissions: ClonePermissions(j.Permissions),
 	}
 }
 
@@ -176,10 +183,28 @@ func CloneWebhooks(webhooks []*Webhook) []*Webhook {
 	return copy
 }
 
-func (w Webhook) Clone() *Webhook {
+func (w *Webhook) Clone() *Webhook {
 	return &Webhook{
 		URL:     w.URL,
 		Headers: maps.Clone(w.Headers),
 		Event:   w.Event,
 	}
+}
+
+func ClonePermissions(perms []*Permission) []*Permission {
+	copy := make([]*Permission, len(perms))
+	for i, p := range perms {
+		copy[i] = p.Clone()
+	}
+	return copy
+}
+
+func (p *Permission) Clone() *Permission {
+	c := &Permission{}
+	if p.Role != nil {
+		c.Role = p.Role.Clone()
+	} else {
+		c.User = p.User.Clone()
+	}
+	return c
 }

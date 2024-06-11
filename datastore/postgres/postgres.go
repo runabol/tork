@@ -525,17 +525,41 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	if j.Tags == nil {
 		j.Tags = make([]string, 0)
 	}
-	q := `insert into jobs 
-	       (id,name,description,state,created_at,started_at,tasks,position,
-			inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by,tags) 
-	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
-	_, err = ds.exec(q, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
-		inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID, pq.StringArray(j.Tags))
-	if err != nil {
-		return errors.Wrapf(err, "error inserting job to the db")
-	}
-	return nil
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		sql := `insert into jobs (id,name,description,state,created_at,started_at,tasks,position,
+					inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by,tags) 
+				values
+					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
+		if _, err := ptx.exec(sql, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
+			inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID, pq.StringArray(j.Tags)); err != nil {
+			return errors.Wrapf(err, "error inserting job to the db")
+		}
+		for _, perm := range j.Permissions {
+			var username *string
+			var roleSlug *string
+			if perm.Role != nil {
+				roleSlug = &perm.Role.Slug
+			} else {
+				username = &perm.User.Username
+			}
+			sql := `insert into jobs_perms 
+			          (id,job_id,user_id,role_id) 
+			        values 
+					  ($1,
+					   $2,
+					   case when $3::varchar is not null then coalesce((select id from users where username_ = $3),'') end,
+					   case when $4::varchar is not null then coalesce((select id from roles where slug = $4),'') end)`
+			if _, err := ptx.exec(sql, uuid.NewUUID(), j.ID, username, roleSlug); err != nil {
+				return errors.Wrapf(err, "error inserting job to the db")
+			}
+		}
+		return nil
+	})
+
 }
 func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error {
 	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
@@ -555,7 +579,7 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		if err != nil {
 			return err
 		}
-		j, err := r.toJob(tasks, []*tork.Task{}, createdBy)
+		j, err := r.toJob(tasks, []*tork.Task{}, createdBy, []*tork.Permission{})
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert jobRecord")
 		}
@@ -593,16 +617,16 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	if err := json.Unmarshal(r.Tasks, &tasks); err != nil {
 		return nil, errors.Wrapf(err, "error desiralizing job.tasks")
 	}
-	rs := make([]taskRecord, 0)
+	rse := make([]taskRecord, 0)
 	q := `SELECT * 
 	      FROM tasks 
 		  where job_id = $1 
 		  ORDER BY position asc,started_at asc`
-	if err := ds.select_(&rs, q, id); err != nil {
+	if err := ds.select_(&rse, q, id); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
-	exec := make([]*tork.Task, len(rs))
-	for i, r := range rs {
+	exec := make([]*tork.Task, len(rse))
+	for i, r := range rse {
 		t, err := r.toTask()
 		if err != nil {
 			return nil, err
@@ -613,8 +637,28 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	if err != nil {
 		return nil, err
 	}
-
-	return r.toJob(tasks, exec, u)
+	rsp := make([]jobPermRecord, 0)
+	q = `SELECT * 
+	      FROM jobs_perms
+		  where job_id = $1`
+	if err := ds.select_(&rsp, q, id); err != nil {
+		return nil, errors.Wrapf(err, "error getting job permissions from db")
+	}
+	perms := make([]*tork.Permission, len(rsp))
+	for i, rp := range rsp {
+		p := &tork.Permission{}
+		if rp.RoleID != nil {
+			p.Role = &tork.Role{
+				ID: *rp.RoleID,
+			}
+		} else {
+			p.User = &tork.User{
+				ID: *rp.UserID,
+			}
+		}
+		perms[i] = p
+	}
+	return r.toJob(tasks, exec, u, perms)
 }
 
 func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
@@ -748,7 +792,7 @@ func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID string, p
 	}, nil
 }
 
-func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
+func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
 	parseQuery := func(query string) (string, []string) {
 		terms := []string{}
 		tags := []string{}
@@ -770,15 +814,38 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
-	  SELECT * 
-	  FROM jobs 
+	  SELECT j.* 
+	  FROM jobs j 
 	  WHERE 
 	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE END
 	  AND 
 	    CASE WHEN array_length($2::text[], 1) > 0 THEN tags && $2 ELSE TRUE END
+	  AND
+	    CASE WHEN $3 != '' AND exists (select 1 from jobs_perms jp where jp.job_id = j.id) THEN exists (
+		   select 1
+		   from jobs_perms jp
+		   where jp.job_id = j.id
+		   and (
+		     jp.user_id = (
+		       select id 
+			   from   users u
+			   where  username_ = $3
+             ) or 
+			 jp.role_id in (
+			   select role_id
+			   from users_roles ur
+			   where ur.user_id = (
+		         select id 
+			     from   users u
+			     where  username_ = $3
+               )
+			 )
+		   )
+		)
+		ELSE TRUE END
 	  ORDER BY created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags)); err != nil {
+	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
 	result := make([]*tork.JobSummary, len(rs))
@@ -787,7 +854,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 		if err != nil {
 			return nil, err
 		}
-		j, err := r.toJob([]*tork.Task{}, []*tork.Task{}, createdBy)
+		j, err := r.toJob([]*tork.Task{}, []*tork.Task{}, createdBy, []*tork.Permission{})
 		if err != nil {
 			return nil, err
 		}
@@ -797,12 +864,35 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, q string, page, size i
 	var count *int
 	if err := ds.get(&count, `
 	  SELECT count(*) 
-	  FROM jobs
+	  FROM jobs j
 	  WHERE 
-	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE 
+	    CASE WHEN $1 != '' THEN ts @@ plainto_tsquery('english', $1) ELSE TRUE END
 	  AND 
 	    CASE WHEN array_length($2::text[], 1) > 0 THEN tags && $2 ELSE TRUE END
-	  END`, searchTerm, pq.StringArray(tags)); err != nil {
+	  AND
+	    CASE WHEN $3 != '' AND exists (select 1 from jobs_perms jp where jp.job_id = j.id) THEN exists (
+		   select 1
+		   from jobs_perms jp
+		   where jp.job_id = j.id
+		   and (
+		     jp.user_id = (
+		       select id 
+			   from   users u
+			   where  username_ = $3
+             ) or 
+			 jp.role_id in (
+			   select role_id
+			   from users_roles ur
+			   where ur.user_id = (
+		         select id 
+			     from   users u
+			     where  username_ = $3
+               )
+			 )
+		   )
+		)
+		ELSE TRUE END
+	  `, searchTerm, pq.StringArray(tags), currentUser); err != nil {
 		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 
@@ -832,6 +922,9 @@ func (ds *PostgresDatastore) GetUser(ctx context.Context, uid string) (*tork.Use
 }
 
 func (ds *PostgresDatastore) CreateUser(ctx context.Context, u *tork.User) error {
+	u.ID = uuid.NewUUID()
+	now := time.Now().UTC()
+	u.CreatedAt = &now
 	q := `insert into users 
 	       (id,name,username_,password_,created_at) 
 	      values
@@ -839,6 +932,73 @@ func (ds *PostgresDatastore) CreateUser(ctx context.Context, u *tork.User) error
 	_, err := ds.exec(q, u.ID, u.Name, u.Username, u.PasswordHash, u.CreatedAt)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting user to the db")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) CreateRole(ctx context.Context, r *tork.Role) error {
+	r.ID = uuid.NewUUID()
+	now := time.Now().UTC()
+	r.CreatedAt = &now
+	q := `insert into roles 
+	       (id,slug,name,created_at) 
+	      values
+	       ($1,$2,$3,$4)`
+	_, err := ds.exec(q, r.ID, r.Slug, r.Name, r.CreatedAt)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting role to the db")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) GetRole(ctx context.Context, id string) (*tork.Role, error) {
+	r := roleRecord{}
+	if err := ds.get(&r, `SELECT * FROM roles where id = $1 or slug = $1`, id); err != nil {
+		return nil, errors.Wrapf(err, "error fetching role from db")
+	}
+	return r.toRole(), nil
+}
+
+func (ds *PostgresDatastore) GetRoles(ctx context.Context) ([]*tork.Role, error) {
+	rs := []roleRecord{}
+	if err := ds.select_(&rs, `SELECT * FROM roles order by name`); err != nil {
+		return nil, errors.Wrapf(err, "error fetching roles from db")
+	}
+	result := make([]*tork.Role, len(rs))
+	for i, r := range rs {
+		result[i] = r.toRole()
+	}
+	return result, nil
+}
+
+func (ds *PostgresDatastore) GetUserRoles(ctx context.Context, userID string) ([]*tork.Role, error) {
+	rs := []roleRecord{}
+	if err := ds.select_(&rs, `SELECT r.* FROM roles r inner join users_roles ur on ur.role_id=r.id where ur.user_id = $1`, userID); err != nil {
+		return nil, errors.Wrapf(err, "error fetching user roles from db")
+	}
+	result := make([]*tork.Role, len(rs))
+	for i, r := range rs {
+		result[i] = r.toRole()
+	}
+	return result, nil
+}
+
+func (ds *PostgresDatastore) AssignRole(ctx context.Context, userID, roleID string) error {
+	q := `insert into users_roles 
+	       (id,user_id,role_id,created_at) 
+	      values
+	       ($1,$2,$3,current_timestamp)`
+	_, err := ds.exec(q, uuid.NewUUID(), userID, roleID)
+	if err != nil {
+		return errors.Wrapf(err, "error inserting role to the db")
+	}
+	return nil
+}
+
+func (ds *PostgresDatastore) UnassignRole(ctx context.Context, userID, roleID string) error {
+	sql := `delete from users_roles where user_id = $1 and role_id = $2`
+	if _, err := ds.exec(sql, userID, roleID); err != nil {
+		return errors.Wrapf(err, "error deleting user role from db")
 	}
 	return nil
 }

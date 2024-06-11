@@ -25,7 +25,27 @@ CREATE TABLE users (
     is_disabled boolean      not null default false
 );
 
-insert into users (SELECT REPLACE(gen_random_uuid()::text, '-', ''),'Guest','guest','',current_timestamp,true);
+insert into users (id,name,username_,password_,created_at,is_disabled) (SELECT REPLACE(gen_random_uuid()::text, '-', ''),'Guest','guest','',current_timestamp,true);
+
+CREATE TABLE roles (
+    id          varchar(32)  not null primary key,
+    name        varchar(64)  not null,
+    slug        varchar(64)  not null unique,
+    created_at  timestamp    not null
+);
+
+CREATE UNIQUE INDEX idx_roles_slug ON roles (slug);
+
+insert into roles (id,name,slug,created_at) (SELECT REPLACE(gen_random_uuid()::text, '-', ''),'Public','public',current_timestamp);
+
+CREATE TABLE users_roles (
+    id         varchar(32) not null primary key,
+    user_id    varchar(32) not null references users(id),
+    role_id    varchar(32) not null references roles(id),
+    created_at timestamp   not null
+);
+
+CREATE UNIQUE INDEX idx_users_roles_uniq ON users_roles (user_id,role_id);
 
 CREATE TABLE jobs (
     id            varchar(32) not null primary key,
@@ -60,10 +80,19 @@ ALTER TABLE jobs ADD COLUMN ts tsvector NOT NULL
         setweight(to_tsvector('english',state),'A') 
     ) STORED;
 
-
 CREATE INDEX jobs_ts_idx ON jobs USING GIN (ts);
 
 create index jobs_tags_idx on jobs using gin (tags);
+
+CREATE TABLE jobs_perms (
+    id      varchar(32) not null primary key,
+    job_id  varchar(32) not null references jobs(id),
+    user_id varchar(32)          references users(id),
+    role_id varchar(32)          references roles(id)
+);
+
+CREATE INDEX jobs_perms_job_id_idx ON jobs_perms (job_id);
+CREATE INDEX jobs_perms_user_role_idx ON jobs_perms (user_id,role_id);
 
 CREATE TABLE tasks (
     id            varchar(32) not null primary key,

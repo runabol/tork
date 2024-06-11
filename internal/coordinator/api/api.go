@@ -7,7 +7,6 @@ import (
 	"io"
 	"strconv"
 	"syscall"
-	"time"
 
 	"net/http"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/hash"
 	"github.com/runabol/tork/internal/httpx"
-	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
@@ -271,7 +269,7 @@ func (s *API) createJob(c echo.Context) error {
 }
 
 func (s *API) SubmitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
-	if err := ji.Validate(); err != nil {
+	if err := ji.Validate(s.ds); err != nil {
 		return nil, err
 	}
 	j := ji.ToJob()
@@ -427,7 +425,16 @@ func (s *API) listJobs(c echo.Context) error {
 		size = 20
 	}
 	q := c.QueryParam("q")
-	res, err := s.ds.GetJobs(c.Request().Context(), q, page, size)
+	currentUser := c.Request().Context().Value(tork.USERNAME)
+	var username string
+	if currentUser != nil {
+		cu, ok := currentUser.(string)
+		if !ok {
+			return errors.Errorf("error casting current user")
+		}
+		username = cu
+	}
+	res, err := s.ds.GetJobs(c.Request().Context(), username, q, page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -585,7 +592,6 @@ func (s *API) createUser(c echo.Context) error {
 	if err := json.Unmarshal(body, &u); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	u.ID = uuid.NewUUID()
 	u.Username = strings.TrimSpace(u.Username)
 	if u.Username == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "must provide username")
@@ -600,8 +606,6 @@ func (s *API) createUser(c echo.Context) error {
 	}
 	u.PasswordHash = passwordHash
 	u.Password = ""
-	now := time.Now().UTC()
-	u.CreatedAt = &now
 	_, err = s.ds.GetUser(c.Request().Context(), u.Username)
 	if err == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "user already exists")

@@ -14,6 +14,7 @@ var (
 	ErrNodeNotFound    = errors.New("node not found")
 	ErrJobNotFound     = errors.New("job not found")
 	ErrUserNotFound    = errors.New("user not found")
+	ErrRoleNotFound    = errors.New("role not found")
 	ErrContextNotFound = errors.New("context not found")
 )
 
@@ -39,10 +40,17 @@ type Datastore interface {
 	UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error
 	GetJobByID(ctx context.Context, id string) (*tork.Job, error)
 	GetJobLogParts(ctx context.Context, jobID string, page, size int) (*Page[*tork.TaskLogPart], error)
-	GetJobs(ctx context.Context, q string, page, size int) (*Page[*tork.JobSummary], error)
+	GetJobs(ctx context.Context, currentUser, q string, page, size int) (*Page[*tork.JobSummary], error)
 
 	CreateUser(ctx context.Context, u *tork.User) error
 	GetUser(ctx context.Context, username string) (*tork.User, error)
+
+	CreateRole(ctx context.Context, r *tork.Role) error
+	GetRole(ctx context.Context, id string) (*tork.Role, error)
+	GetRoles(ctx context.Context) ([]*tork.Role, error)
+	GetUserRoles(ctx context.Context, userID string) ([]*tork.Role, error)
+	AssignRole(ctx context.Context, userID, roleID string) error
+	UnassignRole(ctx context.Context, userID, roleID string) error
 
 	GetMetrics(ctx context.Context) (*tork.Metrics, error)
 
