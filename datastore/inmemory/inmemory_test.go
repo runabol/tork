@@ -512,16 +512,77 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 func TestInMemorySearchJobs(t *testing.T) {
 	ctx := context.Background()
 	ds := inmemory.NewInMemoryDatastore()
-	for i := 0; i < 101; i++ {
+
+	u1 := &tork.User{
+		ID:       uuid.NewUUID(),
+		Username: uuid.NewShortUUID(),
+		Name:     "Tester",
+	}
+	err := ds.CreateUser(ctx, u1)
+	assert.NoError(t, err)
+
+	u2 := &tork.User{
+		ID:       uuid.NewUUID(),
+		Username: uuid.NewShortUUID(),
+		Name:     "Tester",
+	}
+	err = ds.CreateUser(ctx, u2)
+	assert.NoError(t, err)
+
+	r := &tork.Role{
+		Slug: "test-role",
+		Name: "Test Role",
+	}
+	err = ds.CreateRole(ctx, r)
+	assert.NoError(t, err)
+
+	err = ds.AssignRole(ctx, u2.ID, r.ID)
+	assert.NoError(t, err)
+
+	u3 := &tork.User{
+		ID:       uuid.NewUUID(),
+		Username: uuid.NewShortUUID(),
+		Name:     "Tester",
+	}
+	err = ds.CreateUser(ctx, u3)
+	assert.NoError(t, err)
+
+	for i := 0; i < 100; i++ {
 		j1 := tork.Job{
 			ID:    uuid.NewUUID(),
 			Name:  fmt.Sprintf("Job %d", (i + 1)),
 			State: tork.JobStateRunning,
-			Tasks: []*tork.Task{
-				{
-					Name: "some task",
-				},
-			},
+			Tasks: []*tork.Task{{
+				Name: "some task",
+			}},
+			Tags: []string{fmt.Sprintf("tag-%d", i)},
+			Permissions: []*tork.Permission{{
+				User: u1,
+			}, {
+				Role: r,
+			}},
+		}
+		err := ds.CreateJob(ctx, &j1)
+		assert.NoError(t, err)
+
+		now := time.Now().UTC()
+		err = ds.CreateTask(ctx, &tork.Task{
+			ID:        uuid.NewUUID(),
+			JobID:     j1.ID,
+			State:     tork.TaskStateRunning,
+			CreatedAt: &now,
+		})
+		assert.NoError(t, err)
+	}
+
+	for i := 100; i < 101; i++ {
+		j1 := tork.Job{
+			ID:    uuid.NewUUID(),
+			Name:  fmt.Sprintf("Job %d", (i + 1)),
+			State: tork.JobStateRunning,
+			Tasks: []*tork.Task{{
+				Name: "some task",
+			}},
 			Tags: []string{fmt.Sprintf("tag-%d", i)},
 		}
 		err := ds.CreateJob(ctx, &j1)
@@ -537,38 +598,100 @@ func TestInMemorySearchJobs(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	p1, err := ds.GetJobs(ctx, "", 1, 10)
+	p1, err := ds.GetJobs(ctx, "", "", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
 	assert.Equal(t, 101, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "101", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "101", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p1.Size)
 	assert.Equal(t, 1, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "tag:tag-1", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "tag:tag-1", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p1.Size)
 	assert.Equal(t, 1, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "tag:not-a-tag", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "tag:not-a-tag", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, p1.Size)
 	assert.Equal(t, 0, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "tags:not-a-tag,tag-1", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "tags:not-a-tag,tag-1", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, p1.Size)
 	assert.Equal(t, 1, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "Job", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "Job", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
 	assert.Equal(t, 101, p1.TotalItems)
 
-	p1, err = ds.GetJobs(ctx, "running", 1, 10)
+	p1, err = ds.GetJobs(ctx, "", "running", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, p1.Size)
 	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, u1.Username, "running", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, u2.Username, "running", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	p1, err = ds.GetJobs(ctx, u3.Username, "running", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p1.Size)
+	assert.Equal(t, 1, p1.TotalItems)
+}
+
+func TestInMemoryCreateRole(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	now := time.Now().UTC()
+	r := &tork.Role{
+		ID:        uuid.NewUUID(),
+		Slug:      "test-role",
+		Name:      "Test Role",
+		CreatedAt: &now,
+	}
+	err := ds.CreateRole(ctx, r)
+	assert.NoError(t, err)
+
+	role, err := ds.GetRole(ctx, r.Slug)
+	assert.NoError(t, err)
+	assert.Equal(t, r.Slug, role.Slug)
+
+	roles, err := ds.GetRoles(ctx)
+	assert.NoError(t, err)
+	assert.Len(t, roles, 1)
+	assert.Equal(t, "Test Role", roles[0].Name)
+
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
+	}
+	err = ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+
+	err = ds.AssignRole(ctx, u.ID, r.ID)
+	assert.NoError(t, err)
+
+	uroles, err := ds.GetUserRoles(ctx, u.ID)
+	assert.NoError(t, err)
+	assert.Len(t, uroles, 1)
+	assert.Equal(t, r.ID, uroles[0].ID)
+
+	err = ds.UnassignRole(ctx, u.ID, r.ID)
+	assert.NoError(t, err)
+
+	uroles, err = ds.GetUserRoles(ctx, u.ID)
+	assert.NoError(t, err)
+	assert.Len(t, uroles, 0)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/cache"
 	"github.com/runabol/tork/internal/slices"
+	"github.com/runabol/tork/internal/uuid"
 )
 
 const (
@@ -35,6 +36,8 @@ type InMemoryDatastore struct {
 	jobs            *cache.Cache[*tork.Job]
 	usersByID       *cache.Cache[*tork.User]
 	usersByUsername *cache.Cache[*tork.User]
+	roles           *cache.Cache[*tork.Role]
+	userRoles       *cache.Cache[[]*tork.UserRole]
 	logs            *cache.Cache[[]*tork.TaskLogPart]
 	logsMu          sync.RWMutex
 	nodeExpiration  *time.Duration
@@ -80,6 +83,8 @@ func NewInMemoryDatastore(opts ...Option) *InMemoryDatastore {
 	ds.logs = cache.New[[]*tork.TaskLogPart](cache.NoExpiration, ci)
 	ds.usersByID = cache.New[*tork.User](cache.NoExpiration, ci)
 	ds.usersByUsername = cache.New[*tork.User](cache.NoExpiration, ci)
+	ds.roles = cache.New[*tork.Role](cache.NoExpiration, ci)
+	ds.userRoles = cache.New[[]*tork.UserRole](cache.NoExpiration, ci)
 	ds.jobs.OnEvicted(ds.onJobEviction)
 	return ds
 }
@@ -255,7 +260,7 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return result, nil
 }
 
-func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
+func (ds *InMemoryDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
 	parseQuery := func(query string) (string, []string) {
 		terms := []string{}
 		tags := []string{}
@@ -272,10 +277,46 @@ func (ds *InMemoryDatastore) GetJobs(ctx context.Context, q string, page, size i
 		return strings.Join(terms, " "), tags
 	}
 
+	var urs []*tork.Role
+	var user *tork.User
+	if currentUser != "" {
+		u, err := ds.GetUser(ctx, currentUser)
+		if err != nil {
+			return nil, err
+		}
+		user = u
+		ur, err := ds.GetUserRoles(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		urs = ur
+	}
+
 	searchTerm, tags := parseQuery(q)
 	offset := (page - 1) * size
 	filtered := make([]*tork.Job, 0)
+	hasPermission := func(user *tork.User, uroles []*tork.Role, job *tork.Job) bool {
+		if len(job.Permissions) == 0 {
+			return true
+		}
+		for _, p := range job.Permissions {
+			if p.User != nil && p.User.Username == user.Username {
+				return true
+			}
+			if p.Role != nil {
+				for _, ur := range uroles {
+					if p.Role.Slug == ur.Slug {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
 	ds.jobs.Iterate(func(_ string, j *tork.Job) {
+		if currentUser != "" && !hasPermission(user, urs, j) {
+			return
+		}
 		if searchTerm != "" {
 			if strings.Contains(strings.ToLower(j.Name), strings.ToLower(searchTerm)) ||
 				strings.Contains(strings.ToLower(string(j.State)), strings.ToLower(searchTerm)) {
@@ -458,6 +499,19 @@ func (ds *InMemoryDatastore) GetUser(ctx context.Context, uid string) (*tork.Use
 	return nil, datastore.ErrUserNotFound
 }
 
+func (ds *InMemoryDatastore) GetRole(ctx context.Context, id string) (*tork.Role, error) {
+	var r *tork.Role
+	ds.roles.Iterate(func(key string, v *tork.Role) {
+		if key == id || v.Slug == id {
+			r = v
+		}
+	})
+	if r == nil {
+		return nil, datastore.ErrRoleNotFound
+	}
+	return r, nil
+}
+
 func (ds *InMemoryDatastore) CreateUser(ctx context.Context, u *tork.User) error {
 	if _, ok := ds.usersByID.Get(u.ID); ok {
 		return errors.New("user already exists")
@@ -468,6 +522,73 @@ func (ds *InMemoryDatastore) CreateUser(ctx context.Context, u *tork.User) error
 	ds.usersByID.Set(u.ID, u)
 	ds.usersByUsername.Set(u.Username, u)
 	return nil
+}
+
+func (ds *InMemoryDatastore) CreateRole(ctx context.Context, r *tork.Role) error {
+	r.ID = uuid.NewUUID()
+	now := time.Now().UTC()
+	r.CreatedAt = &now
+	ds.roles.Set(r.ID, r)
+	return nil
+}
+
+func (ds *InMemoryDatastore) GetRoles(ctx context.Context) ([]*tork.Role, error) {
+	roles := make([]*tork.Role, 0)
+	ds.roles.Iterate(func(_ string, v *tork.Role) {
+		roles = append(roles, v)
+	})
+	sort.Slice(roles, func(i, j int) bool {
+		return roles[i].Name < roles[j].Name
+	})
+	return roles, nil
+}
+
+func (ds *InMemoryDatastore) AssignRole(ctx context.Context, userID, roleID string) error {
+	now := time.Now().UTC()
+	ur := &tork.UserRole{
+		ID:        uuid.NewUUID(),
+		UserID:    userID,
+		RoleID:    roleID,
+		CreatedAt: &now,
+	}
+	urs, ok := ds.userRoles.Get(userID)
+	if !ok {
+		urs = make([]*tork.UserRole, 0)
+	}
+	urs = append(urs, ur)
+	ds.userRoles.Set(userID, urs)
+	return nil
+}
+
+func (ds *InMemoryDatastore) UnassignRole(ctx context.Context, userID, roleID string) error {
+	urs, ok := ds.userRoles.Get(userID)
+	if !ok {
+		return nil
+	}
+	nurs := make([]*tork.UserRole, 0)
+	for _, v := range urs {
+		if v.UserID != userID || v.RoleID != roleID {
+			nurs = append(nurs, v)
+		}
+	}
+	ds.userRoles.Set(userID, nurs)
+	return nil
+}
+
+func (ds *InMemoryDatastore) GetUserRoles(ctx context.Context, userID string) ([]*tork.Role, error) {
+	uroles, ok := ds.userRoles.Get(userID)
+	if !ok {
+		return make([]*tork.Role, 0), nil
+	}
+	result := make([]*tork.Role, len(uroles))
+	for i, ur := range uroles {
+		r, ok := ds.roles.Get(ur.RoleID)
+		if !ok {
+			return nil, datastore.ErrRoleNotFound
+		}
+		result[i] = r
+	}
+	return result, nil
 }
 
 func (ds *InMemoryDatastore) WithTx(ctx context.Context, f func(tx datastore.Datastore) error) error {

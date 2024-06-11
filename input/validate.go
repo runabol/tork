@@ -1,12 +1,14 @@
 package input
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/mq"
 )
@@ -15,7 +17,7 @@ var (
 	mountPattern = regexp.MustCompile(`^/[\.0-9a-zA-Z_/]+$`)
 )
 
-func (ji Job) Validate() error {
+func (ji Job) Validate(ds datastore.Datastore) error {
 	validate := validator.New()
 	if err := validate.RegisterValidation("duration", validateDuration); err != nil {
 		return err
@@ -28,6 +30,7 @@ func (ji Job) Validate() error {
 	}
 	validate.RegisterStructValidation(validateMount, Mount{})
 	validate.RegisterStructValidation(taskInputValidation, Task{})
+	validate.RegisterStructValidation(validatePermission(ds), Permission{})
 	return validate.Struct(ji)
 }
 
@@ -55,6 +58,28 @@ func validateMount(sl validator.StructLevel) {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
 	} else if mnt.Target == "/tork" {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
+	}
+}
+
+func validatePermission(ds datastore.Datastore) func(sl validator.StructLevel) {
+	return func(sl validator.StructLevel) {
+		perm := sl.Current().Interface().(Permission)
+		if perm.Role == "" && perm.User == "" {
+			sl.ReportError(perm, "perm", "Permission", "roleoruser", "")
+		}
+		if perm.Role != "" && perm.User != "" {
+			sl.ReportError(perm, "perm", "Permission", "roleoruser", "")
+		}
+		if perm.User != "" {
+			if _, err := ds.GetUser(context.Background(), perm.User); err != nil {
+				sl.ReportError(perm, "perm", "Permission", "invalidusername", "")
+			}
+		}
+		if perm.Role != "" {
+			if _, err := ds.GetRole(context.Background(), perm.Role); err != nil {
+				sl.ReportError(perm, "perm", "Permission", "invalidrole", "")
+			}
+		}
 	}
 }
 

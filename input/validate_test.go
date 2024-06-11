@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +21,7 @@ func TestValidateMinJob(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 }
 
@@ -29,7 +30,7 @@ func TestValidateJobNoTasks(t *testing.T) {
 		Name:  "test job",
 		Tasks: []Task{},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -44,7 +45,7 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -57,7 +58,7 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -70,7 +71,7 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -83,7 +84,7 @@ func TestValidateJobNoName(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -97,7 +98,7 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -109,7 +110,7 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -121,7 +122,7 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -138,7 +139,7 @@ func TestValidateJobDefaults(t *testing.T) {
 			Timeout: "1234",
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 	errs := err.(validator.ValidationErrors)
 	assert.Equal(t, "Timeout", errs[0].Field())
@@ -153,7 +154,7 @@ func TestValidateJobTaskNoName(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -166,7 +167,7 @@ func TestValidateJobTaskNoImage(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 }
 
@@ -183,7 +184,7 @@ func TestValidateJobTaskRetry(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -198,7 +199,7 @@ func TestValidateJobTaskRetry(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -213,7 +214,7 @@ func TestValidateJobTaskTimeout(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 }
 
@@ -236,7 +237,7 @@ func TestValidateSubJob(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 }
 
@@ -259,7 +260,7 @@ func TestValidateSubJobBadWebhook(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -279,7 +280,7 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -298,7 +299,7 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -326,7 +327,7 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -347,7 +348,7 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -374,7 +375,7 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -394,7 +395,7 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -412,7 +413,7 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -430,7 +431,7 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -451,7 +452,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -470,7 +471,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -489,7 +490,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -509,7 +510,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -529,7 +530,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -549,7 +550,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -569,7 +570,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -589,7 +590,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 
 	j = Job{
@@ -609,7 +610,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
 
@@ -626,7 +627,7 @@ func TestValidateWebhook(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate()
+	err := j.Validate(inmemory.NewInMemoryDatastore())
 	assert.NoError(t, err)
 
 	j = Job{
@@ -641,6 +642,6 @@ func TestValidateWebhook(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate()
+	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
