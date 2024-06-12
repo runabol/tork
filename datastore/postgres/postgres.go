@@ -753,16 +753,23 @@ func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
 		if !ok {
 			return errors.New("unable to cast to a postgres datastore")
 		}
-		if _, err := ptx.exec(`delete from jobs_perms where job_id in (select id from jobs where delete_at < current_timestamp);`); err != nil {
+		ids := []string{}
+		if err := ptx.select_(&ids, "select id from jobs where delete_at < current_timestamp limit 1000"); err != nil {
+			return errors.Wrapf(err, "error getting list of expired job ids from the db")
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if _, err := ptx.exec(`delete from jobs_perms where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
 			return errors.Wrapf(err, "error deleting expired job perms from the db")
 		}
-		if _, err := ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id in (select id from jobs where delete_at < current_timestamp));`); err != nil {
+		if _, err := ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id = ANY($1));`, pq.StringArray(ids)); err != nil {
 			return errors.Wrapf(err, "error deleting expired task log parts from the db")
 		}
-		if _, err := ptx.exec(`delete from tasks where job_id in (select id from jobs where delete_at < current_timestamp);`); err != nil {
+		if _, err := ptx.exec(`delete from tasks where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
 			return errors.Wrapf(err, "error deleting expired tasks from the db")
 		}
-		res, err := ptx.exec(`delete from jobs where id in (select id from jobs where delete_at < current_timestamp);`)
+		res, err := ptx.exec(`delete from jobs where id = ANY($1);`, pq.StringArray(ids))
 		if err != nil {
 			return errors.Wrapf(err, "error deleting expired jobs from the db")
 		}
