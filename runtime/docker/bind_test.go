@@ -46,3 +46,55 @@ func TestMountCreate(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestMountSources(t *testing.T) {
+
+	t.Run("allowed source", func(t *testing.T) {
+		m := NewBindMounter(BindConfig{
+			Allowed: true,
+			Sources: []string{"/tmp"},
+		})
+		mnt := tork.Mount{
+			Type:   tork.MountTypeBind,
+			Source: "/tmp",
+			Target: "/somevol",
+		}
+
+		err := m.Mount(context.Background(), &mnt)
+		assert.NoError(t, err)
+		assert.Equal(t, "/somevol", mnt.Target)
+		assert.Equal(t, "/tmp", mnt.Source)
+		assert.Equal(t, tork.MountTypeBind, mnt.Type)
+	})
+
+	t.Run("non allowed source", func(t *testing.T) {
+		m := NewBindMounter(BindConfig{
+			Allowed: true,
+			Sources: []string{"/tmp"},
+		})
+		mnt := tork.Mount{
+			Type:   tork.MountTypeBind,
+			Source: "/tmp/sub/path",
+			Target: "/somevol",
+		}
+
+		err := m.Mount(context.Background(), &mnt)
+		assert.Error(t, err)
+	})
+
+	t.Run("non allowed source", func(t *testing.T) {
+		m := NewBindMounter(BindConfig{
+			Allowed: true,
+			Sources: []string{"/tmp"},
+		})
+		mnt := tork.Mount{
+			Type:   tork.MountTypeBind,
+			Source: "/other",
+			Target: "/somevol",
+		}
+
+		err := m.Mount(context.Background(), &mnt)
+		assert.Error(t, err)
+	})
+
+}

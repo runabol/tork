@@ -97,6 +97,8 @@ timeout = "" # e.g. 3h
 
 [mounts.bind]
 allowed = false
+sources = [
+] # a list of paths that are allowed as mount sources. if empty all sources are allowed.
 
 [mounts.temp]
 dir = "/tmp"
