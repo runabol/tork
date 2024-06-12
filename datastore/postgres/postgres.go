@@ -747,53 +747,35 @@ func (ds *PostgresDatastore) expungeExpiredTaskLogPart() (int, error) {
 }
 
 func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
-	var n int64
+	var n int
 	if err := ds.WithTx(context.Background(), func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
 			return errors.New("unable to cast to a postgres datastore")
 		}
-		res, err := ptx.exec(`delete from jobs_perms where job_id in (select id from jobs where delete_at < current_timestamp);`)
-		if err != nil {
+		if _, err := ptx.exec(`delete from jobs_perms where job_id in (select id from jobs where delete_at < current_timestamp);`); err != nil {
 			return errors.Wrapf(err, "error deleting expired job perms from the db")
 		}
-		rows, err := res.RowsAffected()
-		if err != nil {
-			return errors.Wrapf(err, "error getting the number of deleted job perms")
-		}
-		n = n + rows
-		res, err = ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id in (select id from jobs where delete_at < current_timestamp));`)
-		if err != nil {
+		if _, err := ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id in (select id from jobs where delete_at < current_timestamp));`); err != nil {
 			return errors.Wrapf(err, "error deleting expired task log parts from the db")
 		}
-		rows, err = res.RowsAffected()
-		if err != nil {
-			return errors.Wrapf(err, "error getting the number of deleted log parts")
-		}
-		n = n + rows
-		res, err = ptx.exec(`delete from tasks where job_id in (select id from jobs where delete_at < current_timestamp);`)
-		if err != nil {
+		if _, err := ptx.exec(`delete from tasks where job_id in (select id from jobs where delete_at < current_timestamp);`); err != nil {
 			return errors.Wrapf(err, "error deleting expired tasks from the db")
 		}
-		rows, err = res.RowsAffected()
-		if err != nil {
-			return errors.Wrapf(err, "error getting the number of deleted tasks from the db")
-		}
-		n = n + rows
-		res, err = ptx.exec(`delete from jobs where id in (select id from jobs where delete_at < current_timestamp);`)
+		res, err := ptx.exec(`delete from jobs where id in (select id from jobs where delete_at < current_timestamp);`)
 		if err != nil {
 			return errors.Wrapf(err, "error deleting expired jobs from the db")
 		}
-		rows, err = res.RowsAffected()
+		rows, err := res.RowsAffected()
 		if err != nil {
 			return errors.Wrapf(err, "error getting the number of deleted jobs from the db")
 		}
-		n = n + rows
+		n = int(rows)
 		return nil
 	}); err != nil {
 		return 0, err
 	}
-	return int(n), nil
+	return n, nil
 }
 
 func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
