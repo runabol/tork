@@ -84,6 +84,9 @@ func TestPostgresCreateJob(t *testing.T) {
 		ID:        uuid.NewUUID(),
 		CreatedBy: u,
 		Tags:      []string{"tag-a", "tag-b"},
+		AutoDelete: &tork.AutoDelete{
+			After: "5h",
+		},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -93,6 +96,7 @@ func TestPostgresCreateJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, u.Username, j2.CreatedBy.Username)
 	assert.Equal(t, []string{"tag-a", "tag-b"}, j2.Tags)
+	assert.Equal(t, "5h", j2.AutoDelete.After)
 }
 
 func TestPostgresCreateAndGetParallelTask(t *testing.T) {
@@ -541,9 +545,11 @@ func TestPostgresUpdateJob(t *testing.T) {
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
+	deleteAt := time.Now().UTC()
 	err = ds.UpdateJob(ctx, j1.ID, func(u *tork.Job) error {
 		u.State = tork.JobStateCompleted
 		u.Context.Inputs["var2"] = "val2"
+		u.DeleteAt = &deleteAt
 		return nil
 	})
 	assert.NoError(t, err)
@@ -552,6 +558,7 @@ func TestPostgresUpdateJob(t *testing.T) {
 	assert.Equal(t, tork.JobStateCompleted, j2.State)
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
+	assert.Equal(t, deleteAt.Unix(), j2.DeleteAt.Unix())
 }
 
 func TestPostgresUpdateJobConcurrently(t *testing.T) {
@@ -1132,6 +1139,26 @@ func Test_cleanup(t *testing.T) {
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
+
+	j2 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j2)
+	assert.NoError(t, err)
+
+	past := time.Now().UTC().Add(-time.Minute)
+	err = ds.UpdateJob(ctx, j2.ID, func(u *tork.Job) error {
+		u.DeleteAt = &past
+		return nil
+	})
+	assert.NoError(t, err)
+
+	j3 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j3)
+	assert.NoError(t, err)
+
 	t1 := tork.Task{
 		ID:        uuid.NewUUID(),
 		CreatedAt: &now,
@@ -1151,7 +1178,7 @@ func Test_cleanup(t *testing.T) {
 
 	err = ds.cleanup()
 	assert.NoError(t, err)
-	assert.Equal(t, time.Minute*2, *ds.cleanupInterval)
+	assert.Equal(t, time.Minute, *ds.cleanupInterval)
 
 	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
 	assert.NoError(t, err)
@@ -1167,6 +1194,12 @@ func Test_cleanup(t *testing.T) {
 	logs, err = ds.GetTaskLogParts(ctx, t1.ID, 1, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, logs.TotalItems)
+
+	_, err = ds.GetJobByID(ctx, j2.ID)
+	assert.Error(t, err)
+
+	_, err = ds.GetJobByID(ctx, j3.ID)
+	assert.NoError(t, err)
 }
 
 func TestPostgresGetJobLogtParts(t *testing.T) {

@@ -56,6 +56,7 @@ CREATE TABLE jobs (
 	created_by    varchar(32) not null references users(id),
     started_at    timestamp,
     completed_at  timestamp,
+	delete_at     timestamp,
     failed_at     timestamp,
     tasks         jsonb       not null,
     position      int         not null,
@@ -68,7 +69,8 @@ CREATE TABLE jobs (
     result        text,
     error_        text,
     defaults      jsonb,
-    webhooks      jsonb
+    webhooks      jsonb,
+	auto_delete   jsonb
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);

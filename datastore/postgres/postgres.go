@@ -87,12 +87,22 @@ func (ds *PostgresDatastore) cleanupProcess() {
 }
 
 func (ds *PostgresDatastore) cleanup() error {
-	n, err := ds.expungeExpiredTaskLogPart()
+	n1, err := ds.expungeExpiredTaskLogPart()
 	if err != nil {
 		return err
 	}
+	if n1 > 0 {
+		log.Debug().Msgf("Expunged %d expired task log parts from the DB", n1)
+	}
+	n2, err := ds.expungeExpiredJobs()
+	if err != nil {
+		return err
+	}
+	if n2 > 0 {
+		log.Debug().Msgf("Expunged %d expired jobs from the DB", n2)
+	}
+	n := n1 + n2
 	if n > 0 {
-		log.Debug().Msgf("Expunged %d expired task log parts from the DB", n)
 		newCleanupInterval := (*ds.cleanupInterval) / 2
 		if newCleanupInterval < minCleanupInterval {
 			newCleanupInterval = minCleanupInterval
@@ -518,6 +528,15 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		s := string(b)
 		defaults = &s
 	}
+	var autoDelete *string
+	if j.AutoDelete != nil {
+		b, err := json.Marshal(j.AutoDelete)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.autoDelete")
+		}
+		s := string(b)
+		autoDelete = &s
+	}
 	webhooks, err := json.Marshal(j.Webhooks)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize job.webhooks")
@@ -531,11 +550,13 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 			return errors.New("unable to cast to a postgres datastore")
 		}
 		sql := `insert into jobs (id,name,description,state,created_at,started_at,tasks,position,
-					inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,created_by,tags) 
+					inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,
+					created_by,tags,auto_delete) 
 				values
-					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
+					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`
 		if _, err := ptx.exec(sql, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
-			inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID, pq.StringArray(j.Tags)); err != nil {
+			inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID,
+			pq.StringArray(j.Tags), autoDelete); err != nil {
 			return errors.Wrapf(err, "error inserting job to the db")
 		}
 		for _, perm := range j.Permissions {
@@ -598,9 +619,10 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 				position = $5,
 				context = $6,
 				result = $7,
-				error_ = $8
-			  where id = $9`
-		_, err = ptx.exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.ID)
+				error_ = $8,
+				delete_at = $9
+			  where id = $10`
+		_, err = ptx.exec(q, j.State, j.StartedAt, j.CompletedAt, j.FailedAt, j.Position, c, j.Result, j.Error, j.DeleteAt, j.ID)
 		return err
 	})
 }
@@ -722,6 +744,56 @@ func (ds *PostgresDatastore) expungeExpiredTaskLogPart() (int, error) {
 		return 0, errors.Wrapf(err, "error getting the number of deleted log parts")
 	}
 	return int(rows), nil
+}
+
+func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
+	var n int64
+	if err := ds.WithTx(context.Background(), func(tx datastore.Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		res, err := ptx.exec(`delete from jobs_perms where job_id in (select id from jobs where delete_at < current_timestamp);`)
+		if err != nil {
+			return errors.Wrapf(err, "error deleting expired job perms from the db")
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "error getting the number of deleted job perms")
+		}
+		n = n + rows
+		res, err = ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id in (select id from jobs where delete_at < current_timestamp));`)
+		if err != nil {
+			return errors.Wrapf(err, "error deleting expired task log parts from the db")
+		}
+		rows, err = res.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "error getting the number of deleted log parts")
+		}
+		n = n + rows
+		res, err = ptx.exec(`delete from tasks where job_id in (select id from jobs where delete_at < current_timestamp);`)
+		if err != nil {
+			return errors.Wrapf(err, "error deleting expired tasks from the db")
+		}
+		rows, err = res.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "error getting the number of deleted tasks from the db")
+		}
+		n = n + rows
+		res, err = ptx.exec(`delete from jobs where id in (select id from jobs where delete_at < current_timestamp);`)
+		if err != nil {
+			return errors.Wrapf(err, "error deleting expired jobs from the db")
+		}
+		rows, err = res.RowsAffected()
+		if err != nil {
+			return errors.Wrapf(err, "error getting the number of deleted jobs from the db")
+		}
+		n = n + rows
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+	return int(n), nil
 }
 
 func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
