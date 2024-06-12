@@ -247,6 +247,58 @@ func Test_handleCompleteJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.JobStateCompleted, j2.State)
 	assert.Equal(t, "some output", j1.Result)
+	assert.Nil(t, j1.DeleteAt)
+
+	assert.NoError(t, err)
+}
+
+func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	events := 0
+	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+		j, ok := event.(*tork.Job)
+		assert.True(t, ok)
+		assert.Equal(t, tork.JobStateCompleted, j.State)
+		events = events + 1
+	})
+	assert.NoError(t, err)
+
+	ds := inmemory.NewInMemoryDatastore()
+	handler := NewJobHandler(ds, b)
+	assert.NotNil(t, handler)
+
+	j1 := &tork.Job{
+		ID:     uuid.NewUUID(),
+		State:  tork.JobStateRunning,
+		Output: "some output",
+		Tasks: []*tork.Task{
+			{
+				Name: "task-1",
+				Env: map[string]string{
+					"SOMEVAR": "{{ bad_expression }}",
+				},
+			},
+		},
+		AutoDelete: &tork.AutoDelete{
+			After: "1m",
+		},
+	}
+
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	j1.State = tork.JobStateCompleted
+
+	err = handler(ctx, job.StateChange, j1)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.JobStateCompleted, j2.State)
+	assert.Equal(t, "some output", j1.Result)
+	assert.NotNil(t, j1.DeleteAt)
 
 	assert.NoError(t, err)
 }

@@ -63,6 +63,7 @@ type jobRecord struct {
 	StartedAt   *time.Time     `db:"started_at"`
 	CompletedAt *time.Time     `db:"completed_at"`
 	FailedAt    *time.Time     `db:"failed_at"`
+	DeleteAt    *time.Time     `db:"delete_at"`
 	Tasks       []byte         `db:"tasks"`
 	Position    int            `db:"position"`
 	Inputs      []byte         `db:"inputs"`
@@ -75,6 +76,7 @@ type jobRecord struct {
 	TS          string         `db:"ts"`
 	Defaults    []byte         `db:"defaults"`
 	Webhooks    []byte         `db:"webhooks"`
+	AutoDelete  []byte         `db:"auto_delete"`
 }
 
 type jobPermRecord struct {
@@ -284,6 +286,13 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 			return nil, errors.Wrapf(err, "error deserializing job.defaults")
 		}
 	}
+	var autoDelete *tork.AutoDelete
+	if r.AutoDelete != nil {
+		autoDelete = &tork.AutoDelete{}
+		if err := json.Unmarshal(r.AutoDelete, autoDelete); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.autoDelete")
+		}
+	}
 	var webhooks []*tork.Webhook
 	if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.webhook")
@@ -312,6 +321,8 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 		Defaults:    defaults,
 		Webhooks:    webhooks,
 		Permissions: perms,
+		AutoDelete:  autoDelete,
+		DeleteAt:    r.DeleteAt,
 	}, nil
 }
 

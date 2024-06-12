@@ -42,6 +42,8 @@ type Job struct {
 	Defaults    *JobDefaults      `json:"defaults,omitempty"`
 	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
 	Permissions []*Permission     `json:"permissions,omitempty"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty"`
+	DeleteAt    *time.Time        `json:"deleteAt,omitempty"`
 }
 
 type JobSummary struct {
@@ -66,6 +68,10 @@ type JobSummary struct {
 type Permission struct {
 	Role *Role `json:"role,omitempty"`
 	User *User `json:"user,omitempty"`
+}
+
+type AutoDelete struct {
+	After string `json:"after,omitempty"`
 }
 
 type JobContext struct {
@@ -97,6 +103,10 @@ func (j *Job) Clone() *Job {
 	if j.CreatedBy != nil {
 		createdBy = j.CreatedBy.Clone()
 	}
+	var autoDelete *AutoDelete
+	if j.AutoDelete != nil {
+		autoDelete = j.AutoDelete.Clone()
+	}
 	return &Job{
 		ID:          j.ID,
 		Name:        j.Name,
@@ -121,6 +131,7 @@ func (j *Job) Clone() *Job {
 		Defaults:    defaults,
 		Webhooks:    CloneWebhooks(j.Webhooks),
 		Permissions: ClonePermissions(j.Permissions),
+		AutoDelete:  autoDelete,
 	}
 }
 
@@ -207,4 +218,10 @@ func (p *Permission) Clone() *Permission {
 		c.User = p.User.Clone()
 	}
 	return c
+}
+
+func (a *AutoDelete) Clone() *AutoDelete {
+	return &AutoDelete{
+		After: a.After,
+	}
 }

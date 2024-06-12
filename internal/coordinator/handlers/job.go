@@ -108,6 +108,16 @@ func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 			u.CompletedAt = &now
 			u.Result = result
 			j.Result = result
+			if j.AutoDelete != nil && j.AutoDelete.After != "" {
+				dur, err := time.ParseDuration(j.AutoDelete.After)
+				if err != nil {
+					log.Error().Err(err).Msgf("unable to parse auto delete duration: %s", j.AutoDelete.After)
+				} else {
+					deleteAt := time.Now().UTC().Add(dur)
+					u.DeleteAt = &deleteAt
+					j.DeleteAt = &deleteAt
+				}
+			}
 		}
 		return nil
 	}); err != nil {

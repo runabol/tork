@@ -19,6 +19,7 @@ type Job struct {
 	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
 	Permissions []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty" validate:"dive"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty" yaml:"autoDelete,omitempty"`
 }
 
 type Defaults struct {
@@ -27,6 +28,10 @@ type Defaults struct {
 	Timeout  string  `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 	Queue    string  `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Priority int     `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
+}
+
+type AutoDelete struct {
+	After string `json:"after,omitempty" yaml:"after,omitempty" validate:"duration"`
 }
 
 type Webhook struct {
@@ -83,6 +88,11 @@ func (ji *Job) ToJob() *tork.Job {
 		perms[i] = p.toPermission()
 	}
 	j.Permissions = perms
+	if ji.AutoDelete != nil {
+		j.AutoDelete = &tork.AutoDelete{
+			After: ji.AutoDelete.After,
+		}
+	}
 	return j
 }
 
