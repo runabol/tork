@@ -2,7 +2,9 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -18,6 +20,7 @@ type BindMounter struct {
 
 type BindConfig struct {
 	Allowed bool
+	Sources []string
 }
 
 func NewBindMounter(cfg BindConfig) *BindMounter {
@@ -30,6 +33,9 @@ func NewBindMounter(cfg BindConfig) *BindMounter {
 func (m *BindMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 	if !m.cfg.Allowed {
 		return errors.New("bind mounts are not allowed")
+	}
+	if !m.isSourceAllowed(mnt.Source) {
+		return errors.New(fmt.Sprintf("src bind mount is not allowed: %s", mnt.Source))
 	}
 	m.mu.RLock()
 	_, ok := m.mounts[mnt.Source]
@@ -50,6 +56,18 @@ func (m *BindMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 	}
 	m.mounts[mnt.Source] = mnt.Source
 	return nil
+}
+
+func (m *BindMounter) isSourceAllowed(src string) bool {
+	if len(m.cfg.Sources) == 0 {
+		return true
+	}
+	for _, allow := range m.cfg.Sources {
+		if strings.EqualFold(allow, src) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *BindMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
