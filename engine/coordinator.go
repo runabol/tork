@@ -155,6 +155,7 @@ func logger() echo.MiddlewareFunc {
 		LogStatus:   true,
 		LogRemoteIP: true,
 		LogMethod:   true,
+		LogError:    true,
 		Skipper: func(c echo.Context) bool {
 			if len(skip) == 0 {
 				return false
@@ -167,12 +168,22 @@ func logger() echo.MiddlewareFunc {
 			return false
 		},
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			log.WithLevel(level).
-				Str("URI", v.URI).
-				Str("method", v.Method).
-				Str("remote-ip", v.RemoteIP).
-				Int("status", v.Status).
-				Msg("Request")
+			if v.Error != nil {
+				log.Error().
+					Err(v.Error).
+					Str("URI", v.URI).
+					Str("method", v.Method).
+					Str("remote-ip", v.RemoteIP).
+					Int("status", v.Status).
+					Msg("Request")
+			} else {
+				log.WithLevel(level).
+					Str("URI", v.URI).
+					Str("method", v.Method).
+					Str("remote-ip", v.RemoteIP).
+					Int("status", v.Status).
+					Msg("Request")
+			}
 			return nil
 		},
 	})
