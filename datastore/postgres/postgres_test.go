@@ -87,6 +87,9 @@ func TestPostgresCreateJob(t *testing.T) {
 		AutoDelete: &tork.AutoDelete{
 			After: "5h",
 		},
+		Secrets: map[string]string{
+			"password": "secret",
+		},
 	}
 	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
@@ -97,6 +100,7 @@ func TestPostgresCreateJob(t *testing.T) {
 	assert.Equal(t, u.Username, j2.CreatedBy.Username)
 	assert.Equal(t, []string{"tag-a", "tag-b"}, j2.Tags)
 	assert.Equal(t, "5h", j2.AutoDelete.After)
+	assert.Equal(t, map[string]string{"password": "secret"}, j2.Secrets)
 }
 
 func TestPostgresCreateAndGetParallelTask(t *testing.T) {

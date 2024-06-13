@@ -15,6 +15,7 @@ type Job struct {
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty" yaml:"secrets,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
 	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
@@ -58,6 +59,7 @@ func (ji *Job) ToJob() *tork.Job {
 	j.ID = ji.ID()
 	j.Description = ji.Description
 	j.Inputs = ji.Inputs
+	j.Secrets = ji.Secrets
 	j.Tags = ji.Tags
 	j.Name = ji.Name
 	tasks := make([]*tork.Task, len(ji.Tasks))
@@ -69,6 +71,7 @@ func (ji *Job) ToJob() *tork.Job {
 	j.CreatedAt = n
 	j.Context = tork.JobContext{}
 	j.Context.Inputs = ji.Inputs
+	j.Context.Secrets = ji.Secrets
 	j.Context.Job = map[string]string{
 		"id":   j.ID,
 		"name": j.Name,

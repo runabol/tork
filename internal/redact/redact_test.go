@@ -1,20 +1,36 @@
 package redact
 
 import (
+	"context"
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedactTask(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	ctx := context.Background()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+		Secrets: map[string]string{
+			"hush": "shhhhh",
+		},
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
 	ta := tork.Task{
+		JobID: j1.ID,
 		Env: map[string]string{
 			"secret_1":          "secret",
 			"SecrET_2":          "secret",
 			"PASSword":          "password",
 			"AWS_ACCESS_KEY_ID": "some-key",
 			"harmless":          "hello world",
+			"thing":             "shhhhh",
 		},
 		Pre: []*tork.Task{
 			{
@@ -48,7 +64,7 @@ func TestRedactTask(t *testing.T) {
 		},
 	}
 
-	redacter := NewRedacter()
+	redacter := NewRedacter(ds)
 
 	redacter.RedactTask(&ta)
 
@@ -65,10 +81,14 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Parallel.Tasks[0].Env["secret_1"])
 	assert.Equal(t, "hello world", ta.Parallel.Tasks[0].Env["harmless"])
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
+	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 }
 
 func TestRedactJob(t *testing.T) {
 	o := &tork.Job{
+		Secrets: map[string]string{
+			"something": "shhhhh",
+		},
 		Tasks: []*tork.Task{
 			{
 				Env: map[string]string{
@@ -112,15 +132,16 @@ func TestRedactJob(t *testing.T) {
 			{
 				URL: "http://example.com/2",
 				Headers: map[string]string{
-					"my-header": "my-value",
-					"my-secret": "secret",
+					"my-header":      "my-value",
+					"my-secret":      "secret",
+					"another-header": "shhhhh",
 				},
 			},
 		},
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter()
+	redacter := NewRedacter(inmemory.NewInMemoryDatastore())
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
@@ -141,7 +162,7 @@ func TestRedactJob(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", j.Execution[0].Env["secret_1"])
 	assert.Equal(t, "http://example.com/1", j.Webhooks[0].URL)
 	assert.Equal(t, "http://example.com/2", j.Webhooks[1].URL)
-	assert.Equal(t, map[string]string{"my-header": "my-value", "my-secret": "[REDACTED]"}, j.Webhooks[1].Headers)
+	assert.Equal(t, map[string]string{"my-header": "my-value", "my-secret": "[REDACTED]", "another-header": "[REDACTED]"}, j.Webhooks[1].Headers)
 }
 
 func TestRedactJobContains(t *testing.T) {
@@ -158,7 +179,7 @@ func TestRedactJobContains(t *testing.T) {
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter(Contains("secret"))
+	redacter := NewRedacter(inmemory.NewInMemoryDatastore(), Contains("secret"))
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
@@ -180,7 +201,7 @@ func TestRedactJobWildcard(t *testing.T) {
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter(Wildcard("secret*"))
+	redacter := NewRedacter(inmemory.NewInMemoryDatastore(), Wildcard("secret*"))
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])

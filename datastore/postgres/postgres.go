@@ -544,6 +544,15 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	if j.Tags == nil {
 		j.Tags = make([]string, 0)
 	}
+	var secrets *string
+	if j.Secrets != nil {
+		b, err := json.Marshal(j.Secrets)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.secrets")
+		}
+		s := string(b)
+		secrets = &s
+	}
 	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
@@ -551,12 +560,12 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		}
 		sql := `insert into jobs (id,name,description,state,created_at,started_at,tasks,position,
 					inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,
-					created_by,tags,auto_delete) 
+					created_by,tags,auto_delete,secrets) 
 				values
-					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`
+					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`
 		if _, err := ptx.exec(sql, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
 			inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID,
-			pq.StringArray(j.Tags), autoDelete); err != nil {
+			pq.StringArray(j.Tags), autoDelete, secrets); err != nil {
 			return errors.Wrapf(err, "error inserting job to the db")
 		}
 		for _, perm := range j.Permissions {
