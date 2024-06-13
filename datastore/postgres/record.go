@@ -77,6 +77,7 @@ type jobRecord struct {
 	Defaults    []byte         `db:"defaults"`
 	Webhooks    []byte         `db:"webhooks"`
 	AutoDelete  []byte         `db:"auto_delete"`
+	Secrets     []byte         `db:"secrets"`
 }
 
 type jobPermRecord struct {
@@ -297,6 +298,12 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 	if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.webhook")
 	}
+	var secrets map[string]string
+	if r.Secrets != nil {
+		if err := json.Unmarshal(r.Secrets, &secrets); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.secrets")
+		}
+	}
 	return &tork.Job{
 		ID:          r.ID,
 		Name:        r.Name,
@@ -323,6 +330,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 		Permissions: perms,
 		AutoDelete:  autoDelete,
 		DeleteAt:    r.DeleteAt,
+		Secrets:     secrets,
 	}, nil
 }
 

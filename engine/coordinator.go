@@ -45,15 +45,16 @@ func (e *Engine) initCoordinator() error {
 	}
 
 	// redact
-	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", false)
+	redactJobEnabled := conf.BoolDefault("middleware.job.redact.enabled", true)
 	if redactJobEnabled {
 		patterns := conf.Strings("middleware.job.redact.patterns")
 		matchers := make([]redact.Matcher, len(patterns))
 		for i, pattern := range patterns {
 			matchers[i] = redact.Wildcard(pattern)
 		}
-		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact(redact.NewRedacter(matchers...)))
-		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact(redact.NewRedacter(matchers...)))
+		redacter := redact.NewRedacter(e.ds, matchers...)
+		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact(redacter))
+		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact(redacter))
 	}
 
 	// webhook middleware

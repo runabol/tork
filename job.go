@@ -44,6 +44,7 @@ type Job struct {
 	Permissions []*Permission     `json:"permissions,omitempty"`
 	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty"`
 	DeleteAt    *time.Time        `json:"deleteAt,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty"`
 }
 
 type JobSummary struct {
@@ -75,9 +76,10 @@ type AutoDelete struct {
 }
 
 type JobContext struct {
-	Job    map[string]string `json:"job,omitempty"`
-	Inputs map[string]string `json:"inputs,omitempty"`
-	Tasks  map[string]string `json:"tasks,omitempty"`
+	Job     map[string]string `json:"job,omitempty"`
+	Inputs  map[string]string `json:"inputs,omitempty"`
+	Secrets map[string]string `json:"secrets,omitempty"`
+	Tasks   map[string]string `json:"tasks,omitempty"`
 }
 
 type JobDefaults struct {
@@ -122,6 +124,7 @@ func (j *Job) Clone() *Job {
 		Execution:   CloneTasks(j.Execution),
 		Position:    j.Position,
 		Inputs:      maps.Clone(j.Inputs),
+		Secrets:     maps.Clone(j.Secrets),
 		Context:     j.Context.Clone(),
 		ParentID:    j.ParentID,
 		TaskCount:   j.TaskCount,
@@ -137,17 +140,19 @@ func (j *Job) Clone() *Job {
 
 func (c JobContext) Clone() JobContext {
 	return JobContext{
-		Inputs: maps.Clone(c.Inputs),
-		Tasks:  maps.Clone(c.Tasks),
-		Job:    maps.Clone(c.Job),
+		Inputs:  maps.Clone(c.Inputs),
+		Secrets: maps.Clone(c.Secrets),
+		Tasks:   maps.Clone(c.Tasks),
+		Job:     maps.Clone(c.Job),
 	}
 }
 
 func (c JobContext) AsMap() map[string]any {
 	return map[string]any{
-		"inputs": c.Inputs,
-		"tasks":  c.Tasks,
-		"job":    c.Job,
+		"inputs":  c.Inputs,
+		"secrets": c.Secrets,
+		"tasks":   c.Tasks,
+		"job":     c.Job,
 	}
 }
 

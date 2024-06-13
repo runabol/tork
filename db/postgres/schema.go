@@ -70,7 +70,8 @@ CREATE TABLE jobs (
     error_        text,
     defaults      jsonb,
     webhooks      jsonb,
-    auto_delete   jsonb
+    auto_delete   jsonb,
+    secrets       jsonb
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);

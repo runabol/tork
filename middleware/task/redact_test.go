@@ -5,13 +5,23 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/redact"
+	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedactOnRead(t *testing.T) {
-	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter())})
+	ds := inmemory.NewInMemoryDatastore()
+	ctx := context.Background()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter(ds))})
 	t1 := &tork.Task{
+		JobID: j1.ID,
 		Env: map[string]string{
 			"secret": "1234",
 		},
@@ -21,8 +31,16 @@ func TestRedactOnRead(t *testing.T) {
 }
 
 func TestNoRedact(t *testing.T) {
-	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter())})
+	ds := inmemory.NewInMemoryDatastore()
+	ctx := context.Background()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter(ds))})
 	t1 := &tork.Task{
+		JobID: j1.ID,
 		Env: map[string]string{
 			"secret": "1234",
 		},
