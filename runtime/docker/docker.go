@@ -653,6 +653,9 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		dockerfile := fmt.Sprintf(`
 		FROM %s
 
+		# Ensure commands are run as the root user
+		USER root
+
 		# Detect and install user management tools if useradd is not available
 		RUN if ! command -v useradd >/dev/null 2>&1; then \
 				if command -v apt-get >/dev/null 2>&1; then \
