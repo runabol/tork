@@ -63,6 +63,7 @@ type Task struct {
 	Tags        []string          `json:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty"`
 	Priority    int               `json:"priority,omitempty"`
+	Internal    bool              `json:"-"`
 }
 
 type TaskSummary struct {

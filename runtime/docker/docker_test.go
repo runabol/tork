@@ -522,3 +522,19 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestRunTaskSandbox(t *testing.T) {
+	rt, err := NewDockerRuntime(WithSandbox(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "id > $TORK_OUTPUT",
+	}
+
+	err = rt.Run(context.Background(), tk)
+	assert.NoError(t, err)
+	assert.Equal(t, "uid=3000(tork) gid=3000(tork) groups=3000(tork)\n", tk.Result)
+}
