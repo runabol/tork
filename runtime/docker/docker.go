@@ -119,10 +119,6 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 
 func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// prepare mounts
-	t.Mounts = append(t.Mounts, tork.Mount{
-		Type:   tork.MountTypeVolume,
-		Target: "/tork",
-	})
 	for i, mnt := range t.Mounts {
 		err := d.mounter.Mount(ctx, &mnt)
 		if err != nil {
@@ -230,6 +226,23 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
 		mounts = append(mounts, mount)
 	}
+
+	torkdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
+	if err := d.mounter.Mount(ctx, torkdir); err != nil {
+		return err
+	}
+	defer func() {
+		uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		if err := d.mounter.Unmount(uctx, torkdir); err != nil {
+			log.Error().Err(err).Msgf("error unmounting workdir")
+		}
+	}()
+	mounts = append(mounts, mount.Mount{
+		Type:   mount.TypeVolume,
+		Source: torkdir.Source,
+		Target: torkdir.Target,
+	})
 
 	// parse task limits
 	cpus, err := parseCPUs(t.Limits)

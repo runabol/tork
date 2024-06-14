@@ -588,4 +588,37 @@ func TestRunTaskSandbox(t *testing.T) {
 		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
 	})
 
+	t.Run("pre_post_and_files", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "ubuntu:mantic",
+			Run:   "id > $TORK_OUTPUT",
+			Files: map[string]string{
+				"somefile.txt": "hello world",
+			},
+			Mounts: []tork.Mount{{
+				Type:   tork.MountTypeVolume,
+				Target: "/workdir",
+			}},
+			Pre: []*tork.Task{{
+				ID:    uuid.NewUUID(),
+				Image: "ubuntu:mantic",
+				Run:   "id > $TORK_OUTPUT",
+			}},
+			Post: []*tork.Task{{
+				ID:    uuid.NewUUID(),
+				Image: "ubuntu:mantic",
+				Run:   "id > $TORK_OUTPUT",
+			}},
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1001(tork) gid=1001(tork) groups=1001(tork)\n", tk.Result)
+	})
+
 }
