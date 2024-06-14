@@ -638,15 +638,44 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 	// and set the 'tork' user as the default user
 	if d.sandbox {
 		dockerfile := fmt.Sprintf(`
-        FROM %s
-		# create the tork user
-        RUN adduser --uid 3000 --disabled-password tork || useradd -u 3000 tork
+		FROM %s
 
-        # Ensure no root password is set
-        RUN passwd -d root
+		# Detect and install user management tools if useradd is not available
+		RUN if ! command -v useradd >/dev/null 2>&1; then \
+				if command -v apt-get >/dev/null 2>&1; then \
+					echo "detected apt-get" && apt-get update && apt-get install -y --no-install-recommends passwd && rm -rf /var/lib/apt/lists/*; \
+				elif command -v yum >/dev/null 2>&1; then \
+					echo "detected yum" && yum update -y && yum install -y shadow-utils && yum clean all && rm -rf /var/cache/yum; \
+				elif command -v apk >/dev/null 2>&1; then \
+					echo "detected apk add" && apk update && apk add --no-cache shadow && rm -rf /var/cache/apk/*; \
+				elif command -v busybox >/dev/null 2>&1; then \
+					echo "Detected BusyBox"; \
+				else \
+					echo "Unsupported base image"; \
+					exit 1; \
+				fi; \
+			fi
 
-        # Set the tork user as the default user
-        USER tork
+		# Create the user tork if it doesn't already exist
+		RUN if ! id -u tork >/dev/null 2>&1; then \
+				if command -v busybox >/dev/null 2>&1; then \
+					echo "adduser tork" && adduser -D tork; \
+				else \
+					echo "useradd tork" && useradd -m tork; \
+				fi; \
+			fi
+
+		# Remove user management tools if they were installed
+		RUN if command -v apt-get >/dev/null 2>&1 && dpkg -l | grep -q passwd; then \
+				apt-get remove -y passwd && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
+			elif command -v yum >/dev/null 2>&1 && rpm -q shadow-utils >/dev/null 2>&1; then \
+				yum remove -y shadow-utils && yum clean all && rm -rf /var/cache/yum; \
+			elif command -v apk >/dev/null 2>&1 && apk info | grep -q shadow; then \
+				apk del shadow && rm -rf /var/cache/apk/*; \
+			fi
+
+		# Switch to the new user
+		USER tork
 		`, pr.image)
 
 		// Create a tarball containing the Dockerfile

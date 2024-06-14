@@ -463,7 +463,7 @@ func Test_imagePull(t *testing.T) {
 	assert.NotNil(t, rt)
 
 	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "busybox:*")),
+		Filters: filters.NewArgs(filters.Arg("reference", "debian:*")),
 	})
 	assert.NoError(t, err)
 
@@ -481,7 +481,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:1.36"}, os.Stdout)
+			err := rt.imagePull(ctx, &tork.Task{Image: "debian:jessie-slim"}, os.Stdout)
 			assert.NoError(t, err)
 		}()
 	}
@@ -524,17 +524,68 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 }
 
 func TestRunTaskSandbox(t *testing.T) {
-	rt, err := NewDockerRuntime(WithSandbox(true))
-	assert.NoError(t, err)
-	assert.NotNil(t, rt)
+	t.Run("ubuntu", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
 
-	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
-		Run:   "id > $TORK_OUTPUT",
-	}
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "ubuntu:mantic",
+			Run:   "id > $TORK_OUTPUT",
+		}
 
-	err = rt.Run(context.Background(), tk)
-	assert.NoError(t, err)
-	assert.Equal(t, "uid=3000(tork) gid=3000(tork) groups=3000(tork)\n", tk.Result)
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1001(tork) gid=1001(tork) groups=1001(tork)\n", tk.Result)
+	})
+
+	t.Run("centos", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "centos:latest",
+			Run:   "id > $TORK_OUTPUT",
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+	})
+
+	t.Run("alpine", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "alpine:latest",
+			Run:   "id > $TORK_OUTPUT",
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+	})
+
+	t.Run("busybox", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "busybox:latest",
+			Run:   "id > $TORK_OUTPUT",
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+	})
+
 }
