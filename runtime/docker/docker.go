@@ -22,6 +22,7 @@ import (
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
+	mobyarchive "github.com/moby/moby/pkg/archive"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
@@ -44,6 +45,7 @@ type DockerRuntime struct {
 	mounter runtime.Mounter
 	broker  mq.Broker
 	config  string
+	sandbox bool
 }
 
 type dockerLogsReader struct {
@@ -51,6 +53,7 @@ type dockerLogsReader struct {
 }
 
 type pullRequest struct {
+	ctx      context.Context
 	image    string
 	logger   io.Writer
 	registry registry
@@ -82,6 +85,12 @@ func WithConfig(config string) Option {
 	}
 }
 
+func WithSandbox(val bool) Option {
+	return func(rt *DockerRuntime) {
+		rt.sandbox = val
+	}
+}
+
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -104,16 +113,30 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 		}
 		rt.mounter = vmounter
 	}
-	go rt.puller(context.Background())
+	go rt.puller()
 	return rt, nil
 }
 
 func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// prepare mounts
+	t.Mounts = append(t.Mounts, tork.Mount{
+		Type:   tork.MountTypeVolume,
+		Target: "/tork",
+	})
 	for i, mnt := range t.Mounts {
 		err := d.mounter.Mount(ctx, &mnt)
 		if err != nil {
 			return err
+		}
+		if d.sandbox && mnt.Type == tork.MountTypeVolume {
+			// add a pre-task to adjust volume permissions
+			// to allow access to the tork user
+			t.Pre = append([]*tork.Task{{
+				Internal: true,
+				Image:    "busybox:stable",
+				CMD:      []string{"sh", "-c", fmt.Sprintf("chmod 777 %s", mnt.Target)},
+				Mounts:   []tork.Mount{mnt},
+			}}, t.Pre...)
 		}
 		defer func(m tork.Mount) {
 			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -166,6 +189,9 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err := d.imagePull(ctx, t, logger); err != nil {
 		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
+	if d.sandbox && !t.Internal {
+		t.Image = fmt.Sprintf("%s_sandbox", t.Image)
+	}
 
 	env := []string{}
 	for name, value := range t.Env {
@@ -204,22 +230,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
 		mounts = append(mounts, mount)
 	}
-	torkdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
-	if err := d.mounter.Mount(ctx, torkdir); err != nil {
-		return err
-	}
-	defer func() {
-		uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		if err := d.mounter.Unmount(uctx, torkdir); err != nil {
-			log.Error().Err(err).Msgf("error unmounting workdir")
-		}
-	}()
-	mounts = append(mounts, mount.Mount{
-		Type:   mount.TypeVolume,
-		Source: torkdir.Source,
-		Target: torkdir.Target,
-	})
 
 	// parse task limits
 	cpus, err := parseCPUs(t.Limits)
@@ -252,7 +262,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	cmd := t.CMD
 	if len(cmd) == 0 {
-		cmd = []string{fmt.Sprintf("%s/entrypoint", torkdir.Target)}
+		cmd = []string{"/tork/entrypoint"}
 	}
 	entrypoint := t.Entrypoint
 	if len(entrypoint) == 0 && t.Run != "" {
@@ -441,7 +451,7 @@ func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *
 	}
 
 	if t.Run != "" {
-		if err := ar.WriteFile("entrypoint", 0111, []byte(t.Run)); err != nil {
+		if err := ar.WriteFile("entrypoint", 0555, []byte(t.Run)); err != nil {
 			return err
 		}
 	}
@@ -549,24 +559,8 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.W
 	if ok {
 		return nil
 	}
-	// let's check if we have the image
-	// locally already
-	images, err := d.client.ImageList(
-		ctx,
-		image.ListOptions{All: true},
-	)
-	if err != nil {
-		return err
-	}
-	for _, img := range images {
-		for _, tag := range img.RepoTags {
-			if tag == t.Image {
-				d.images.Set(tag, true)
-				return nil
-			}
-		}
-	}
 	pr := &pullRequest{
+		ctx:    ctx,
 		image:  t.Image,
 		logger: logger,
 		done:   make(chan error),
@@ -578,13 +572,28 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.W
 		}
 	}
 	d.pullq <- pr
-	return <-pr.done
+	err := <-pr.done
+	if err == nil {
+		d.images.Set(t.Image, true)
+	}
+	return err
 }
 
 // puller is a goroutine that serializes all requests
 // to pull images from the docker repo
-func (d *DockerRuntime) puller(ctx context.Context) {
+func (d *DockerRuntime) puller() {
 	for pr := range d.pullq {
+		pr.done <- d.doPullRequest(pr)
+	}
+}
+
+func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
+	// let's check if we have the image locally already
+	imageExists, err := d.imageExistsLocally(pr.ctx, pr.image)
+	if err != nil {
+		return err
+	}
+	if !imageExists {
 		var authConfig regtypes.AuthConfig
 		if pr.registry.username != "" {
 			authConfig = regtypes.AuthConfig{
@@ -594,14 +603,12 @@ func (d *DockerRuntime) puller(ctx context.Context) {
 		} else {
 			ref, err := parseRef(pr.image)
 			if err != nil {
-				pr.done <- err
-				continue
+				return err
 			}
 			if ref.domain != "" {
 				username, password, err := getRegistryCredentials(d.config, ref.domain)
 				if err != nil {
-					pr.done <- err
-					continue
+					return err
 				}
 				authConfig = regtypes.AuthConfig{
 					Username: username,
@@ -612,21 +619,78 @@ func (d *DockerRuntime) puller(ctx context.Context) {
 
 		encodedJSON, err := json.Marshal(authConfig)
 		if err != nil {
-			pr.done <- err
-			continue
+			return err
 		}
 		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
 		reader, err := d.client.ImagePull(
-			ctx, pr.image, image.PullOptions{RegistryAuth: authStr})
+			pr.ctx, pr.image, image.PullOptions{RegistryAuth: authStr})
 		if err != nil {
-			pr.done <- err
-			continue
+			return err
 		}
-		_, err = io.Copy(pr.logger, reader)
-		if err != nil {
-			pr.done <- err
-			continue
+		defer reader.Close()
+
+		if _, err := io.Copy(pr.logger, reader); err != nil {
+			return err
 		}
-		pr.done <- nil
 	}
+
+	// when in sandbox mode we extend the original image
+	// and set the 'tork' user as the default user
+	if d.sandbox {
+		dockerfile := fmt.Sprintf(`
+        FROM %s
+		# create the tork user
+        RUN adduser --uid 3000 --disabled-password tork || useradd -u 3000 tork
+
+        # Ensure no root password is set
+        RUN passwd -d root
+
+        # Set the tork user as the default user
+        USER tork
+		`, pr.image)
+
+		// Create a tarball containing the Dockerfile
+		dockerfileTar, err := mobyarchive.Generate("Dockerfile", dockerfile)
+		if err != nil {
+			return err
+		}
+
+		// Define build options
+		buildOptions := types.ImageBuildOptions{
+			Context:    dockerfileTar,
+			Dockerfile: "Dockerfile",
+			Tags:       []string{fmt.Sprintf("%s_sandbox", pr.image)},
+		}
+
+		// Build the image
+		response, err := d.client.ImageBuild(pr.ctx, dockerfileTar, buildOptions)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
+
+		if _, err := io.Copy(pr.logger, response.Body); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *DockerRuntime) imageExistsLocally(ctx context.Context, name string) (bool, error) {
+	images, err := d.client.ImageList(
+		ctx,
+		image.ListOptions{All: true},
+	)
+	if err != nil {
+		return false, err
+	}
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == name {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

@@ -75,6 +75,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			docker.WithMounter(mounter),
 			docker.WithConfig(conf.String("runtime.docker.config")),
 			docker.WithBroker(e.broker),
+			docker.WithSandbox(conf.BoolDefault("runtime.docker.sandbox", false)),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
