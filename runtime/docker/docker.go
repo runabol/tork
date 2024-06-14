@@ -665,15 +665,6 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 				fi; \
 			fi
 
-		# Remove user management tools if they were installed
-		RUN if command -v apt-get >/dev/null 2>&1 && dpkg -l | grep -q passwd; then \
-				apt-get remove -y passwd && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
-			elif command -v yum >/dev/null 2>&1 && rpm -q shadow-utils >/dev/null 2>&1; then \
-				yum remove -y shadow-utils && yum clean all && rm -rf /var/cache/yum; \
-			elif command -v apk >/dev/null 2>&1 && apk info | grep -q shadow; then \
-				apk del shadow && rm -rf /var/cache/apk/*; \
-			fi
-
 		# Switch to the new user
 		USER tork
 		`, pr.image)
