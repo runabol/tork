@@ -35,7 +35,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 </h1>
 
 - [REST API](https://www.tork.run/rest)
-- [Extensible](https://www.tork.run/customize)
+- [Highly extensible](https://www.tork.run/extend)
 - Horizontally scalable
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](https://www.tork.run/tasks#limits)
 - Automatic recovery of tasks in the event of a worker crash
@@ -48,9 +48,12 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - [Full-text search](https://www.tork.run/rest#list-jobs)
 - [Expression Language](https://www.tork.run/tasks#expressions)
 - [Conditional Tasks](https://www.tork.run/tasks#expressions)
-- [Parallel Task](https://www.tork.run/tasks#parallel-task)
-- [Each Task](https://www.tork.run/tasks#each-task)
+- [Parallel Tasks](https://www.tork.run/tasks#parallel-task)
+- [For-Each Task](https://www.tork.run/tasks#each-task)
 - [Subjob Task](https://www.tork.run/tasks#sub-job-task)
+- [Task Priority](https://www.tork.run/tasks#priority)
+- [Sandbox Mode](https://www.tork.run/runtime#sandbox-mode-experimental)
+- [Secrets](https://www.tork.run/tasks#secrets)
 - [Web UI](https://www.tork.run/web-ui)
 
 ## Documentation
