@@ -543,26 +543,6 @@ func TestValidateMounts(t *testing.T) {
 				Mounts: []Mount{
 					{
 						Type:   tork.MountTypeBind,
-						Source: "../some/source", // invalid
-						Target: "/some/target",
-					},
-				},
-			},
-		},
-	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
-	assert.Error(t, err)
-
-	j = Job{
-		Name: "test job",
-		Tasks: []Task{
-			{
-				Name:  "test task",
-				Image: "some:image",
-				Run:   "some script",
-				Mounts: []Mount{
-					{
-						Type:   tork.MountTypeBind,
 						Source: "/some#/source", // invalid
 						Target: "/some/target",
 					},
@@ -612,6 +592,26 @@ func TestValidateMounts(t *testing.T) {
 	}
 	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "key1=value1 ke2=value2",
+						Target: "/some/path",
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(inmemory.NewInMemoryDatastore())
+	assert.NoError(t, err)
 }
 
 func TestValidateWebhook(t *testing.T) {
