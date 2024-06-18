@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	mountPattern = regexp.MustCompile(`^[/\.0-9a-zA-Z_/= ]+$`)
+	mountPattern = regexp.MustCompile(`^[-/\.0-9a-zA-Z_/= ]+$`)
 )
 
 func (ji Job) Validate(ds datastore.Datastore) error {

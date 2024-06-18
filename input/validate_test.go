@@ -603,7 +603,7 @@ func TestValidateMounts(t *testing.T) {
 				Mounts: []Mount{
 					{
 						Type:   tork.MountTypeBind,
-						Source: "key1=value1 ke2=value2",
+						Source: "bucket=some-bucket path=/mnt/some-path",
 						Target: "/some/path",
 					},
 				},
