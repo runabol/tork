@@ -10,18 +10,21 @@ import (
 
 type MultiMounter struct {
 	mounters map[string]Mounter
-	mapping  map[*tork.Mount]Mounter
+	mapping  map[string]Mounter
 	mu       sync.RWMutex
 }
 
 func NewMultiMounter() *MultiMounter {
 	return &MultiMounter{
 		mounters: map[string]Mounter{},
-		mapping:  make(map[*tork.Mount]Mounter),
+		mapping:  make(map[string]Mounter),
 	}
 }
 
 func (m *MultiMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
+	if mnt.ID == "" {
+		return errors.New("must provide a mount ID")
+	}
 	m.mu.RLock()
 	mounter, ok := m.mounters[mnt.Type]
 	m.mu.RUnlock()
@@ -29,20 +32,23 @@ func (m *MultiMounter) Mount(ctx context.Context, mnt *tork.Mount) error {
 		return errors.Errorf("unknown mount type: %s", mnt.Type)
 	}
 	m.mu.Lock()
-	m.mapping[mnt] = mounter
+	m.mapping[mnt.ID] = mounter
 	m.mu.Unlock()
 	return mounter.Mount(ctx, mnt)
 }
 
 func (m *MultiMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
+	if mnt.ID == "" {
+		return errors.New("must provide a mount ID")
+	}
 	m.mu.RLock()
-	mounter, ok := m.mapping[mnt]
+	mounter, ok := m.mapping[mnt.ID]
 	m.mu.RUnlock()
 	if !ok {
 		return errors.Errorf("unmounter not found for: %+v", mnt)
 	}
 	m.mu.Lock()
-	delete(m.mapping, mnt)
+	delete(m.mapping, mnt.ID)
 	m.mu.Unlock()
 	return mounter.Unmount(ctx, mnt)
 }

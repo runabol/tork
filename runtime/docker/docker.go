@@ -120,6 +120,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// prepare mounts
 	for i, mnt := range t.Mounts {
+		mnt.ID = uuid.NewUUID()
 		err := d.mounter.Mount(ctx, &mnt)
 		if err != nil {
 			return err
@@ -227,7 +228,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		mounts = append(mounts, mount)
 	}
 
-	torkdir := &tork.Mount{Type: tork.MountTypeVolume, Target: "/tork"}
+	torkdir := &tork.Mount{
+		ID:     uuid.NewUUID(),
+		Type:   tork.MountTypeVolume,
+		Target: "/tork",
+	}
 	if err := d.mounter.Mount(ctx, torkdir); err != nil {
 		return err
 	}
