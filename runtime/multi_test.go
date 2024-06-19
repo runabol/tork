@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/uuid"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,6 +29,7 @@ func TestMultiVolumeMount(t *testing.T) {
 	m.RegisterMounter(tork.MountTypeVolume, &fakeMounter{newType: tork.MountTypeVolume})
 	ctx := context.Background()
 	mnt := &tork.Mount{
+		ID:     uuid.NewUUID(),
 		Type:   tork.MountTypeVolume,
 		Target: "/mnt",
 	}
@@ -42,7 +44,11 @@ func TestMultiVolumeMount(t *testing.T) {
 func TestMultiBadTypeMount(t *testing.T) {
 	m := NewMultiMounter()
 	ctx := context.Background()
-	mnt := &tork.Mount{Type: "badone", Target: "/mnt"}
+	mnt := &tork.Mount{
+		ID:     uuid.NewUUID(),
+		Type:   "badone",
+		Target: "/mnt",
+	}
 	err := m.Mount(ctx, mnt)
 	assert.Error(t, err)
 }
@@ -52,6 +58,7 @@ func TestMultiMountUnmount(t *testing.T) {
 	m.RegisterMounter(tork.MountTypeVolume, &fakeMounter{newType: "other-type"})
 	ctx := context.Background()
 	mnt := &tork.Mount{
+		ID:     uuid.NewUUID(),
 		Type:   tork.MountTypeVolume,
 		Target: "/mnt",
 	}
@@ -73,6 +80,7 @@ func TestMountConcurrency(t *testing.T) {
 		go func() {
 			defer w.Done()
 			mnt := &tork.Mount{
+				ID:     uuid.NewUUID(),
 				Type:   tork.MountTypeVolume,
 				Target: "/mnt",
 			}
