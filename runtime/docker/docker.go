@@ -22,7 +22,6 @@ import (
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
-	mobyarchive "github.com/moby/moby/pkg/archive"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
@@ -35,7 +34,10 @@ import (
 
 // defaultWorkdir is the directory where `Task.File`s are
 // written to by default, should `Task.Workdir` not be set
-const defaultWorkdir = "/tork/workdir"
+const (
+	defaultWorkdir     = "/tork/workdir"
+	defaultSandboxUser = "1000:1000"
+)
 
 type DockerRuntime struct {
 	client  *client.Client
@@ -186,9 +188,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err := d.imagePull(ctx, t, logger); err != nil {
 		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
-	if d.sandbox && !t.Internal {
-		t.Image = fmt.Sprintf("%s_sandbox", t.Image)
-	}
 
 	env := []string{}
 	for name, value := range t.Env {
@@ -291,6 +290,17 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		Env:        env,
 		Cmd:        cmd,
 		Entrypoint: entrypoint,
+	}
+	if d.sandbox && !t.Internal {
+		imageInspect, _, err := d.client.ImageInspectWithRaw(ctx, t.Image)
+		if err != nil {
+			return err
+		}
+		if imageInspect.Config.User == "" {
+			// set a sandboxed (non-root) user
+			// only if the default user is root
+			containerConf.User = defaultSandboxUser
+		}
 	}
 	// we want to override the default
 	// image WORKDIR only if the task
@@ -648,69 +658,6 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		defer reader.Close()
 
 		if _, err := io.Copy(pr.logger, reader); err != nil {
-			return err
-		}
-	}
-
-	// when in sandbox mode we extend the original image
-	// and set the 'tork' user as the default user
-	if d.sandbox {
-		dockerfile := fmt.Sprintf(`
-		FROM %s
-
-		# Ensure commands are run as the root user
-		USER root
-
-		# Detect and install user management tools if useradd is not available
-		RUN if ! command -v useradd >/dev/null 2>&1; then \
-				if command -v apt-get >/dev/null 2>&1; then \
-					echo "detected apt-get" && apt-get update && apt-get install -y --no-install-recommends passwd && rm -rf /var/lib/apt/lists/*; \
-				elif command -v yum >/dev/null 2>&1; then \
-					echo "detected yum" && yum update -y && yum install -y shadow-utils && yum clean all && rm -rf /var/cache/yum; \
-				elif command -v apk >/dev/null 2>&1; then \
-					echo "detected apk add" && apk update && apk add --no-cache shadow && rm -rf /var/cache/apk/*; \
-				elif command -v busybox >/dev/null 2>&1; then \
-					echo "Detected BusyBox"; \
-				else \
-					echo "Unsupported base image"; \
-					exit 1; \
-				fi; \
-			fi
-
-		# Create the user tork if it doesn't already exist
-		RUN if ! id -u tork >/dev/null 2>&1; then \
-				if command -v busybox >/dev/null 2>&1; then \
-					echo "adduser tork" && adduser -D tork; \
-				else \
-					echo "useradd tork" && useradd -m tork; \
-				fi; \
-			fi
-
-		# Switch to the new user
-		USER tork
-		`, pr.image)
-
-		// Create a tarball containing the Dockerfile
-		dockerfileTar, err := mobyarchive.Generate("Dockerfile", dockerfile)
-		if err != nil {
-			return err
-		}
-
-		// Define build options
-		buildOptions := types.ImageBuildOptions{
-			Context:    dockerfileTar,
-			Dockerfile: "Dockerfile",
-			Tags:       []string{fmt.Sprintf("%s_sandbox", pr.image)},
-		}
-
-		// Build the image
-		response, err := d.client.ImageBuild(pr.ctx, dockerfileTar, buildOptions)
-		if err != nil {
-			return err
-		}
-		defer response.Body.Close()
-
-		if _, err := io.Copy(pr.logger, response.Body); err != nil {
 			return err
 		}
 	}

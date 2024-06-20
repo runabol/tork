@@ -537,7 +537,7 @@ func TestRunTaskSandbox(t *testing.T) {
 
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
-		assert.Equal(t, "uid=1001(tork) gid=1001(tork) groups=1001(tork)\n", tk.Result)
+		assert.Equal(t, "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)\n", tk.Result)
 	})
 
 	t.Run("centos", func(t *testing.T) {
@@ -553,7 +553,7 @@ func TestRunTaskSandbox(t *testing.T) {
 
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
-		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+		assert.Equal(t, "uid=1000 gid=1000 groups=1000\n", tk.Result)
 	})
 
 	t.Run("alpine", func(t *testing.T) {
@@ -569,7 +569,7 @@ func TestRunTaskSandbox(t *testing.T) {
 
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
-		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+		assert.Equal(t, "uid=1000 gid=1000 groups=1000\n", tk.Result)
 	})
 
 	t.Run("busybox", func(t *testing.T) {
@@ -585,7 +585,7 @@ func TestRunTaskSandbox(t *testing.T) {
 
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
-		assert.Equal(t, "uid=1000(tork) gid=1000(tork) groups=1000(tork)\n", tk.Result)
+		assert.Equal(t, "uid=1000 gid=1000 groups=1000\n", tk.Result)
 	})
 
 	t.Run("pre_post_and_files", func(t *testing.T) {
@@ -618,7 +618,7 @@ func TestRunTaskSandbox(t *testing.T) {
 
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
-		assert.Equal(t, "uid=1001(tork) gid=1001(tork) groups=1001(tork)\n", tk.Result)
+		assert.Equal(t, "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)\n", tk.Result)
 	})
 
 }
