@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
@@ -346,6 +347,49 @@ func Test_middleware(t *testing.T) {
 	assert.NoError(t, err)
 
 	<-completions
+
+	assert.NoError(t, err)
+}
+
+func Test_middlewareFailure(t *testing.T) {
+	rt, err := docker.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	ch := make(chan any)
+	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+		close(ch)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+		Queues:  map[string]int{"someq": 1},
+		Middleware: []task.MiddlewareFunc{
+			func(next task.HandlerFunc) task.HandlerFunc {
+				return func(ctx context.Context, et task.EventType, t *tork.Task) error {
+					return errors.Errorf("some error")
+				}
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+	err = w.Start()
+	assert.NoError(t, err)
+
+	err = b.PublishTask(context.Background(), "someq", &tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateScheduled,
+		Image: "alpine:3.18.3",
+		Run:   "echo hello world > $TORK_OUTPUT",
+	})
+	assert.NoError(t, err)
+
+	<-ch
 
 	assert.NoError(t, err)
 }

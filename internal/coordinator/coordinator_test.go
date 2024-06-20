@@ -62,9 +62,12 @@ func TestTaskMiddlewareWithResult(t *testing.T) {
 
 func TestTaskMiddlewareWithError(t *testing.T) {
 	Err := errors.New("some error")
+	b := mq.NewInMemoryBroker()
+	ds := inmemory.NewInMemoryDatastore()
+
 	c, err := NewCoordinator(Config{
-		Broker:    mq.NewInMemoryBroker(),
-		DataStore: inmemory.NewInMemoryDatastore(),
+		Broker:    b,
+		DataStore: ds,
 		Middleware: Middleware{
 			Task: []task.MiddlewareFunc{
 				func(next task.HandlerFunc) task.HandlerFunc {
@@ -77,7 +80,36 @@ func TestTaskMiddlewareWithError(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
-	assert.ErrorIs(t, c.onPending(context.Background(), task.StateChange, &tork.Task{}), Err)
+
+	ctx := context.Background()
+
+	j1 := &tork.Job{
+		ID:    uuid.NewUUID(),
+		State: tork.JobStateRunning,
+		Name:  "test job",
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Name:  "my task",
+		State: tork.TaskStatePending,
+		JobID: j1.ID,
+	}
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	result := c.taskHandler(c.onPending)(ctx, task.StateChange, tk)
+	assert.NoError(t, result)
+
+	tk2, err := ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateFailed, tk2.State)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.JobStateFailed, j2.State)
 }
 
 func TestTaskMiddlewareNoOp(t *testing.T) {
@@ -145,6 +177,43 @@ func TestJobMiddlewareWithOutput(t *testing.T) {
 	j := &tork.Job{}
 	assert.NoError(t, c.onJob(context.Background(), job.StateChange, j))
 	assert.Equal(t, "some output", j.Output)
+}
+
+func TestJobMiddlewareError(t *testing.T) {
+	b := mq.NewInMemoryBroker()
+	ds := inmemory.NewInMemoryDatastore()
+
+	c, err := NewCoordinator(Config{
+		Broker:    b,
+		DataStore: ds,
+		Middleware: Middleware{
+			Job: []job.MiddlewareFunc{
+				func(next job.HandlerFunc) job.HandlerFunc {
+					return func(ctx context.Context, _ job.EventType, j *tork.Job) error {
+						return errors.New("some error")
+					}
+				},
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+
+	ctx := context.Background()
+
+	j1 := &tork.Job{
+		ID:    uuid.NewUUID(),
+		State: tork.JobStateRunning,
+		Name:  "test job",
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	result := c.jobHandler(c.onJob)(ctx, task.StateChange, j1)
+	assert.NoError(t, result)
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.JobStateFailed, j2.State)
 }
 
 func TestJobMiddlewareWithError(t *testing.T) {

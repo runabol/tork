@@ -206,28 +206,33 @@ func (c *Coordinator) Start() error {
 			var err error
 			switch qname {
 			case mq.QUEUE_PENDING:
+				pendingHandler := c.taskHandler(c.onPending)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					return c.onPending(context.Background(), task.StateChange, t)
+					return pendingHandler(context.Background(), task.StateChange, t)
 				})
 			case mq.QUEUE_COMPLETED:
+				completedHandler := c.taskHandler(c.onCompleted)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					return c.onCompleted(context.Background(), task.StateChange, t)
+					return completedHandler(context.Background(), task.StateChange, t)
 				})
 			case mq.QUEUE_STARTED:
+				startedHandler := c.taskHandler(c.onStarted)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					return c.onStarted(context.Background(), task.Started, t)
+					return startedHandler(context.Background(), task.StateChange, t)
 				})
 			case mq.QUEUE_ERROR:
+				errorHandler := c.taskHandler(c.onError)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
-					return c.onError(context.Background(), task.StateChange, t)
+					return errorHandler(context.Background(), task.StateChange, t)
 				})
 			case mq.QUEUE_HEARTBEAT:
 				err = c.broker.SubscribeForHeartbeats(func(n *tork.Node) error {
 					return c.onHeartbeat(context.Background(), n)
 				})
 			case mq.QUEUE_JOBS:
+				jobHandler := c.jobHandler(c.onJob)
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
-					return c.onJob(context.Background(), job.StateChange, j)
+					return jobHandler(context.Background(), job.StateChange, j)
 				})
 			case mq.QUEUE_LOGS:
 				err = c.broker.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
@@ -241,6 +246,35 @@ func (c *Coordinator) Start() error {
 	}
 	go c.sendHeartbeats()
 	return nil
+}
+
+func (c *Coordinator) taskHandler(handler task.HandlerFunc) task.HandlerFunc {
+	onError := handlers.NewErrorHandler(c.ds, c.broker)
+	return func(ctx context.Context, et task.EventType, t *tork.Task) error {
+		err := handler(ctx, et, t)
+		if err != nil {
+			now := time.Now().UTC()
+			t.FailedAt = &now
+			t.State = tork.TaskStateFailed
+			t.Error = err.Error()
+			return onError(ctx, et, t)
+		}
+		return nil
+	}
+}
+
+func (c *Coordinator) jobHandler(handler job.HandlerFunc) job.HandlerFunc {
+	onError := handlers.NewJobHandler(c.ds, c.broker)
+	return func(ctx context.Context, et job.EventType, j *tork.Job) error {
+		err := handler(ctx, et, j)
+		if err != nil {
+			now := time.Now().UTC()
+			j.FailedAt = &now
+			j.State = tork.JobStateFailed
+			return onError(ctx, et, j)
+		}
+		return nil
+	}
 }
 
 func (c *Coordinator) Stop() error {
