@@ -118,7 +118,14 @@ func (w *Worker) onTask(t *tork.Task) error {
 		return w.handleTask(t)
 	}
 	mw := task.ApplyMiddleware(adapter, w.middleware)
-	return mw(context.Background(), task.StateChange, t)
+	if err := mw(context.Background(), task.StateChange, t); err != nil {
+		now := time.Now().UTC()
+		t.Error = err.Error()
+		t.FailedAt = &now
+		t.State = tork.TaskStateFailed
+		return w.broker.PublishTask(context.Background(), mq.QUEUE_ERROR, t)
+	}
+	return nil
 }
 
 func (w *Worker) runTask(t *tork.Task) error {
