@@ -33,6 +33,8 @@ func TestWebhookOK(t *testing.T) {
 		}
 		assert.Equal(t, "2", js.ID)
 		assert.Equal(t, tork.TaskStateCompleted, js.State)
+		assert.Equal(t, "my-value", r.Header.Get("my-header"))
+		assert.Equal(t, "1234-5678", r.Header.Get("secret"))
 		w.WriteHeader(http.StatusOK)
 		received <- 1
 	}))
@@ -40,9 +42,18 @@ func TestWebhookOK(t *testing.T) {
 	j := &tork.Job{
 		ID:    "1",
 		State: tork.JobStateCompleted,
+		Context: tork.JobContext{
+			Secrets: map[string]string{
+				"some_key": "1234-5678",
+			},
+		},
 		Webhooks: []*tork.Webhook{{
 			URL:   svr.URL,
 			Event: webhook.EventTaskStateChange,
+			Headers: map[string]string{
+				"my-header": "my-value",
+				"secret":    "{{secrets.some_key}}",
+			},
 		}},
 	}
 

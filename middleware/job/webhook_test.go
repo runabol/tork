@@ -136,8 +136,8 @@ func TestWebhookOKWithHeaders(t *testing.T) {
 		}
 		ctype := r.Header.Get("Content-Type")
 		assert.Equal(t, "application/json; charset=UTF-8", ctype)
-		val := r.Header.Get("my-header")
-		assert.Equal(t, "my-value", val)
+		assert.Equal(t, "my-value", r.Header.Get("my-header"))
+		assert.Equal(t, "1234-5678", r.Header.Get("secret"))
 		assert.Equal(t, "1234", js.ID)
 		assert.Equal(t, tork.JobStateCompleted, js.State)
 		w.WriteHeader(http.StatusOK)
@@ -147,10 +147,16 @@ func TestWebhookOKWithHeaders(t *testing.T) {
 	j := &tork.Job{
 		ID:    "1234",
 		State: tork.JobStateCompleted,
+		Context: tork.JobContext{
+			Secrets: map[string]string{
+				"some_key": "1234-5678",
+			},
+		},
 		Webhooks: []*tork.Webhook{{
 			URL: svr.URL,
 			Headers: map[string]string{
 				"my-header": "my-value",
+				"secret":    "{{secrets.some_key}}",
 			},
 		}},
 	}
