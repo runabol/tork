@@ -29,6 +29,9 @@ const (
 	// The queue used by workers to send task
 	// logs to the Coordinator
 	QUEUE_LOGS = "logs"
+	// The queue used by workers to send task
+	// progress to the Coordinator
+	QUEUE_PROGRESS = "progress"
 	// The prefix used for queues that
 	// are exclusive
 	QUEUE_EXCLUSIVE_PREFIX = "x-"
@@ -50,6 +53,7 @@ func IsCoordinatorQueue(qname string) bool {
 		QUEUE_HEARTBEAT,
 		QUEUE_JOBS,
 		QUEUE_LOGS,
+		QUEUE_PROGRESS,
 	}
 	return slices.Contains(coordQueues, qname)
 }

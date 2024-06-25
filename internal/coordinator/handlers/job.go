@@ -33,6 +33,9 @@ func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFun
 }
 
 func (h *jobHandler) handle(ctx context.Context, et job.EventType, j *tork.Job) error {
+	if et != job.StateChange {
+		return nil
+	}
 	switch j.State {
 	case tork.JobStatePending:
 		return h.startJob(ctx, j)

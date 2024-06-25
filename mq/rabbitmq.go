@@ -280,7 +280,7 @@ func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(msg
 
 func serialize(msg any) ([]byte, error) {
 	mtype := fmt.Sprintf("%T", msg)
-	if mtype != "*tork.Task" && mtype != "*tork.Job" && mtype != "*tork.Node" && mtype != "*tork.TaskLogPart" {
+	if mtype != "*tork.Task" && mtype != "*tork.Job" && mtype != "*tork.Node" && mtype != "*tork.TaskLogPart" && mtype != "*tork.TaskProgress" {
 		return nil, errors.Errorf("unnknown type: %T", msg)
 	}
 	body, err := json.Marshal(msg)
@@ -550,5 +550,19 @@ func (b *RabbitMQBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPar
 		}
 		handler(p)
 		return nil
+	})
+}
+
+func (b *RabbitMQBroker) PublishTaskProgress(ctx context.Context, tp *tork.Task) error {
+	return b.publish(ctx, exchangeDefault, QUEUE_PROGRESS, tp)
+}
+
+func (b *RabbitMQBroker) SubscribeForTaskProgress(handler func(t *tork.Task) error) error {
+	return b.subscribe(exchangeDefault, keyDefault, QUEUE_PROGRESS, func(msg any) error {
+		p, ok := msg.(*tork.Task)
+		if !ok {
+			return errors.Errorf("expecting a *tork.TaskProgress but got %T", msg)
+		}
+		return handler(p)
 	})
 }

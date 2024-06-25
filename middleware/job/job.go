@@ -13,6 +13,8 @@ const (
 	// Handler can inspect the job's State property
 	// in order to determine what state the job is at.
 	StateChange = "STATE_CHANGE"
+	// Progress occurs when a job's progress changes.
+	Progress = "PROGRESS"
 	// Read occurs when a Job is read by the client
 	// through the API.
 	Read = "READ"

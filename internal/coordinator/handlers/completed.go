@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/pkg/errors"
@@ -189,6 +190,10 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 		}
 		// update job in DB
 		if err := tx.UpdateJob(ctx, t.JobID, func(u *tork.Job) error {
+			progress := float64(u.Position) / float64(u.TaskCount) * 100
+			// Round progress to two decimal points
+			progress = math.Round(progress*100) / 100
+			u.Progress = progress
 			u.Position = u.Position + 1
 			if t.Result != "" && t.Var != "" {
 				if u.Context.Tasks == nil {
@@ -209,6 +214,9 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 	j, err := c.ds.GetJobByID(ctx, t.JobID)
 	if err != nil {
 		return errors.Wrapf(err, "error getting job from datatstore")
+	}
+	if err := c.onJob(ctx, job.Progress, j); err != nil {
+		return err
 	}
 	if j.Position <= len(j.Tasks) {
 		now := time.Now().UTC()

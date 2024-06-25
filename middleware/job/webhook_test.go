@@ -49,9 +49,9 @@ func TestWebhookNoEvent(t *testing.T) {
 func TestWebhookJobEvent(t *testing.T) {
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
 
-	received := make(chan any)
+	received := make(chan any, 2)
 
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			panic(err)
@@ -64,19 +64,46 @@ func TestWebhookJobEvent(t *testing.T) {
 		assert.Equal(t, "1234", js.ID)
 		assert.Equal(t, tork.JobStateCompleted, js.State)
 		w.WriteHeader(http.StatusOK)
-		close(received)
+		received <- 1
 	}))
 
-	j := &tork.Job{
+	callbackProgress := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		js := tork.JobSummary{}
+		err = json.Unmarshal(body, &js)
+		if err != nil {
+			panic(err)
+		}
+		assert.Equal(t, "5678", js.ID)
+		assert.Equal(t, tork.JobStateRunning, js.State)
+		w.WriteHeader(http.StatusOK)
+		received <- 1
+	}))
+
+	j1 := &tork.Job{
 		ID:    "1234",
 		State: tork.JobStateCompleted,
 		Webhooks: []*tork.Webhook{{
-			URL:   svr.URL,
+			URL:   callbackState.URL,
 			Event: webhook.EventJobStateChange,
 		}},
 	}
 
-	assert.NoError(t, hm(context.Background(), StateChange, j))
+	j2 := &tork.Job{
+		ID:    "5678",
+		State: tork.JobStateRunning,
+		Webhooks: []*tork.Webhook{{
+			URL:   callbackProgress.URL,
+			Event: webhook.EventJobProgress,
+		}},
+	}
+
+	assert.NoError(t, hm(context.Background(), StateChange, j1))
+	<-received
+	assert.NoError(t, hm(context.Background(), Progress, j2))
 	<-received
 }
 

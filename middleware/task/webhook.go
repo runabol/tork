@@ -19,7 +19,7 @@ func Webhook(ds datastore.Datastore) MiddlewareFunc {
 			if err := next(ctx, et, t); err != nil {
 				return err
 			}
-			if et != StateChange {
+			if et != StateChange && et != Progress {
 				return nil
 			}
 			job, err := getJob(ctx, t, ds, cache)
@@ -31,7 +31,11 @@ func Webhook(ds datastore.Datastore) MiddlewareFunc {
 			}
 			summary := tork.NewTaskSummary(t)
 			for _, wh := range job.Webhooks {
-				if wh.Event != webhook.EventTaskStateChange {
+				if wh.Event != webhook.EventTaskStateChange && wh.Event != webhook.EventTaskProgress {
+					continue
+				}
+				if (wh.Event == webhook.EventTaskStateChange && et != StateChange) ||
+					(wh.Event == webhook.EventTaskProgress && et != Progress) {
 					continue
 				}
 				go func(w *tork.Webhook) {

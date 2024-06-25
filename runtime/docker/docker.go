@@ -11,6 +11,8 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	cliopts "github.com/docker/cli/opts"
@@ -194,6 +196,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		env = append(env, fmt.Sprintf("%s=%s", name, value))
 	}
 	env = append(env, "TORK_OUTPUT=/tork/stdout")
+	env = append(env, "TORK_PROGRESS=/tork/progress")
 
 	var mounts []mount.Mount
 
@@ -370,6 +373,10 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err != nil {
 		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
 	}
+
+	// report task progress
+	go d.reportProgress(ctx, resp.ID, t)
+
 	// read the container's stdout
 	out, err := d.client.ContainerLogs(
 		ctx,
@@ -388,10 +395,14 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
 		}
 	}()
+
+	// read the task's output
 	_, err = io.Copy(logger, dockerLogsReader{reader: out})
 	if err != nil {
 		return errors.Wrapf(err, "error reading the std out")
 	}
+
+	// wait for the task to finish execution
 	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
@@ -433,6 +444,27 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	return nil
 }
 
+func (d *DockerRuntime) reportProgress(ctx context.Context, containerID string, t *tork.Task) {
+	for {
+		progress, err := d.readProgress(ctx, containerID)
+		if err != nil {
+			log.Error().Err(err).Msgf("error reading progress value")
+		} else {
+			if progress != t.Progress {
+				t.Progress = progress
+				if err := d.broker.PublishTaskProgress(ctx, t); err != nil {
+					log.Error().Err(err).Msgf("error publishing task progress")
+				}
+			}
+		}
+		select {
+		case <-time.After(time.Second * 5):
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (d *DockerRuntime) readOutput(ctx context.Context, containerID string) (string, error) {
 	r, _, err := d.client.CopyFromContainer(ctx, containerID, "/tork/stdout")
 	if err != nil {
@@ -462,6 +494,39 @@ func (d *DockerRuntime) readOutput(ctx context.Context, containerID string) (str
 	return buf.String(), nil
 }
 
+func (d *DockerRuntime) readProgress(ctx context.Context, containerID string) (float64, error) {
+	r, _, err := d.client.CopyFromContainer(ctx, containerID, "/tork/progress")
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		err := r.Close()
+		if err != nil {
+			log.Error().Err(err).Msgf("error closing /tork/progress reader")
+		}
+	}()
+	tr := tar.NewReader(r)
+	var buf bytes.Buffer
+	for {
+		_, err := tr.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return 0, err
+		}
+
+		if _, err := io.Copy(&buf, tr); err != nil {
+			return 0, err
+		}
+	}
+	s := strings.TrimSpace(buf.String())
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.ParseFloat(s, 32)
+}
+
 func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *tork.Task) error {
 	ar, err := NewTempArchive()
 	if err != nil {
@@ -475,6 +540,9 @@ func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *
 	}()
 
 	if err := ar.WriteFile("stdout", 0222, []byte{}); err != nil {
+		return err
+	}
+	if err := ar.WriteFile("progress", 0222, []byte{}); err != nil {
 		return err
 	}
 

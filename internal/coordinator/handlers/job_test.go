@@ -349,3 +349,37 @@ func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func Test_handleJobProgress(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+	ds := inmemory.NewInMemoryDatastore()
+	handler := NewJobHandler(ds, b)
+	assert.NotNil(t, handler)
+
+	j1 := &tork.Job{
+		ID:     uuid.NewUUID(),
+		State:  tork.JobStateRunning,
+		Output: "some output",
+		Tasks: []*tork.Task{
+			{
+				Name: "task-1",
+				Env: map[string]string{
+					"SOMEVAR": "{{ bad_expression }}",
+				},
+			},
+		},
+	}
+
+	err := ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	err = handler(ctx, job.Progress, j1)
+	assert.NoError(t, err)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Empty(t, j1.Result)
+	assert.Nil(t, j1.DeleteAt)
+}

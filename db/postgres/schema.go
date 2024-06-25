@@ -71,7 +71,8 @@ CREATE TABLE jobs (
     defaults      jsonb,
     webhooks      jsonb,
     auto_delete   jsonb,
-    secrets       jsonb
+    secrets       jsonb,
+    progress      numeric(5,2) default 0
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);
@@ -139,7 +140,8 @@ CREATE TABLE tasks (
     if_           text,
     tags          text[],
     priority      int,
-    workdir       varchar(256)
+    workdir       varchar(256),
+    progress      numeric(5,2) default 0
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

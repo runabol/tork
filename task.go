@@ -63,6 +63,7 @@ type Task struct {
 	Tags        []string          `json:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty"`
 	Priority    int               `json:"priority,omitempty"`
+	Progress    float64           `json:"progress,omitempty"`
 	Internal    bool              `json:"-"`
 }
 
@@ -70,6 +71,7 @@ type TaskSummary struct {
 	ID          string     `json:"id,omitempty"`
 	JobID       string     `json:"jobId,omitempty"`
 	Position    int        `json:"position,omitempty"`
+	Progress    float64    `json:"progress,omitempty"`
 	Name        string     `json:"name,omitempty"`
 	Description string     `json:"description,omitempty"`
 	State       TaskState  `json:"state,omitempty"`
@@ -200,6 +202,7 @@ func (t *Task) Clone() *Task {
 		Tags:        t.Tags,
 		Workdir:     t.Workdir,
 		Priority:    t.Priority,
+		Progress:    t.Progress,
 	}
 }
 
@@ -267,6 +270,7 @@ func NewTaskSummary(t *Task) *TaskSummary {
 		ID:          t.ID,
 		JobID:       t.JobID,
 		Position:    t.Position,
+		Progress:    t.Progress,
 		Name:        t.Name,
 		Description: t.Description,
 		State:       t.State,

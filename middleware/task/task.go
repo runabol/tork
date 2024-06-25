@@ -13,10 +13,12 @@ const (
 	// the Coordinator that the task began processing.
 	Started = "STARTED"
 	// StateChange occurs when a task's state changes.
-	// Handler can inspect the job's State property
+	// Handler can inspect the task's State property
 	// in order to determine what state the task is at.
 	StateChange = "STATE_CHANGE"
-	// Read occurs when a Task is read by the client
+	// Progress event occurs when a task's progress changes.
+	Progress = "PROGRESS"
+	// Read occurs when a task is read by the client
 	// through the API.
 	Read = "READ"
 )

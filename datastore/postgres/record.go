@@ -50,6 +50,7 @@ type taskRecord struct {
 	Tags        pq.StringArray `db:"tags"`
 	Priority    int            `db:"priority"`
 	Workdir     string         `db:"workdir"`
+	Progress    float64        `db:"progress"`
 }
 
 type jobRecord struct {
@@ -78,6 +79,7 @@ type jobRecord struct {
 	Webhooks    []byte         `db:"webhooks"`
 	AutoDelete  []byte         `db:"auto_delete"`
 	Secrets     []byte         `db:"secrets"`
+	Progress    float64        `db:"progress"`
 }
 
 type jobPermRecord struct {
@@ -238,6 +240,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Tags:        r.Tags,
 		Priority:    r.Priority,
 		Workdir:     r.Workdir,
+		Progress:    r.Progress,
 	}, nil
 }
 
@@ -331,6 +334,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 		AutoDelete:  autoDelete,
 		DeleteAt:    r.DeleteAt,
 		Secrets:     secrets,
+		Progress:    r.Progress,
 	}, nil
 }
 

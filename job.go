@@ -45,6 +45,7 @@ type Job struct {
 	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty"`
 	DeleteAt    *time.Time        `json:"deleteAt,omitempty"`
 	Secrets     map[string]string `json:"secrets,omitempty"`
+	Progress    float64           `json:"progress,omitempty"`
 }
 
 type JobSummary struct {
@@ -64,6 +65,7 @@ type JobSummary struct {
 	TaskCount   int               `json:"taskCount,omitempty"`
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
+	Progress    float64           `json:"progress,omitempty"`
 }
 
 type Permission struct {
@@ -135,6 +137,7 @@ func (j *Job) Clone() *Job {
 		Webhooks:    CloneWebhooks(j.Webhooks),
 		Permissions: ClonePermissions(j.Permissions),
 		AutoDelete:  autoDelete,
+		Progress:    j.Progress,
 	}
 }
 
@@ -188,6 +191,7 @@ func NewJobSummary(j *Job) *JobSummary {
 		TaskCount:   j.TaskCount,
 		Result:      j.Result,
 		Error:       j.Error,
+		Progress:    j.Progress,
 	}
 }
 
