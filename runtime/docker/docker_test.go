@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/errdefs"
 
 	"github.com/runabol/tork"
 
@@ -125,6 +126,42 @@ func TestRunTaskCMD(t *testing.T) {
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
+}
+
+func TestProgress(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "sleep 1",
+	}
+
+	ctx := context.Background()
+
+	go func() {
+		err := rt.Run(ctx, tk)
+		assert.NoError(t, err)
+	}()
+
+	time.Sleep(time.Millisecond * 500)
+	containerID, ok := rt.tasks.Get(tk.ID)
+	assert.True(t, ok)
+	assert.NotEmpty(t, containerID)
+
+	p, err := rt.readProgress(ctx, containerID)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(0), p)
+
+	// wait for the task to complete
+	time.Sleep(time.Second * 1)
+
+	p, err = rt.readProgress(ctx, containerID)
+	var notFoundError errdefs.ErrNotFound
+	assert.ErrorAs(t, err, &notFoundError)
+	assert.Equal(t, float64(0), p)
 }
 
 func TestRunTaskCMDLogger(t *testing.T) {

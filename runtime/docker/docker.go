@@ -23,6 +23,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -448,7 +449,10 @@ func (d *DockerRuntime) reportProgress(ctx context.Context, containerID string, 
 	for {
 		progress, err := d.readProgress(ctx, containerID)
 		if err != nil {
-			log.Error().Err(err).Msgf("error reading progress value")
+			var notFoundError errdefs.ErrNotFound
+			if !errors.As(err, &notFoundError) {
+				log.Error().Err(err).Msgf("error reading progress value")
+			}
 		} else {
 			if progress != t.Progress {
 				t.Progress = progress
