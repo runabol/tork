@@ -193,7 +193,9 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		for {
 			progress, err := r.readProgress(workdir)
 			if err != nil {
-				log.Error().Err(err).Msgf("error reading progress value")
+				if !os.IsNotExist(err) {
+					log.Error().Err(err).Msgf("error reading progress value")
+				}
 			} else {
 				if progress != t.Progress {
 					t.Progress = progress
