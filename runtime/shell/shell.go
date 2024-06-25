@@ -4,7 +4,9 @@ import (
 	"context"
 	"flag"
 	"io"
+	"strconv"
 	"strings"
+	"time"
 
 	"fmt"
 	"os"
@@ -139,6 +141,10 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		return errors.Wrapf(err, "error writing the entrypoint")
 	}
 
+	if err := os.WriteFile(fmt.Sprintf("%s/progress", workdir), []byte{}, 0606); err != nil {
+		return errors.Wrapf(err, "error writing the progress file")
+	}
+
 	for filename, contents := range t.Files {
 		filename = fmt.Sprintf("%s/%s", workdir, filename)
 		if err := os.WriteFile(filename, []byte(contents), 0444); err != nil {
@@ -151,6 +157,7 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		env = append(env, fmt.Sprintf("%s%s=%s", envVarPrefix, name, value))
 	}
 	env = append(env, fmt.Sprintf("%sTORK_OUTPUT=%s/stdout", envVarPrefix, workdir))
+	env = append(env, fmt.Sprintf("%sTORK_PROGRESS=%s/progress", envVarPrefix, workdir))
 	env = append(env, fmt.Sprintf("WORKDIR=%s", workdir))
 	env = append(env, fmt.Sprintf("PATH=%s", os.Getenv("PATH")))
 
@@ -182,6 +189,27 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		}
 	}()
 
+	go func() {
+		for {
+			progress, err := r.readProgress(workdir)
+			if err != nil {
+				log.Error().Err(err).Msgf("error reading progress value")
+			} else {
+				if progress != t.Progress {
+					t.Progress = progress
+					if err := r.broker.PublishTaskProgress(ctx, t); err != nil {
+						log.Error().Err(err).Msgf("error publishing task progress")
+					}
+				}
+			}
+			select {
+			case <-time.After(time.Second * 5):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	errChan := make(chan error)
 	doneChan := make(chan any)
 	go func() {
@@ -210,6 +238,18 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 	t.Result = string(output)
 
 	return nil
+}
+
+func (r *ShellRuntime) readProgress(workdir string) (float64, error) {
+	b, err := os.ReadFile(fmt.Sprintf("%s/progress", workdir))
+	if err != nil {
+		return 0, err
+	}
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.ParseFloat(s, 32)
 }
 
 func reexecRun() {

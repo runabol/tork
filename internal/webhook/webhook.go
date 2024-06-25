@@ -17,7 +17,9 @@ const (
 
 const (
 	EventJobStateChange  = "job.StateChange"
+	EventJobProgress     = "job.Progress"
 	EventTaskStateChange = "task.StateChange"
+	EventTaskProgress    = "task.Progress"
 	EventDefault         = ""
 )
 

@@ -300,3 +300,18 @@ func TestRabbitMQTaskPriority(t *testing.T) {
 	assert.Equal(t, 2, (<-tasks).Priority)
 	assert.Equal(t, 1, (<-tasks).Priority)
 }
+
+func TestRabbitMQTaskProgress(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	processed := make(chan any)
+	err = b.SubscribeForTaskProgress(func(p *tork.Task) error {
+		close(processed)
+		return nil
+	})
+	assert.NoError(t, err)
+	err = b.PublishTaskProgress(ctx, &tork.Task{})
+	<-processed
+	assert.NoError(t, err)
+}

@@ -293,3 +293,17 @@ func (b *InMemoryBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPar
 		return nil
 	})
 }
+
+func (b *InMemoryBroker) PublishTaskProgress(ctx context.Context, tp *tork.Task) error {
+	return b.publish(QUEUE_PROGRESS, tp)
+}
+
+func (b *InMemoryBroker) SubscribeForTaskProgress(handler func(tp *tork.Task) error) error {
+	return b.subscribe(QUEUE_PROGRESS, func(m any) error {
+		p, ok := m.(*tork.Task)
+		if !ok {
+			return errors.New("can't cast to task progress")
+		}
+		return handler(p)
+	})
+}

@@ -240,6 +240,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 		u.State = tork.TaskStateScheduled
 		u.Result = "my result"
 		u.Queue = "somequeue"
+		u.Progress = 57.3
 		return nil
 	})
 	assert.NoError(t, err)
@@ -249,6 +250,7 @@ func TestPostgresUpdateTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
 	assert.Equal(t, "my result", t2.Result)
 	assert.Equal(t, "somequeue", t2.Queue)
+	assert.Equal(t, 57.3, t2.Progress)
 }
 
 func TestPostgresUpdateTaskConcurrently(t *testing.T) {
@@ -554,6 +556,7 @@ func TestPostgresUpdateJob(t *testing.T) {
 		u.State = tork.JobStateCompleted
 		u.Context.Inputs["var2"] = "val2"
 		u.DeleteAt = &deleteAt
+		u.Progress = 56
 		return nil
 	})
 	assert.NoError(t, err)
@@ -563,6 +566,7 @@ func TestPostgresUpdateJob(t *testing.T) {
 	assert.Equal(t, "val1", j2.Context.Inputs["var1"])
 	assert.Equal(t, "val2", j2.Context.Inputs["var2"])
 	assert.Equal(t, deleteAt.Unix(), j2.DeleteAt.Unix())
+	assert.Equal(t, float64(56), j2.Progress)
 }
 
 func TestPostgresUpdateJobConcurrently(t *testing.T) {

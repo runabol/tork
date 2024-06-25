@@ -44,6 +44,7 @@ type Coordinator struct {
 	onHeartbeat node.HandlerFunc
 	onCompleted task.HandlerFunc
 	onLogPart   func(*tork.TaskLogPart)
+	onProgress  task.HandlerFunc
 	stop        chan any
 }
 
@@ -102,6 +103,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}
 	if cfg.Queues[mq.QUEUE_LOGS] < 1 {
 		cfg.Queues[mq.QUEUE_LOGS] = 1
+	}
+	if cfg.Queues[mq.QUEUE_PROGRESS] < 1 {
+		cfg.Queues[mq.QUEUE_PROGRESS] = 1
 	}
 	api, err := api.NewAPI(api.Config{
 		Broker:    cfg.Broker,
@@ -168,6 +172,14 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 
 	onLogPart := handlers.NewLogHandler(cfg.DataStore)
 
+	onProgress := task.ApplyMiddleware(
+		handlers.NewProgressHandler(
+			cfg.DataStore,
+			onJob,
+		),
+		cfg.Middleware.Task,
+	)
+
 	return &Coordinator{
 		id:          uuid.NewShortUUID(),
 		startTime:   time.Now(),
@@ -183,6 +195,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		onHeartbeat: onHeartbeat,
 		onCompleted: onCompleted,
 		onLogPart:   onLogPart,
+		onProgress:  onProgress,
 		stop:        make(chan any),
 	}, nil
 }
@@ -237,6 +250,11 @@ func (c *Coordinator) Start() error {
 			case mq.QUEUE_LOGS:
 				err = c.broker.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
 					c.onLogPart(p)
+				})
+			case mq.QUEUE_PROGRESS:
+				progressHandler := c.taskHandler(c.onProgress)
+				err = c.broker.SubscribeForTaskProgress(func(t *tork.Task) error {
+					return progressHandler(context.Background(), task.Progress, t)
 				})
 			}
 			if err != nil {

@@ -14,14 +14,20 @@ func Webhook(next HandlerFunc) HandlerFunc {
 		if err := next(ctx, et, j); err != nil {
 			return err
 		}
-		if et != StateChange {
+		if et != StateChange && et != Progress {
 			return nil
 		}
 		if len(j.Webhooks) == 0 {
 			return nil
 		}
 		for _, wh := range j.Webhooks {
-			if wh.Event != webhook.EventJobStateChange && wh.Event != webhook.EventDefault {
+			if wh.Event != webhook.EventJobStateChange && wh.Event != webhook.EventDefault && wh.Event != webhook.EventJobProgress {
+				continue
+			}
+			if et == StateChange && wh.Event != webhook.EventJobStateChange && wh.Event != webhook.EventDefault {
+				continue
+			}
+			if et == Progress && wh.Event != webhook.EventJobProgress {
 				continue
 			}
 			go func(w *tork.Webhook) {

@@ -24,9 +24,10 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	now := time.Now().UTC()
 
 	j1 := &tork.Job{
-		ID:       uuid.NewUUID(),
-		State:    tork.JobStateRunning,
-		Position: 2,
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		Position:  2,
+		TaskCount: 2,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -61,6 +62,10 @@ func Test_handleCompletedLastTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateCompleted, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	j2, err := ds.GetJobByID(ctx, t1.JobID)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(100), j2.Progress)
 }
 
 func Test_handleSkippedTask(t *testing.T) {
@@ -73,9 +78,10 @@ func Test_handleSkippedTask(t *testing.T) {
 	now := time.Now().UTC()
 
 	j1 := &tork.Job{
-		ID:       uuid.NewUUID(),
-		State:    tork.JobStateRunning,
-		Position: 2,
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		Position:  2,
+		TaskCount: 2,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -110,6 +116,10 @@ func Test_handleSkippedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateSkipped, t2.State)
 	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	j2, err := ds.GetJobByID(ctx, t1.JobID)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(100), j2.Progress)
 }
 
 func Test_handleCompletedLastSubJobTask(t *testing.T) {
@@ -214,9 +224,10 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	now := time.Now().UTC()
 
 	j1 := &tork.Job{
-		ID:       uuid.NewUUID(),
-		State:    tork.JobStateRunning,
-		Position: 1,
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		Position:  1,
+		TaskCount: 2,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -260,6 +271,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.Equal(t, float64(50), j2.Progress)
 }
 
 func Test_handleCompletedScheduledTask(t *testing.T) {
@@ -603,6 +615,7 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateRunning,
 		Position:  1,
+		TaskCount: 2,
 		CreatedAt: time.Now().UTC(),
 		Tasks: []*tork.Task{
 			{
