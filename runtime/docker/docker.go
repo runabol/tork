@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,8 @@ const (
 	defaultWorkdir     = "/tork/workdir"
 	defaultSandboxUser = "1000:1000"
 )
+
+var rootUserPattern = regexp.MustCompile(`^(|root|0|root(:root)?|root:0|0:root|0:0)$`)
 
 type DockerRuntime struct {
 	client  *client.Client
@@ -300,7 +303,8 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		if err != nil {
 			return err
 		}
-		if imageInspect.Config.User == "" {
+		user := imageInspect.Config.User
+		if rootUserPattern.MatchString(user) {
 			// set a sandboxed (non-root) user
 			// only if the default user is root
 			containerConf.User = defaultSandboxUser
