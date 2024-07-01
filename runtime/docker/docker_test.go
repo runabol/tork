@@ -11,11 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/errdefs"
 
 	"github.com/runabol/tork"
+
+	mobyarchive "github.com/moby/moby/pkg/archive"
 
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/mq"
@@ -625,6 +628,44 @@ func TestRunTaskSandbox(t *testing.T) {
 		assert.Equal(t, "uid=1000 gid=1000 groups=1000\n", tk.Result)
 	})
 
+	t.Run("busybox-user-root", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		dockerfile := `
+		FROM busybox:latest
+
+		USER root:root
+		`
+
+		dockerfileTar, err := mobyarchive.Generate("Dockerfile", dockerfile)
+		assert.NoError(t, err)
+
+		buildOptions := types.ImageBuildOptions{
+			Context:    dockerfileTar,
+			Dockerfile: "Dockerfile",
+			Tags:       []string{"busybox_user_root"},
+		}
+
+		response, err := rt.client.ImageBuild(context.Background(), dockerfileTar, buildOptions)
+		assert.NoError(t, err)
+		defer response.Body.Close()
+
+		_, err = io.Copy(os.Stdout, response.Body)
+		assert.NoError(t, err)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "busybox_user_root:latest",
+			Run:   "id > $TORK_OUTPUT",
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1000 gid=1000 groups=1000\n", tk.Result)
+	})
+
 	t.Run("pre_post_and_files", func(t *testing.T) {
 		rt, err := NewDockerRuntime(WithSandbox(true))
 		assert.NoError(t, err)
@@ -656,6 +697,22 @@ func TestRunTaskSandbox(t *testing.T) {
 		err = rt.Run(context.Background(), tk)
 		assert.NoError(t, err)
 		assert.Equal(t, "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)\n", tk.Result)
+	})
+
+	t.Run("no sandbox", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(false))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "ubuntu:mantic",
+			Run:   "id > $TORK_OUTPUT",
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=0(root) gid=0(root) groups=0(root)\n", tk.Result)
 	})
 
 }
