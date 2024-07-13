@@ -32,6 +32,7 @@ type Task struct {
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty" yaml:"workdir,omitempty" validate:"max=256"`
 	Priority    int               `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
+	Ports       []Port            `json:"ports,omitempty" yaml:"ports,omitempty" validate:"dive"`
 }
 
 type SubJob struct {
@@ -85,6 +86,10 @@ type AuxTask struct {
 	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+}
+
+type Port struct {
+	Port string `json:"port,omitempty" yaml:"port,omitempty" validate:"required"`
 }
 
 func (m Mount) toMount() tork.Mount {
@@ -164,6 +169,12 @@ func (i Task) toTask() *tork.Task {
 			Password: i.Registry.Password,
 		}
 	}
+	ports := make([]*tork.Port, len(i.Ports))
+	for ix, p := range i.Ports {
+		ports[ix] = &tork.Port{
+			Port: p.Port,
+		}
+	}
 	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
@@ -191,6 +202,7 @@ func (i Task) toTask() *tork.Task {
 		Tags:        i.Tags,
 		Workdir:     i.Workdir,
 		Priority:    i.Priority,
+		Ports:       ports,
 	}
 }
 

@@ -896,3 +896,39 @@ func TestShutdown(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 }
+
+func Test_completeTask(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	node := &tork.Node{
+		ID:              "1234",
+		LastHeartbeatAt: time.Now().UTC(),
+	}
+	err := ds.CreateNode(context.Background(), node)
+	assert.NoError(t, err)
+	ta := tork.Task{
+		ID:     "1234",
+		Name:   "test task",
+		State:  tork.TaskStateRunning,
+		NodeID: node.ID,
+	}
+	err = ds.CreateTask(context.Background(), &ta)
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("PUT", "/tasks/1234/complete", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+	tr := tork.Task{}
+	err = json.Unmarshal(body, &tr)
+	assert.NoError(t, err)
+	assert.Equal(t, "1234", tr.ID)
+	assert.Equal(t, "test task", tr.Name)
+	assert.Equal(t, http.StatusOK, w.Code)
+}

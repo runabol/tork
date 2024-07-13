@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func Test_health(t *testing.T) {
 	api := newAPI(Config{
 		Broker:  mq.NewInMemoryBroker(),
 		Runtime: rt,
-	})
+	}, &syncx.Map[string, runningTask]{})
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)

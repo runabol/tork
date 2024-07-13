@@ -157,6 +157,7 @@ func logger() echo.MiddlewareFunc {
 		LogRemoteIP: true,
 		LogMethod:   true,
 		LogError:    true,
+		HandleError: true,
 		Skipper: func(c echo.Context) bool {
 			if len(skip) == 0 {
 				return false

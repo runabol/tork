@@ -52,7 +52,7 @@ func (h *startedHandler) handle(ctx context.Context, et task.EventType, t *tork.
 	if j.State == tork.JobStateScheduled {
 		j.State = tork.JobStateRunning
 		if err := h.onJob(ctx, job.StateChange, j); err != nil {
-			return nil
+			return err
 		}
 	}
 	return h.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
