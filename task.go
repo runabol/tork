@@ -64,6 +64,7 @@ type Task struct {
 	Workdir     string            `json:"workdir,omitempty"`
 	Priority    int               `json:"priority,omitempty"`
 	Progress    float64           `json:"progress,omitempty"`
+	Ports       []*Port           `json:"ports,omitempty"`
 	Internal    bool              `json:"-"`
 }
 
@@ -129,6 +130,11 @@ type TaskLimits struct {
 type Registry struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
+}
+
+type Port struct {
+	Port    string `json:"port,omitempty"`
+	Address string `json:"-"`
 }
 
 func (s TaskState) IsActive() bool {
@@ -203,6 +209,7 @@ func (t *Task) Clone() *Task {
 		Workdir:     t.Workdir,
 		Priority:    t.Priority,
 		Progress:    t.Progress,
+		Ports:       ClonePorts(t.Ports),
 	}
 }
 
@@ -283,4 +290,27 @@ func NewTaskSummary(t *Task) *TaskSummary {
 		Var:         t.Var,
 		Tags:        t.Tags,
 	}
+}
+
+func (p *Port) Clone() *Port {
+	return &Port{
+		Port: p.Port,
+	}
+}
+
+func ClonePorts(ports []*Port) []*Port {
+	copy := make([]*Port, len(ports))
+	for i, v := range ports {
+		copy[i] = v.Clone()
+	}
+	return copy
+}
+
+func (t *Task) Port(name string) (*Port, bool) {
+	for _, p := range t.Ports {
+		if p.Port == name {
+			return p, true
+		}
+	}
+	return nil, false
 }
