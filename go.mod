@@ -7,6 +7,7 @@ retract v0.1.0
 require (
 	github.com/docker/cli v26.1.1+incompatible
 	github.com/docker/docker v26.1.1+incompatible
+	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/expr-lang/expr v1.16.5
 	github.com/fatih/color v1.16.0
@@ -42,7 +43,6 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect

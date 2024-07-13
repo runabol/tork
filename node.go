@@ -24,6 +24,7 @@ type Node struct {
 	Queue           string     `json:"queue,omitempty"`
 	Status          NodeStatus `json:"status,omitempty"`
 	Hostname        string     `json:"hostname,omitempty"`
+	Port            int        `json:"port,omitempty"`
 	TaskCount       int        `json:"taskCount,omitempty"`
 	Version         string     `json:"version"`
 }
@@ -38,6 +39,7 @@ func (n *Node) Clone() *Node {
 		Queue:           n.Queue,
 		Status:          n.Status,
 		Hostname:        n.Hostname,
+		Port:            n.Port,
 		TaskCount:       n.TaskCount,
 		Version:         n.Version,
 	}

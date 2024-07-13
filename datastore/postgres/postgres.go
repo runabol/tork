@@ -213,6 +213,15 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		s := string(b)
 		mounts = &s
 	}
+	var ports *string
+	if t.Ports != nil {
+		b, err := json.Marshal(t.Ports)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize task.ports")
+		}
+		s := string(b)
+		ports = &s
+	}
 	q := `insert into tasks (
 		    id, -- $1
 			job_id, -- $2
@@ -252,13 +261,14 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 			if_, -- $36
 			tags, -- $37
 			priority, -- $38
-			workdir -- $39
+			workdir, -- $39
+			ports -- $40
 		  ) 
 	      values (
 			$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
 		    $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 			$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-			$39)`
+			$39,$40)`
 	_, err = ds.exec(q,
 		t.ID,                         // $1
 		t.JobID,                      // $2
@@ -299,6 +309,7 @@ func (ds *PostgresDatastore) CreateTask(ctx context.Context, t *tork.Task) error
 		pq.StringArray(t.Tags),       // $37
 		t.Priority,                   // $38
 		t.Workdir,                    // $39
+		ports,                        // $40
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task to the db")
@@ -431,10 +442,10 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 
 func (ds *PostgresDatastore) CreateNode(ctx context.Context, n *tork.Node) error {
 	q := `insert into nodes 
-	       (id,name,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_) 
+	       (id,name,started_at,last_heartbeat_at,cpu_percent,queue,status,hostname,task_count,version_,port)
 	      values
-	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
-	_, err := ds.exec(q, n.ID, n.Name, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount, n.Version)
+	       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
+	_, err := ds.exec(q, n.ID, n.Name, n.StartedAt, n.LastHeartbeatAt, n.CPUPercent, n.Queue, n.Status, n.Hostname, n.TaskCount, n.Version, n.Port)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting node to the db")
 	}

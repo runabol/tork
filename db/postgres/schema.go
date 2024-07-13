@@ -10,6 +10,7 @@ CREATE TABLE nodes (
     cpu_percent        float        not null,
     status             varchar(10)  not null,
     hostname           varchar(128) not null,
+    port               int          not null,
     task_count         int          not null,
     version_           varchar(32)  not null
 );
@@ -141,7 +142,8 @@ CREATE TABLE tasks (
     tags          text[],
     priority      int,
     workdir       varchar(256),
-    progress      numeric(5,2) default 0
+    progress      numeric(5,2) default 0,
+    ports         jsonb
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

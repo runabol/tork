@@ -54,6 +54,7 @@ type Limits struct {
 
 type runningTask struct {
 	cancel context.CancelFunc
+	task   *tork.Task
 }
 
 func NewWorker(cfg Config) (*Worker, error) {
@@ -66,6 +67,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 	if cfg.Runtime == nil {
 		return nil, errors.New("must provide runtime")
 	}
+	tasks := new(syncx.Map[string, runningTask])
 	w := &Worker{
 		id:         uuid.NewShortUUID(),
 		name:       cfg.Name,
@@ -73,27 +75,13 @@ func NewWorker(cfg Config) (*Worker, error) {
 		broker:     cfg.Broker,
 		runtime:    cfg.Runtime,
 		queues:     cfg.Queues,
-		tasks:      new(syncx.Map[string, runningTask]),
+		tasks:      tasks,
 		limits:     cfg.Limits,
-		api:        newAPI(cfg),
+		api:        newAPI(cfg, tasks),
 		stop:       make(chan any),
 		middleware: cfg.Middleware,
 	}
 	return w, nil
-}
-
-func (w *Worker) handleTask(t *tork.Task) error {
-	log.Debug().
-		Str("task-id", t.ID).
-		Msg("received task")
-	switch t.State {
-	case tork.TaskStateRunning:
-		return w.runTask(t)
-	case tork.TaskStateCancelled:
-		return w.cancelTask(t)
-	default:
-		return errors.Errorf("invalid task state: %s", t.State)
-	}
 }
 
 func (w *Worker) cancelTask(t *tork.Task) error {
@@ -108,14 +96,25 @@ func (w *Worker) cancelTask(t *tork.Task) error {
 	return nil
 }
 
-func (w *Worker) onTask(t *tork.Task) error {
-	t.State = tork.TaskStateRunning
+func (w *Worker) handleTask(t *tork.Task) error {
 	started := time.Now().UTC()
 	t.StartedAt = &started
-	t.State = tork.TaskStateRunning
 	t.NodeID = w.id
+	// prepare limits
+	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
+		t.Limits = &tork.TaskLimits{}
+	}
+	if t.Limits != nil && t.Limits.CPUs == "" {
+		t.Limits.CPUs = w.limits.DefaultCPUsLimit
+	}
+	if t.Limits != nil && t.Limits.Memory == "" {
+		t.Limits.Memory = w.limits.DefaultMemoryLimit
+	}
+	if t.Timeout == "" {
+		t.Timeout = w.limits.DefaultTimeout
+	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
-		return w.handleTask(t)
+		return w.runTask(t)
 	}
 	mw := task.ApplyMiddleware(adapter, w.middleware)
 	if err := mw(context.Background(), task.StateChange, t); err != nil {
@@ -129,10 +128,75 @@ func (w *Worker) onTask(t *tork.Task) error {
 }
 
 func (w *Worker) runTask(t *tork.Task) error {
+	if t.Ports != nil {
+		return w.runServiceTask(t)
+	}
+	return w.runPrcessingTask(t)
+}
+
+func (w *Worker) runServiceTask(t *tork.Task) error {
+	atomic.AddInt32(&w.taskCount, 1)
+	// clone the task so that the runtime
+	// process can mutate the task without
+	// affecting the original
+	rt := t.Clone()
+	// create a cancellation context in case
+	// the coordinator wants to cancel the
+	// task later on
+	ctx, cancel := context.WithCancel(context.Background())
+	w.tasks.Set(t.ID, runningTask{
+		cancel: cancel,
+		task:   rt,
+	})
+	// run the task
+	go func() {
+		defer func() {
+			atomic.AddInt32(&w.taskCount, -1)
+		}()
+		defer cancel()
+		defer w.tasks.Delete(t.ID)
+		// let the coordinator know that the task started executing
+		if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
+			log.Error().Err(err).Msgf("error publishing service task to started queue")
+		}
+		// actually run the task
+		if err := w.doRunTask(ctx, rt); err != nil {
+			finished := time.Now().UTC()
+			t.FailedAt = &finished
+			t.State = tork.TaskStateFailed
+			t.Error = err.Error()
+		}
+		switch rt.State {
+		case tork.TaskStateCompleted:
+			t.Result = rt.Result
+			t.CompletedAt = rt.CompletedAt
+			t.State = rt.State
+			if err := w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
+				log.Error().Err(err).Msgf("error publishing service task to completion queue")
+			}
+		case tork.TaskStateFailed:
+			t.Error = rt.Error
+			t.FailedAt = rt.FailedAt
+			t.State = rt.State
+			if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
+				log.Error().Err(err).Msgf("error publishing service task to error queue")
+			}
+		default:
+			log.Error().Msgf("unexpected state %s for task %s", rt.State, t.ID)
+		}
+	}()
+	return nil
+}
+
+func (w *Worker) runPrcessingTask(t *tork.Task) error {
 	atomic.AddInt32(&w.taskCount, 1)
 	defer func() {
 		atomic.AddInt32(&w.taskCount, -1)
 	}()
+	// clone the task so that the downstream
+	// process can mutate the task without
+	// affecting the original
+	rt := t.Clone()
 	// create a cancellation context in case
 	// the coordinator wants to cancel the
 	// task later on
@@ -140,16 +204,13 @@ func (w *Worker) runTask(t *tork.Task) error {
 	defer cancel()
 	w.tasks.Set(t.ID, runningTask{
 		cancel: cancel,
+		task:   rt,
 	})
 	defer w.tasks.Delete(t.ID)
 	// let the coordinator know that the task started executing
 	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
 		return err
 	}
-	// clone the task so that the downstream
-	// process can mutate the task without
-	// affecting the original
-	rt := t.Clone()
 	if err := w.doRunTask(ctx, rt); err != nil {
 		return err
 	}
@@ -175,19 +236,6 @@ func (w *Worker) runTask(t *tork.Task) error {
 }
 
 func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
-	// prepare limits
-	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
-		t.Limits = &tork.TaskLimits{}
-	}
-	if t.Limits != nil && t.Limits.CPUs == "" {
-		t.Limits.CPUs = w.limits.DefaultCPUsLimit
-	}
-	if t.Limits != nil && t.Limits.Memory == "" {
-		t.Limits.Memory = w.limits.DefaultMemoryLimit
-	}
-	if t.Timeout == "" {
-		t.Timeout = w.limits.DefaultTimeout
-	}
 	// create timeout context -- if timeout is defined
 	rctx := ctx
 	if t.Timeout != "" {
@@ -200,8 +248,7 @@ func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 		rctx = tctx
 	}
 	// run the task
-	rtTask := t.Clone()
-	if err := w.runtime.Run(rctx, rtTask); err != nil {
+	if err := w.runtime.Run(rctx, t); err != nil {
 		finished := time.Now().UTC()
 		t.FailedAt = &finished
 		t.State = tork.TaskStateFailed
@@ -211,7 +258,6 @@ func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 	finished := time.Now().UTC()
 	t.CompletedAt = &finished
 	t.State = tork.TaskStateCompleted
-	t.Result = rtTask.Result
 	return nil
 }
 
@@ -240,6 +286,7 @@ func (w *Worker) sendHeartbeats() {
 				Status:          status,
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
+				Port:            w.api.port,
 				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
 				Version:         tork.Version,
 			},
@@ -263,7 +310,7 @@ func (w *Worker) Start() error {
 		return err
 	}
 	// subscribe for a private queue for the node
-	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.handleTask); err != nil {
+	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.cancelTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
 	// subscribe to shared work queues
@@ -272,7 +319,7 @@ func (w *Worker) Start() error {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
-			err := w.broker.SubscribeForTasks(qname, w.onTask)
+			err := w.broker.SubscribeForTasks(qname, w.handleTask)
 			if err != nil {
 				return errors.Wrapf(err, "error subscribing for queue: %s", qname)
 			}
