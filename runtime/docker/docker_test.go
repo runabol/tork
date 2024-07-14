@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -715,4 +716,54 @@ func TestRunTaskSandbox(t *testing.T) {
 		assert.Equal(t, "uid=0(root) gid=0(root) groups=0(root)\n", tk.Result)
 	})
 
+}
+
+func TestRunServiceTask(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "node:lts-alpine3.20",
+		Run:   "node server.js",
+		Ports: []*tork.Port{{
+			Port:     "8080",
+			HostPort: 55000,
+		}},
+		Files: map[string]string{
+			"server.js": `
+             const http = require('http');
+             const hostname = '0.0.0.0';
+             const port = 8080;
+             const server = http.createServer((req, res) => {
+               res.statusCode = 200;
+               res.setHeader('Content-Type', 'text/plain');
+               res.end('Hello World\n');
+             });
+            server.listen(port, hostname, () => {
+              console.log('server running');
+            });
+			`,
+		},
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		_ = rt.Run(ctx, tk)
+	}()
+
+	var resp *http.Response
+	for i := 0; i < 30; i++ {
+		resp, err = http.Get("http://localhost:55000")
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	assert.Equal(t, 200, resp.StatusCode)
+	err = rt.Stop(context.Background(), tk)
+	assert.NoError(t, err)
 }

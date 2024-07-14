@@ -3,7 +3,9 @@ package worker
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +36,8 @@ type Worker struct {
 	api        *api
 	taskCount  int32
 	middleware []task.MiddlewareFunc
+	usedPorts  map[int]struct{}
+	mu         sync.Mutex
 }
 
 type Config struct {
@@ -80,6 +84,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		api:        newAPI(cfg, tasks),
 		stop:       make(chan any),
 		middleware: cfg.Middleware,
+		usedPorts:  make(map[int]struct{}),
 	}
 	return w, nil
 }
@@ -112,6 +117,20 @@ func (w *Worker) handleTask(t *tork.Task) error {
 	}
 	if t.Timeout == "" {
 		t.Timeout = w.limits.DefaultTimeout
+	}
+	// assign host ports
+	for _, p := range t.Ports {
+		hostPort, err := w.reservePort()
+		if err != nil {
+			now := time.Now().UTC()
+			t.Error = err.Error()
+			t.FailedAt = &now
+			t.State = tork.TaskStateFailed
+			return w.broker.PublishTask(context.Background(), mq.QUEUE_ERROR, t)
+		}
+		log.Debug().Msgf("Port mapping %d->%s", hostPort, p.Port)
+		defer w.releasePort(hostPort)
+		p.HostPort = hostPort
 	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
 		return w.runTask(t)
@@ -341,4 +360,40 @@ func (w *Worker) Stop() error {
 		return errors.Wrapf(err, "error shutting down worker %s", w.id)
 	}
 	return nil
+}
+
+func (w *Worker) reservePort() (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+
+	maxAttempts := 10
+
+	var port int
+	var attempt int
+	for ; attempt < maxAttempts; attempt++ {
+		port = listener.Addr().(*net.TCPAddr).Port
+		if _, exists := w.usedPorts[port]; !exists {
+			break
+		}
+	}
+
+	if attempt >= maxAttempts {
+		return 0, errors.New("could not find an available port to reserve")
+	}
+
+	w.usedPorts[port] = struct{}{}
+
+	return port, nil
+}
+
+func (w *Worker) releasePort(port int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	delete(w.usedPorts, port)
 }

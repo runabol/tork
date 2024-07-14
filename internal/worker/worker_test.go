@@ -583,3 +583,24 @@ func Test_runServiceTask(t *testing.T) {
 	err = w.cancelTask(t1)
 	assert.NoError(t, err)
 }
+
+func Test_reservePort(t *testing.T) {
+	rt, err := docker.NewDockerRuntime()
+	assert.NoError(t, err)
+
+	b := mq.NewInMemoryBroker()
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: rt,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+
+	port, err := w.reservePort()
+	assert.NoError(t, err)
+	assert.Greater(t, port, 0)
+	assert.Contains(t, w.usedPorts, port)
+	w.releasePort(port)
+	assert.NotContains(t, w.usedPorts, port)
+}
