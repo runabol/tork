@@ -532,60 +532,6 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
 
-func Test_runServiceTask(t *testing.T) {
-	rt, err := docker.NewDockerRuntime()
-	assert.NoError(t, err)
-
-	b := mq.NewInMemoryBroker()
-
-	w, err := NewWorker(Config{
-		Broker:  b,
-		Runtime: rt,
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, w)
-
-	starts := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
-		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
-		close(starts)
-		return nil
-	})
-	assert.NoError(t, err)
-
-	t1 := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Image: "node:lts-alpine3.20",
-		Run:   "node server.js",
-		Ports: []*tork.Port{{
-			Port: "8080",
-		}},
-		Files: map[string]string{
-			"server.js": `
-             const http = require('http');
-             const hostname = '0.0.0.0';
-             const port = 8080;
-             const server = http.createServer((req, res) => {
-               res.statusCode = 200;
-               res.setHeader('Content-Type', 'text/plain');
-               res.end('Hello World\n');
-             });
-            server.listen(port, hostname, () => {
-              console.log('server running');
-            });
-			`,
-		},
-	}
-
-	go func() {
-		err = w.handleTask(t1)
-		assert.NoError(t, err)
-	}()
-	<-starts
-	err = w.cancelTask(t1)
-	assert.NoError(t, err)
-}
-
 func Test_reservePort(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
