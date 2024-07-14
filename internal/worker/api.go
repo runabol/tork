@@ -76,7 +76,7 @@ func (s *api) proxy(c echo.Context) error {
 	if !ok {
 		return echo.NewHTTPError(http.StatusNotFound, "port not found")
 	}
-	backendURL, err := url.Parse(fmt.Sprintf("http://%s", binding.Address))
+	backendURL, err := url.Parse(fmt.Sprintf("http://localhost:%d", binding.HostPort))
 	if err != nil {
 		return err
 	}

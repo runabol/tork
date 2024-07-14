@@ -133,8 +133,8 @@ type Registry struct {
 }
 
 type Port struct {
-	Port    string `json:"port,omitempty"`
-	Address string `json:"-"`
+	Port     string `json:"port,omitempty"`
+	HostPort int    `json:"-"`
 }
 
 func (s TaskState) IsActive() bool {
@@ -294,7 +294,8 @@ func NewTaskSummary(t *Task) *TaskSummary {
 
 func (p *Port) Clone() *Port {
 	return &Port{
-		Port: p.Port,
+		Port:     p.Port,
+		HostPort: p.HostPort,
 	}
 }
 

@@ -284,7 +284,8 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	for _, p := range t.Ports {
 		exposedPorts[nat.Port(p.Port)] = struct{}{}
 		portBindings[nat.Port(p.Port)] = []nat.PortBinding{{
-			HostIP: "localhost",
+			HostIP:   "localhost",
+			HostPort: fmt.Sprintf("%d/tcp", p.HostPort),
 		}}
 	}
 
@@ -393,28 +394,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// report task progress
 	go d.reportProgress(ctx, resp.ID, t)
-
-	// inspect the container port mappings
-	inspection, err := d.client.ContainerInspect(ctx, resp.ID)
-	if err != nil {
-		return errors.Wrapf(err, "error inspecting container %s: %v\n", resp.ID, err)
-	}
-	for port, bindings := range inspection.NetworkSettings.Ports {
-		var portKey string
-		if _, ok := t.Port(string(port)); ok {
-			portKey = string(port)
-		} else if _, ok := t.Port(strings.TrimSuffix(string(port), "/tcp")); ok {
-			portKey = strings.TrimSuffix(string(port), "/tcp")
-		}
-		if portKey != "" {
-			for _, binding := range bindings {
-				p, ok := t.Port(portKey)
-				if ok {
-					p.Address = fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
-				}
-			}
-		}
-	}
 
 	// read the container's stdout
 	out, err := d.client.ContainerLogs(
