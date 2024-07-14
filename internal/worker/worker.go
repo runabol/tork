@@ -147,67 +147,6 @@ func (w *Worker) handleTask(t *tork.Task) error {
 }
 
 func (w *Worker) runTask(t *tork.Task) error {
-	if t.Ports != nil {
-		return w.runServiceTask(t)
-	}
-	return w.runPrcessingTask(t)
-}
-
-func (w *Worker) runServiceTask(t *tork.Task) error {
-	atomic.AddInt32(&w.taskCount, 1)
-	// clone the task so that the runtime
-	// process can mutate the task without
-	// affecting the original
-	rt := t.Clone()
-	// create a cancellation context in case
-	// the coordinator wants to cancel the
-	// task later on
-	ctx, cancel := context.WithCancel(context.Background())
-	w.tasks.Set(t.ID, runningTask{
-		cancel: cancel,
-		task:   rt,
-	})
-	// run the task
-	go func() {
-		defer func() {
-			atomic.AddInt32(&w.taskCount, -1)
-		}()
-		defer cancel()
-		defer w.tasks.Delete(t.ID)
-		// let the coordinator know that the task started executing
-		if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
-			log.Error().Err(err).Msgf("error publishing service task to started queue")
-		}
-		// actually run the task
-		if err := w.doRunTask(ctx, rt); err != nil {
-			finished := time.Now().UTC()
-			t.FailedAt = &finished
-			t.State = tork.TaskStateFailed
-			t.Error = err.Error()
-		}
-		switch rt.State {
-		case tork.TaskStateCompleted:
-			t.Result = rt.Result
-			t.CompletedAt = rt.CompletedAt
-			t.State = rt.State
-			if err := w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
-				log.Error().Err(err).Msgf("error publishing service task to completion queue")
-			}
-		case tork.TaskStateFailed:
-			t.Error = rt.Error
-			t.FailedAt = rt.FailedAt
-			t.State = rt.State
-			if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
-				log.Error().Err(err).Msgf("error publishing service task to error queue")
-			}
-		default:
-			log.Error().Msgf("unexpected state %s for task %s", rt.State, t.ID)
-		}
-	}()
-	return nil
-}
-
-func (w *Worker) runPrcessingTask(t *tork.Task) error {
 	atomic.AddInt32(&w.taskCount, 1)
 	defer func() {
 		atomic.AddInt32(&w.taskCount, -1)

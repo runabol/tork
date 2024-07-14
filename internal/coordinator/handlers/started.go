@@ -64,8 +64,14 @@ func (h *startedHandler) handle(ctx context.Context, et task.EventType, t *tork.
 			t.StartedAt = &now
 			u.State = tork.TaskStateRunning
 			u.StartedAt = &now
-			u.NodeID = t.NodeID
 		}
+		// if the worker crashed, the task
+		// would automatically be returned
+		// the queue and another worker
+		// would pick it up. So we always
+		// want to keep track of the latest
+		// node that picked up the task.
+		u.NodeID = t.NodeID
 		return nil
 	})
 }

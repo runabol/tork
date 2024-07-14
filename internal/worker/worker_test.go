@@ -577,8 +577,10 @@ func Test_runServiceTask(t *testing.T) {
 		},
 	}
 
-	err = w.handleTask(t1)
-	assert.NoError(t, err)
+	go func() {
+		err = w.handleTask(t1)
+		assert.NoError(t, err)
+	}()
 	<-starts
 	err = w.cancelTask(t1)
 	assert.NoError(t, err)
