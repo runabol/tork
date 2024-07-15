@@ -105,6 +105,7 @@ func (w *Worker) handleTask(t *tork.Task) error {
 	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.NodeID = w.id
+	t.State = tork.TaskStateRunning
 	// prepare limits
 	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
 		t.Limits = &tork.TaskLimits{}
