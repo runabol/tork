@@ -932,3 +932,33 @@ func Test_completeTask(t *testing.T) {
 	assert.Equal(t, "test task", tr.Name)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+func Test_proxyTaskNotRunning(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	node := &tork.Node{
+		ID:              "1234",
+		LastHeartbeatAt: time.Now().UTC(),
+	}
+	err := ds.CreateNode(context.Background(), node)
+	assert.NoError(t, err)
+	ta := tork.Task{
+		ID:     "1234",
+		Name:   "test task",
+		State:  tork.TaskStateCancelled,
+		NodeID: node.ID,
+	}
+	err = ds.CreateTask(context.Background(), &ta)
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/tasks/1234/proxy/8080", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadGateway, w.Code)
+}

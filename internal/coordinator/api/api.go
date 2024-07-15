@@ -674,6 +674,9 @@ func (a *API) proxy(c echo.Context) error {
 		}
 		return err
 	}
+	if task.State != tork.TaskStateRunning {
+		return echo.NewHTTPError(http.StatusBadGateway, "task is not in a RUNNING state")
+	}
 	node, err := a.ds.GetNodeByID(ctx, task.NodeID)
 	if err != nil {
 		log.Error().Err(err).Msgf("error looking up node %s", task.NodeID)
