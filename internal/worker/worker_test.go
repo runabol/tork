@@ -284,22 +284,33 @@ func Test_handleTaskOutput(t *testing.T) {
 	w, err := NewWorker(Config{
 		Broker:  b,
 		Runtime: rt,
+		Middleware: []task.MiddlewareFunc{
+			func(next task.HandlerFunc) task.HandlerFunc {
+				return func(ctx context.Context, et task.EventType, tk *tork.Task) error {
+					assert.Equal(t, tork.TaskStateRunning, tk.State)
+					return next(ctx, et, tk)
+				}
+			},
+		},
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, w)
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = w.handleTask(&tork.Task{
+	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
-		State: tork.TaskStateRunning,
+		State: tork.TaskStateScheduled,
 		Image: "ubuntu:mantic",
 		Run:   "echo -n 'hello world' >> $TORK_OUTPUT",
-	})
+	}
+
+	err = w.handleTask(tk)
 
 	<-completions
 
 	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateCompleted, tk.State)
 }
 
 func Test_middleware(t *testing.T) {
