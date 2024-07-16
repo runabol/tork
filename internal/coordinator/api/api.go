@@ -692,7 +692,7 @@ func (a *API) proxy(c echo.Context) error {
 	if path != "" && !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	req.URL.Path = fmt.Sprintf("/tasks/%s/%s/proxy%s", task.ID, port, path)
+	req.URL.Path = fmt.Sprintf("/tasks/%s/%s%s", task.ID, port, path)
 	proxy.ServeHTTP(c.Response(), req)
 	return nil
 }

@@ -969,7 +969,7 @@ func Test_proxyTaskRoot(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/tasks/1234/8080/proxy", r.URL.Path)
+		assert.Equal(t, "/tasks/1234/8080", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -1013,7 +1013,7 @@ func Test_proxyTaskSomePath(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/tasks/1234/8080/proxy/some/path", r.URL.Path)
+		assert.Equal(t, "/tasks/1234/8080/some/path", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 	}))
 
