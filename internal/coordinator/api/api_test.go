@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -961,4 +963,94 @@ func Test_proxyTaskNotRunning(t *testing.T) {
 	api.server.Handler.ServeHTTP(w, req)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadGateway, w.Code)
+}
+
+func Test_proxyTaskRoot(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/tasks/1234/8080/proxy", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	svrURL, err := url.Parse(svr.URL)
+	assert.NoError(t, err)
+
+	port, err := strconv.Atoi(svrURL.Port())
+	assert.NoError(t, err)
+
+	node := &tork.Node{
+		ID:              "1234",
+		LastHeartbeatAt: time.Now().UTC(),
+		Hostname:        svrURL.Hostname(),
+		Port:            port,
+	}
+	err = ds.CreateNode(context.Background(), node)
+	assert.NoError(t, err)
+	ta := tork.Task{
+		ID:     "1234",
+		Name:   "test task",
+		State:  tork.TaskStateRunning,
+		NodeID: node.ID,
+	}
+	err = ds.CreateTask(context.Background(), &ta)
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/tasks/1234/proxy/8080", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func Test_proxyTaskSomePath(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/tasks/1234/8080/proxy/some/path", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	svrURL, err := url.Parse(svr.URL)
+	assert.NoError(t, err)
+
+	fmt.Println(svrURL)
+
+	port, err := strconv.Atoi(svrURL.Port())
+	assert.NoError(t, err)
+
+	node := &tork.Node{
+		ID:              "1234",
+		LastHeartbeatAt: time.Now().UTC(),
+		Hostname:        svrURL.Hostname(),
+		Port:            port,
+	}
+	err = ds.CreateNode(context.Background(), node)
+	assert.NoError(t, err)
+	ta := tork.Task{
+		ID:     "1234",
+		Name:   "test task",
+		State:  tork.TaskStateRunning,
+		NodeID: node.ID,
+	}
+	err = ds.CreateTask(context.Background(), &ta)
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    mq.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/tasks/1234/proxy/8080/some/path", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
