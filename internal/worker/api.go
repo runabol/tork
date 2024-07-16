@@ -82,7 +82,11 @@ func (s *api) proxy(c echo.Context) error {
 	}
 	proxy := httputil.NewSingleHostReverseProxy(backendURL)
 	req := c.Request()
-	req.URL.Path = strings.Join(strings.Split(c.Path(), "/")[4:], "/")
+	path := strings.Join(strings.Split(req.URL.Path, "/")[4:], "/")
+	if path != "" && !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	req.URL.Path = path
 	proxy.ServeHTTP(c.Response(), req)
 	return nil
 }
