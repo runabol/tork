@@ -321,8 +321,8 @@ func Test_middleware(t *testing.T) {
 
 	completions := make(chan any)
 	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
-		assert.NotEmpty(t, tk.Result)
-		assert.Equal(t, "someval", tk.Env["SOMEVAR"])
+		assert.Equal(t, "someval", tk.Result)
+		assert.Equal(t, "", tk.Env["SOMEVAR"])
 		close(completions)
 		return nil
 	})
@@ -349,12 +349,14 @@ func Test_middleware(t *testing.T) {
 	err = w.Start()
 	assert.NoError(t, err)
 
-	err = b.PublishTask(context.Background(), "someq", &tork.Task{
+	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		State: tork.TaskStateScheduled,
 		Image: "alpine:3.18.3",
-		Run:   "echo hello world > $TORK_OUTPUT",
-	})
+		Run:   "echo -n $SOMEVAR > $TORK_OUTPUT",
+	}
+
+	err = b.PublishTask(context.Background(), "someq", tk)
 	assert.NoError(t, err)
 
 	<-completions

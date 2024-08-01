@@ -102,6 +102,7 @@ func (w *Worker) cancelTask(t *tork.Task) error {
 }
 
 func (w *Worker) handleTask(t *tork.Task) error {
+	ctx := context.Background()
 	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.NodeID = w.id
@@ -127,7 +128,7 @@ func (w *Worker) handleTask(t *tork.Task) error {
 			t.Error = err.Error()
 			t.FailedAt = &now
 			t.State = tork.TaskStateFailed
-			return w.broker.PublishTask(context.Background(), mq.QUEUE_ERROR, t)
+			return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 		}
 		log.Debug().Msgf("Port mapping %d->%s", hostPort, p.Port)
 		defer w.releasePort(hostPort)
@@ -136,42 +137,17 @@ func (w *Worker) handleTask(t *tork.Task) error {
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
 		return w.runTask(t)
 	}
-	mw := task.ApplyMiddleware(adapter, w.middleware)
-	if err := mw(context.Background(), task.StateChange, t); err != nil {
-		now := time.Now().UTC()
-		t.Error = err.Error()
-		t.FailedAt = &now
-		t.State = tork.TaskStateFailed
-		return w.broker.PublishTask(context.Background(), mq.QUEUE_ERROR, t)
-	}
-	return nil
-}
-
-func (w *Worker) runTask(t *tork.Task) error {
-	atomic.AddInt32(&w.taskCount, 1)
-	defer func() {
-		atomic.AddInt32(&w.taskCount, -1)
-	}()
 	// clone the task so that the downstream
 	// process can mutate the task without
 	// affecting the original
 	rt := t.Clone()
-	// create a cancellation context in case
-	// the coordinator wants to cancel the
-	// task later on
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	w.tasks.Set(t.ID, runningTask{
-		cancel: cancel,
-		task:   rt,
-	})
-	defer w.tasks.Delete(t.ID)
-	// let the coordinator know that the task started executing
-	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
-		return err
-	}
-	if err := w.doRunTask(ctx, rt); err != nil {
-		return err
+	mw := task.ApplyMiddleware(adapter, w.middleware)
+	if err := mw(ctx, task.StateChange, rt); err != nil {
+		now := time.Now().UTC()
+		t.Error = err.Error()
+		t.FailedAt = &now
+		t.State = tork.TaskStateFailed
+		return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 	}
 	switch rt.State {
 	case tork.TaskStateCompleted:
@@ -190,6 +166,31 @@ func (w *Worker) runTask(t *tork.Task) error {
 		}
 	default:
 		return errors.Errorf("unexpected state %s for task %s", rt.State, t.ID)
+	}
+	return nil
+}
+
+func (w *Worker) runTask(t *tork.Task) error {
+	atomic.AddInt32(&w.taskCount, 1)
+	defer func() {
+		atomic.AddInt32(&w.taskCount, -1)
+	}()
+	// create a cancellation context in case
+	// the coordinator wants to cancel the
+	// task later on
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.tasks.Set(t.ID, runningTask{
+		cancel: cancel,
+		task:   t,
+	})
+	defer w.tasks.Delete(t.ID)
+	// let the coordinator know that the task started executing
+	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
+		return err
+	}
+	if err := w.doRunTask(ctx, t); err != nil {
+		return err
 	}
 	return nil
 }
