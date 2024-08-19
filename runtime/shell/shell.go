@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
@@ -101,7 +100,7 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if r.broker != nil {
-		logger = logging.NewForwarder(r.broker, t.ID)
+		logger = mq.NewLogShipper(r.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}

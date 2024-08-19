@@ -1,4 +1,4 @@
-package logging
+package mq
 
 import (
 	"context"
@@ -7,18 +7,17 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/mq"
 )
 
-type Forwarder struct {
-	Broker mq.Broker
+type LogShipper struct {
+	Broker Broker
 	TaskID string
 	part   int
 	q      chan []byte
 }
 
-func NewForwarder(broker mq.Broker, taskID string) *Forwarder {
-	f := &Forwarder{
+func NewLogShipper(broker Broker, taskID string) *LogShipper {
+	f := &LogShipper{
 		Broker: broker,
 		TaskID: taskID,
 		q:      make(chan []byte, 1000),
@@ -27,7 +26,7 @@ func NewForwarder(broker mq.Broker, taskID string) *Forwarder {
 	return f
 }
 
-func (r *Forwarder) Write(p []byte) (int, error) {
+func (r *LogShipper) Write(p []byte) (int, error) {
 	pc := make([]byte, len(p))
 	copy(pc, p)
 	select {
@@ -38,7 +37,7 @@ func (r *Forwarder) Write(p []byte) (int, error) {
 	}
 }
 
-func (r *Forwarder) startFlushTimer() {
+func (r *LogShipper) startFlushTimer() {
 	ticker := time.NewTicker(time.Second)
 	buffer := make([]byte, 0)
 	for {

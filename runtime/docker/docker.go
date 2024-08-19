@@ -30,7 +30,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/mq"
@@ -157,7 +156,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if d.broker != nil {
-		logger = logging.NewForwarder(d.broker, t.ID)
+		logger = mq.NewLogShipper(d.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}
