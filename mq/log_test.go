@@ -1,4 +1,4 @@
-package logging
+package mq
 
 import (
 	"fmt"
@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestForwardTimeout(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
@@ -20,7 +19,7 @@ func TestForwardTimeout(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	fwd := NewForwarder(b, "some-task-id")
+	fwd := NewLogShipper(b, "some-task-id")
 	for i := 0; i < 1; i++ {
 		_, err = fwd.Write([]byte("hello\n"))
 		assert.NoError(t, err)
@@ -31,7 +30,7 @@ func TestForwardTimeout(t *testing.T) {
 }
 
 func TestForwardBatch(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
@@ -40,7 +39,7 @@ func TestForwardBatch(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	fwd := NewForwarder(b, "some-task-id")
+	fwd := NewLogShipper(b, "some-task-id")
 
 	for i := 0; i < 5; i++ {
 		_, err = fwd.Write([]byte(fmt.Sprintf("hello %d\n", i)))
