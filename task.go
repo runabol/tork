@@ -12,6 +12,7 @@ import (
 type TaskState string
 
 const (
+	TaskStateCreated   TaskState = "CREATED"
 	TaskStatePending   TaskState = "PENDING"
 	TaskStateScheduled TaskState = "SCHEDULED"
 	TaskStateRunning   TaskState = "RUNNING"
@@ -21,6 +22,13 @@ const (
 	TaskStateFailed    TaskState = "FAILED"
 	TaskStateSkipped   TaskState = "SKIPPED"
 )
+
+var TaskStateActive = []TaskState{
+	TaskStateCreated,
+	TaskStatePending,
+	TaskStateScheduled,
+	TaskStateRunning,
+}
 
 // Task is the basic unit of work that a Worker can handle.
 type Task struct {
@@ -115,6 +123,8 @@ type EachTask struct {
 	Task        *Task  `json:"task,omitempty"`
 	Size        int    `json:"size,omitempty"`
 	Completions int    `json:"completions,omitempty"`
+	Concurrency int    `json:"concurrency,omitempty"`
+	Index       int    `json:"index,omitempty"`
 }
 
 type TaskRetry struct {
@@ -138,9 +148,7 @@ type Port struct {
 }
 
 func (s TaskState) IsActive() bool {
-	return s == TaskStatePending ||
-		s == TaskStateScheduled ||
-		s == TaskStateRunning
+	return slices.Contains(TaskStateActive, s)
 }
 
 func (t *Task) Clone() *Task {
@@ -242,6 +250,8 @@ func (e *EachTask) Clone() *EachTask {
 		Task:        e.Task.Clone(),
 		Size:        e.Size,
 		Completions: e.Completions,
+		Concurrency: e.Concurrency,
+		Index:       e.Index,
 	}
 }
 

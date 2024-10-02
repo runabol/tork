@@ -80,6 +80,23 @@ func (h *completedHandler) completeEachTask(ctx context.Context, t *tork.Task) e
 		if err := tx.UpdateTask(ctx, t.ParentID, func(u *tork.Task) error {
 			u.Each.Completions = u.Each.Completions + 1
 			isLast = u.Each.Completions >= u.Each.Size
+			if !isLast && u.Each.Concurrency > 0 && u.Each.Index < u.Each.Size {
+				next, err := h.ds.GetNextTask(ctx, u.ID)
+				if err != nil {
+					return err
+				}
+				next.State = tork.TaskStatePending
+				if err := h.ds.UpdateTask(ctx, next.ID, func(nu *tork.Task) error {
+					nu.State = tork.TaskStatePending
+					return nil
+				}); err != nil {
+					return err
+				}
+				if err := h.broker.PublishTask(ctx, mq.QUEUE_PENDING, next); err != nil {
+					return err
+				}
+			}
+			u.Each.Index = u.Each.Index + 1
 			return nil
 		}); err != nil {
 			return errors.Wrapf(err, "error updating task in datastore")

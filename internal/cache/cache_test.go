@@ -593,3 +593,25 @@ func BenchmarkDeleteExpiredLoop(b *testing.B) {
 		tc.deleteExpired()
 	}
 }
+
+func TestList(t *testing.T) {
+	tc := New[*tork.Task](DefaultExpiration, 0)
+
+	for i := 0; i < 1000; i++ {
+		tc.SetWithExpiration(fmt.Sprintf("foo%d", i), &tork.Task{Name: "some task"}, DefaultExpiration)
+	}
+
+	r := sync.WaitGroup{}
+	r.Add(100)
+
+	for i := 0; i < 100; i++ {
+		go func() {
+			defer r.Done()
+			tc.List(func(v *tork.Task) bool {
+				return false
+			})
+		}()
+	}
+
+	r.Wait()
+}

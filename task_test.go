@@ -37,3 +37,26 @@ func TestCloneTask(t *testing.T) {
 	assert.NotEqual(t, t1.Limits.CPUs, t2.Limits.CPUs)
 	assert.NotEqual(t, t1.Parallel.Tasks[0].Env, t2.Parallel.Tasks[0].Env)
 }
+
+func TestIsActive(t *testing.T) {
+	t1 := &tork.Task{
+		State: tork.TaskStateCancelled,
+	}
+	assert.False(t, t1.State.IsActive())
+	t2 := &tork.Task{
+		State: tork.TaskStateCreated,
+	}
+	assert.True(t, t2.State.IsActive())
+	t3 := &tork.Task{
+		State: tork.TaskStatePending,
+	}
+	assert.True(t, t3.State.IsActive())
+	t4 := &tork.Task{
+		State: tork.TaskStateRunning,
+	}
+	assert.True(t, t4.State.IsActive())
+	t5 := &tork.Task{
+		State: tork.TaskStateCompleted,
+	}
+	assert.False(t, t5.State.IsActive())
+}

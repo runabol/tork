@@ -751,3 +751,103 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, t11.State)
 }
+
+func Test_handleCompletedEachTaskWithNextTask(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	ds := inmemory.NewInMemoryDatastore()
+	handler := NewCompletedHandler(ds, b)
+	assert.NotNil(t, handler)
+
+	now := time.Now().UTC()
+
+	j1 := &tork.Job{
+		ID:       uuid.NewUUID(),
+		State:    tork.JobStateRunning,
+		Position: 1,
+		Tasks: []*tork.Task{
+			{
+				Name: "task-1",
+				Each: &tork.EachTask{
+					Size:        3,
+					Concurrency: 1,
+					List:        "some expression",
+					Task: &tork.Task{
+						Name: "some task",
+					},
+				},
+			},
+			{
+				Name: "task-2",
+			},
+		},
+	}
+	err := ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	pt := &tork.Task{
+		ID:       uuid.NewUUID(),
+		JobID:    j1.ID,
+		Position: 1,
+		Name:     "parent task",
+		Each: &tork.EachTask{
+			Size:        3,
+			List:        "some expression",
+			Concurrency: 1,
+			Task: &tork.Task{
+				Name: "some task",
+			},
+		},
+		State: tork.TaskStateRunning,
+	}
+
+	err = ds.CreateTask(ctx, pt)
+	assert.NoError(t, err)
+
+	t1 := &tork.Task{
+		ID:          uuid.NewUUID(),
+		State:       tork.TaskStateRunning,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    pt.ID,
+	}
+
+	t6 := &tork.Task{
+		ID:          uuid.NewUUID(),
+		State:       tork.TaskStateCreated,
+		StartedAt:   &now,
+		CompletedAt: &now,
+		NodeID:      uuid.NewUUID(),
+		JobID:       j1.ID,
+		Position:    1,
+		ParentID:    pt.ID,
+	}
+
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	t1.State = tork.TaskStateCompleted
+
+	err = ds.CreateTask(ctx, t6)
+	assert.NoError(t, err)
+
+	err = handler(ctx, task.StateChange, t1)
+	assert.NoError(t, err)
+
+	t2, err := ds.GetTaskByID(ctx, t1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateCompleted, t2.State)
+	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+
+	t3, err := ds.GetTaskByID(ctx, t6.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStatePending, t3.State)
+
+	pt1, err := ds.GetTaskByID(ctx, t1.ParentID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateRunning, pt1.State)
+}

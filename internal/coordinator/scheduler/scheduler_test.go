@@ -518,3 +518,63 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 }
+
+func Test_scheduleEachTaskConcurrency(t *testing.T) {
+	ctx := context.Background()
+	b := mq.NewInMemoryBroker()
+
+	processed := make(chan any, 1)
+	var counter atomic.Int32
+	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+		assert.Equal(t, "test-queue", tk.Queue)
+		assert.Equal(t, fmt.Sprintf("%d", counter.Load()), tk.Env["ITEM_INDEX"])
+		processed <- 1
+		counter.Add(1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds := inmemory.NewInMemoryDatastore()
+	s := NewScheduler(ds, b)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{
+		ID:   uuid.NewUUID(),
+		Name: "test job",
+	}
+
+	err = ds.CreateJob(ctx, j)
+	assert.NoError(t, err)
+
+	tk := &tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: j.ID,
+		Each: &tork.EachTask{
+			List:        "{{ sequence (1,3) }}",
+			Concurrency: 1,
+			Task: &tork.Task{
+				Queue: "test-queue",
+				Env: map[string]string{
+					"ITEM_INDEX": "{{item.index}}",
+					"ITEM_VAL":   "{{item.value}}",
+				},
+			},
+		},
+	}
+
+	err = ds.CreateTask(ctx, tk)
+	assert.NoError(t, err)
+
+	err = s.scheduleEachTask(ctx, tk)
+	assert.NoError(t, err)
+
+	// wait for the tasks to get processed
+	<-processed
+
+	tk, err = ds.GetTaskByID(ctx, tk.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.TaskStateRunning, tk.State)
+	// task should only be processed once
+	assert.Equal(t, int32(1), counter.Load())
+}

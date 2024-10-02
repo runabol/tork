@@ -260,6 +260,16 @@ func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	return result, nil
 }
 
+func (ds *InMemoryDatastore) GetNextTask(ctx context.Context, parentTaskID string) (*tork.Task, error) {
+	result := ds.tasks.List(func(v *tork.Task) bool {
+		return v.ParentID == parentTaskID && v.State == tork.TaskStateCreated
+	})
+	if len(result) == 0 {
+		return nil, datastore.ErrTaskNotFound
+	}
+	return result[0], nil
+}
+
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
 	parseQuery := func(query string) (string, []string) {
 		terms := []string{}
