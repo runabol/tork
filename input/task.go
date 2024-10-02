@@ -47,9 +47,10 @@ type SubJob struct {
 }
 
 type Each struct {
-	Var  string `json:"var,omitempty" yaml:"var,omitempty" `
-	List string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
-	Task Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
+	Var         string `json:"var,omitempty" yaml:"var,omitempty" `
+	List        string `json:"list,omitempty" yaml:"list,omitempty" validate:"required,expr"`
+	Task        Task   `json:"task,omitempty" yaml:"task,omitempty" validate:"required"`
+	Concurrency int    `json:"concurrency,omitempty" yaml:"concurrency,omitempty" validate:"min=0,max=99999"`
 }
 
 type Parallel struct {
@@ -135,9 +136,10 @@ func (i Task) toTask() *tork.Task {
 	var each *tork.EachTask
 	if i.Each != nil {
 		each = &tork.EachTask{
-			Var:  i.Each.Var,
-			List: i.Each.List,
-			Task: i.Each.Task.toTask(),
+			Var:         i.Each.Var,
+			List:        i.Each.List,
+			Task:        i.Each.Task.toTask(),
+			Concurrency: i.Each.Concurrency,
 		}
 	}
 	var subjob *tork.SubJobTask

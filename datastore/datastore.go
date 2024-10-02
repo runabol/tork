@@ -28,6 +28,7 @@ type Datastore interface {
 	UpdateTask(ctx context.Context, id string, modify func(u *tork.Task) error) error
 	GetTaskByID(ctx context.Context, id string) (*tork.Task, error)
 	GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error)
+	GetNextTask(ctx context.Context, parentTaskID string) (*tork.Task, error)
 	CreateTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error
 	GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*Page[*tork.TaskLogPart], error)
 

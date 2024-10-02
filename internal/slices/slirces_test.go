@@ -3,6 +3,7 @@ package slices
 import (
 	"testing"
 
+	"github.com/runabol/tork"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,4 +25,19 @@ func TestHasIntersection(t *testing.T) {
 		got := Intersect(tt.slice1, tt.slice2)
 		assert.Equal(t, tt.want, got)
 	}
+}
+
+func TestMap(t *testing.T) {
+	tests := []*tork.Task{{
+		Name: "a",
+	}, {
+		Name: "b",
+	}, {
+		Name: "c",
+	}}
+
+	got := Map(tests, func(tk *tork.Task) string {
+		return tk.Name
+	})
+	assert.Equal(t, []string{"a", "b", "c"}, got)
 }

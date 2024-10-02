@@ -695,3 +695,31 @@ func TestInMemoryCreateRole(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, uroles, 0)
 }
+
+func TestInMemoryGetNextTask(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	jid := uuid.NewUUID()
+
+	tasks := []tork.Task{{
+		ID:    "parent-id",
+		State: tork.TaskStatePending,
+		JobID: jid,
+	}, {
+		ID:       "child-id",
+		ParentID: "parent-id",
+		State:    tork.TaskStateCreated,
+		JobID:    jid,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, &ta)
+		assert.NoError(t, err)
+	}
+	nt, err := ds.GetNextTask(ctx, "parent-id")
+	assert.NoError(t, err)
+	assert.Equal(t, "child-id", nt.ID)
+
+	_, err = ds.GetNextTask(ctx, "no-such-id")
+	assert.Error(t, err)
+}

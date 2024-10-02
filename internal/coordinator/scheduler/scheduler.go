@@ -206,11 +206,11 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 		u.ScheduledAt = &now
 		u.StartedAt = &now
 		u.Each.Size = len(list)
+		u.Each.Index = u.Each.Concurrency
 		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
-	// schedule a task for each elements in the list
 	for ix, item := range list {
 		cx := j.Context.Clone().AsMap()
 		eachVar := t.Each.Var
@@ -224,7 +224,13 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 		et := t.Each.Task.Clone()
 		et.ID = uuid.NewUUID()
 		et.JobID = j.ID
-		et.State = tork.TaskStatePending
+		// if "concurrency" level is configured, we only create
+		// the task, but we do not fire it to the broker.
+		if t.Each.Concurrency == 0 || ix < t.Each.Concurrency {
+			et.State = tork.TaskStatePending
+		} else {
+			et.State = tork.TaskStateCreated
+		}
 		et.Position = t.Position
 		et.CreatedAt = &now
 		et.ParentID = t.ID
@@ -236,8 +242,13 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 		if err := s.ds.CreateTask(ctx, et); err != nil {
 			return err
 		}
-		if err := s.broker.PublishTask(ctx, mq.QUEUE_PENDING, et); err != nil {
-			return err
+		// if "concurrency" level is configured, take that into
+		// account by only firing an amount of tasks upto that
+		// level of concurrency.
+		if t.Each.Concurrency == 0 || ix < t.Each.Concurrency {
+			if err := s.broker.PublishTask(ctx, mq.QUEUE_PENDING, et); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

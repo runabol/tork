@@ -1297,3 +1297,56 @@ func TestPostgresCreateRole(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, uroles, 0)
 }
+
+func TestPostgresGetNextTask(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		CreatedAt: time.Now().UTC(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	parentTaskID := uuid.NewUUID()
+	childTaskID := uuid.NewUUID()
+
+	tasks := []*tork.Task{{
+		ID:        parentTaskID,
+		State:     tork.TaskStatePending,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        childTaskID,
+		ParentID:  parentTaskID,
+		State:     tork.TaskStateCreated,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateCreated,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}, {
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateCreated,
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}}
+
+	for _, ta := range tasks {
+		err := ds.CreateTask(ctx, ta)
+		assert.NoError(t, err)
+	}
+	nt, err := ds.GetNextTask(ctx, parentTaskID)
+	assert.NoError(t, err)
+	assert.Equal(t, childTaskID, nt.ID)
+
+	_, err = ds.GetNextTask(ctx, childTaskID)
+	assert.Error(t, err)
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/internal/slices"
 	"github.com/runabol/tork/internal/uuid"
 )
 
@@ -715,10 +716,10 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	q := `SELECT * 
 	      FROM tasks 
 		  where job_id = $1 
-		  AND 
-		    (state = $2 OR state = $3 OR state = $4)
+		  AND state = ANY($2)
 		  ORDER BY position,created_at ASC`
-	if err := ds.select_(&rs, q, jobID, tork.TaskStatePending, tork.TaskStateScheduled, tork.TaskStateRunning); err != nil {
+	activeStates := slices.Map(tork.TaskStateActive, func(state tork.TaskState) string { return string(state) })
+	if err := ds.select_(&rs, q, jobID, pq.StringArray(activeStates)); err != nil {
 		return nil, errors.Wrapf(err, "error getting job execution from db")
 	}
 	actives := make([]*tork.Task, len(rs))
@@ -731,6 +732,17 @@ func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) (
 	}
 
 	return actives, nil
+}
+
+func (ds *PostgresDatastore) GetNextTask(ctx context.Context, parentTaskID string) (*tork.Task, error) {
+	r := taskRecord{}
+	if err := ds.get(&r, `SELECT * FROM tasks where parent_id = $1 and state = 'CREATED' limit 1`, parentTaskID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, datastore.ErrTaskNotFound
+		}
+		return nil, errors.Wrapf(err, "error fetching task from db")
+	}
+	return r.toTask()
 }
 
 func (ds *PostgresDatastore) CreateTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error {

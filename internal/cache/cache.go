@@ -217,6 +217,22 @@ func (c *Cache[V]) allItems() map[string]*Item[V] {
 	return m
 }
 
+func (c *Cache[V]) List(filters ...func(v V) bool) (vals []V) {
+	items := c.allItems()
+next:
+	for _, v := range items {
+		for _, filter := range filters {
+			if !filter(v.Object) {
+				continue next
+			}
+		}
+		v.mu.Lock()
+		vals = append(vals, v.Object)
+		v.mu.Unlock()
+	}
+	return
+}
+
 func (c *Cache[V]) Iterate(it func(key string, v V)) {
 	items := c.allItems()
 	for k, v := range items {
