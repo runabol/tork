@@ -229,6 +229,9 @@ func TestEvalSubjob(t *testing.T) {
 				"input1": "{{inputs.VAR1}}",
 				"input2": "{{inputs.VAR2}}",
 			},
+			Secrets: map[string]string{
+				"secret": "{{secrets.SECRET}}",
+			},
 			Webhooks: []*tork.Webhook{{
 				URL: "{{inputs.VAR1}}",
 				Headers: map[string]string{
@@ -242,10 +245,14 @@ func TestEvalSubjob(t *testing.T) {
 			"VAR1": "VAL1",
 			"VAR2": "VAL2",
 		},
+		"secrets": map[string]string{
+			"SECRET": "PASSWORD",
+		},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "some name VAL1", t1.SubJob.Name)
 	assert.Equal(t, "VAL1", t1.SubJob.Inputs["input1"])
+	assert.Equal(t, "PASSWORD", t1.SubJob.Secrets["secret"])
 	assert.Equal(t, "VAL1", t1.SubJob.Webhooks[0].URL)
 	assert.Equal(t, "VAL2", t1.SubJob.Webhooks[0].Headers["somekey"])
 }

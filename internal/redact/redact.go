@@ -80,6 +80,11 @@ func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
 	if redacted.Registry != nil {
 		redacted.Registry.Password = redactedStr
 	}
+	if redacted.SubJob != nil {
+		for k := range redacted.SubJob.Secrets {
+			redacted.SubJob.Secrets[k] = redactedStr
+		}
+	}
 }
 
 func (r *Redacter) RedactJob(j *tork.Job) {
