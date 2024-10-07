@@ -41,6 +41,8 @@ type SubJob struct {
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required"`
 	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty" yaml:"autoDelete,omitempty"`
 	Output      string            `json:"output,omitempty" yaml:"output,omitempty"`
 	Detached    bool              `json:"detached,omitempty" yaml:"detached,omitempty"`
 	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
@@ -153,9 +155,15 @@ func (i Task) toTask() *tork.Task {
 			Description: i.SubJob.Description,
 			Tasks:       toTasks(i.SubJob.Tasks),
 			Inputs:      maps.Clone(i.SubJob.Inputs),
+			Secrets:     maps.Clone(i.SubJob.Secrets),
 			Output:      i.SubJob.Output,
 			Detached:    i.SubJob.Detached,
 			Webhooks:    webhooks,
+		}
+		if i.SubJob.AutoDelete != nil {
+			subjob.AutoDelete = &tork.AutoDelete{
+				After: i.SubJob.AutoDelete.After,
+			}
 		}
 	}
 	var parallel *tork.ParallelTask

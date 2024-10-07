@@ -107,6 +107,8 @@ type SubJobTask struct {
 	Description string            `json:"description,omitempty"`
 	Tasks       []*Task           `json:"tasks,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty"`
 	Output      string            `json:"output,omitempty"`
 	Detached    bool              `json:"detached,omitempty"`
 	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
@@ -256,11 +258,17 @@ func (e *EachTask) Clone() *EachTask {
 }
 
 func (s *SubJobTask) Clone() *SubJobTask {
+	var autoDelete *AutoDelete
+	if s.AutoDelete != nil {
+		autoDelete = s.AutoDelete.Clone()
+	}
 	return &SubJobTask{
 		ID:          s.ID,
 		Name:        s.Name,
 		Description: s.Description,
 		Inputs:      maps.Clone(s.Inputs),
+		Secrets:     maps.Clone(s.Secrets),
+		AutoDelete:  autoDelete,
 		Tasks:       CloneTasks(s.Tasks),
 		Output:      s.Output,
 		Detached:    s.Detached,

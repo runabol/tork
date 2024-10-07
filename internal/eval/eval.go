@@ -108,6 +108,13 @@ func EvaluateTask(t *tork.Task, c map[string]any) error {
 			}
 			t.SubJob.Inputs[k] = result
 		}
+		for k, v := range t.SubJob.Secrets {
+			result, err := EvaluateTemplate(v, c)
+			if err != nil {
+				return err
+			}
+			t.SubJob.Secrets[k] = result
+		}
 		for _, wh := range t.SubJob.Webhooks {
 			url, err := EvaluateTemplate(wh.URL, c)
 			if err != nil {

@@ -58,6 +58,11 @@ func TestRedactTask(t *testing.T) {
 				},
 			},
 		},
+		SubJob: &tork.SubJobTask{
+			Secrets: map[string]string{
+				"hush": "shhhhh",
+			},
+		},
 		Registry: &tork.Registry{
 			Username: "me",
 			Password: "secret",
@@ -82,6 +87,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "hello world", ta.Parallel.Tasks[0].Env["harmless"])
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
+	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
 }
 
 func TestRedactJob(t *testing.T) {

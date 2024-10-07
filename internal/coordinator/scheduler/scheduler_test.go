@@ -407,6 +407,8 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
 		assert.NotEmpty(t, j.ParentID)
+		assert.Equal(t, "https://example.com", j.Inputs["some_input"])
+		assert.Equal(t, "password", j.Secrets["some_secret"])
 		close(processed)
 		return nil
 	})
@@ -430,6 +432,12 @@ func Test_scheduleSubJobTask(t *testing.T) {
 		JobID: j.ID,
 		SubJob: &tork.SubJobTask{
 			Name: "my sub job",
+			Inputs: map[string]string{
+				"some_input": "https://example.com",
+			},
+			Secrets: map[string]string{
+				"some_secret": "password",
+			},
 			Tasks: []*tork.Task{
 				{
 					Name: "some task",
