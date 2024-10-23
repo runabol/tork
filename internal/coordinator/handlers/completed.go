@@ -235,8 +235,8 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 	if err := c.onJob(ctx, job.Progress, j); err != nil {
 		return err
 	}
+	now := time.Now().UTC()
 	if j.Position <= len(j.Tasks) {
-		now := time.Now().UTC()
 		next := j.Tasks[j.Position-1]
 		next.ID = uuid.NewUUID()
 		next.JobID = j.ID
@@ -254,6 +254,7 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 		return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
 	} else {
 		j.State = tork.JobStateCompleted
+		j.CompletedAt = &now
 		return c.onJob(ctx, job.StateChange, j)
 	}
 
