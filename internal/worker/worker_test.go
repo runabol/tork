@@ -287,7 +287,7 @@ func Test_handleTaskOutput(t *testing.T) {
 		Middleware: []task.MiddlewareFunc{
 			func(next task.HandlerFunc) task.HandlerFunc {
 				return func(ctx context.Context, et task.EventType, tk *tork.Task) error {
-					assert.Equal(t, tork.TaskStateRunning, tk.State)
+					assert.Equal(t, tork.TaskStateScheduled, tk.State)
 					return next(ctx, et, tk)
 				}
 			},

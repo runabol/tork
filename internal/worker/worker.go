@@ -102,41 +102,41 @@ func (w *Worker) cancelTask(t *tork.Task) error {
 }
 
 func (w *Worker) handleTask(t *tork.Task) error {
-	ctx := context.Background()
-	started := time.Now().UTC()
-	t.StartedAt = &started
-	t.NodeID = w.id
-	t.State = tork.TaskStateRunning
-	// prepare limits
-	if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
-		t.Limits = &tork.TaskLimits{}
-	}
-	if t.Limits != nil && t.Limits.CPUs == "" {
-		t.Limits.CPUs = w.limits.DefaultCPUsLimit
-	}
-	if t.Limits != nil && t.Limits.Memory == "" {
-		t.Limits.Memory = w.limits.DefaultMemoryLimit
-	}
-	if t.Timeout == "" {
-		t.Timeout = w.limits.DefaultTimeout
-	}
-	// assign host ports
-	for _, p := range t.Ports {
-		hostPort, err := w.reservePort()
-		if err != nil {
-			now := time.Now().UTC()
-			t.Error = err.Error()
-			t.FailedAt = &now
-			t.State = tork.TaskStateFailed
-			return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
-		}
-		log.Debug().Msgf("Port mapping %d->%s", hostPort, p.Port)
-		defer w.releasePort(hostPort)
-		p.HostPort = hostPort
-	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
+		started := time.Now().UTC()
+		t.StartedAt = &started
+		t.NodeID = w.id
+		t.State = tork.TaskStateRunning
+		// prepare limits
+		if t.Limits == nil && (w.limits.DefaultCPUsLimit != "" || w.limits.DefaultMemoryLimit != "") {
+			t.Limits = &tork.TaskLimits{}
+		}
+		if t.Limits != nil && t.Limits.CPUs == "" {
+			t.Limits.CPUs = w.limits.DefaultCPUsLimit
+		}
+		if t.Limits != nil && t.Limits.Memory == "" {
+			t.Limits.Memory = w.limits.DefaultMemoryLimit
+		}
+		if t.Timeout == "" {
+			t.Timeout = w.limits.DefaultTimeout
+		}
+		// assign host ports
+		for _, p := range t.Ports {
+			hostPort, err := w.reservePort()
+			if err != nil {
+				now := time.Now().UTC()
+				t.Error = err.Error()
+				t.FailedAt = &now
+				t.State = tork.TaskStateFailed
+				return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+			}
+			log.Debug().Msgf("Port mapping %d->%s", hostPort, p.Port)
+			defer w.releasePort(hostPort)
+			p.HostPort = hostPort
+		}
 		return w.runTask(t)
 	}
+	ctx := context.Background()
 	// clone the task so that the downstream
 	// process can mutate the task without
 	// affecting the original
