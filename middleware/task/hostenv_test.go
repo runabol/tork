@@ -18,7 +18,7 @@ func TestHostEnv1(t *testing.T) {
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
 	t1 := &tork.Task{
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 	}
 	assert.NoError(t, hm(context.Background(), StateChange, t1))
 	assert.Equal(t, "value1", t1.Env["TORK_HOST_VAR1"])
@@ -33,7 +33,7 @@ func TestHostEnv2(t *testing.T) {
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
 	t1 := &tork.Task{
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Env: map[string]string{
 			"OTHER_VAR": "othervalue",
 		},
@@ -52,7 +52,7 @@ func TestHostEnv3(t *testing.T) {
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
 	t1 := &tork.Task{
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Env: map[string]string{
 			"OTHER_VAR": "othervalue",
 		},
@@ -76,7 +76,7 @@ func TestHostEnv5(t *testing.T) {
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
 	t1 := &tork.Task{
-		State: tork.TaskStateScheduled,
+		State: tork.TaskStateRunning,
 		Env: map[string]string{
 			"OTHER_VAR": "othervalue",
 		},
