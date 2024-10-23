@@ -30,7 +30,7 @@ func NewHostEnv(vars ...string) (*HostEnv, error) {
 
 func (m *HostEnv) Execute(next HandlerFunc) HandlerFunc {
 	return func(ctx context.Context, et EventType, t *tork.Task) error {
-		if et == StateChange && t.State == tork.TaskStateScheduled {
+		if et == StateChange && t.State == tork.TaskStateRunning {
 			m.setHostVars(t)
 		}
 		return next(ctx, et, t)
