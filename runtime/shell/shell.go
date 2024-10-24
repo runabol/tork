@@ -159,6 +159,7 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 	env = append(env, fmt.Sprintf("%sTORK_PROGRESS=%s/progress", envVarPrefix, workdir))
 	env = append(env, fmt.Sprintf("WORKDIR=%s", workdir))
 	env = append(env, fmt.Sprintf("PATH=%s", os.Getenv("PATH")))
+	env = append(env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
 
 	if err := os.WriteFile(fmt.Sprintf("%s/entrypoint", workdir), []byte(t.Run), 0555); err != nil {
 		return errors.Wrapf(err, "error writing the entrypoint")
@@ -280,6 +281,9 @@ func reexecRun() {
 			env = append(env, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
+	env = append(env, fmt.Sprintf("WORKDIR=%s", workdir))
+	env = append(env, fmt.Sprintf("PATH=%s", os.Getenv("PATH")))
+	env = append(env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
 
 	cmd := exec.Command(flag.Args()[0], flag.Args()[1:]...)
 	cmd.Stdout = os.Stdout

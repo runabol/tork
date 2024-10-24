@@ -33,6 +33,25 @@ func TestShellRuntimeRunResult(t *testing.T) {
 	assert.Equal(t, "hello world", tk.Result)
 }
 
+func TestShellRuntimeRunPath(t *testing.T) {
+	rt := NewShellRuntime(Config{
+		UID: DEFAULT_UID,
+		GID: DEFAULT_GID,
+		Rexec: func(args ...string) *exec.Cmd {
+			cmd := exec.Command(args[5], args[6:]...)
+			return cmd
+		},
+	})
+
+	tk := &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "echo -n $PATH > $REEXEC_TORK_OUTPUT",
+	}
+	err := rt.Run(context.Background(), tk)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, "hello world", tk.Result)
+}
+
 func TestShellRuntimeRunFile(t *testing.T) {
 	rt := NewShellRuntime(Config{
 		UID: DEFAULT_UID,
