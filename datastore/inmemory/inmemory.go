@@ -271,22 +271,6 @@ func (ds *InMemoryDatastore) GetNextTask(ctx context.Context, parentTaskID strin
 }
 
 func (ds *InMemoryDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
-	parseQuery := func(query string) (string, []string) {
-		terms := []string{}
-		tags := []string{}
-		parts := strings.Fields(query)
-		for _, part := range parts {
-			if strings.HasPrefix(part, "tag:") {
-				tags = append(tags, strings.TrimPrefix(part, "tag:"))
-			} else if strings.HasPrefix(part, "tags:") {
-				tags = append(tags, strings.Split(strings.TrimPrefix(part, "tag:"), ",")...)
-			} else {
-				terms = append(terms, part)
-			}
-		}
-		return strings.Join(terms, " "), tags
-	}
-
 	var urs []*tork.Role
 	var user *tork.User
 	if currentUser != "" {
@@ -381,7 +365,7 @@ func (ds *InMemoryDatastore) CreateTaskLogPart(ctx context.Context, p *tork.Task
 	return nil
 }
 
-func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
+func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	_, err := ds.GetTaskByID(ctx, taskID)
 	if err != nil {
 		return nil, err
@@ -396,17 +380,30 @@ func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 			TotalItems: 0,
 		}, nil
 	}
-	sort.Slice(parts, func(i, j int) bool {
-		return parts[i].Number > parts[j].Number
+
+	var filteredLogs []*tork.TaskLogPart
+	if q == "" {
+		filteredLogs = parts
+	} else {
+		searchTerm, _ := parseQuery(q)
+		for _, p := range parts {
+			if strings.Contains(p.Contents, searchTerm) {
+				filteredLogs = append(filteredLogs, p)
+			}
+		}
+	}
+
+	sort.Slice(filteredLogs, func(i, j int) bool {
+		return filteredLogs[i].Number > filteredLogs[j].Number
 	})
 	offset := (page - 1) * size
 	result := make([]*tork.TaskLogPart, 0)
-	for i := offset; i < (offset+size) && i < len(parts); i++ {
-		p := parts[i]
+	for i := offset; i < (offset+size) && i < len(filteredLogs); i++ {
+		p := filteredLogs[i]
 		result = append(result, p)
 	}
-	totalPages := len(parts) / size
-	if len(parts)%size != 0 {
+	totalPages := len(filteredLogs) / size
+	if len(filteredLogs)%size != 0 {
 		totalPages = totalPages + 1
 	}
 	return &datastore.Page[*tork.TaskLogPart]{
@@ -414,7 +411,7 @@ func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID string,
 		Number:     page,
 		Size:       len(result),
 		TotalPages: totalPages,
-		TotalItems: len(parts),
+		TotalItems: len(filteredLogs),
 	}, nil
 }
 
@@ -619,4 +616,20 @@ func (ds *InMemoryDatastore) onJobEviction(s string, job *tork.Job) {
 
 func (ds *InMemoryDatastore) HealthCheck(ctx context.Context) error {
 	return nil
+}
+
+func parseQuery(query string) (string, []string) {
+	terms := []string{}
+	tags := []string{}
+	parts := strings.Fields(query)
+	for _, part := range parts {
+		if strings.HasPrefix(part, "tag:") {
+			tags = append(tags, strings.TrimPrefix(part, "tag:"))
+		} else if strings.HasPrefix(part, "tags:") {
+			tags = append(tags, strings.Split(strings.TrimPrefix(part, "tag:"), ",")...)
+		} else {
+			terms = append(terms, part)
+		}
+	}
+	return strings.Join(terms, " "), tags
 }

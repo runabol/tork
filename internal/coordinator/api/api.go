@@ -549,7 +549,7 @@ func (s *API) getTaskLog(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	l, err := s.ds.GetTaskLogParts(c.Request().Context(), id, page, size)
+	l, err := s.ds.GetTaskLogParts(c.Request().Context(), id, "", page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}

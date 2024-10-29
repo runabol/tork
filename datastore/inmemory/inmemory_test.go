@@ -398,7 +398,7 @@ func TestInMemoryCreateAndGetTaskLogs(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 1", logs.Items[0].Contents)
@@ -433,7 +433,7 @@ func TestInMemoryCreateAndGetTaskLogsMultiParts(t *testing.T) {
 
 	wg.Wait()
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 10)
 	assert.Equal(t, "line 10", logs.Items[0].Contents)
@@ -458,7 +458,7 @@ func TestInMemoryCreateAndGetTaskLogsLarge(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, 1, 10)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 10)
 	assert.Equal(t, "line 100", logs.Items[0].Contents)
@@ -506,6 +506,32 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 2)
 	assert.Equal(t, "line 2", logs.Items[0].Contents)
+	assert.Equal(t, 1, logs.TotalPages)
+}
+
+func TestInMemoryCreateAndQueryLogPartsLarge(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	t1 := tork.Task{
+		ID: uuid.NewUUID(),
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "100", 10, 1)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, "line 100", logs.Items[0].Contents)
+	assert.Equal(t, 1, logs.Size)
 	assert.Equal(t, 1, logs.TotalPages)
 }
 

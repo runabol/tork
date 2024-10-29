@@ -111,6 +111,7 @@ type taskLogPartRecord struct {
 	TaskID   string    `db:"task_id"`
 	CreateAt time.Time `db:"created_at"`
 	Contents string    `db:"contents"`
+	TS       string    `db:"ts"`
 }
 
 type userRecord struct {

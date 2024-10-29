@@ -820,16 +820,17 @@ func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
 	return n, nil
 }
 
-func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
+func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, size, page int) (*datastore.Page[*tork.TaskLogPart], error) {
+	searchTerm, _ := parseQuery(q)
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
-	q := fmt.Sprintf(`select * 
+	qry := fmt.Sprintf(`select * 
 	      from tasks_log_parts 
-		  where task_id = $1
+		  where task_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('english', $2))
 		  order by number_ DESC
 		  offset %d limit %d`, offset, size)
 
-	if err := ds.select_(&rs, q, taskID); err != nil {
+	if err := ds.select_(&rs, qry, taskID, searchTerm); err != nil {
 		return nil, errors.Wrapf(err, "error task log parts from db")
 	}
 	items := make([]*tork.TaskLogPart, len(rs))
@@ -893,22 +894,6 @@ func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID string, p
 }
 
 func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
-	parseQuery := func(query string) (string, []string) {
-		terms := []string{}
-		tags := []string{}
-		parts := strings.Fields(query)
-		for _, part := range parts {
-			if strings.HasPrefix(part, "tag:") {
-				tags = append(tags, strings.TrimPrefix(part, "tag:"))
-			} else if strings.HasPrefix(part, "tags:") {
-				tags = append(tags, strings.Split(strings.TrimPrefix(part, "tags:"), ",")...)
-			} else {
-				terms = append(terms, part)
-			}
-		}
-		return strings.Join(terms, " "), tags
-	}
-
 	searchTerm, tags := parseQuery(q)
 
 	offset := (page - 1) * size
@@ -1206,4 +1191,20 @@ func (ds *PostgresDatastore) HealthCheck(ctx context.Context) error {
 		return errors.Wrapf(err, "error reading from nodes table")
 	}
 	return nil
+}
+
+func parseQuery(query string) (string, []string) {
+	terms := []string{}
+	tags := []string{}
+	parts := strings.Fields(query)
+	for _, part := range parts {
+		if strings.HasPrefix(part, "tag:") {
+			tags = append(tags, strings.TrimPrefix(part, "tag:"))
+		} else if strings.HasPrefix(part, "tags:") {
+			tags = append(tags, strings.Split(strings.TrimPrefix(part, "tags:"), ",")...)
+		} else {
+			terms = append(terms, part)
+		}
+	}
+	return strings.Join(terms, " "), tags
 }

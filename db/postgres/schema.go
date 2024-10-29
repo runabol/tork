@@ -157,6 +157,14 @@ CREATE TABLE tasks_log_parts (
     contents   text        not null
 );
 
+
+ALTER TABLE tasks_log_parts ADD COLUMN ts tsvector NOT NULL
+    GENERATED ALWAYS AS (
+        to_tsvector('english',contents)  
+    ) STORED;
+
+CREATE INDEX tasks_log_parts_ts_idx ON tasks_log_parts USING GIN (ts);
+
 CREATE INDEX idx_tasks_log_parts_task_id ON tasks_log_parts (task_id);
 CREATE INDEX idx_tasks_log_parts_created_at ON tasks_log_parts (created_at);
 `
