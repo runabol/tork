@@ -41,7 +41,7 @@ func Test_handleLog(t *testing.T) {
 
 	handler(&p1)
 
-	n11, err := ds.GetTaskLogParts(ctx, p1.TaskID, 1, 10)
+	n11, err := ds.GetTaskLogParts(ctx, p1.TaskID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, n11.TotalItems)
 	assert.Equal(t, "line 1", n11.Items[0].Contents)

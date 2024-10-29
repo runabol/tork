@@ -30,7 +30,7 @@ type Datastore interface {
 	GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error)
 	GetNextTask(ctx context.Context, parentTaskID string) (*tork.Task, error)
 	CreateTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error
-	GetTaskLogParts(ctx context.Context, taskID string, page, size int) (*Page[*tork.TaskLogPart], error)
+	GetTaskLogParts(ctx context.Context, taskID, q string, page, size int) (*Page[*tork.TaskLogPart], error)
 
 	CreateNode(ctx context.Context, n *tork.Node) error
 	UpdateNode(ctx context.Context, id string, modify func(u *tork.Node) error) error
