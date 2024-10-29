@@ -527,7 +527,7 @@ func TestInMemoryCreateAndQueryLogPartsLarge(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "100", 10, 1)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "100", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 100", logs.Items[0].Contents)
