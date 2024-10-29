@@ -517,6 +517,7 @@ func (s *API) completeTask(c echo.Context) error {
 // @Success 200 {object} []tork.TaskLogPart
 // @Router /tasks/{id}/log [get]
 // @Param id path string true "Task ID"
+// @Param q query int false "string search"
 // @Param page query int false "page number"
 // @Param size query int false "page size"
 func (s *API) getTaskLog(c echo.Context) error {
