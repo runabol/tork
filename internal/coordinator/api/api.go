@@ -537,6 +537,7 @@ func (s *API) getTaskLog(c echo.Context) error {
 		si = "25"
 	}
 	size, err := strconv.Atoi(si)
+	q := c.QueryParam("q")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid size: %s", ps))
 	}
@@ -549,7 +550,7 @@ func (s *API) getTaskLog(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	l, err := s.ds.GetTaskLogParts(c.Request().Context(), id, "", page, size)
+	l, err := s.ds.GetTaskLogParts(c.Request().Context(), id, q, page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
