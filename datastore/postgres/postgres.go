@@ -820,7 +820,7 @@ func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
 	return n, nil
 }
 
-func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, size, page int) (*datastore.Page[*tork.TaskLogPart], error) {
+func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	searchTerm, _ := parseQuery(q)
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}

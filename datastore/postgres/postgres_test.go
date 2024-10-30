@@ -1006,7 +1006,7 @@ func TestPostgresCreateAndGetTaskLogs(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "line 1", 10, 1)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 1", logs.Items[0].Contents)
@@ -1122,7 +1122,7 @@ func TestPostgresQueryTaskLogs(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "line 91", 10, 1)
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "line 91", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 91", logs.Items[0].Contents)
