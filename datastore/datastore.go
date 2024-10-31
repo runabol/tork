@@ -40,7 +40,7 @@ type Datastore interface {
 	CreateJob(ctx context.Context, j *tork.Job) error
 	UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error
 	GetJobByID(ctx context.Context, id string) (*tork.Job, error)
-	GetJobLogParts(ctx context.Context, jobID string, page, size int) (*Page[*tork.TaskLogPart], error)
+	GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*Page[*tork.TaskLogPart], error)
 	GetJobs(ctx context.Context, currentUser, q string, page, size int) (*Page[*tork.JobSummary], error)
 
 	CreateUser(ctx context.Context, u *tork.User) error
