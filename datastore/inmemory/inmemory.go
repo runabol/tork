@@ -415,7 +415,7 @@ func (ds *InMemoryDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 	}, nil
 }
 
-func (ds *InMemoryDatastore) GetJobLogParts(ctx context.Context, jobID string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
+func (ds *InMemoryDatastore) GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	execution := ds.getExecution(jobID)
 	allParts := make([]*tork.TaskLogPart, 0)
 	for _, task := range execution {
@@ -433,24 +433,36 @@ func (ds *InMemoryDatastore) GetJobLogParts(ctx context.Context, jobID string, p
 			TotalItems: 0,
 		}, nil
 	}
-	sort.Slice(allParts, func(i, j int) bool {
-		ti, _ := ds.tasks.Get(allParts[i].TaskID)
-		tj, _ := ds.tasks.Get(allParts[j].TaskID)
+
+	var filtered []*tork.TaskLogPart
+	if q == "" {
+		filtered = allParts
+	} else {
+		searchTerm, _ := parseQuery(q)
+		for _, p := range allParts {
+			if strings.Contains(p.Contents, searchTerm) {
+				filtered = append(filtered, p)
+			}
+		}
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		ti, _ := ds.tasks.Get(filtered[i].TaskID)
+		tj, _ := ds.tasks.Get(filtered[j].TaskID)
 		if ti.Position > tj.Position {
 			return true
 		} else if ti.Position < tj.Position {
 			return false
 		}
-		return allParts[i].Number > allParts[j].Number
+		return filtered[i].Number > filtered[j].Number
 	})
 	offset := (page - 1) * size
 	result := make([]*tork.TaskLogPart, 0)
-	for i := offset; i < (offset+size) && i < len(allParts); i++ {
-		p := allParts[i]
+	for i := offset; i < (offset+size) && i < len(filtered); i++ {
+		p := filtered[i]
 		result = append(result, p)
 	}
-	totalPages := len(allParts) / size
-	if len(allParts)%size != 0 {
+	totalPages := len(filtered) / size
+	if len(filtered)%size != 0 {
 		totalPages = totalPages + 1
 	}
 	return &datastore.Page[*tork.TaskLogPart]{
@@ -458,7 +470,7 @@ func (ds *InMemoryDatastore) GetJobLogParts(ctx context.Context, jobID string, p
 		Number:     page,
 		Size:       len(result),
 		TotalPages: totalPages,
-		TotalItems: len(allParts),
+		TotalItems: len(filtered),
 	}, nil
 }
 

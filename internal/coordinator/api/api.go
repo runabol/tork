@@ -376,6 +376,8 @@ func (s *API) getJobLog(c echo.Context) error {
 	if si == "" {
 		si = "25"
 	}
+	q := c.QueryParam("q")
+
 	size, err := strconv.Atoi(si)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid size: %s", ps))
@@ -389,7 +391,7 @@ func (s *API) getJobLog(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	l, err := s.ds.GetJobLogParts(c.Request().Context(), id, page, size)
+	l, err := s.ds.GetJobLogParts(c.Request().Context(), id, q, page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}

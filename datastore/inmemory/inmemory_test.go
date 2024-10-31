@@ -478,7 +478,7 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 	err := ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
 
-	logs, err := ds.GetJobLogParts(ctx, jid, 1, 10)
+	logs, err := ds.GetJobLogParts(ctx, jid, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 0)
 
@@ -489,7 +489,7 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logs, err = ds.GetJobLogParts(ctx, jid, 1, 10)
+	logs, err = ds.GetJobLogParts(ctx, jid, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 1", logs.Items[0].Contents)
@@ -502,14 +502,14 @@ func TestInMemoryGetJobLogParts(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logs, err = ds.GetJobLogParts(ctx, jid, 1, 10)
+	logs, err = ds.GetJobLogParts(ctx, jid, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 2)
 	assert.Equal(t, "line 2", logs.Items[0].Contents)
 	assert.Equal(t, 1, logs.TotalPages)
 }
 
-func TestInMemoryCreateAndQueryLogPartsLarge(t *testing.T) {
+func TestInMemoryCreateAndQueryTaskLogPartsLarge(t *testing.T) {
 	ctx := context.Background()
 	ds := inmemory.NewInMemoryDatastore()
 	t1 := tork.Task{
@@ -532,6 +532,37 @@ func TestInMemoryCreateAndQueryLogPartsLarge(t *testing.T) {
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 100", logs.Items[0].Contents)
 	assert.Equal(t, 1, logs.Size)
+	assert.Equal(t, 1, logs.TotalPages)
+}
+
+func TestInMemoryCreateAndQueryJobLogPartsLarge(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+	jid := uuid.NewUUID()
+	t1 := tork.Task{
+		ID:    uuid.NewUUID(),
+		JobID: jid,
+	}
+	err := ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	logs, err := ds.GetJobLogParts(ctx, jid, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 0)
+
+	for i := 1; i <= 100; i++ {
+		err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   2,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	logs, err = ds.GetJobLogParts(ctx, jid, "line 99", 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, "line 99", logs.Items[0].Contents)
 	assert.Equal(t, 1, logs.TotalPages)
 }
 

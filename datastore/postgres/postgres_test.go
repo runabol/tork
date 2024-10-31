@@ -1250,7 +1250,7 @@ func Test_cleanup(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPostgresGetJobLogtParts(t *testing.T) {
+func TestPostgresGetJobLogParts(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 	ds, err := NewPostgresDataStore(dsn)
@@ -1276,10 +1276,44 @@ func TestPostgresGetJobLogtParts(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logs, err := ds.GetJobLogParts(ctx, j1.ID, 1, 10)
+	logs, err := ds.GetJobLogParts(ctx, j1.ID, "", 1, 10)
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 1", logs.Items[0].Contents)
+}
+
+func TestPostgresQueryJobLogParts(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	logs, err := ds.GetJobLogParts(ctx, j1.ID, "line 91", 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, "line 91", logs.Items[0].Contents)
 }
 
 func TestPostgresCreateRole(t *testing.T) {
