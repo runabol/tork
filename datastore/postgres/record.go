@@ -278,6 +278,7 @@ func (r nodeRecord) toNode() *tork.Node {
 
 func (r taskLogPartRecord) toTaskLogPart() *tork.TaskLogPart {
 	return &tork.TaskLogPart{
+		ID:        r.ID,
 		Number:    r.Number,
 		TaskID:    r.TaskID,
 		Contents:  r.Contents,

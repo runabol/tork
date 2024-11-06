@@ -95,6 +95,7 @@ type TaskSummary struct {
 }
 
 type TaskLogPart struct {
+	ID        string     `json:"id,omitempty"`
 	Number    int        `json:"number,omitempty"`
 	TaskID    string     `json:"taskId,omitempty"`
 	Contents  string     `json:"contents,omitempty"`

@@ -1010,6 +1010,7 @@ func TestPostgresCreateAndGetTaskLogs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, logs.Items, 1)
 	assert.Equal(t, "line 1", logs.Items[0].Contents)
+	assert.NotEmpty(t, logs.Items[0].ID)
 }
 
 func TestPostgresCreateAndGetTaskLogsMultiParts(t *testing.T) {
