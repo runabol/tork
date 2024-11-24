@@ -147,7 +147,7 @@ type Registry struct {
 
 type Port struct {
 	Port     string `json:"port,omitempty"`
-	HostPort int    `json:"-"`
+	HostPort string `json:"-"`
 }
 
 func (s TaskState) IsActive() bool {

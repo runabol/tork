@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/runabol/tork"
@@ -46,7 +45,7 @@ func Test_proxyTaskRoot(t *testing.T) {
 	svrURL, err := url.Parse(svr.URL)
 	assert.NoError(t, err)
 
-	port, err := strconv.Atoi(svrURL.Port())
+	port := svrURL.Port()
 	assert.NoError(t, err)
 
 	tasks := &syncx.Map[string, runningTask]{}
@@ -84,7 +83,7 @@ func Test_proxyTaskSomePath(t *testing.T) {
 	svrURL, err := url.Parse(svr.URL)
 	assert.NoError(t, err)
 
-	port, err := strconv.Atoi(svrURL.Port())
+	port := svrURL.Port()
 	assert.NoError(t, err)
 
 	tasks := &syncx.Map[string, runningTask]{}

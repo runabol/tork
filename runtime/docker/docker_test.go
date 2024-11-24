@@ -729,7 +729,7 @@ func TestRunServiceTask(t *testing.T) {
 		Run:   "node server.js",
 		Ports: []*tork.Port{{
 			Port:     "8080",
-			HostPort: 55000,
+			HostPort: "55000",
 		}},
 		Files: map[string]string{
 			"server.js": `

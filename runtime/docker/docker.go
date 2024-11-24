@@ -284,7 +284,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		exposedPorts[nat.Port(p.Port)] = struct{}{}
 		portBindings[nat.Port(p.Port)] = []nat.PortBinding{{
 			HostIP:   "localhost",
-			HostPort: fmt.Sprintf("%d/tcp", p.HostPort),
+			HostPort: fmt.Sprintf("%s/tcp", p.HostPort),
 		}}
 	}
 
