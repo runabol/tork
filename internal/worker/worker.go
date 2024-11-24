@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,7 +37,7 @@ type Worker struct {
 	api        *api
 	taskCount  int32
 	middleware []task.MiddlewareFunc
-	usedPorts  map[int]struct{}
+	usedPorts  map[string]struct{}
 	mu         sync.Mutex
 }
 
@@ -84,7 +85,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		api:        newAPI(cfg, tasks),
 		stop:       make(chan any),
 		middleware: cfg.Middleware,
-		usedPorts:  make(map[int]struct{}),
+		usedPorts:  make(map[string]struct{}),
 	}
 	return w, nil
 }
@@ -102,7 +103,10 @@ func (w *Worker) cancelTask(t *tork.Task) error {
 }
 
 func (w *Worker) handleTask(t *tork.Task) error {
-	ctx := context.Background()
+	return w.doHandleTask(context.Background(), t)
+}
+
+func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 	started := time.Now().UTC()
 	t.StartedAt = &started
 	t.NodeID = w.id
@@ -122,17 +126,35 @@ func (w *Worker) handleTask(t *tork.Task) error {
 	}
 	// assign host ports
 	for _, p := range t.Ports {
-		hostPort, err := w.reservePort()
-		if err != nil {
+		portMapping := strings.Split(p.Port, ":")
+		if len(portMapping) < 1 || len(portMapping) > 2 {
 			now := time.Now().UTC()
-			t.Error = err.Error()
+			t.Error = fmt.Sprintf("invalid port mapping: %s", p.Port)
 			t.FailedAt = &now
 			t.State = tork.TaskStateFailed
 			return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
 		}
-		log.Debug().Msgf("Port mapping %d->%s", hostPort, p.Port)
+		var hostPort string
+		var containerPort string
+		if len(portMapping) == 2 {
+			hostPort = portMapping[0]
+			containerPort = portMapping[1]
+		} else {
+			reservedPort, err := w.reservePort()
+			if err != nil {
+				now := time.Now().UTC()
+				t.Error = err.Error()
+				t.FailedAt = &now
+				t.State = tork.TaskStateFailed
+				return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+			}
+			hostPort = reservedPort
+			containerPort = portMapping[0]
+		}
+		log.Debug().Msgf("Port mapping %s->%s", hostPort, containerPort)
 		defer w.releasePort(hostPort)
 		p.HostPort = hostPort
+		p.Port = containerPort
 	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
 		return w.runTask(t)
@@ -303,12 +325,12 @@ func (w *Worker) Stop() error {
 	return nil
 }
 
-func (w *Worker) reservePort() (int, error) {
+func (w *Worker) reservePort() (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	defer listener.Close()
 
@@ -318,21 +340,21 @@ func (w *Worker) reservePort() (int, error) {
 	var attempt int
 	for ; attempt < maxAttempts; attempt++ {
 		port = listener.Addr().(*net.TCPAddr).Port
-		if _, exists := w.usedPorts[port]; !exists {
+		if _, exists := w.usedPorts[fmt.Sprintf("%d", port)]; !exists {
 			break
 		}
 	}
 
 	if attempt >= maxAttempts {
-		return 0, errors.New("could not find an available port to reserve")
+		return "", errors.New("could not find an available port to reserve")
 	}
 
-	w.usedPorts[port] = struct{}{}
+	w.usedPorts[fmt.Sprintf("%d", port)] = struct{}{}
 
-	return port, nil
+	return fmt.Sprintf("%d", port), nil
 }
 
-func (w *Worker) releasePort(port int) {
+func (w *Worker) releasePort(port string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
