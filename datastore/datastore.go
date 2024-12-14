@@ -10,12 +10,13 @@ import (
 type Provider func() (Datastore, error)
 
 var (
-	ErrTaskNotFound    = errors.New("task not found")
-	ErrNodeNotFound    = errors.New("node not found")
-	ErrJobNotFound     = errors.New("job not found")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrRoleNotFound    = errors.New("role not found")
-	ErrContextNotFound = errors.New("context not found")
+	ErrTaskNotFound         = errors.New("task not found")
+	ErrNodeNotFound         = errors.New("node not found")
+	ErrJobNotFound          = errors.New("job not found")
+	ErrScheduledJobNotFound = errors.New("scheduled job not found")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrRoleNotFound         = errors.New("role not found")
+	ErrContextNotFound      = errors.New("context not found")
 )
 
 const (
@@ -42,6 +43,12 @@ type Datastore interface {
 	GetJobByID(ctx context.Context, id string) (*tork.Job, error)
 	GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*Page[*tork.TaskLogPart], error)
 	GetJobs(ctx context.Context, currentUser, q string, page, size int) (*Page[*tork.JobSummary], error)
+
+	CreateScheduledJob(ctx context.Context, s *tork.ScheduledJob) error
+	GetActiveScheduledJobs(ctx context.Context) ([]*tork.ScheduledJob, error)
+	GetScheduledJobs(ctx context.Context, currentUser string, page, size int) (*Page[*tork.ScheduledJobSummary], error)
+	GetScheduledJobByID(ctx context.Context, id string) (*tork.ScheduledJob, error)
+	UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error
 
 	CreateUser(ctx context.Context, u *tork.User) error
 	GetUser(ctx context.Context, username string) (*tork.User, error)

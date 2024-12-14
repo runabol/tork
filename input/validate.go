@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/robfig/cron/v3"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
@@ -18,6 +19,23 @@ var (
 )
 
 func (ji Job) Validate(ds datastore.Datastore) error {
+	validate := validator.New()
+	if err := validate.RegisterValidation("duration", validateDuration); err != nil {
+		return err
+	}
+	if err := validate.RegisterValidation("queue", validateQueue); err != nil {
+		return err
+	}
+	if err := validate.RegisterValidation("expr", validateExpr); err != nil {
+		return err
+	}
+	validate.RegisterStructValidation(validateMount, Mount{})
+	validate.RegisterStructValidation(taskInputValidation, Task{})
+	validate.RegisterStructValidation(validatePermission(ds), Permission{})
+	return validate.Struct(ji)
+}
+
+func (ji ScheduledJob) Validate(ds datastore.Datastore) error {
 	validate := validator.New()
 	if err := validate.RegisterValidation("duration", validateDuration); err != nil {
 		return err
@@ -59,6 +77,12 @@ func validateMount(sl validator.StructLevel) {
 	} else if mnt.Target == "/tork" {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
 	}
+}
+
+func validateCron(fl validator.FieldLevel) bool {
+	v := fl.Field().String()
+	_, err := cron.ParseStandard(v)
+	return err == nil
 }
 
 func validatePermission(ds datastore.Datastore) func(sl validator.StructLevel) {
