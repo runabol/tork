@@ -23,12 +23,32 @@ type Job struct {
 	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty" yaml:"autoDelete,omitempty"`
 }
 
+type ScheduledJob struct {
+	id          string
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Tasks       []Task            `json:"tasks,omitempty" yaml:"tasks,omitempty" validate:"required,min=1,dive"`
+	Inputs      map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+	Output      string            `json:"output,omitempty" yaml:"output,omitempty" validate:"expr"`
+	Defaults    *Defaults         `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
+	Permissions []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty" validate:"dive"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty" yaml:"autoDelete,omitempty"`
+	Schedule    *Schedule         `json:"schedule,omitempty" yaml:"schedule,omitempty" validate:"required"`
+}
+
 type Defaults struct {
 	Retry    *Retry  `json:"retry,omitempty" yaml:"retry,omitempty"`
 	Limits   *Limits `json:"limits,omitempty" yaml:"limits,omitempty"`
 	Timeout  string  `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 	Queue    string  `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Priority int     `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
+}
+
+type Schedule struct {
+	Cron string `json:"cron" yaml:"cron" validate:"required,cron"`
 }
 
 type AutoDelete struct {
@@ -47,6 +67,13 @@ type Permission struct {
 }
 
 func (ji *Job) ID() string {
+	if ji.id == "" {
+		ji.id = uuid.NewUUID()
+	}
+	return ji.id
+}
+
+func (ji *ScheduledJob) ID() string {
 	if ji.id == "" {
 		ji.id = uuid.NewUUID()
 	}
@@ -96,6 +123,45 @@ func (ji *Job) ToJob() *tork.Job {
 			After: ji.AutoDelete.After,
 		}
 	}
+	return j
+}
+
+func (ji *ScheduledJob) ToScheduledJob() *tork.ScheduledJob {
+	n := time.Now().UTC()
+	j := &tork.ScheduledJob{}
+	j.ID = ji.ID()
+	j.Description = ji.Description
+	j.Inputs = ji.Inputs
+	j.Secrets = ji.Secrets
+	j.Tags = ji.Tags
+	j.Name = ji.Name
+	tasks := make([]*tork.Task, len(ji.Tasks))
+	for i, ti := range ji.Tasks {
+		tasks[i] = ti.toTask()
+	}
+	j.Tasks = tasks
+	j.State = tork.ScheduledJobStateActive
+	j.CreatedAt = n
+	j.Output = ji.Output
+	if ji.Defaults != nil {
+		j.Defaults = ji.Defaults.ToJobDefaults()
+	}
+	webhooks := make([]*tork.Webhook, len(ji.Webhooks))
+	for i, wh := range ji.Webhooks {
+		webhooks[i] = wh.toWebhook()
+	}
+	j.Webhooks = webhooks
+	perms := make([]*tork.Permission, len(ji.Permissions))
+	for i, p := range ji.Permissions {
+		perms[i] = p.toPermission()
+	}
+	j.Permissions = perms
+	if ji.AutoDelete != nil {
+		j.AutoDelete = &tork.AutoDelete{
+			After: ji.AutoDelete.After,
+		}
+	}
+	j.Cron = ji.Schedule.Cron
 	return j
 }
 

@@ -645,3 +645,33 @@ func TestValidateWebhook(t *testing.T) {
 	err = j.Validate(inmemory.NewInMemoryDatastore())
 	assert.Error(t, err)
 }
+
+func TestValidateCron(t *testing.T) {
+	validate := validator.New()
+	err := validate.RegisterValidation("cron", validateCron)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		cron      string
+		shouldErr bool
+	}{
+		{"Valid cron expression", "0 0 * * *", false},
+		{"Valid cron expression", "0/10 0 * * *", false},
+		{"Invalid cron expression", "invalid-cron", true},
+		{"Empty cron expression", "", true},
+		{"Valid cron expression with seconds", "0 0 0 * * *", true},
+		{"Invalid cron expression with extra field", "0 0 0 0 * * *", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validate.Var(tt.cron, "cron")
+			if tt.shouldErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

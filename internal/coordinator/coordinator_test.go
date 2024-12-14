@@ -11,6 +11,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/locker"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
@@ -32,6 +33,7 @@ func TestNewCoordinatorFail(t *testing.T) {
 func TestNewCoordinatorOK(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: inmemory.NewInMemoryDatastore(),
 	})
 	assert.NoError(t, err)
@@ -41,6 +43,7 @@ func TestNewCoordinatorOK(t *testing.T) {
 func TestTaskMiddlewareWithResult(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Middleware: Middleware{
 			Task: []task.MiddlewareFunc{
@@ -68,6 +71,7 @@ func TestTaskMiddlewareWithError(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: ds,
+		Locker:    locker.NewInMemoryLocker(),
 		Middleware: Middleware{
 			Task: []task.MiddlewareFunc{
 				func(next task.HandlerFunc) task.HandlerFunc {
@@ -116,6 +120,7 @@ func TestTaskMiddlewareNoOp(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: ds,
 		Middleware: Middleware{
 			Task: []task.MiddlewareFunc{
@@ -159,6 +164,7 @@ func TestTaskMiddlewareNoOp(t *testing.T) {
 func TestJobMiddlewareWithOutput(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
@@ -185,6 +191,7 @@ func TestJobMiddlewareError(t *testing.T) {
 
 	c, err := NewCoordinator(Config{
 		Broker:    b,
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: ds,
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
@@ -220,6 +227,7 @@ func TestJobMiddlewareWithError(t *testing.T) {
 	Err := errors.New("some error")
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
@@ -241,6 +249,7 @@ func TestJobMiddlewareNoOp(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: ds,
 		Middleware: Middleware{
 			Job: []job.MiddlewareFunc{
@@ -282,6 +291,7 @@ func TestNodeMiddlewareModify(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: ds,
 		Middleware: Middleware{
 			Node: []node.MiddlewareFunc{
@@ -318,6 +328,7 @@ func TestStartCoordinator(t *testing.T) {
 	address := fmt.Sprintf(":%d", rand.Int31n(60000)+5000)
 	c, err := NewCoordinator(Config{
 		Broker:    mq.NewInMemoryBroker(),
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Address:   address,
 	})
@@ -342,6 +353,7 @@ func Test_sendHeartbeat(t *testing.T) {
 	c, err := NewCoordinator(Config{
 		Broker:    b,
 		DataStore: inmemory.NewInMemoryDatastore(),
+		Locker:    locker.NewInMemoryLocker(),
 		Address:   address,
 	})
 	assert.NoError(t, err)
@@ -390,6 +402,7 @@ func doRunJob(t *testing.T, filename string) *tork.Job {
 	ds := inmemory.NewInMemoryDatastore()
 	c, err := NewCoordinator(Config{
 		Broker:    b,
+		Locker:    locker.NewInMemoryLocker(),
 		DataStore: ds,
 	})
 	assert.NoError(t, err)

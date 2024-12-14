@@ -1419,3 +1419,127 @@ func TestPostgresGetNextTask(t *testing.T) {
 	_, err = ds.GetNextTask(ctx, childTaskID)
 	assert.Error(t, err)
 }
+
+func TestPostgresUpdateScheduledJob(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	sj := tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		Name:      "Test Scheduled Job",
+		CreatedAt: now,
+		State:     tork.ScheduledJobStateActive,
+	}
+	err = ds.CreateScheduledJob(ctx, &sj)
+	assert.NoError(t, err)
+
+	err = ds.UpdateScheduledJob(ctx, sj.ID, func(u *tork.ScheduledJob) error {
+		u.State = tork.ScheduledJobStatePaused
+		return nil
+	})
+	assert.NoError(t, err)
+
+	updatedSJ, err := ds.GetScheduledJobByID(ctx, sj.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.ScheduledJobStatePaused, updatedSJ.State)
+}
+
+func TestPostgresGetScheduledJobs(t *testing.T) {
+	ctx := context.Background()
+	schemaName := fmt.Sprintf("tork%d", rand.Int())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	assert.NoError(t, err)
+	_, err = ds.db.Exec(fmt.Sprintf("create schema %s", schemaName))
+	assert.NoError(t, err)
+	defer func() {
+		_, err = ds.db.Exec(fmt.Sprintf("drop schema %s cascade", schemaName))
+		assert.NoError(t, err)
+	}()
+	err = ds.ExecScript(postgres.SCHEMA)
+	assert.NoError(t, err)
+	for i := 0; i < 101; i++ {
+		j1 := tork.ScheduledJob{
+			ID:   uuid.NewUUID(),
+			Cron: "* * * * *",
+			Name: fmt.Sprintf("Scheduled Job %d", (i + 1)),
+			Tasks: []*tork.Task{
+				{
+					Name: "some task",
+				},
+			},
+		}
+		err := ds.CreateScheduledJob(ctx, &j1)
+		assert.NoError(t, err)
+	}
+	p1, err := ds.GetScheduledJobs(ctx, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p1.Size)
+	assert.Equal(t, 101, p1.TotalItems)
+
+	sj, err := ds.GetScheduledJobByID(ctx, p1.Items[0].ID)
+	assert.NoError(t, err)
+	assert.Equal(t, p1.Items[0].ID, sj.ID)
+
+	p2, err := ds.GetScheduledJobs(ctx, "", 2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p2.Size)
+
+	p10, err := ds.GetScheduledJobs(ctx, "", 10, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, p10.Size)
+
+	p11, err := ds.GetScheduledJobs(ctx, "", 11, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p11.Size)
+
+	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
+	assert.NotEqual(t, p2.Items[0].ID, p1.Items[9].ID)
+}
+
+func TestPostgresGetActiveScheduledJobs(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
+	}
+	err = ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+
+	sj1 := &tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		Name:      "Scheduled Job 1",
+		CreatedAt: now,
+		CreatedBy: u,
+		State:     tork.ScheduledJobStateActive,
+	}
+	err = ds.CreateScheduledJob(ctx, sj1)
+	assert.NoError(t, err)
+
+	sj2 := &tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		Name:      "Scheduled Job 2",
+		CreatedAt: now,
+		CreatedBy: u,
+		State:     tork.ScheduledJobStatePaused,
+	}
+	err = ds.CreateScheduledJob(ctx, sj2)
+	assert.NoError(t, err)
+
+	activeJobs, err := ds.GetActiveScheduledJobs(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, activeJobs)
+	for _, aj := range activeJobs {
+		assert.Equal(t, tork.ScheduledJobStateActive, aj.State)
+	}
+}

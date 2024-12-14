@@ -18,6 +18,13 @@ const (
 	JobStateRestart   JobState = "RESTART"
 )
 
+type ScheduledJobState string
+
+const (
+	ScheduledJobStateActive ScheduledJobState = "ACTIVE"
+	ScheduledJobStatePaused ScheduledJobState = "PAUSED"
+)
+
 type Job struct {
 	ID          string            `json:"id,omitempty"`
 	ParentID    string            `json:"parentId,omitempty"`
@@ -46,6 +53,38 @@ type Job struct {
 	DeleteAt    *time.Time        `json:"deleteAt,omitempty"`
 	Secrets     map[string]string `json:"secrets,omitempty"`
 	Progress    float64           `json:"progress,omitempty"`
+	Schedule    *JobSchedule      `json:"schedule,omitempty"`
+}
+
+type ScheduledJob struct {
+	ID          string            `json:"id,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Cron        string            `json:"cron,omitempty"`
+	State       ScheduledJobState `json:"state,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
+	Tasks       []*Task           `json:"tasks"`
+	CreatedBy   *User             `json:"createdBy,omitempty"`
+	Defaults    *JobDefaults      `json:"defaults,omitempty"`
+	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty"`
+	Webhooks    []*Webhook        `json:"webhooks,omitempty"`
+	Permissions []*Permission     `json:"permissions,omitempty"`
+	CreatedAt   time.Time         `json:"createdAt,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Secrets     map[string]string `json:"secrets,omitempty"`
+	Output      string            `json:"output,omitempty"`
+}
+
+type JobSchedule struct {
+	ID   string `json:"id,omitempty"`
+	Cron string `json:"cron,omitempty"`
+}
+
+func (s *JobSchedule) Clone() *JobSchedule {
+	return &JobSchedule{
+		ID:   s.ID,
+		Cron: s.Cron,
+	}
 }
 
 type JobSummary struct {
@@ -66,6 +105,19 @@ type JobSummary struct {
 	Result      string            `json:"result,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Progress    float64           `json:"progress,omitempty"`
+	Schedule    *JobSchedule      `json:"schedule,omitempty"`
+}
+
+type ScheduledJobSummary struct {
+	ID          string            `json:"id,omitempty"`
+	CreatedBy   *User             `json:"createdBy,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
+	State       ScheduledJobState `json:"state,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	CreatedAt   time.Time         `json:"createdAt,omitempty"`
+	Cron        string            `json:"cron,omitempty"`
 }
 
 type Permission struct {
@@ -111,6 +163,10 @@ func (j *Job) Clone() *Job {
 	if j.AutoDelete != nil {
 		autoDelete = j.AutoDelete.Clone()
 	}
+	var schedule *JobSchedule
+	if j.Schedule != nil {
+		schedule = j.Schedule.Clone()
+	}
 	return &Job{
 		ID:          j.ID,
 		Name:        j.Name,
@@ -138,6 +194,40 @@ func (j *Job) Clone() *Job {
 		Permissions: ClonePermissions(j.Permissions),
 		AutoDelete:  autoDelete,
 		Progress:    j.Progress,
+		Schedule:    schedule,
+	}
+}
+
+func (j *ScheduledJob) Clone() *ScheduledJob {
+	var defaults *JobDefaults
+	if j.Defaults != nil {
+		defaults = j.Defaults.Clone()
+	}
+	var createdBy *User
+	if j.CreatedBy != nil {
+		createdBy = j.CreatedBy.Clone()
+	}
+	var autoDelete *AutoDelete
+	if j.AutoDelete != nil {
+		autoDelete = j.AutoDelete.Clone()
+	}
+	return &ScheduledJob{
+		ID:          j.ID,
+		Cron:        j.Cron,
+		Name:        j.Name,
+		Description: j.Description,
+		Tags:        j.Tags,
+		CreatedAt:   j.CreatedAt,
+		CreatedBy:   createdBy,
+		Tasks:       CloneTasks(j.Tasks),
+		Inputs:      maps.Clone(j.Inputs),
+		Secrets:     maps.Clone(j.Secrets),
+		Output:      j.Output,
+		Defaults:    defaults,
+		Webhooks:    CloneWebhooks(j.Webhooks),
+		Permissions: ClonePermissions(j.Permissions),
+		AutoDelete:  autoDelete,
+		State:       j.State,
 	}
 }
 
@@ -192,6 +282,21 @@ func NewJobSummary(j *Job) *JobSummary {
 		Result:      j.Result,
 		Error:       j.Error,
 		Progress:    j.Progress,
+		Schedule:    j.Schedule,
+	}
+}
+
+func NewScheduledJobSummary(sj *ScheduledJob) *ScheduledJobSummary {
+	return &ScheduledJobSummary{
+		ID:          sj.ID,
+		CreatedBy:   sj.CreatedBy,
+		Name:        sj.Name,
+		State:       sj.State,
+		Description: sj.Description,
+		Tags:        sj.Tags,
+		Inputs:      maps.Clone(sj.Inputs),
+		Cron:        sj.Cron,
+		CreatedAt:   sj.CreatedAt,
 	}
 }
 

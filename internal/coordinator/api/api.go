@@ -136,6 +136,11 @@ func NewAPI(cfg Config) (*API, error) {
 		r.GET("/jobs", s.listJobs)
 		r.PUT("/jobs/:id/cancel", s.cancelJob)
 		r.PUT("/jobs/:id/restart", s.restartJob)
+
+		r.POST("/scheduled-jobs", s.createScheduledJob)
+		r.GET("/scheduled-jobs", s.listScheduledJobs)
+		r.PUT("/scheduled-jobs/:id/pause", s.pauseScheduledJob)
+		r.PUT("/scheduled-jobs/:id/resume", s.resumeScheduledJob)
 	}
 	if v, ok := cfg.Enabled["metrics"]; !ok || v {
 		r.GET("/metrics", s.getMetrics)
@@ -250,24 +255,21 @@ func (s *API) listActiveNodes(c echo.Context) error {
 // @Router /jobs [post]
 // @Param request body input.Job true "body"
 func (s *API) createJob(c echo.Context) error {
-	var ji *input.Job
-	var err error
 	contentType := c.Request().Header.Get("content-type")
+	var ji input.Job
 	switch contentType {
 	case "application/json":
-		ji, err = bindJobInputJSON(c.Request().Body)
-		if err != nil {
+		if err := bindInputJSON(&ji, c.Request().Body); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	case "text/yaml":
-		ji, err = bindJobInputYAML(c.Request().Body)
-		if err != nil {
+		if err := bindInputYAML(&ji, c.Request().Body); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
-	if j, err := s.SubmitJob(c.Request().Context(), ji); err != nil {
+	if j, err := s.SubmitJob(c.Request().Context(), &ji); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	} else {
 		return c.JSON(http.StatusOK, tork.NewJobSummary(j))
@@ -301,32 +303,30 @@ func (s *API) SubmitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
 	return j, nil
 }
 
-func bindJobInputJSON(r io.ReadCloser) (*input.Job, error) {
-	ji := input.Job{}
+func bindInputJSON(target any, r io.ReadCloser) error {
 	body, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	dec := json.NewDecoder(strings.NewReader(string(body)))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&ji); err != nil {
-		return nil, err
+	if err := dec.Decode(target); err != nil {
+		return err
 	}
-	return &ji, nil
+	return nil
 }
 
-func bindJobInputYAML(r io.ReadCloser) (*input.Job, error) {
-	ji := input.Job{}
+func bindInputYAML(target any, r io.ReadCloser) error {
 	body, err := io.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	dec := yaml.NewDecoder(strings.NewReader(string(body)))
 	dec.KnownFields(true)
-	if err := dec.Decode(&ji); err != nil {
-		return nil, err
+	if err := dec.Decode(target); err != nil {
+		return err
 	}
-	return &ji, nil
+	return nil
 }
 
 // getJob
@@ -453,6 +453,147 @@ func (s *API) listJobs(c echo.Context) error {
 		Items:      res.Items,
 		TotalItems: res.TotalItems,
 	})
+}
+
+func (s *API) createScheduledJob(c echo.Context) error {
+	contentType := c.Request().Header.Get("content-type")
+	var ji input.ScheduledJob
+	switch contentType {
+	case "application/json":
+
+		if err := bindInputJSON(&ji, c.Request().Body); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	case "text/yaml":
+		if err := bindInputYAML(&ji, c.Request().Body); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
+	}
+	if sj, err := s.submitScheduledJob(c.Request().Context(), &ji); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	} else {
+		return c.JSON(http.StatusOK, tork.NewScheduledJobSummary(sj))
+	}
+}
+
+func (s *API) submitScheduledJob(ctx context.Context, ji *input.ScheduledJob) (*tork.ScheduledJob, error) {
+	if err := ji.Validate(s.ds); err != nil {
+		return nil, err
+	}
+	sj := ji.ToScheduledJob()
+	currentUser := ctx.Value(tork.USERNAME)
+	if currentUser != nil {
+		cu, ok := currentUser.(string)
+		if !ok {
+			return nil, errors.Errorf("error casting current user")
+		}
+		u, err := s.ds.GetUser(ctx, cu)
+		if err != nil {
+			return nil, err
+		}
+		sj.CreatedBy = u
+	}
+	if err := s.ds.CreateScheduledJob(ctx, sj); err != nil {
+		return nil, err
+	}
+	log.Info().Str("job-id", sj.ID).Msg("created scheduled job")
+	if err := s.broker.PublishEvent(ctx, mq.TOPIC_JOB_SCHEDULED, sj); err != nil {
+		return nil, err
+	}
+	return sj, nil
+}
+
+func (s *API) listScheduledJobs(c echo.Context) error {
+	ps := c.QueryParam("page")
+	if ps == "" {
+		ps = "1"
+	}
+	page, err := strconv.Atoi(ps)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid page number: %s", ps))
+	}
+	if page < 1 {
+		page = 1
+	}
+	si := c.QueryParam("size")
+	if si == "" {
+		si = "10"
+	}
+	size, err := strconv.Atoi(si)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("invalid size: %s", ps))
+	}
+	if size < 1 {
+		size = 1
+	} else if size > 20 {
+		size = 20
+	}
+	currentUser := c.Request().Context().Value(tork.USERNAME)
+	var username string
+	if currentUser != nil {
+		cu, ok := currentUser.(string)
+		if !ok {
+			return errors.Errorf("error casting current user")
+		}
+		username = cu
+	}
+	res, err := s.ds.GetScheduledJobs(c.Request().Context(), username, page, size)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, datastore.Page[*tork.ScheduledJobSummary]{
+		Number:     res.Number,
+		Size:       res.Size,
+		TotalPages: res.TotalPages,
+		Items:      res.Items,
+		TotalItems: res.TotalItems,
+	})
+}
+
+func (s *API) pauseScheduledJob(c echo.Context) error {
+	id := c.Param("id")
+	j, err := s.ds.GetScheduledJobByID(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	if j.State != tork.ScheduledJobStateActive {
+		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not active")
+	}
+	j.State = tork.ScheduledJobStatePaused
+	if err := s.ds.UpdateScheduledJob(c.Request().Context(), id, func(u *tork.ScheduledJob) error {
+		u.State = tork.ScheduledJobStatePaused
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := s.broker.PublishEvent(c.Request().Context(), mq.TOPIC_JOB_SCHEDULED, j); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
+}
+
+func (s *API) resumeScheduledJob(c echo.Context) error {
+	id := c.Param("id")
+	j, err := s.ds.GetScheduledJobByID(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	if j.State != tork.ScheduledJobStatePaused {
+		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not paused")
+	}
+	j.State = tork.ScheduledJobStateActive
+	if err := s.ds.UpdateScheduledJob(c.Request().Context(), id, func(u *tork.ScheduledJob) error {
+		u.State = tork.ScheduledJobStateActive
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := s.broker.PublishEvent(c.Request().Context(), mq.TOPIC_JOB_SCHEDULED, j); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
 
 // getTask

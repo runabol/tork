@@ -48,32 +48,58 @@ CREATE TABLE users_roles (
 
 CREATE UNIQUE INDEX idx_users_roles_uniq ON users_roles (user_id,role_id);
 
+CREATE TABLE scheduled_jobs (
+    id             varchar(32) not null primary key,
+    name           varchar(64) not null,
+	description    text        not null,
+    tags           text[]      not null default '{}',
+    cron_expr      varchar(64) not null,
+    inputs         jsonb       not null,
+	output_        text        not null,
+	tasks          jsonb       not null,
+    defaults       jsonb,
+    webhooks       jsonb,
+    auto_delete    jsonb,
+    secrets        jsonb,
+    created_at     timestamp   not null,
+	created_by     varchar(32) not null references users(id),
+	state          varchar(10) not null
+);
+
+CREATE TABLE scheduled_jobs_perms (
+    id               varchar(32) not null primary key,
+    scheduled_job_id varchar(32) not null references scheduled_jobs(id),
+    user_id          varchar(32)          references users(id),
+    role_id          varchar(32)          references roles(id)
+);
+
 CREATE TABLE jobs (
-    id            varchar(32) not null primary key,
-    name          varchar(256),
-    tags          text[]      not null default '{}',
-    state         varchar(10) not null,
-    created_at    timestamp   not null,
-	created_by    varchar(32) not null references users(id),
-    started_at    timestamp,
-    completed_at  timestamp,
-    delete_at     timestamp,
-    failed_at     timestamp,
-    tasks         jsonb       not null,
-    position      int         not null,
-    inputs        jsonb       not null,
-    context       jsonb       not null,
-    description   text,
-    parent_id     varchar(32),
-    task_count    int         not null,
-    output_       text,
-    result        text,
-    error_        text,
-    defaults      jsonb,
-    webhooks      jsonb,
-    auto_delete   jsonb,
-    secrets       jsonb,
-    progress      numeric(5,2) default 0
+    id               varchar(32) not null primary key,
+    name             varchar(256),
+    tags             text[]      not null default '{}',
+    state            varchar(10) not null,
+    created_at       timestamp   not null,
+    created_by       varchar(32) not null references users(id),
+    started_at       timestamp,
+    completed_at     timestamp,
+    delete_at        timestamp,
+    failed_at        timestamp,
+    tasks            jsonb       not null,
+    position         int         not null,
+    inputs           jsonb       not null,
+    context          jsonb       not null,
+    description      text,
+    parent_id        varchar(32),
+    task_count       int         not null,
+    output_          text,
+    result           text,
+    error_           text,
+    defaults         jsonb,
+    webhooks         jsonb,
+    auto_delete      jsonb,
+    secrets          jsonb,
+    progress         numeric(5,2) default 0,
+    scheduled_job_id varchar(32) references scheduled_jobs(id)
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);
