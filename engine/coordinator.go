@@ -31,6 +31,7 @@ func (e *Engine) initCoordinator() error {
 		Name:      conf.StringDefault("coordinator.name", "Coordinator"),
 		Broker:    e.broker,
 		DataStore: e.ds,
+		Locker:    e.locker,
 		Queues:    queues,
 		Address:   conf.String("coordinator.address"),
 		Middleware: coordinator.Middleware{

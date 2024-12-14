@@ -23,7 +23,7 @@ const (
 	// The queue used by workers to periodically
 	// notify the coordinator about their aliveness
 	QUEUE_HEARTBEAT = "heartbeat"
-	// The queue used by for job creation
+	// The queue used by the Coordinator for job creation
 	// and job-related state changes (e.g. cancellation)
 	QUEUE_JOBS = "jobs"
 	// The queue used by workers to send task

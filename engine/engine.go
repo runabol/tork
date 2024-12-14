@@ -16,6 +16,7 @@ import (
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/coordinator"
 	"github.com/runabol/tork/internal/worker"
+	"github.com/runabol/tork/locker"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
@@ -49,6 +50,7 @@ type Engine struct {
 	mu           sync.Mutex
 	broker       mq.Broker
 	ds           datastore.Datastore
+	locker       locker.Locker
 	mounters     map[string]*runtime.MultiMounter
 	runtime      runtime.Runtime
 	coordinator  *coordinator.Coordinator
@@ -153,6 +155,10 @@ func (e *Engine) runCoordinator() error {
 		return err
 	}
 
+	if err := e.initLocker(); err != nil {
+		return err
+	}
+
 	if err := e.initCoordinator(); err != nil {
 		return err
 	}
@@ -202,6 +208,10 @@ func (e *Engine) runStandalone() error {
 	}
 
 	if err := e.initDatastore(); err != nil {
+		return err
+	}
+
+	if err := e.initLocker(); err != nil {
 		return err
 	}
 

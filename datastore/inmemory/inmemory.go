@@ -37,6 +37,7 @@ type InMemoryDatastore struct {
 	usersByID       *cache.Cache[*tork.User]
 	usersByUsername *cache.Cache[*tork.User]
 	roles           *cache.Cache[*tork.Role]
+	scheduledJobs   *cache.Cache[*tork.ScheduledJob]
 	userRoles       *cache.Cache[[]*tork.UserRole]
 	logs            *cache.Cache[[]*tork.TaskLogPart]
 	logsMu          sync.RWMutex
@@ -85,6 +86,7 @@ func NewInMemoryDatastore(opts ...Option) *InMemoryDatastore {
 	ds.usersByUsername = cache.New[*tork.User](cache.NoExpiration, ci)
 	ds.roles = cache.New[*tork.Role](cache.NoExpiration, ci)
 	ds.userRoles = cache.New[[]*tork.UserRole](cache.NoExpiration, ci)
+	ds.scheduledJobs = cache.New[*tork.ScheduledJob](cache.NoExpiration, ci)
 	ds.jobs.OnEvicted(ds.onJobEviction)
 	return ds
 }
@@ -608,6 +610,36 @@ func (ds *InMemoryDatastore) GetUserRoles(ctx context.Context, userID string) ([
 		result[i] = r
 	}
 	return result, nil
+}
+
+func (ds *InMemoryDatastore) CreateScheduledJob(ctx context.Context, s *tork.ScheduledJob) error {
+	if s.CreatedBy == nil {
+		s.CreatedBy = guestUser
+	}
+	ds.scheduledJobs.Set(s.ID, s.Clone())
+	return nil
+}
+
+func (ds *InMemoryDatastore) GetActiveScheduledJobs(ctx context.Context) ([]*tork.ScheduledJob, error) {
+	ajobs := make([]*tork.ScheduledJob, 0)
+	ds.scheduledJobs.Iterate(func(_ string, sj *tork.ScheduledJob) {
+		if sj.State == tork.ScheduledJobStateActive {
+			ajobs = append(ajobs, sj.Clone())
+		}
+	})
+	return ajobs, nil
+}
+
+func (ds *InMemoryDatastore) GetScheduledJobs(ctx context.Context, currentUser string, page, size int) (*datastore.Page[*tork.ScheduledJobSummary], error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ds *InMemoryDatastore) GetScheduledJobByID(ctx context.Context, id string) (*tork.ScheduledJob, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ds *InMemoryDatastore) UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error {
+	return errors.New("not implemented")
 }
 
 func (ds *InMemoryDatastore) WithTx(ctx context.Context, f func(tx datastore.Datastore) error) error {
