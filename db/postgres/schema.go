@@ -77,6 +77,7 @@ CREATE TABLE jobs (
 );
 
 CREATE INDEX idx_jobs_state ON jobs (state);
+CREATE INDEX idx_jobs_delete_at ON jobs (delete_at);
 
 
 CREATE INDEX idx_jobs_created_at ON jobs (created_at);
@@ -148,6 +149,7 @@ CREATE TABLE tasks (
 
 CREATE INDEX idx_tasks_state ON tasks (state);
 CREATE INDEX idx_tasks_job_id ON tasks (job_id);
+CREATE INDEX idx_tasks_parent_and_state ON tasks (parent_id,state);
 
 CREATE TABLE tasks_log_parts (
     id         varchar(32) not null primary key,
