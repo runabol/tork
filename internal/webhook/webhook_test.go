@@ -25,8 +25,8 @@ func TestCall(t *testing.T) {
 		},
 		{
 			name:            "Retryable Response - 500 Internal Server Error",
-			responseCodes:   []int{http.StatusInternalServerError, http.StatusOK},
-			expectedRetries: 2,
+			responseCodes:   []int{http.StatusInternalServerError, http.StatusInternalServerError, http.StatusOK},
+			expectedRetries: 3,
 			expectedError:   false,
 		},
 		{
