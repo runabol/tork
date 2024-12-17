@@ -23,6 +23,18 @@ const (
 	EventDefault         = ""
 )
 
+var retryableStatusCodes = map[int]bool{
+	http.StatusTooManyRequests:     true, // 429
+	http.StatusInternalServerError: true, // 500
+	http.StatusBadGateway:          true, // 502
+	http.StatusServiceUnavailable:  true, // 503
+	http.StatusGatewayTimeout:      true, // 504
+}
+
+func isRetryable(statusCode int) bool {
+	return retryableStatusCodes[statusCode]
+}
+
 func Call(wh *tork.Webhook, body any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -47,7 +59,13 @@ func Call(wh *tork.Webhook, body any) error {
 		if err != nil {
 			return err
 		}
+		// Success
 		if resp.StatusCode == http.StatusOK {
+			return nil
+		}
+		// Check if the status code is retryable
+		if !isRetryable(resp.StatusCode) {
+			log.Error().Msgf("[Webhook] request to %s failed with non-retryable status %d", wh.URL, resp.StatusCode)
 			return nil
 		}
 		log.Warn().Msgf("[Webhook] request to %s failed with %d", wh.URL, resp.StatusCode)
