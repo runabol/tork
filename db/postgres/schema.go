@@ -78,8 +78,6 @@ CREATE TABLE jobs (
 
 CREATE INDEX idx_jobs_state ON jobs (state);
 CREATE INDEX idx_jobs_delete_at ON jobs (delete_at);
-
-
 CREATE INDEX idx_jobs_created_at ON jobs (created_at);
 
 ALTER TABLE jobs ADD COLUMN ts tsvector NOT NULL
