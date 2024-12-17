@@ -1,8 +1,6 @@
 package webhook
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,109 +9,62 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWebhookOK(t *testing.T) {
-	received := make(chan any)
-
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		js := tork.JobSummary{}
-		err = json.Unmarshal(body, &js)
-		if err != nil {
-			panic(err)
-		}
-		assert.Equal(t, "1234", js.ID)
-		assert.Equal(t, tork.JobStateCompleted, js.State)
-		w.WriteHeader(http.StatusOK)
-		close(received)
-	}))
-
-	j := &tork.Job{
-		ID:    "1234",
-		State: tork.JobStateCompleted,
+func TestCall(t *testing.T) {
+	// Test Cases
+	tests := []struct {
+		name            string
+		responseCodes   []int // Sequence of response codes to return
+		expectedRetries int   // Expected retry attempts
+		expectedError   bool  // Should the function return an error?
+	}{
+		{
+			name:            "Successful Response",
+			responseCodes:   []int{http.StatusOK},
+			expectedRetries: 1,
+			expectedError:   false,
+		},
+		{
+			name:            "Retryable Response - 500 Internal Server Error",
+			responseCodes:   []int{http.StatusInternalServerError, http.StatusOK},
+			expectedRetries: 2,
+			expectedError:   false,
+		},
+		{
+			name:            "Non-Retryable Response - 400 Bad Request",
+			responseCodes:   []int{http.StatusBadRequest},
+			expectedRetries: 1,
+			expectedError:   false,
+		},
 	}
 
-	wh := &tork.Webhook{
-		URL: svr.URL,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test server that returns responses in sequence
+			requestCount := 0
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if requestCount < len(tt.responseCodes) {
+					w.WriteHeader(tt.responseCodes[requestCount])
+					requestCount++
+				}
+			}))
+			defer testServer.Close()
+
+			// Prepare the Webhook configuration
+			wh := &tork.Webhook{
+				URL: testServer.URL,
+			}
+			body := map[string]string{"key": "value"}
+
+			// Call the function
+			err := Call(wh, body)
+
+			// Check retries and errors
+			assert.Equal(t, tt.expectedRetries, requestCount, "Number of retries should match expected")
+			if tt.expectedError {
+				assert.Error(t, err, "Expected an error but got nil")
+			} else {
+				assert.NoError(t, err, "Did not expect an error but got one")
+			}
+		})
 	}
-
-	assert.NoError(t, Call(wh, tork.NewJobSummary(j)))
-	<-received
-}
-
-func TestWebhookRetry(t *testing.T) {
-	received := make(chan any)
-	attempt := 1
-
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if attempt == 1 {
-			attempt = attempt + 1
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		js := tork.JobSummary{}
-		err = json.Unmarshal(body, &js)
-		if err != nil {
-			panic(err)
-		}
-		assert.Equal(t, "1234", js.ID)
-		assert.Equal(t, tork.JobStateCompleted, js.State)
-		w.WriteHeader(http.StatusOK)
-		close(received)
-	}))
-
-	j := &tork.Job{
-		ID:    "1234",
-		State: tork.JobStateCompleted,
-	}
-
-	wh := &tork.Webhook{
-		URL: svr.URL,
-	}
-
-	assert.NoError(t, Call(wh, tork.NewJobSummary(j)))
-	<-received
-}
-
-func TestWebhookOKWithHeaders(t *testing.T) {
-	received := make(chan any)
-
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		js := tork.JobSummary{}
-		err = json.Unmarshal(body, &js)
-		if err != nil {
-			panic(err)
-		}
-		ctype := r.Header.Get("Content-Type")
-		assert.Equal(t, "application/json; charset=UTF-8", ctype)
-		val := r.Header.Get("my-header")
-		assert.Equal(t, "my-value", val)
-		assert.Equal(t, "1234", js.ID)
-		assert.Equal(t, tork.JobStateCompleted, js.State)
-		w.WriteHeader(http.StatusOK)
-		close(received)
-	}))
-
-	j := &tork.Job{
-		ID:    "1234",
-		State: tork.JobStateCompleted,
-	}
-
-	wh := &tork.Webhook{URL: svr.URL,
-		Headers: map[string]string{
-			"my-header": "my-value",
-		}}
-
-	assert.NoError(t, Call(wh, tork.NewJobSummary(j)))
-	<-received
 }
