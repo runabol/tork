@@ -11,6 +11,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/expr-lang/expr v1.16.5
 	github.com/fatih/color v1.16.0
+	github.com/go-co-op/gocron/v2 v2.13.0
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
@@ -26,10 +27,10 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/rs/zerolog v1.32.0
 	github.com/shirou/gopsutil/v3 v3.24.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.2
 	golang.org/x/crypto v0.31.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sys v0.28.0
 	golang.org/x/time v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -55,6 +56,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
@@ -76,6 +78,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect

@@ -567,6 +567,10 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		s := string(b)
 		secrets = &s
 	}
+	var scheduledJobID *string
+	if j.Schedule != nil && j.Schedule.ID != "" {
+		scheduledJobID = &j.Schedule.ID
+	}
 	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
 		if !ok {
@@ -574,12 +578,12 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		}
 		sql := `insert into jobs (id,name,description,state,created_at,started_at,tasks,position,
 					inputs,context,parent_id,task_count,output_,result,error_,defaults,webhooks,
-					created_by,tags,auto_delete,secrets) 
+					created_by,tags,auto_delete,secrets,scheduled_job_id) 
 				values
-					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`
+					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`
 		if _, err := ptx.exec(sql, j.ID, j.Name, j.Description, j.State, j.CreatedAt, j.StartedAt, tasks, j.Position,
 			inputs, c, j.ParentID, j.TaskCount, j.Output, j.Result, j.Error, defaults, webhooks, j.CreatedBy.ID,
-			pq.StringArray(j.Tags), autoDelete, secrets); err != nil {
+			pq.StringArray(j.Tags), autoDelete, secrets, scheduledJobID); err != nil {
 			return errors.Wrapf(err, "error inserting job to the db")
 		}
 		for _, perm := range j.Permissions {
@@ -1121,6 +1125,158 @@ func (ds *PostgresDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, err
 	}
 
 	return s, nil
+}
+
+func (ds *PostgresDatastore) CreateScheduledJob(ctx context.Context, sj *tork.ScheduledJob) error {
+	if sj.ID == "" {
+		return errors.Errorf("scheduled job id must not be empty")
+	}
+	if sj.CreatedBy == nil {
+		guest, err := ds.GetUser(ctx, tork.USER_GUEST)
+		if err != nil {
+			return err
+		}
+		sj.CreatedBy = guest
+	}
+	tasks, err := json.Marshal(sj.Tasks)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize tasks")
+	}
+	inputs, err := json.Marshal(sj.Inputs)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize inputs")
+	}
+	var defaults *string
+	if sj.Defaults != nil {
+		b, err := json.Marshal(sj.Defaults)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.defaults")
+		}
+		s := string(b)
+		defaults = &s
+	}
+	var autoDelete *string
+	if sj.AutoDelete != nil {
+		b, err := json.Marshal(sj.AutoDelete)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize job.autoDelete")
+		}
+		s := string(b)
+		autoDelete = &s
+	}
+	webhooks, err := json.Marshal(sj.Webhooks)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize webhooks")
+	}
+	if sj.Tags == nil {
+		sj.Tags = make([]string, 0)
+	}
+	var secrets *string
+	if sj.Secrets != nil {
+		b, err := json.Marshal(sj.Secrets)
+		if err != nil {
+			return errors.Wrapf(err, "failed to serialize secrets")
+		}
+		s := string(b)
+		secrets = &s
+	}
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		sql := `insert into scheduled_jobs (id,name,description,created_at,tasks,inputs,output_,defaults,webhooks,
+					created_by,tags,auto_delete,secrets,cron_expr,state) 
+				values
+					($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`
+		if _, err := ptx.exec(sql, sj.ID, sj.Name, sj.Description, sj.CreatedAt, tasks,
+			inputs, sj.Output, defaults, webhooks, sj.CreatedBy.ID,
+			pq.StringArray(sj.Tags), autoDelete, secrets, sj.Cron, sj.State); err != nil {
+			return errors.Wrapf(err, "error inserting scheduled job to the db")
+		}
+		for _, perm := range sj.Permissions {
+			var username *string
+			var roleSlug *string
+			if perm.Role != nil {
+				roleSlug = &perm.Role.Slug
+			} else {
+				username = &perm.User.Username
+			}
+			sql := `insert into scheduled_jobs_perms 
+			          (id,scheduled_job_id,user_id,role_id) 
+			        values 
+					  ($1,
+					   $2,
+					   case when $3::varchar is not null then coalesce((select id from users where username_ = $3),'') end,
+					   case when $4::varchar is not null then coalesce((select id from roles where slug = $4),'') end)`
+			if _, err := ptx.exec(sql, uuid.NewUUID(), sj.ID, username, roleSlug); err != nil {
+				return errors.Wrapf(err, "error inserting job to the db")
+			}
+		}
+		return nil
+	})
+}
+
+func (ds *PostgresDatastore) GetActiveScheduledJobs(ctx context.Context) ([]*tork.ScheduledJob, error) {
+	sjrs := []scheduledJobRecord{}
+	q := `SELECT * FROM scheduled_jobs where state = 'ACTIVE'`
+	if err := ds.select_(&sjrs, q); err != nil {
+		return nil, errors.Wrapf(err, "error getting active scheduled jobs from db")
+	}
+	sjs := make([]*tork.ScheduledJob, len(sjrs))
+	for i, sjr := range sjrs {
+		tasks := make([]*tork.Task, 0)
+		if err := json.Unmarshal(sjr.Tasks, &tasks); err != nil {
+			return nil, errors.Wrapf(err, "error desiralizing scheduled job tasks")
+		}
+		u, err := ds.GetUser(ctx, sjr.CreatedBy)
+		if err != nil {
+			return nil, err
+		}
+		rsp := make([]scheduledPermRecord, 0)
+		q = `SELECT * 
+			  FROM scheduled_jobs_perms
+			  where scheduled_job_id = $1`
+		if err := ds.select_(&rsp, q, sjr.ID); err != nil {
+			return nil, errors.Wrapf(err, "error getting scheduled job permissions from db")
+		}
+		perms := make([]*tork.Permission, len(rsp))
+		for i, rp := range rsp {
+			p := &tork.Permission{}
+			if rp.RoleID != nil {
+				role, err := ds.GetRole(ctx, *rp.RoleID)
+				if err != nil {
+					return nil, err
+				}
+				p.Role = role
+			} else {
+				user, err := ds.GetUser(ctx, *rp.UserID)
+				if err != nil {
+					return nil, err
+				}
+				p.User = user
+			}
+			perms[i] = p
+		}
+		sj, err := sjr.toScheduledJob(tasks, u, perms)
+		if err != nil {
+			return nil, err
+		}
+		sjs[i] = sj
+	}
+	return sjs, nil
+}
+
+func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser string, page, size int) (*datastore.Page[*tork.ScheduledJobSummary], error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ds *PostgresDatastore) GetScheduledJobByID(ctx context.Context, id string) (*tork.ScheduledJob, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ds *PostgresDatastore) UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error {
+	return errors.New("not implemented")
 }
 
 func (ds *PostgresDatastore) get(dest interface{}, query string, args ...interface{}) error {

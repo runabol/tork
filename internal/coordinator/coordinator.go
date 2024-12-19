@@ -14,6 +14,7 @@ import (
 	"github.com/runabol/tork/internal/coordinator/api"
 	"github.com/runabol/tork/internal/coordinator/handlers"
 	"github.com/runabol/tork/internal/host"
+	"github.com/runabol/tork/locker"
 
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/middleware/job"
@@ -30,28 +31,30 @@ import (
 // clients, scheduling tasks for workers to execute and for
 // exposing the cluster's state to the outside world.
 type Coordinator struct {
-	id          string
-	startTime   time.Time
-	Name        string
-	broker      mq.Broker
-	api         *api.API
-	ds          datastore.Datastore
-	queues      map[string]int
-	onPending   task.HandlerFunc
-	onStarted   task.HandlerFunc
-	onError     task.HandlerFunc
-	onJob       job.HandlerFunc
-	onHeartbeat node.HandlerFunc
-	onCompleted task.HandlerFunc
-	onLogPart   func(*tork.TaskLogPart)
-	onProgress  task.HandlerFunc
-	stop        chan any
+	id             string
+	startTime      time.Time
+	Name           string
+	broker         mq.Broker
+	api            *api.API
+	ds             datastore.Datastore
+	queues         map[string]int
+	onPending      task.HandlerFunc
+	onStarted      task.HandlerFunc
+	onError        task.HandlerFunc
+	onJob          job.HandlerFunc
+	onHeartbeat    node.HandlerFunc
+	onCompleted    task.HandlerFunc
+	onLogPart      func(*tork.TaskLogPart)
+	onProgress     task.HandlerFunc
+	onScheduledJob func(ctx context.Context, s *tork.ScheduledJob) error
+	stop           chan any
 }
 
 type Config struct {
 	Name       string
 	Broker     mq.Broker
 	DataStore  datastore.Datastore
+	Locker     locker.Locker
 	Address    string
 	Queues     map[string]int
 	Endpoints  map[string]web.HandlerFunc
@@ -73,6 +76,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	}
 	if cfg.DataStore == nil {
 		return nil, errors.New("most provide a datastore")
+	}
+	if cfg.Locker == nil {
+		return nil, errors.New("most provide a locker")
 	}
 	if cfg.Queues == nil {
 		cfg.Queues = make(map[string]int)
@@ -180,23 +186,29 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		cfg.Middleware.Task,
 	)
 
+	onScheduledJob, err := handlers.NewJobSchedulerHandler(cfg.DataStore, cfg.Broker, cfg.Locker)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error initializing the job scheduler")
+	}
+
 	return &Coordinator{
-		id:          uuid.NewShortUUID(),
-		startTime:   time.Now(),
-		Name:        cfg.Name,
-		api:         api,
-		broker:      cfg.Broker,
-		ds:          cfg.DataStore,
-		queues:      cfg.Queues,
-		onPending:   onPending,
-		onStarted:   onStarted,
-		onError:     onError,
-		onJob:       onJob,
-		onHeartbeat: onHeartbeat,
-		onCompleted: onCompleted,
-		onLogPart:   onLogPart,
-		onProgress:  onProgress,
-		stop:        make(chan any),
+		id:             uuid.NewShortUUID(),
+		startTime:      time.Now(),
+		Name:           cfg.Name,
+		api:            api,
+		broker:         cfg.Broker,
+		ds:             cfg.DataStore,
+		queues:         cfg.Queues,
+		onPending:      onPending,
+		onStarted:      onStarted,
+		onError:        onError,
+		onJob:          onJob,
+		onHeartbeat:    onHeartbeat,
+		onCompleted:    onCompleted,
+		onLogPart:      onLogPart,
+		onProgress:     onProgress,
+		onScheduledJob: onScheduledJob,
+		stop:           make(chan any),
 	}, nil
 }
 
@@ -261,6 +273,18 @@ func (c *Coordinator) Start() error {
 				return err
 			}
 		}
+	}
+	if err := c.broker.SubscribeForEvents(context.Background(), mq.TOPIC_JOB_SCHEDULED, func(ev any) {
+		sj, ok := ev.(*tork.ScheduledJob)
+		if !ok {
+			log.Error().Msgf("error casting scheduled job: %v", ev)
+			return
+		}
+		if err := c.onScheduledJob(context.Background(), sj); err != nil {
+			log.Error().Msgf("error handling scheduled job: %s", sj.ID)
+		}
+	}); err != nil {
+		return err
 	}
 	go c.sendHeartbeats()
 	return nil

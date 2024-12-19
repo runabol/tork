@@ -34,6 +34,23 @@ func (ji Job) Validate(ds datastore.Datastore) error {
 	return validate.Struct(ji)
 }
 
+func (ji ScheduledJob) Validate(ds datastore.Datastore) error {
+	validate := validator.New()
+	if err := validate.RegisterValidation("duration", validateDuration); err != nil {
+		return err
+	}
+	if err := validate.RegisterValidation("queue", validateQueue); err != nil {
+		return err
+	}
+	if err := validate.RegisterValidation("expr", validateExpr); err != nil {
+		return err
+	}
+	validate.RegisterStructValidation(validateMount, Mount{})
+	validate.RegisterStructValidation(taskInputValidation, Task{})
+	validate.RegisterStructValidation(validatePermission(ds), Permission{})
+	return validate.Struct(ji)
+}
+
 func validateExpr(fl validator.FieldLevel) bool {
 	v := fl.Field().String()
 	if v == "" {

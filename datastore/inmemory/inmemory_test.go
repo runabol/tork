@@ -780,3 +780,60 @@ func TestInMemoryGetNextTask(t *testing.T) {
 	_, err = ds.GetNextTask(ctx, "no-such-id")
 	assert.Error(t, err)
 }
+
+func TestInMemoryGetScheduledJobs(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+
+	// Create some scheduled jobs
+	for i := 0; i < 15; i++ {
+		sj := &tork.ScheduledJob{
+			ID:    uuid.NewUUID(),
+			Name:  fmt.Sprintf("ScheduledJob-%d", i),
+			State: tork.ScheduledJobStateActive,
+		}
+		err := ds.CreateScheduledJob(ctx, sj)
+		assert.NoError(t, err)
+	}
+
+	// Test fetching the first page
+	page, err := ds.GetScheduledJobs(ctx, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, len(page.Items))
+	assert.Equal(t, 1, page.Number)
+	assert.Equal(t, 10, page.Size)
+	assert.Equal(t, 2, page.TotalPages)
+	assert.Equal(t, 15, page.TotalItems)
+
+	// Test fetching the second page
+	page, err = ds.GetScheduledJobs(ctx, "", 2, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, 5, len(page.Items))
+	assert.Equal(t, 2, page.Number)
+	assert.Equal(t, 5, page.Size)
+	assert.Equal(t, 2, page.TotalPages)
+	assert.Equal(t, 15, page.TotalItems)
+}
+
+func TestInMemoryGetScheduledJobByID(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+
+	// Test case: Scheduled job not found
+	_, err := ds.GetScheduledJobByID(ctx, "non-existent-id")
+	assert.Error(t, err)
+	assert.Equal(t, datastore.ErrJobNotFound, err)
+
+	// Test case: Scheduled job found
+	scheduledJob := &tork.ScheduledJob{
+		ID:   uuid.NewUUID(),
+		Name: "Test Scheduled Job",
+	}
+	err = ds.CreateScheduledJob(ctx, scheduledJob)
+	assert.NoError(t, err)
+
+	retrievedJob, err := ds.GetScheduledJobByID(ctx, scheduledJob.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, scheduledJob.ID, retrievedJob.ID)
+	assert.Equal(t, scheduledJob.Name, retrievedJob.Name)
+}

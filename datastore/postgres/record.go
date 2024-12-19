@@ -55,32 +55,51 @@ type taskRecord struct {
 }
 
 type jobRecord struct {
+	ID             string         `db:"id"`
+	Name           string         `db:"name"`
+	Description    string         `db:"description"`
+	Tags           pq.StringArray `db:"tags"`
+	State          string         `db:"state"`
+	CreatedAt      time.Time      `db:"created_at"`
+	CreatedBy      string         `db:"created_by"`
+	StartedAt      *time.Time     `db:"started_at"`
+	CompletedAt    *time.Time     `db:"completed_at"`
+	FailedAt       *time.Time     `db:"failed_at"`
+	DeleteAt       *time.Time     `db:"delete_at"`
+	Tasks          []byte         `db:"tasks"`
+	Position       int            `db:"position"`
+	Inputs         []byte         `db:"inputs"`
+	Context        []byte         `db:"context"`
+	ParentID       string         `db:"parent_id"`
+	TaskCount      int            `db:"task_count"`
+	Output         string         `db:"output_"`
+	Result         string         `db:"result"`
+	Error          string         `db:"error_"`
+	TS             string         `db:"ts"`
+	Defaults       []byte         `db:"defaults"`
+	Webhooks       []byte         `db:"webhooks"`
+	AutoDelete     []byte         `db:"auto_delete"`
+	Secrets        []byte         `db:"secrets"`
+	Progress       float64        `db:"progress"`
+	ScheduledJobID *string        `db:"scheduled_job_id"`
+}
+
+type scheduledJobRecord struct {
 	ID          string         `db:"id"`
+	Cron        string         `db:"cron_expr"`
 	Name        string         `db:"name"`
 	Description string         `db:"description"`
 	Tags        pq.StringArray `db:"tags"`
 	State       string         `db:"state"`
 	CreatedAt   time.Time      `db:"created_at"`
 	CreatedBy   string         `db:"created_by"`
-	StartedAt   *time.Time     `db:"started_at"`
-	CompletedAt *time.Time     `db:"completed_at"`
-	FailedAt    *time.Time     `db:"failed_at"`
-	DeleteAt    *time.Time     `db:"delete_at"`
 	Tasks       []byte         `db:"tasks"`
-	Position    int            `db:"position"`
 	Inputs      []byte         `db:"inputs"`
-	Context     []byte         `db:"context"`
-	ParentID    string         `db:"parent_id"`
-	TaskCount   int            `db:"task_count"`
 	Output      string         `db:"output_"`
-	Result      string         `db:"result"`
-	Error       string         `db:"error_"`
-	TS          string         `db:"ts"`
 	Defaults    []byte         `db:"defaults"`
 	Webhooks    []byte         `db:"webhooks"`
 	AutoDelete  []byte         `db:"auto_delete"`
 	Secrets     []byte         `db:"secrets"`
-	Progress    float64        `db:"progress"`
 }
 
 type jobPermRecord struct {
@@ -89,6 +108,14 @@ type jobPermRecord struct {
 	UserID    *string   `db:"user_id"`
 	RoleID    *string   `db:"role_id"`
 	CreatedAt time.Time `db:"created_at"`
+}
+
+type scheduledPermRecord struct {
+	ID             string    `db:"id"`
+	ScheduledJobID string    `db:"scheduled_job_id"`
+	UserID         *string   `db:"user_id"`
+	RoleID         *string   `db:"role_id"`
+	CreatedAt      time.Time `db:"created_at"`
 }
 
 type nodeRecord struct {
@@ -319,6 +346,12 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 			return nil, errors.Wrapf(err, "error deserializing job.secrets")
 		}
 	}
+	var schedule *tork.JobSchedule
+	if r.ScheduledJobID != nil {
+		schedule = &tork.JobSchedule{
+			ID: *r.ScheduledJobID,
+		}
+	}
 	return &tork.Job{
 		ID:          r.ID,
 		Name:        r.Name,
@@ -347,6 +380,56 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 		DeleteAt:    r.DeleteAt,
 		Secrets:     secrets,
 		Progress:    r.Progress,
+		Schedule:    schedule,
+	}, nil
+}
+
+func (r scheduledJobRecord) toScheduledJob(tasks []*tork.Task, createdBy *tork.User, perms []*tork.Permission) (*tork.ScheduledJob, error) {
+	var inputs map[string]string
+	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
+		return nil, errors.Wrapf(err, "error deserializing job.inputs")
+	}
+	var defaults *tork.JobDefaults
+	if r.Defaults != nil {
+		defaults = &tork.JobDefaults{}
+		if err := json.Unmarshal(r.Defaults, defaults); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.defaults")
+		}
+	}
+	var autoDelete *tork.AutoDelete
+	if r.AutoDelete != nil {
+		autoDelete = &tork.AutoDelete{}
+		if err := json.Unmarshal(r.AutoDelete, autoDelete); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.autoDelete")
+		}
+	}
+	var webhooks []*tork.Webhook
+	if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
+		return nil, errors.Wrapf(err, "error deserializing job.webhook")
+	}
+	var secrets map[string]string
+	if r.Secrets != nil {
+		if err := json.Unmarshal(r.Secrets, &secrets); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.secrets")
+		}
+	}
+	return &tork.ScheduledJob{
+		ID:          r.ID,
+		Cron:        r.Cron,
+		Name:        r.Name,
+		Tags:        r.Tags,
+		State:       tork.ScheduledJobState(r.State),
+		CreatedAt:   r.CreatedAt,
+		CreatedBy:   createdBy,
+		Tasks:       tasks,
+		Inputs:      inputs,
+		Description: r.Description,
+		Output:      r.Output,
+		Defaults:    defaults,
+		Webhooks:    webhooks,
+		Permissions: perms,
+		AutoDelete:  autoDelete,
+		Secrets:     secrets,
 	}, nil
 }
 
