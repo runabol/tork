@@ -631,11 +631,75 @@ func (ds *InMemoryDatastore) GetActiveScheduledJobs(ctx context.Context) ([]*tor
 }
 
 func (ds *InMemoryDatastore) GetScheduledJobs(ctx context.Context, currentUser string, page, size int) (*datastore.Page[*tork.ScheduledJobSummary], error) {
-	return nil, errors.New("not implemented")
+	var urs []*tork.Role
+	var user *tork.User
+	if currentUser != "" {
+		u, err := ds.GetUser(ctx, currentUser)
+		if err != nil {
+			return nil, err
+		}
+		user = u
+		ur, err := ds.GetUserRoles(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		urs = ur
+	}
+
+	offset := (page - 1) * size
+	filtered := make([]*tork.ScheduledJob, 0)
+	hasPermission := func(user *tork.User, uroles []*tork.Role, job *tork.ScheduledJob) bool {
+		if len(job.Permissions) == 0 {
+			return true
+		}
+		for _, p := range job.Permissions {
+			if p.User != nil && p.User.Username == user.Username {
+				return true
+			}
+			if p.Role != nil {
+				for _, ur := range uroles {
+					if p.Role.Slug == ur.Slug {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+	ds.scheduledJobs.Iterate(func(_ string, j *tork.ScheduledJob) {
+		if currentUser != "" && !hasPermission(user, urs, j) {
+			return
+		}
+
+		filtered = append(filtered, j)
+	})
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+	})
+	result := make([]*tork.ScheduledJobSummary, 0)
+	for i := offset; i < (offset+size) && i < len(filtered); i++ {
+		j := filtered[i]
+		result = append(result, tork.NewScheduledJobSummary(j))
+	}
+	totalPages := len(filtered) / size
+	if len(filtered)%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &datastore.Page[*tork.ScheduledJobSummary]{
+		Items:      result,
+		Number:     page,
+		Size:       len(result),
+		TotalPages: totalPages,
+		TotalItems: len(filtered),
+	}, nil
 }
 
 func (ds *InMemoryDatastore) GetScheduledJobByID(ctx context.Context, id string) (*tork.ScheduledJob, error) {
-	return nil, errors.New("not implemented")
+	j, ok := ds.scheduledJobs.Get(id)
+	if !ok {
+		return nil, datastore.ErrJobNotFound
+	}
+	return j.Clone(), nil
 }
 
 func (ds *InMemoryDatastore) UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error {
