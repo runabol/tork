@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 )
@@ -38,7 +39,7 @@ func isRetryable(statusCode int) bool {
 func Call(wh *tork.Webhook, body any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
-		log.Err(err).Msgf("[Webhook] error serializing body")
+		return errors.Wrapf(err, "[Webhook] error serializing body")
 	}
 	attempts := 1
 	client := http.Client{
@@ -57,7 +58,10 @@ func Call(wh *tork.Webhook, body any) error {
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return err
+			log.Error().Msgf("[Webhook] request to %s failed with error: %v", wh.URL, err)
+			time.Sleep(time.Second * time.Duration(attempts*2))
+			attempts++
+			continue
 		}
 		// Success
 		if resp.StatusCode == http.StatusOK {
