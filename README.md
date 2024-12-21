@@ -54,6 +54,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - [Task Priority](https://www.tork.run/tasks#priority)
 - [Sandbox Mode](https://www.tork.run/runtime#sandbox-mode-experimental)
 - [Secrets](https://www.tork.run/tasks#secrets)
+- [Scheduled Jobs][https://tork.run/jobs#scheduled-jobs]
 - [Web UI](https://www.tork.run/web-ui)
 
 ## Documentation
