@@ -8,7 +8,7 @@ import (
 func GetCPUPercent() float64 {
 	perc, err := cpu.Percent(0, false)
 	if err != nil {
-		log.Warn().
+		log.Debug().
 			Err(err).
 			Msgf("error getting CPU usage")
 		return 0
