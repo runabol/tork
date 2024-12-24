@@ -200,8 +200,9 @@ func TestWebhookIgnored(t *testing.T) {
 
 func TestWebhookWrongEvent(t *testing.T) {
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
+	received := make(chan any)
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic(1)
+		close(received)
 	}))
 	j := &tork.Job{
 		ID:    "1234",
@@ -214,7 +215,12 @@ func TestWebhookWrongEvent(t *testing.T) {
 			Event: webhook.EventJobStateChange,
 		}},
 	}
-	assert.NoError(t, hm(context.Background(), StateChange, j))
+	assert.NoError(t, hm(context.Background(), "NO_STATE_CHANGE", j))
+	select {
+	case <-received:
+		t.Error("Received a webhook call when it should not have been called")
+	case <-time.After(500 * time.Millisecond):
+	}
 }
 
 func TestWebhookIfTrue(t *testing.T) {

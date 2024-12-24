@@ -46,14 +46,15 @@ const (
 var rootUserPattern = regexp.MustCompile(`^(|root|0|root(:root)?|root:0|0:root|0:0)$`)
 
 type DockerRuntime struct {
-	client  *client.Client
-	tasks   *syncx.Map[string, string]
-	images  *syncx.Map[string, bool]
-	pullq   chan *pullRequest
-	mounter runtime.Mounter
-	broker  mq.Broker
-	config  string
-	sandbox bool
+	client       *client.Client
+	tasks        *syncx.Map[string, string]
+	images       *syncx.Map[string, bool]
+	pullq        chan *pullRequest
+	mounter      runtime.Mounter
+	broker       mq.Broker
+	config       string
+	sandbox      bool
+	busyboxImage string
 }
 
 type dockerLogsReader struct {
@@ -99,6 +100,12 @@ func WithSandbox(val bool) Option {
 	}
 }
 
+func WithBusyboxImage(name string) Option {
+	return func(rt *DockerRuntime) {
+		rt.busyboxImage = name
+	}
+}
+
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -112,6 +119,9 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	for _, o := range opts {
 		o(rt)
+	}
+	if rt.busyboxImage == "" {
+		rt.busyboxImage = "busybox:stable"
 	}
 	// setup a default mounter
 	if rt.mounter == nil {
@@ -138,7 +148,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 			// to allow access to the tork user
 			t.Pre = append([]*tork.Task{{
 				Internal: true,
-				Image:    "busybox:stable",
+				Image:    d.busyboxImage,
 				CMD:      []string{"sh", "-c", fmt.Sprintf("chmod 777 %s", mnt.Target)},
 				Mounts:   []tork.Mount{mnt},
 			}}, t.Pre...)
