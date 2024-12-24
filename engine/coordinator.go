@@ -104,7 +104,7 @@ func echoMiddleware(ds datastore.Datastore) []echo.MiddlewareFunc {
 	}
 
 	// body limit
-	bodyLimit := conf.StringDefault("middleware.web.bodylimit", "64K")
+	bodyLimit := conf.StringDefault("middleware.web.bodylimit", "500K")
 	mw = append(mw, middleware.BodyLimit(bodyLimit))
 
 	loggerEnabled := conf.BoolDefault("middleware.web.logger.enabled", true)
