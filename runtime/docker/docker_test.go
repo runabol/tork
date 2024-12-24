@@ -700,6 +700,39 @@ func TestRunTaskSandbox(t *testing.T) {
 		assert.Equal(t, "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)\n", tk.Result)
 	})
 
+	t.Run("custom busybox image", func(t *testing.T) {
+		rt, err := NewDockerRuntime(WithSandbox(true), WithBusyboxImage("busybox:latest"))
+		assert.NoError(t, err)
+		assert.NotNil(t, rt)
+
+		tk := &tork.Task{
+			ID:    uuid.NewUUID(),
+			Image: "ubuntu:mantic",
+			Run:   "id > $TORK_OUTPUT",
+			Files: map[string]string{
+				"somefile.txt": "hello world",
+			},
+			Mounts: []tork.Mount{{
+				Type:   tork.MountTypeVolume,
+				Target: "/workdir",
+			}},
+			Pre: []*tork.Task{{
+				ID:    uuid.NewUUID(),
+				Image: "ubuntu:mantic",
+				Run:   "id > $TORK_OUTPUT",
+			}},
+			Post: []*tork.Task{{
+				ID:    uuid.NewUUID(),
+				Image: "ubuntu:mantic",
+				Run:   "id > $TORK_OUTPUT",
+			}},
+		}
+
+		err = rt.Run(context.Background(), tk)
+		assert.NoError(t, err)
+		assert.Equal(t, "uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu)\n", tk.Result)
+	})
+
 	t.Run("no sandbox", func(t *testing.T) {
 		rt, err := NewDockerRuntime(WithSandbox(false))
 		assert.NoError(t, err)

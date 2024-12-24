@@ -76,6 +76,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			docker.WithConfig(conf.String("runtime.docker.config")),
 			docker.WithBroker(e.broker),
 			docker.WithSandbox(conf.BoolDefault("runtime.docker.sandbox", false)),
+			docker.WithBusyboxImage(conf.StringDefault("runtime.docker.busybox.image", "busybox:stable")),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
