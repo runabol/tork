@@ -46,7 +46,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 
 	// mark the task as FAILED
 	if err := h.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
-		if u.State.IsActive() {
+		if u.IsActive() {
 			u.State = tork.TaskStateFailed
 			u.FailedAt = t.FailedAt
 			u.Error = t.Error

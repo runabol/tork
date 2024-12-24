@@ -257,3 +257,21 @@ func TestWebhookIfFalse(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 	}
 }
+
+func TestWebhookIfJobStatus(t *testing.T) {
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
+	received := make(chan any)
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	j := &tork.Job{
+		ID:    "1234",
+		State: tork.JobStateCompleted,
+		Webhooks: []*tork.Webhook{{
+			URL: svr.URL,
+			If:  "{{ job.State == 'COMPLETED' }}",
+		}},
+	}
+	assert.NoError(t, hm(context.Background(), StateChange, j))
+	<-received
+}

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type JobState string
+type JobState = string
 
 const (
 	JobStatePending   JobState = "PENDING"

@@ -32,7 +32,7 @@ func Webhook(next HandlerFunc) HandlerFunc {
 			}
 			if wh.If != "" {
 				val, err := eval.EvaluateExpr(wh.If, map[string]any{
-					"job": j,
+					"job": tork.NewJobSummary(j),
 				})
 				if err != nil {
 					log.Error().Err(err).Msgf("[Webhook] error evaluating if expression %s", wh.If)
