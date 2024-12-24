@@ -30,6 +30,23 @@ func Webhook(next HandlerFunc) HandlerFunc {
 			if et == Progress && wh.Event != webhook.EventJobProgress {
 				continue
 			}
+			if wh.If != "" {
+				val, err := eval.EvaluateExpr(wh.If, map[string]any{
+					"job": j,
+				})
+				if err != nil {
+					log.Error().Err(err).Msgf("[Webhook] error evaluating if expression %s", wh.If)
+					continue
+				}
+				ifResult, ok := val.(bool)
+				if !ok {
+					log.Error().Msgf("[Webhook] if expression %s did not evaluate to a boolean", wh.If)
+					continue
+				}
+				if !ifResult {
+					continue
+				}
+			}
 			go func(w *tork.Webhook) {
 				callWebhook(w.Clone(), j)
 			}(wh)

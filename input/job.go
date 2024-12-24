@@ -59,6 +59,7 @@ type Webhook struct {
 	URL     string            `json:"url,omitempty" yaml:"url,omitempty" validate:"required"`
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 	Event   string            `json:"event,omitempty" yaml:"event,omitempty"`
+	If      string            `json:"if,omitempty" yaml:"if,omitempty" validate:"expr"`
 }
 
 type Permission struct {
@@ -184,6 +185,7 @@ func (w Webhook) toWebhook() *tork.Webhook {
 		URL:     w.URL,
 		Headers: maps.Clone(w.Headers),
 		Event:   w.Event,
+		If:      w.If,
 	}
 }
 

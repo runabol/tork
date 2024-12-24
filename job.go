@@ -148,6 +148,7 @@ type Webhook struct {
 	URL     string            `json:"url,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 	Event   string            `json:"event,omitempty"`
+	If      string            `json:"if,omitempty"`
 }
 
 func (j *Job) Clone() *Job {
@@ -313,6 +314,7 @@ func (w *Webhook) Clone() *Webhook {
 		URL:     w.URL,
 		Headers: maps.Clone(w.Headers),
 		Event:   w.Event,
+		If:      w.If,
 	}
 }
 
