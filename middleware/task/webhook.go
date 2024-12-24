@@ -38,6 +38,24 @@ func Webhook(ds datastore.Datastore) MiddlewareFunc {
 					(wh.Event == webhook.EventTaskProgress && et != Progress) {
 					continue
 				}
+				if wh.If != "" {
+					val, err := eval.EvaluateExpr(wh.If, map[string]any{
+						"task": t,
+						"job":  job,
+					})
+					if err != nil {
+						log.Error().Err(err).Msgf("[Webhook] error evaluating if expression %s", wh.If)
+						continue
+					}
+					ifResult, ok := val.(bool)
+					if !ok {
+						log.Error().Msgf("[Webhook] if expression %s did not evaluate to a boolean", wh.If)
+						continue
+					}
+					if !ifResult {
+						continue
+					}
+				}
 				go func(w *tork.Webhook) {
 					callWebhook(w.Clone(), job, summary)
 				}(wh)

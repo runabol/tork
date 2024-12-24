@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/internal/webhook"
@@ -214,4 +215,45 @@ func TestWebhookWrongEvent(t *testing.T) {
 		}},
 	}
 	assert.NoError(t, hm(context.Background(), StateChange, j))
+}
+
+func TestWebhookIfTrue(t *testing.T) {
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
+	received := make(chan any)
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	j := &tork.Job{
+		ID:    "1234",
+		State: tork.JobStateCompleted,
+		Webhooks: []*tork.Webhook{{
+			URL: svr.URL,
+			If:  "true",
+		}},
+	}
+
+	assert.NoError(t, hm(context.Background(), StateChange, j))
+	<-received
+}
+
+func TestWebhookIfFalse(t *testing.T) {
+	received := make(chan any)
+	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook})
+	j := &tork.Job{
+		ID:    "1234",
+		State: tork.JobStateCompleted,
+		Webhooks: []*tork.Webhook{{
+			URL: svr.URL,
+			If:  "false",
+		}},
+	}
+	assert.NoError(t, hm(context.Background(), StateChange, j))
+	select {
+	case <-received:
+		t.Error("Received a webhook call when it should not have been called")
+	case <-time.After(500 * time.Millisecond):
+	}
 }

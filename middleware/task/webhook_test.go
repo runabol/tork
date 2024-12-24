@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore/inmemory"
@@ -139,4 +140,64 @@ func TestWebhookIgnored(t *testing.T) {
 	ds := inmemory.NewInMemoryDatastore()
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	assert.NoError(t, hm(context.Background(), Read, nil))
+}
+
+func TestWebhookIfTrue(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
+	received := make(chan any)
+	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	j := &tork.Job{
+		ID:      "1",
+		State:   tork.JobStateCompleted,
+		Context: tork.JobContext{},
+		Webhooks: []*tork.Webhook{{
+			URL:   callbackState.URL,
+			Event: webhook.EventTaskStateChange,
+			If:    "true",
+		}},
+	}
+	err := ds.CreateJob(context.Background(), j)
+	assert.NoError(t, err)
+	tk := &tork.Task{
+		ID:    "2",
+		JobID: j.ID,
+		State: tork.TaskStateCompleted,
+	}
+	assert.NoError(t, hm(context.Background(), StateChange, tk))
+	<-received
+}
+
+func TestWebhookIfFalse(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
+	received := make(chan any)
+	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	j := &tork.Job{
+		ID:      "1",
+		State:   tork.JobStateCompleted,
+		Context: tork.JobContext{},
+		Webhooks: []*tork.Webhook{{
+			URL:   callbackState.URL,
+			Event: webhook.EventTaskStateChange,
+			If:    "false",
+		}},
+	}
+	err := ds.CreateJob(context.Background(), j)
+	assert.NoError(t, err)
+	tk := &tork.Task{
+		ID:    "2",
+		JobID: j.ID,
+		State: tork.TaskStateCompleted,
+	}
+	assert.NoError(t, hm(context.Background(), StateChange, tk))
+	select {
+	case <-received:
+		t.Error("Received a webhook call when it should not have been called")
+	case <-time.After(500 * time.Millisecond):
+	}
 }
