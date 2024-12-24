@@ -40,8 +40,8 @@ func Webhook(ds datastore.Datastore) MiddlewareFunc {
 				}
 				if wh.If != "" {
 					val, err := eval.EvaluateExpr(wh.If, map[string]any{
-						"task": t,
-						"job":  job,
+						"task": tork.NewTaskSummary(t),
+						"job":  tork.NewJobSummary(job),
 					})
 					if err != nil {
 						log.Error().Err(err).Msgf("[Webhook] error evaluating if expression %s", wh.If)

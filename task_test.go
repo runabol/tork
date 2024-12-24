@@ -42,21 +42,21 @@ func TestIsActive(t *testing.T) {
 	t1 := &tork.Task{
 		State: tork.TaskStateCancelled,
 	}
-	assert.False(t, t1.State.IsActive())
+	assert.False(t, t1.IsActive())
 	t2 := &tork.Task{
 		State: tork.TaskStateCreated,
 	}
-	assert.True(t, t2.State.IsActive())
+	assert.True(t, t2.IsActive())
 	t3 := &tork.Task{
 		State: tork.TaskStatePending,
 	}
-	assert.True(t, t3.State.IsActive())
+	assert.True(t, t3.IsActive())
 	t4 := &tork.Task{
 		State: tork.TaskStateRunning,
 	}
-	assert.True(t, t4.State.IsActive())
+	assert.True(t, t4.IsActive())
 	t5 := &tork.Task{
 		State: tork.TaskStateCompleted,
 	}
-	assert.False(t, t5.State.IsActive())
+	assert.False(t, t5.IsActive())
 }

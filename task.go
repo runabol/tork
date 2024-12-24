@@ -9,7 +9,7 @@ import (
 
 // State defines the list of states that a
 // task can be in, at any given moment.
-type TaskState string
+type TaskState = string
 
 const (
 	TaskStateCreated   TaskState = "CREATED"
@@ -150,8 +150,8 @@ type Port struct {
 	HostPort string `json:"-"`
 }
 
-func (s TaskState) IsActive() bool {
-	return slices.Contains(TaskStateActive, s)
+func (t *Task) IsActive() bool {
+	return slices.Contains(TaskStateActive, t.State)
 }
 
 func (t *Task) Clone() *Task {

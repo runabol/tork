@@ -255,7 +255,7 @@ func (ds *InMemoryDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 func (ds *InMemoryDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
 	result := make([]*tork.Task, 0)
 	ds.tasks.Iterate(func(_ string, t *tork.Task) {
-		if t.JobID == jobID && t.State.IsActive() {
+		if t.JobID == jobID && t.IsActive() {
 			result = append(result, t.Clone())
 		}
 	})

@@ -201,3 +201,31 @@ func TestWebhookIfFalse(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 	}
 }
+
+func TestWebhookState(t *testing.T) {
+	ds := inmemory.NewInMemoryDatastore()
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
+	received := make(chan any)
+	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(received)
+	}))
+	j := &tork.Job{
+		ID:      "1",
+		State:   tork.JobStateCompleted,
+		Context: tork.JobContext{},
+		Webhooks: []*tork.Webhook{{
+			URL:   callbackState.URL,
+			Event: webhook.EventTaskStateChange,
+			If:    "{{ task.State == 'COMPLETED' && job.State == 'COMPLETED' }}",
+		}},
+	}
+	err := ds.CreateJob(context.Background(), j)
+	assert.NoError(t, err)
+	tk := &tork.Task{
+		ID:    "2",
+		JobID: j.ID,
+		State: tork.TaskStateCompleted,
+	}
+	assert.NoError(t, hm(context.Background(), StateChange, tk))
+	<-received
+}
