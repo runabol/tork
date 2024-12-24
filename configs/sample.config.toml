@@ -62,7 +62,7 @@ enabled = false
 key = ""        # if left blank, it will auto-generate a key and print it to the logs on startup
 
 [middleware.web]
-bodylimit = 64K # Limit can be specified as 4x, where x is one of the multiple from K, M, G, T or P.
+bodylimit = "500K" # Limit can be specified as 4x, where x is one of the multiple from K, M, G, T or P.
 
 
 # rate limiter middleware
