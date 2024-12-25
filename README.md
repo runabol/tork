@@ -42,6 +42,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - Supports both stand-alone and [distributed](https://www.tork.run/installation#running-in-a-distributed-mode) setup
 - Retry failed tasks
 - [Middleware](https://www.tork.run/extend#middleware)
+- [Webhooks](https://www.tork.run/jobs#webhooks)
 - [Pre/Post tasks](https://www.tork.run/tasks#pre-post-tasks)
 - No single point of failure
 - Task timeout
