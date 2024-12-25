@@ -40,7 +40,7 @@ Tork is a highly-scalable, general-purpose workflow engine.
 - Task isolation - tasks are executed within a container to provide isolation, idempotency, and in order to enforce resource [limits](https://www.tork.run/tasks#limits)
 - Automatic recovery of tasks in the event of a worker crash
 - Supports both stand-alone and [distributed](https://www.tork.run/installation#running-in-a-distributed-mode) setup
-- Retry failed tasks
+- [Retry failed tasks](https://www.tork.run/tasks#retry)
 - [Middleware](https://www.tork.run/extend#middleware)
 - [Webhooks](https://www.tork.run/jobs#webhooks)
 - [Pre/Post tasks](https://www.tork.run/tasks#pre-post-tasks)
