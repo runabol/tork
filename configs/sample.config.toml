@@ -20,9 +20,12 @@ durable.queues = false
 [datastore]
 type = "inmemory" # inmemory | postgres
 
+[datastore.retention]
+logs.duration = "168h" # 1 week
+jobs.duration = "8760h" # 1 year
+
 [datastore.postgres]
 dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
-task.logs.interval = "168h"
 
 [coordinator]
 address = "localhost:8000"

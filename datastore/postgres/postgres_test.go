@@ -1166,7 +1166,7 @@ func TestPostgresCreateAndExpungeTaskLogs(t *testing.T) {
 	assert.Equal(t, 100, logs.TotalItems)
 
 	retentionPeriod := time.Microsecond
-	ds.taskLogsRetentionPeriod = &retentionPeriod
+	ds.logsRetentionDuration = &retentionPeriod
 
 	n, err = ds.expungeExpiredTaskLogPart()
 	assert.NoError(t, err)
@@ -1234,7 +1234,7 @@ func Test_cleanup(t *testing.T) {
 	assert.Equal(t, 100, logs.TotalItems)
 
 	retentionPeriod := time.Microsecond
-	ds.taskLogsRetentionPeriod = &retentionPeriod
+	ds.logsRetentionDuration = &retentionPeriod
 
 	err = ds.cleanup()
 	assert.NoError(t, err)
@@ -1541,5 +1541,76 @@ func TestPostgresGetActiveScheduledJobs(t *testing.T) {
 	assert.NotEmpty(t, activeJobs)
 	for _, aj := range activeJobs {
 		assert.Equal(t, tork.ScheduledJobStateActive, aj.State)
+	}
+}
+
+func TestPostgresExpungeExpiredJobs(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn, WithJobsRetentionDuration(time.Hour*24*30))
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+
+	// Create jobs with different states and delete_at times
+	jobs := []*tork.Job{
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStateCompleted,
+			CreatedAt: now.Add(-time.Hour * 24 * 31), // older than default retention
+		},
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStateFailed,
+			CreatedAt: now.Add(-time.Hour * 24 * 31), // older than default retention
+		},
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStateCancelled,
+			CreatedAt: now.Add(-time.Hour * 24 * 31), // older than default retention
+		},
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStateRunning,
+			CreatedAt: now.Add(-time.Hour * 24 * 31), // should not be deleted
+		},
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStatePending,
+			CreatedAt: now.Add(-time.Hour * 24 * 31), // should not be deleted
+		},
+		{
+			ID:        uuid.NewUUID(),
+			State:     tork.JobStateCompleted,
+			CreatedAt: now,
+			DeleteAt:  &now, // should be deleted
+		},
+	}
+
+	for _, job := range jobs {
+		err = ds.CreateJob(ctx, job)
+		assert.NoError(t, err)
+		if job.DeleteAt != nil {
+			err = ds.UpdateJob(ctx, job.ID, func(u *tork.Job) error {
+				u.DeleteAt = job.DeleteAt
+				return nil
+			})
+			assert.NoError(t, err)
+		}
+	}
+
+	// Expunge expired jobs
+	n, err := ds.expungeExpiredJobs()
+	assert.NoError(t, err)
+	assert.Equal(t, 4, n) // 3 jobs older than retention + 1 job with delete_at
+
+	// Verify remaining jobs
+	for _, job := range jobs {
+		_, err := ds.GetJobByID(ctx, job.ID)
+		if job.State == tork.JobStateRunning || job.State == tork.JobStatePending {
+			assert.NoError(t, err)
+		} else if job.DeleteAt == nil || job.DeleteAt.Before(now) {
+			assert.Error(t, err)
+		}
 	}
 }
