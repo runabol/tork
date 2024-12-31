@@ -20,26 +20,34 @@ import (
 )
 
 type PostgresDatastore struct {
-	db                      *sqlx.DB
-	tx                      *sqlx.Tx
-	taskLogsRetentionPeriod *time.Duration
-	cleanupInterval         *time.Duration
-	rand                    *rand.Rand
-	disableCleanup          bool
+	db                    *sqlx.DB
+	tx                    *sqlx.Tx
+	logsRetentionDuration *time.Duration
+	jobsRetentionDuration *time.Duration
+	cleanupInterval       *time.Duration
+	rand                  *rand.Rand
+	disableCleanup        bool
 }
 
 var (
-	initialCleanupInterval         = minCleanupInterval
-	minCleanupInterval             = time.Minute
-	maxCleanupInterval             = time.Hour
-	DefaultTaskLogsRetentionPeriod = time.Hour * 24 * 7
+	initialCleanupInterval       = minCleanupInterval
+	minCleanupInterval           = time.Minute
+	maxCleanupInterval           = time.Hour
+	DefaultLogsRetentionDuration = time.Hour * 24 * 7   // 1 week
+	DefaultJobsRetentionDuration = time.Hour * 24 * 365 // 1 year
 )
 
 type Option = func(ds *PostgresDatastore)
 
-func WithTaskLogRetentionPeriod(dur time.Duration) Option {
+func WithLogsRetentionDuration(dur time.Duration) Option {
 	return func(ds *PostgresDatastore) {
-		ds.taskLogsRetentionPeriod = &dur
+		ds.logsRetentionDuration = &dur
+	}
+}
+
+func WithJobsRetentionDuration(dur time.Duration) Option {
+	return func(ds *PostgresDatastore) {
+		ds.jobsRetentionDuration = &dur
 	}
 }
 
@@ -62,14 +70,20 @@ func NewPostgresDataStore(dsn string, opts ...Option) (*PostgresDatastore, error
 		opt(ds)
 	}
 	ds.cleanupInterval = &initialCleanupInterval
-	if ds.taskLogsRetentionPeriod == nil {
-		ds.taskLogsRetentionPeriod = &DefaultTaskLogsRetentionPeriod
+	if ds.logsRetentionDuration == nil {
+		ds.logsRetentionDuration = &DefaultLogsRetentionDuration
+	}
+	if ds.jobsRetentionDuration == nil {
+		ds.jobsRetentionDuration = &DefaultJobsRetentionDuration
 	}
 	if *ds.cleanupInterval < time.Minute {
 		return nil, errors.Errorf("cleanup interval can not be under 1 minute")
 	}
-	if *ds.taskLogsRetentionPeriod < time.Minute {
-		return nil, errors.Errorf("task logs retention period can not be under 1 minute")
+	if *ds.logsRetentionDuration < time.Minute {
+		return nil, errors.Errorf("logs retention period can not be under 1 minute")
+	}
+	if *ds.jobsRetentionDuration < time.Minute {
+		return nil, errors.Errorf("jobs retention period can not be under 1 minute")
 	}
 	if !ds.disableCleanup {
 		go ds.cleanupProcess()
@@ -774,7 +788,7 @@ func (ds *PostgresDatastore) expungeExpiredTaskLogPart() (int, error) {
 		    where  created_at < $1 
 		    limit  1000
 	      )`
-	res, err := ds.exec(q, time.Now().UTC().Add(-*ds.taskLogsRetentionPeriod))
+	res, err := ds.exec(q, time.Now().UTC().Add(-*ds.logsRetentionDuration))
 	if err != nil {
 		return 0, errors.Wrapf(err, "error deleting expired task log parts from the db")
 	}
@@ -793,7 +807,7 @@ func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
 			return errors.New("unable to cast to a postgres datastore")
 		}
 		ids := []string{}
-		if err := ptx.select_(&ids, "select id from jobs where delete_at < current_timestamp limit 1000"); err != nil {
+		if err := ptx.select_(&ids, "select id from jobs where (delete_at < current_timestamp) OR (created_at < $1 AND (state = 'COMPLETED' or state = 'FAILED' or state = 'CANCELLED')) limit 1000", time.Now().UTC().Add(-*ds.jobsRetentionDuration)); err != nil {
 			return errors.Wrapf(err, "error getting list of expired job ids from the db")
 		}
 		if len(ids) == 0 {
