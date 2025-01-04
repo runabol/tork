@@ -308,18 +308,13 @@ func TestOnDatastoreInit(t *testing.T) {
 	eng := New(Config{Mode: ModeStandalone})
 	assert.Equal(t, StateIdle, eng.state)
 
-	c := make(chan any)
-	eng.OnDatastoreInit(func(ds datastore.Datastore) error {
-		assert.NotNil(t, ds)
-		close(c)
-		return nil
-	})
+	ds := eng.Datastore()
+	assert.Error(t, ds.HealthCheck(context.Background()))
 
 	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
-
-	<-c
+	assert.NoError(t, ds.HealthCheck(context.Background()))
 
 	err = eng.Terminate()
 	assert.NoError(t, err)

@@ -49,7 +49,7 @@ type Engine struct {
 	state        string
 	mu           sync.Mutex
 	broker       mq.Broker
-	ds           datastore.Datastore
+	ds           *datastoreProxy
 	locker       locker.Locker
 	mounters     map[string]*runtime.MultiMounter
 	runtime      runtime.Runtime
@@ -58,7 +58,6 @@ type Engine struct {
 	dsProviders  map[string]datastore.Provider
 	mqProviders  map[string]mq.Provider
 	onBrokerInit []func(b mq.Broker) error
-	onDsInit     []func(ds datastore.Datastore) error
 }
 
 type Config struct {
@@ -89,6 +88,7 @@ func New(cfg Config) *Engine {
 		mounters:    make(map[string]*runtime.MultiMounter),
 		dsProviders: make(map[string]datastore.Provider),
 		mqProviders: make(map[string]mq.Provider),
+		ds:          &datastoreProxy{},
 	}
 }
 
@@ -358,11 +358,10 @@ func (e *Engine) OnBrokerInit(fn func(b mq.Broker) error) {
 	e.onBrokerInit = append(e.onBrokerInit, fn)
 }
 
-func (e *Engine) OnDatastoreInit(fn func(ds datastore.Datastore) error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.mustState(StateIdle)
-	e.onDsInit = append(e.onDsInit, fn)
+// Datastore returns the datastore used by the engine.
+// It is only available after the engine has been started.
+func (e *Engine) Datastore() datastore.Datastore {
+	return e.ds
 }
 
 func (e *Engine) awaitTerm() {
