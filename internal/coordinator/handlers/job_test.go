@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_handleJobs(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
@@ -44,7 +44,7 @@ func Test_handleJobs(t *testing.T) {
 
 func Test_handleCancelJob(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
@@ -117,7 +117,7 @@ func Test_handleCancelJob(t *testing.T) {
 
 func Test_handleRestartJob(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
@@ -174,7 +174,7 @@ func Test_handleRestartJob(t *testing.T) {
 
 func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
@@ -206,10 +206,10 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 
 func Test_handleCompleteJob(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	events := 0
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err := b.SubscribeForEvents(ctx, broker.TOPIC_JOB_COMPLETED, func(event any) {
 		j, ok := event.(*tork.Job)
 		assert.True(t, ok)
 		assert.Equal(t, tork.JobStateCompleted, j.State)
@@ -254,10 +254,10 @@ func Test_handleCompleteJob(t *testing.T) {
 
 func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	events := 0
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err := b.SubscribeForEvents(ctx, broker.TOPIC_JOB_COMPLETED, func(event any) {
 		j, ok := event.(*tork.Job)
 		assert.True(t, ok)
 		assert.Equal(t, tork.JobStateCompleted, j.State)
@@ -305,10 +305,10 @@ func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
 
 func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	events := 0
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err := b.SubscribeForEvents(ctx, broker.TOPIC_JOB_COMPLETED, func(event any) {
 		j, ok := event.(*tork.Job)
 		assert.True(t, ok)
 		assert.Equal(t, tork.JobStateCompleted, j.State)
@@ -352,7 +352,7 @@ func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 
 func Test_handleJobProgress(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)

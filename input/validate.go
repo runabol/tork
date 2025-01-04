@@ -9,9 +9,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/robfig/cron/v3"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
-	"github.com/runabol/tork/mq"
 )
 
 var (
@@ -121,10 +121,10 @@ func validateQueue(fl validator.FieldLevel) bool {
 	if v == "" {
 		return true
 	}
-	if strings.HasPrefix(v, mq.QUEUE_EXCLUSIVE_PREFIX) {
+	if strings.HasPrefix(v, broker.QUEUE_EXCLUSIVE_PREFIX) {
 		return false
 	}
-	if mq.IsCoordinatorQueue(v) {
+	if broker.IsCoordinatorQueue(v) {
 		return false
 	}
 	return true

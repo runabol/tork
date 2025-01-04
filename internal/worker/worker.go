@@ -14,8 +14,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 
 	"github.com/runabol/tork/internal/host"
 	"github.com/runabol/tork/internal/syncx"
@@ -29,7 +29,7 @@ type Worker struct {
 	name       string
 	startTime  time.Time
 	runtime    runtime.Runtime
-	broker     mq.Broker
+	broker     broker.Broker
 	stop       chan any
 	queues     map[string]int
 	tasks      *syncx.Map[string, runningTask]
@@ -44,7 +44,7 @@ type Worker struct {
 type Config struct {
 	Name       string
 	Address    string
-	Broker     mq.Broker
+	Broker     broker.Broker
 	Runtime    runtime.Runtime
 	Queues     map[string]int
 	Limits     Limits
@@ -64,7 +64,7 @@ type runningTask struct {
 
 func NewWorker(cfg Config) (*Worker, error) {
 	if len(cfg.Queues) == 0 {
-		cfg.Queues = map[string]int{mq.QUEUE_DEFAULT: 1}
+		cfg.Queues = map[string]int{broker.QUEUE_DEFAULT: 1}
 	}
 	if cfg.Broker == nil {
 		return nil, errors.New("must provide broker")
@@ -132,7 +132,7 @@ func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 			t.Error = fmt.Sprintf("invalid port mapping: %s", p.Port)
 			t.FailedAt = &now
 			t.State = tork.TaskStateFailed
-			return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+			return w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 		}
 		var hostPort string
 		var containerPort string
@@ -146,7 +146,7 @@ func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 				t.Error = err.Error()
 				t.FailedAt = &now
 				t.State = tork.TaskStateFailed
-				return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+				return w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 			}
 			hostPort = reservedPort
 			containerPort = portMapping[0]
@@ -169,21 +169,21 @@ func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 		t.Error = err.Error()
 		t.FailedAt = &now
 		t.State = tork.TaskStateFailed
-		return w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+		return w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 	}
 	switch rt.State {
 	case tork.TaskStateCompleted:
 		t.Result = rt.Result
 		t.CompletedAt = rt.CompletedAt
 		t.State = rt.State
-		if err := w.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
+		if err := w.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t); err != nil {
 			return err
 		}
 	case tork.TaskStateFailed:
 		t.Error = rt.Error
 		t.FailedAt = rt.FailedAt
 		t.State = rt.State
-		if err := w.broker.PublishTask(ctx, mq.QUEUE_ERROR, t); err != nil {
+		if err := w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t); err != nil {
 			return err
 		}
 	default:
@@ -208,7 +208,7 @@ func (w *Worker) runTask(t *tork.Task) error {
 	})
 	defer w.tasks.Delete(t.ID)
 	// let the coordinator know that the task started executing
-	if err := w.broker.PublishTask(ctx, mq.QUEUE_STARTED, t); err != nil {
+	if err := w.broker.PublishTask(ctx, broker.QUEUE_STARTED, t); err != nil {
 		return err
 	}
 	if err := w.doRunTask(ctx, t); err != nil {
@@ -264,7 +264,7 @@ func (w *Worker) sendHeartbeats() {
 				Name:            w.name,
 				StartedAt:       w.startTime,
 				CPUPercent:      cpuPercent,
-				Queue:           fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id),
+				Queue:           fmt.Sprintf("%s%s", broker.QUEUE_EXCLUSIVE_PREFIX, w.id),
 				Status:          status,
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
@@ -292,12 +292,12 @@ func (w *Worker) Start() error {
 		return err
 	}
 	// subscribe for a private queue for the node
-	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", mq.QUEUE_EXCLUSIVE_PREFIX, w.id), w.cancelTask); err != nil {
+	if err := w.broker.SubscribeForTasks(fmt.Sprintf("%s%s", broker.QUEUE_EXCLUSIVE_PREFIX, w.id), w.cancelTask); err != nil {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
 	// subscribe to shared work queues
 	for qname, concurrency := range w.queues {
-		if !mq.IsWorkerQueue(qname) {
+		if !broker.IsWorkerQueue(qname) {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {

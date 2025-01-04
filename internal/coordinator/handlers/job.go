@@ -7,22 +7,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 )
 
 type jobHandler struct {
 	ds        datastore.Datastore
-	broker    mq.Broker
+	broker    broker.Broker
 	onPending task.HandlerFunc
 	onCancel  job.HandlerFunc
 }
 
-func NewJobHandler(ds datastore.Datastore, b mq.Broker, mw ...task.MiddlewareFunc) job.HandlerFunc {
+func NewJobHandler(ds datastore.Datastore, b broker.Broker, mw ...task.MiddlewareFunc) job.HandlerFunc {
 	h := &jobHandler{
 		ds:        ds,
 		broker:    b,
@@ -142,13 +142,13 @@ func (h *jobHandler) completeJob(ctx context.Context, j *tork.Job) error {
 			parent.CompletedAt = &now
 			parent.Result = j.Result
 		}
-		return h.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, parent)
+		return h.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, parent)
 	}
 	// publish job completd/failed event
 	if j.State == tork.JobStateFailed {
-		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
+		return h.broker.PublishEvent(ctx, broker.TOPIC_JOB_FAILED, j)
 	} else {
-		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j)
+		return h.broker.PublishEvent(ctx, broker.TOPIC_JOB_COMPLETED, j)
 	}
 }
 
@@ -191,7 +191,7 @@ func (h *jobHandler) restartJob(ctx context.Context, j *tork.Job) error {
 	if err := h.ds.CreateTask(ctx, t); err != nil {
 		return err
 	}
-	return h.broker.PublishTask(ctx, mq.QUEUE_PENDING, t)
+	return h.broker.PublishTask(ctx, broker.QUEUE_PENDING, t)
 }
 
 func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
@@ -217,7 +217,7 @@ func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
 		parent.State = tork.TaskStateFailed
 		parent.FailedAt = j.FailedAt
 		parent.Error = j.Error
-		return h.broker.PublishTask(ctx, mq.QUEUE_ERROR, parent)
+		return h.broker.PublishTask(ctx, broker.QUEUE_ERROR, parent)
 	}
 	// cancel all currently running tasks
 	if err := cancelActiveTasks(ctx, h.ds, h.broker, j.ID); err != nil {
@@ -228,7 +228,7 @@ func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
 		return errors.Wrapf(err, "unknown job: %s", j.ID)
 	}
 	if j.State == tork.JobStateFailed {
-		return h.broker.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j)
+		return h.broker.PublishEvent(ctx, broker.TOPIC_JOB_FAILED, j)
 	}
 	return nil
 }

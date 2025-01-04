@@ -1,4 +1,4 @@
-package mq
+package broker
 
 import (
 	"fmt"

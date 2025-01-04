@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/input"
@@ -16,7 +17,6 @@ import (
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/runabol/tork/runtime/shell"
 
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 	"github.com/stretchr/testify/assert"
 )
@@ -212,7 +212,7 @@ func TestSubmitJob(t *testing.T) {
 
 	j.State = tork.JobStateCompleted
 
-	err = eng.Broker().PublishEvent(context.Background(), mq.TOPIC_JOB_COMPLETED, j)
+	err = eng.Broker().PublishEvent(context.Background(), broker.TOPIC_JOB_COMPLETED, j)
 	assert.NoError(t, err)
 	<-c
 }

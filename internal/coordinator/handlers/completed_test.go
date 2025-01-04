@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_handleCompletedLastTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -70,7 +70,7 @@ func Test_handleCompletedLastTask(t *testing.T) {
 
 func Test_handleSkippedTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -124,7 +124,7 @@ func Test_handleSkippedTask(t *testing.T) {
 
 func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -157,7 +157,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 	err = ds.CreateTask(ctx, parentTask)
 	assert.NoError(t, err)
 
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t1 *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(t1 *tork.Task) error {
 		// expecting completion of parent task
 		assert.Equal(t, parentTask.ID, t1.ID)
 		assert.Equal(t, tork.TaskStateCompleted, t1.State)
@@ -215,7 +215,7 @@ func Test_handleCompletedLastSubJobTask(t *testing.T) {
 
 func Test_handleCompletedFirstTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -276,7 +276,7 @@ func Test_handleCompletedFirstTask(t *testing.T) {
 
 func Test_handleCompletedScheduledTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -330,7 +330,7 @@ func Test_handleCompletedScheduledTask(t *testing.T) {
 
 func Test_handleCompletedParallelTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -440,7 +440,7 @@ func Test_handleCompletedParallelTask(t *testing.T) {
 
 func Test_handleCompletedEachTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)
@@ -550,7 +550,7 @@ func Test_completeTopLevelTaskWithTxRollback(t *testing.T) {
 	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
@@ -601,12 +601,12 @@ func Test_completeTopLevelTaskWithTx(t *testing.T) {
 	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	handler := NewCompletedHandler(ds, b)
 	assert.NotNil(t, handler)
 
-	err = b.SubscribeForTasks(mq.QUEUE_PENDING, func(t1 *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_PENDING, func(t1 *tork.Task) error {
 		return nil
 	})
 	assert.NoError(t, err)
@@ -658,7 +658,7 @@ func Test_completeParallelTaskWithTx(t *testing.T) {
 	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	handler := NewCompletedHandler(ds, mq.NewInMemoryBroker())
+	handler := NewCompletedHandler(ds, broker.NewInMemoryBroker())
 	assert.NotNil(t, handler)
 
 	j1 := &tork.Job{
@@ -708,7 +708,7 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 	ds, err := postgres.NewPostgresDataStore(dsn)
 	assert.NoError(t, err)
 
-	handler := NewCompletedHandler(ds, mq.NewInMemoryBroker())
+	handler := NewCompletedHandler(ds, broker.NewInMemoryBroker())
 	assert.NotNil(t, handler)
 
 	j1 := &tork.Job{
@@ -754,7 +754,7 @@ func Test_completeEachTaskWithTx(t *testing.T) {
 
 func Test_handleCompletedEachTaskWithNextTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	handler := NewCompletedHandler(ds, b)

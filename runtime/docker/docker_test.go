@@ -21,8 +21,8 @@ import (
 
 	mobyarchive "github.com/moby/moby/pkg/archive"
 
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -169,7 +169,7 @@ func TestProgress(t *testing.T) {
 }
 
 func TestRunTaskCMDLogger(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
 		processed <- 1

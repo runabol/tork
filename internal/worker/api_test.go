@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/syncx"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func Test_health(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 	api := newAPI(Config{
-		Broker:  mq.NewInMemoryBroker(),
+		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
 	}, &syncx.Map[string, runningTask]{})
 	assert.NotNil(t, api)
@@ -60,7 +60,7 @@ func Test_proxyTaskRoot(t *testing.T) {
 	})
 
 	api := newAPI(Config{
-		Broker:  mq.NewInMemoryBroker(),
+		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
 	}, tasks)
 	assert.NotNil(t, api)
@@ -98,7 +98,7 @@ func Test_proxyTaskSomePath(t *testing.T) {
 	})
 
 	api := newAPI(Config{
-		Broker:  mq.NewInMemoryBroker(),
+		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
 	}, tasks)
 	assert.NotNil(t, api)

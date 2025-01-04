@@ -30,9 +30,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -51,7 +51,7 @@ type DockerRuntime struct {
 	images       *syncx.Map[string, bool]
 	pullq        chan *pullRequest
 	mounter      runtime.Mounter
-	broker       mq.Broker
+	broker       broker.Broker
 	config       string
 	sandbox      bool
 	busyboxImage string
@@ -82,7 +82,7 @@ func WithMounter(mounter runtime.Mounter) Option {
 	}
 }
 
-func WithBroker(broker mq.Broker) Option {
+func WithBroker(broker broker.Broker) Option {
 	return func(rt *DockerRuntime) {
 		rt.broker = broker
 	}
@@ -166,7 +166,7 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if d.broker != nil {
-		logger = mq.NewLogShipper(d.broker, t.ID)
+		logger = broker.NewLogShipper(d.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}

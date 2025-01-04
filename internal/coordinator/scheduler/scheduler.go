@@ -8,18 +8,18 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 )
 
 type Scheduler struct {
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 }
 
-func NewScheduler(ds datastore.Datastore, b mq.Broker) *Scheduler {
+func NewScheduler(ds datastore.Datastore, b broker.Broker) *Scheduler {
 	return &Scheduler{ds: ds, broker: b}
 }
 
@@ -72,7 +72,7 @@ func (s *Scheduler) scheduleRegularTask(ctx context.Context, t *tork.Task) error
 		}
 	}
 	if t.Queue == "" {
-		t.Queue = mq.QUEUE_DEFAULT
+		t.Queue = broker.QUEUE_DEFAULT
 	}
 	// mark task state as scheduled
 	t.State = tork.TaskStateScheduled
@@ -179,7 +179,7 @@ func (s *Scheduler) scheduleDetachedSubJob(ctx context.Context, t *tork.Task) er
 	}
 	t.CompletedAt = &now
 	t.State = tork.TaskStateCompleted
-	return s.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
+	return s.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t)
 }
 
 func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
@@ -194,7 +194,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	if err != nil {
 		t.Error = err.Error()
 		t.State = tork.TaskStateFailed
-		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+		return s.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 	}
 	var list []any
 	rlist := reflect.ValueOf(lraw)
@@ -205,7 +205,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	} else {
 		t.Error = "each.list does not evaluate to a list"
 		t.State = tork.TaskStateFailed
-		return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+		return s.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 	}
 	// mark the task as running
 	if err := s.ds.UpdateTask(ctx, t.ID, func(u *tork.Task) error {
@@ -244,7 +244,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 		if err := eval.EvaluateTask(et, cx); err != nil {
 			t.Error = err.Error()
 			t.State = tork.TaskStateFailed
-			return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+			return s.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 		}
 		if err := s.ds.CreateTask(ctx, et); err != nil {
 			return err
@@ -253,7 +253,7 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 		// account by only firing an amount of tasks upto that
 		// level of concurrency.
 		if t.Each.Concurrency == 0 || ix < t.Each.Concurrency {
-			if err := s.broker.PublishTask(ctx, mq.QUEUE_PENDING, et); err != nil {
+			if err := s.broker.PublishTask(ctx, broker.QUEUE_PENDING, et); err != nil {
 				return err
 			}
 		}
@@ -288,12 +288,12 @@ func (s *Scheduler) scheduleParallelTask(ctx context.Context, t *tork.Task) erro
 		if err := eval.EvaluateTask(pt, j.Context.AsMap()); err != nil {
 			t.Error = err.Error()
 			t.State = tork.TaskStateFailed
-			return s.broker.PublishTask(ctx, mq.QUEUE_ERROR, t)
+			return s.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
 		}
 		if err := s.ds.CreateTask(ctx, pt); err != nil {
 			return err
 		}
-		if err := s.broker.PublishTask(ctx, mq.QUEUE_PENDING, pt); err != nil {
+		if err := s.broker.PublishTask(ctx, broker.QUEUE_PENDING, pt); err != nil {
 			return err
 		}
 	}

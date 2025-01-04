@@ -6,17 +6,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/middleware/job"
-	"github.com/runabol/tork/mq"
 )
 
 type cancelHandler struct {
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 }
 
-func NewCancelHandler(ds datastore.Datastore, b mq.Broker) job.HandlerFunc {
+func NewCancelHandler(ds datastore.Datastore, b broker.Broker) job.HandlerFunc {
 	h := &cancelHandler{
 		ds:     ds,
 		broker: b,
@@ -59,7 +59,7 @@ func (h *cancelHandler) handle(ctx context.Context, _ job.EventType, j *tork.Job
 	return nil
 }
 
-func cancelActiveTasks(ctx context.Context, ds datastore.Datastore, b mq.Broker, jobID string) error {
+func cancelActiveTasks(ctx context.Context, ds datastore.Datastore, b broker.Broker, jobID string) error {
 	// get a list of active tasks for the job
 	tasks, err := ds.GetActiveTasks(ctx, jobID)
 	if err != nil {

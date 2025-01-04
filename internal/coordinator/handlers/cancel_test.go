@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ func Test_cancelActiveTasks(t *testing.T) {
 	ctx := context.Background()
 
 	ds := inmemory.NewInMemoryDatastore()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),

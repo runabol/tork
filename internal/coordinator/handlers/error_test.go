@@ -6,19 +6,19 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_handleFailedTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	events := make(chan any)
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB_FAILED, func(event any) {
+	err := b.SubscribeForEvents(ctx, broker.TOPIC_JOB_FAILED, func(event any) {
 		j, ok := event.(*tork.Job)
 		assert.True(t, ok)
 		assert.Equal(t, tork.JobStateFailed, j.State)
@@ -109,10 +109,10 @@ func Test_handleFailedTask(t *testing.T) {
 
 func Test_handleFailedTaskRetry(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
 		assert.Nil(t, tk.FailedAt)
 		close(processed)
 		return nil

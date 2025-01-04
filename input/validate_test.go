@@ -6,8 +6,9 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
-	"github.com/runabol/tork/mq"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,7 +68,7 @@ func TestValidateQueue(t *testing.T) {
 			{
 				Name:  "test task",
 				Image: "some:image",
-				Queue: mq.QUEUE_JOBS,
+				Queue: broker.QUEUE_JOBS,
 			},
 		},
 	}

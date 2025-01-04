@@ -22,14 +22,14 @@ import (
 	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/middleware/web"
 
-	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/broker"
 
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_getQueues(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	err := b.SubscribeForTasks("some-queue", func(t *tork.Task) error {
 		return nil
 	})
@@ -47,7 +47,7 @@ func Test_getQueues(t *testing.T) {
 	body, err := io.ReadAll(w.Body)
 	assert.NoError(t, err)
 
-	qs := []mq.QueueInfo{}
+	qs := []broker.QueueInfo{}
 	err = json.Unmarshal(body, &qs)
 	assert.NoError(t, err)
 
@@ -57,7 +57,7 @@ func Test_getQueues(t *testing.T) {
 }
 
 func Test_listJobs(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	ds := inmemory.NewInMemoryDatastore()
 	api, err := NewAPI(Config{
 		DataStore: ds,
@@ -139,7 +139,7 @@ func Test_getActiveNodes(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -162,7 +162,7 @@ func Test_getActiveNodes(t *testing.T) {
 func Test_healthOK(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -184,7 +184,7 @@ func Test_healthNotOK(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -202,7 +202,7 @@ func Test_healthNotOK(t *testing.T) {
 func Test_getUnknownTask(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -225,7 +225,7 @@ func Test_getTask(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -246,7 +246,7 @@ func Test_getTask(t *testing.T) {
 func Test_createJob(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -273,7 +273,7 @@ func Test_createJob(t *testing.T) {
 func Test_createJobInvalidProperty(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -299,7 +299,7 @@ func Test_getJob(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -370,7 +370,7 @@ func Test_cancelRunningJob(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -438,7 +438,7 @@ func Test_cancelScheduledJob(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -487,7 +487,7 @@ func Test_restartJob(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -536,7 +536,7 @@ func Test_restartRunningJob(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -582,7 +582,7 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -604,7 +604,7 @@ func Test_middleware(t *testing.T) {
 			return next(c)
 		}
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -627,7 +627,7 @@ func Test_middleware(t *testing.T) {
 }
 
 func Test_echoMiddleware(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -672,7 +672,7 @@ func Test_middlewareMultiple(t *testing.T) {
 			return next(c)
 		}
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -713,7 +713,7 @@ func Test_2CustomEndpoints(t *testing.T) {
 	h2 := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK 2")
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -750,7 +750,7 @@ func Test_customEndpoint(t *testing.T) {
 	h := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK")
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -776,7 +776,7 @@ func Test_customEndpointInvalidSpec(t *testing.T) {
 	h := func(c web.Context) error {
 		return c.String(http.StatusOK, "OK")
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	_, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -792,7 +792,7 @@ func Test_customEndpointError(t *testing.T) {
 		c.Error(http.StatusBadRequest, errors.Errorf("bad stuff happened"))
 		return nil
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -825,7 +825,7 @@ func Test_customEndpointBind(t *testing.T) {
 		}
 		return c.String(http.StatusOK, s.Name)
 	}
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
 		Broker:    b,
@@ -851,7 +851,7 @@ func Test_customEndpointBind(t *testing.T) {
 func Test_disableEndpoint(t *testing.T) {
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 		Enabled:   map[string]bool{"health": false},
 	})
 	assert.NoError(t, err)
@@ -879,7 +879,7 @@ func TestShutdown(t *testing.T) {
 
 	api, err := NewAPI(Config{
 		DataStore: inmemory.NewInMemoryDatastore(),
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw},
 		},
@@ -917,7 +917,7 @@ func Test_completeTask(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -953,7 +953,7 @@ func Test_proxyTaskNotRunning(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -997,7 +997,7 @@ func Test_proxyTaskRoot(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)
@@ -1043,7 +1043,7 @@ func Test_proxyTaskSomePath(t *testing.T) {
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
-		Broker:    mq.NewInMemoryBroker(),
+		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, api)

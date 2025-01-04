@@ -9,9 +9,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime/docker"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ func TestNewWorker(t *testing.T) {
 	assert.Nil(t, w)
 
 	w, err = NewWorker(Config{
-		Broker:  mq.NewInMemoryBroker(),
+		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
 	})
 	assert.NoError(t, err)
@@ -37,7 +37,7 @@ func TestStart(t *testing.T) {
 	assert.NoError(t, err)
 
 	w, err := NewWorker(Config{
-		Broker:  mq.NewInMemoryBroker(),
+		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
 	})
 	assert.NoError(t, err)
@@ -50,7 +50,7 @@ func Test_handleTaskRun(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -60,14 +60,14 @@ func Test_handleTaskRun(t *testing.T) {
 	assert.NotNil(t, w)
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
 
 	starts := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
 		close(starts)
 		return nil
@@ -103,7 +103,7 @@ func Test_handleTaskRunOutput(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -132,10 +132,10 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		close(completions)
 		return nil
 	})
@@ -188,7 +188,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -199,7 +199,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	tid := uuid.NewUUID()
 
 	errs := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
 		assert.NotEmpty(t, tk.Error)
 		close(errs)
 		return nil
@@ -207,7 +207,7 @@ func Test_handleTaskCancel(t *testing.T) {
 	assert.NoError(t, err)
 
 	// cancel the task immediately upon start
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
 		err := w.cancelTask(&tork.Task{
 			ID:    tid,
 			State: tork.TaskStateCancelled,
@@ -237,10 +237,10 @@ func Test_handleTaskError(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	errs := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
 		assert.NotEmpty(t, tk.Error)
 		close(errs)
 		return nil
@@ -272,10 +272,10 @@ func Test_handleTaskOutput(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		assert.NotEmpty(t, tk.Result)
 		close(completions)
 		return nil
@@ -318,10 +318,10 @@ func Test_middleware(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		assert.Equal(t, "someval", tk.Result)
 		assert.Equal(t, "", tk.Env["SOMEVAR"])
 		close(completions)
@@ -369,10 +369,10 @@ func Test_middlewareFailure(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ch := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
 		close(ch)
 		return nil
 	})
@@ -411,7 +411,7 @@ func Test_middlewareFailure(t *testing.T) {
 func Test_sendHeartbeat(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	heartbeats := make(chan any)
 	err = b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		assert.Contains(t, n.Version, tork.Version)
@@ -437,7 +437,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -450,7 +450,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 	assert.NotNil(t, w)
 
 	errors := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
 		assert.Contains(t, tk.Error, "context deadline exceeded")
 		close(errors)
 		return nil
@@ -458,7 +458,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 	assert.NoError(t, err)
 
 	starts := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
 		close(starts)
 		return nil
@@ -494,7 +494,7 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -507,14 +507,14 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	assert.NotNil(t, w)
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
 
 	starts := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
 		close(starts)
 		return nil
@@ -550,7 +550,7 @@ func Test_reservePort(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -571,7 +571,7 @@ func Test_handleServiceTaskRun(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	w, err := NewWorker(Config{
 		Broker:  b,
@@ -581,14 +581,14 @@ func Test_handleServiceTaskRun(t *testing.T) {
 	assert.NotNil(t, w)
 
 	completions := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		close(completions)
 		return nil
 	})
 	assert.NoError(t, err)
 
 	starts := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_STARTED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
 		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
 		close(starts)
 		return nil
