@@ -48,8 +48,8 @@ type Engine struct {
 	cfg          Config
 	state        string
 	mu           sync.Mutex
-	broker       mq.Broker
-	ds           *datastoreProxy
+	brokerRef    *brokerProxy
+	datastoreRef *datastoreProxy
 	locker       locker.Locker
 	mounters     map[string]*runtime.MultiMounter
 	runtime      runtime.Runtime
@@ -57,7 +57,6 @@ type Engine struct {
 	worker       *worker.Worker
 	dsProviders  map[string]datastore.Provider
 	mqProviders  map[string]mq.Provider
-	onBrokerInit []func(b mq.Broker) error
 }
 
 type Config struct {
@@ -80,15 +79,16 @@ func New(cfg Config) *Engine {
 		cfg.Endpoints = make(map[string]web.HandlerFunc)
 	}
 	return &Engine{
-		quit:        make(chan os.Signal, 1),
-		terminate:   make(chan any),
-		terminated:  make(chan any),
-		cfg:         cfg,
-		state:       StateIdle,
-		mounters:    make(map[string]*runtime.MultiMounter),
-		dsProviders: make(map[string]datastore.Provider),
-		mqProviders: make(map[string]mq.Provider),
-		ds:          &datastoreProxy{},
+		quit:         make(chan os.Signal, 1),
+		terminate:    make(chan any),
+		terminated:   make(chan any),
+		cfg:          cfg,
+		state:        StateIdle,
+		mounters:     make(map[string]*runtime.MultiMounter),
+		dsProviders:  make(map[string]datastore.Provider),
+		mqProviders:  make(map[string]mq.Provider),
+		datastoreRef: &datastoreProxy{},
+		brokerRef:    &brokerProxy{},
 	}
 }
 
@@ -331,7 +331,7 @@ func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobL
 	if e.cfg.Mode != ModeStandalone && e.cfg.Mode != ModeCoordinator {
 		panic(errors.Errorf("engine not in coordinator/standalone mode"))
 	}
-	if err := e.broker.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(ev any) {
+	if err := e.brokerRef.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(ev any) {
 		j, ok := ev.(*tork.Job)
 		if !ok {
 			log.Error().Msg("unable to cast event to *tork.Job")
@@ -351,17 +351,16 @@ func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobL
 	return job.Clone(), nil
 }
 
-func (e *Engine) OnBrokerInit(fn func(b mq.Broker) error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.mustState(StateIdle)
-	e.onBrokerInit = append(e.onBrokerInit, fn)
+// Broker returns the broker used by the engine.
+// It is only available after the engine has been started.
+func (e *Engine) Broker() mq.Broker {
+	return e.brokerRef
 }
 
 // Datastore returns the datastore used by the engine.
 // It is only available after the engine has been started.
 func (e *Engine) Datastore() datastore.Datastore {
-	return e.ds
+	return e.datastoreRef
 }
 
 func (e *Engine) awaitTerm() {

@@ -212,7 +212,7 @@ func TestSubmitJob(t *testing.T) {
 
 	j.State = tork.JobStateCompleted
 
-	err = eng.broker.PublishEvent(context.Background(), mq.TOPIC_JOB_COMPLETED, j)
+	err = eng.Broker().PublishEvent(context.Background(), mq.TOPIC_JOB_COMPLETED, j)
 	assert.NoError(t, err)
 	<-c
 }
@@ -287,18 +287,15 @@ func TestOnBrokerInit(t *testing.T) {
 	eng := New(Config{Mode: ModeStandalone})
 	assert.Equal(t, StateIdle, eng.state)
 
-	c := make(chan any)
-	eng.OnBrokerInit(func(b mq.Broker) error {
-		assert.NotNil(t, b)
-		close(c)
-		return nil
-	})
+	b := eng.Broker()
+
+	assert.Error(t, b.HealthCheck(context.Background()))
 
 	err := eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
-	<-c
+	assert.NoError(t, b.HealthCheck(context.Background()))
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
