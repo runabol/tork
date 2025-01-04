@@ -25,7 +25,7 @@ func (e *Engine) initWorker() error {
 	e.cfg.Middleware.Task = append(e.cfg.Middleware.Task, hostenv.Execute)
 	w, err := worker.NewWorker(worker.Config{
 		Name:    conf.StringDefault("worker.name", "Worker"),
-		Broker:  e.broker,
+		Broker:  e.brokerRef,
 		Runtime: rt,
 		Queues:  conf.IntMap("worker.queues"),
 		Limits: worker.Limits{
@@ -74,7 +74,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		return docker.NewDockerRuntime(
 			docker.WithMounter(mounter),
 			docker.WithConfig(conf.String("runtime.docker.config")),
-			docker.WithBroker(e.broker),
+			docker.WithBroker(e.brokerRef),
 			docker.WithSandbox(conf.BoolDefault("runtime.docker.sandbox", false)),
 			docker.WithBusyboxImage(conf.StringDefault("runtime.docker.busybox.image", "busybox:stable")),
 		)
@@ -83,7 +83,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			CMD:    conf.Strings("runtime.shell.cmd"),
 			UID:    conf.StringDefault("runtime.shell.uid", shell.DEFAULT_UID),
 			GID:    conf.StringDefault("runtime.shell.gid", shell.DEFAULT_GID),
-			Broker: e.broker,
+			Broker: e.brokerRef,
 		}), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)

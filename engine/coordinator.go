@@ -29,8 +29,8 @@ func (e *Engine) initCoordinator() error {
 
 	cfg := coordinator.Config{
 		Name:      conf.StringDefault("coordinator.name", "Coordinator"),
-		Broker:    e.broker,
-		DataStore: e.ds,
+		Broker:    e.brokerRef,
+		DataStore: e.datastoreRef,
 		Locker:    e.locker,
 		Queues:    queues,
 		Address:   conf.String("coordinator.address"),
@@ -39,7 +39,7 @@ func (e *Engine) initCoordinator() error {
 			Task: e.cfg.Middleware.Task,
 			Job:  e.cfg.Middleware.Job,
 			Node: e.cfg.Middleware.Node,
-			Echo: echoMiddleware(e.ds),
+			Echo: echoMiddleware(e.datastoreRef),
 		},
 		Endpoints: e.cfg.Endpoints,
 		Enabled:   conf.BoolMap("coordinator.api.endpoints"),
@@ -53,14 +53,14 @@ func (e *Engine) initCoordinator() error {
 		for i, pattern := range patterns {
 			matchers[i] = redact.Wildcard(pattern)
 		}
-		redacter := redact.NewRedacter(e.ds, matchers...)
+		redacter := redact.NewRedacter(e.datastoreRef, matchers...)
 		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact(redacter))
 		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact(redacter))
 	}
 
 	// webhook middleware
 	cfg.Middleware.Job = append(cfg.Middleware.Job, job.Webhook)
-	cfg.Middleware.Task = append(cfg.Middleware.Task, task.Webhook(e.ds))
+	cfg.Middleware.Task = append(cfg.Middleware.Task, task.Webhook(e.datastoreRef))
 
 	c, err := coordinator.NewCoordinator(cfg)
 	if err != nil {
