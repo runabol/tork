@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/health"
 
@@ -29,7 +30,7 @@ import (
 	"github.com/runabol/tork/middleware/web"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/mq"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,7 +46,7 @@ type HealthResponse struct {
 
 type API struct {
 	server     *http.Server
-	broker     mq.Broker
+	broker     broker.Broker
 	ds         datastore.Datastore
 	terminate  chan any
 	onReadJob  job.HandlerFunc
@@ -53,7 +54,7 @@ type API struct {
 }
 
 type Config struct {
-	Broker     mq.Broker
+	Broker     broker.Broker
 	DataStore  datastore.Datastore
 	Address    string
 	Middleware Middleware
@@ -222,7 +223,7 @@ func (s *API) health(c echo.Context) error {
 // @Summary get a list of queues
 // @Tags queues
 // @Produce application/json
-// @Success 200 {object} []mq.QueueInfo
+// @Success 200 {object} []broker.QueueInfo
 // @Router /queues [get]
 func (s *API) listQueues(c echo.Context) error {
 	qs, err := s.broker.Queues(c.Request().Context())
@@ -499,7 +500,7 @@ func (s *API) submitScheduledJob(ctx context.Context, ji *input.ScheduledJob) (*
 		return nil, err
 	}
 	log.Info().Str("job-id", sj.ID).Msg("created scheduled job")
-	if err := s.broker.PublishEvent(ctx, mq.TOPIC_JOB_SCHEDULED, sj); err != nil {
+	if err := s.broker.PublishEvent(ctx, broker.TOPIC_JOB_SCHEDULED, sj); err != nil {
 		return nil, err
 	}
 	return sj, nil
@@ -568,7 +569,7 @@ func (s *API) pauseScheduledJob(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.broker.PublishEvent(c.Request().Context(), mq.TOPIC_JOB_SCHEDULED, j); err != nil {
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
@@ -590,7 +591,7 @@ func (s *API) resumeScheduledJob(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.broker.PublishEvent(c.Request().Context(), mq.TOPIC_JOB_SCHEDULED, j); err != nil {
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
@@ -637,7 +638,7 @@ func (s *API) completeTask(c echo.Context) error {
 	now := time.Now().UTC()
 	t.State = tork.TaskStateCompleted
 	t.CompletedAt = &now
-	if err := s.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t); err != nil {
+	if err := s.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t); err != nil {
 		log.Error().Err(err).Msgf("error publishing service task to completion queue")
 	}
 	// notify the node currently running the task to cancel it

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -164,7 +164,7 @@ func TestShellRuntimeStop(t *testing.T) {
 }
 
 func TestRunTaskCMDLogger(t *testing.T) {
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
 		close(processed)

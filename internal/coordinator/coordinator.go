@@ -22,7 +22,7 @@ import (
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
 
-	"github.com/runabol/tork/mq"
+	"github.com/runabol/tork/broker"
 
 	"github.com/runabol/tork/internal/uuid"
 )
@@ -34,7 +34,7 @@ type Coordinator struct {
 	id             string
 	startTime      time.Time
 	Name           string
-	broker         mq.Broker
+	broker         broker.Broker
 	api            *api.API
 	ds             datastore.Datastore
 	queues         map[string]int
@@ -52,7 +52,7 @@ type Coordinator struct {
 
 type Config struct {
 	Name       string
-	Broker     mq.Broker
+	Broker     broker.Broker
 	DataStore  datastore.Datastore
 	Locker     locker.Locker
 	Address    string
@@ -89,29 +89,29 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Enabled == nil {
 		cfg.Enabled = make(map[string]bool)
 	}
-	if cfg.Queues[mq.QUEUE_COMPLETED] < 1 {
-		cfg.Queues[mq.QUEUE_COMPLETED] = 1
+	if cfg.Queues[broker.QUEUE_COMPLETED] < 1 {
+		cfg.Queues[broker.QUEUE_COMPLETED] = 1
 	}
-	if cfg.Queues[mq.QUEUE_ERROR] < 1 {
-		cfg.Queues[mq.QUEUE_ERROR] = 1
+	if cfg.Queues[broker.QUEUE_ERROR] < 1 {
+		cfg.Queues[broker.QUEUE_ERROR] = 1
 	}
-	if cfg.Queues[mq.QUEUE_PENDING] < 1 {
-		cfg.Queues[mq.QUEUE_PENDING] = 1
+	if cfg.Queues[broker.QUEUE_PENDING] < 1 {
+		cfg.Queues[broker.QUEUE_PENDING] = 1
 	}
-	if cfg.Queues[mq.QUEUE_STARTED] < 1 {
-		cfg.Queues[mq.QUEUE_STARTED] = 1
+	if cfg.Queues[broker.QUEUE_STARTED] < 1 {
+		cfg.Queues[broker.QUEUE_STARTED] = 1
 	}
-	if cfg.Queues[mq.QUEUE_HEARTBEAT] < 1 {
-		cfg.Queues[mq.QUEUE_HEARTBEAT] = 1
+	if cfg.Queues[broker.QUEUE_HEARTBEAT] < 1 {
+		cfg.Queues[broker.QUEUE_HEARTBEAT] = 1
 	}
-	if cfg.Queues[mq.QUEUE_JOBS] < 1 {
-		cfg.Queues[mq.QUEUE_JOBS] = 1
+	if cfg.Queues[broker.QUEUE_JOBS] < 1 {
+		cfg.Queues[broker.QUEUE_JOBS] = 1
 	}
-	if cfg.Queues[mq.QUEUE_LOGS] < 1 {
-		cfg.Queues[mq.QUEUE_LOGS] = 1
+	if cfg.Queues[broker.QUEUE_LOGS] < 1 {
+		cfg.Queues[broker.QUEUE_LOGS] = 1
 	}
-	if cfg.Queues[mq.QUEUE_PROGRESS] < 1 {
-		cfg.Queues[mq.QUEUE_PROGRESS] = 1
+	if cfg.Queues[broker.QUEUE_PROGRESS] < 1 {
+		cfg.Queues[broker.QUEUE_PROGRESS] = 1
 	}
 	api, err := api.NewAPI(api.Config{
 		Broker:    cfg.Broker,
@@ -224,46 +224,46 @@ func (c *Coordinator) Start() error {
 	}
 	// subscribe to task queues
 	for qname, conc := range c.queues {
-		if !mq.IsCoordinatorQueue(qname) {
+		if !broker.IsCoordinatorQueue(qname) {
 			continue
 		}
 		for i := 0; i < conc; i++ {
 			var err error
 			switch qname {
-			case mq.QUEUE_PENDING:
+			case broker.QUEUE_PENDING:
 				pendingHandler := c.taskHandler(c.onPending)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					return pendingHandler(context.Background(), task.StateChange, t)
 				})
-			case mq.QUEUE_COMPLETED:
+			case broker.QUEUE_COMPLETED:
 				completedHandler := c.taskHandler(c.onCompleted)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					return completedHandler(context.Background(), task.StateChange, t)
 				})
-			case mq.QUEUE_STARTED:
+			case broker.QUEUE_STARTED:
 				startedHandler := c.taskHandler(c.onStarted)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					return startedHandler(context.Background(), task.StateChange, t)
 				})
-			case mq.QUEUE_ERROR:
+			case broker.QUEUE_ERROR:
 				errorHandler := c.taskHandler(c.onError)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
 					return errorHandler(context.Background(), task.StateChange, t)
 				})
-			case mq.QUEUE_HEARTBEAT:
+			case broker.QUEUE_HEARTBEAT:
 				err = c.broker.SubscribeForHeartbeats(func(n *tork.Node) error {
 					return c.onHeartbeat(context.Background(), n)
 				})
-			case mq.QUEUE_JOBS:
+			case broker.QUEUE_JOBS:
 				jobHandler := c.jobHandler(c.onJob)
 				err = c.broker.SubscribeForJobs(func(j *tork.Job) error {
 					return jobHandler(context.Background(), job.StateChange, j)
 				})
-			case mq.QUEUE_LOGS:
+			case broker.QUEUE_LOGS:
 				err = c.broker.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
 					c.onLogPart(p)
 				})
-			case mq.QUEUE_PROGRESS:
+			case broker.QUEUE_PROGRESS:
 				progressHandler := c.taskHandler(c.onProgress)
 				err = c.broker.SubscribeForTaskProgress(func(t *tork.Task) error {
 					return progressHandler(context.Background(), task.Progress, t)
@@ -274,7 +274,7 @@ func (c *Coordinator) Start() error {
 			}
 		}
 	}
-	if err := c.broker.SubscribeForEvents(context.Background(), mq.TOPIC_JOB_SCHEDULED, func(ev any) {
+	if err := c.broker.SubscribeForEvents(context.Background(), broker.TOPIC_JOB_SCHEDULED, func(ev any) {
 		sj, ok := ev.(*tork.ScheduledJob)
 		if !ok {
 			log.Error().Msgf("error casting scheduled job: %v", ev)

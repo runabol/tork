@@ -13,10 +13,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/health"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/internal/syncx"
-	"github.com/runabol/tork/mq"
 	"github.com/runabol/tork/runtime"
 )
 
@@ -27,7 +27,7 @@ const (
 
 type api struct {
 	server  *http.Server
-	broker  mq.Broker
+	broker  broker.Broker
 	runtime runtime.Runtime
 	tasks   *syncx.Map[string, runningTask]
 	port    int

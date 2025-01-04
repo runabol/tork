@@ -8,19 +8,19 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/coordinator/scheduler"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 )
 
 type pendingHandler struct {
 	sched  scheduler.Scheduler
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 }
 
-func NewPendingHandler(ds datastore.Datastore, b mq.Broker) task.HandlerFunc {
+func NewPendingHandler(ds datastore.Datastore, b broker.Broker) task.HandlerFunc {
 	h := &pendingHandler{
 		ds:     ds,
 		broker: b,
@@ -54,5 +54,5 @@ func (h *pendingHandler) skipTask(ctx context.Context, t *tork.Task) error {
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
-	return h.broker.PublishTask(ctx, mq.QUEUE_COMPLETED, t)
+	return h.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t)
 }

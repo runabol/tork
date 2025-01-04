@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_handlePendingTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
@@ -56,10 +56,10 @@ func Test_handlePendingTask(t *testing.T) {
 
 func Test_handleConditionalTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	completed := make(chan any)
-	err := b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(t *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(t *tork.Task) error {
 		close(completed)
 		return nil
 	})

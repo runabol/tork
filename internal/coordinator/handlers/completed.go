@@ -9,21 +9,21 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 )
 
 type completedHandler struct {
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 	onJob  job.HandlerFunc
 }
 
-func NewCompletedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
+func NewCompletedHandler(ds datastore.Datastore, b broker.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
 	h := &completedHandler{
 		ds:     ds,
 		broker: b,
@@ -92,7 +92,7 @@ func (h *completedHandler) completeEachTask(ctx context.Context, t *tork.Task) e
 				}); err != nil {
 					return err
 				}
-				if err := h.broker.PublishTask(ctx, mq.QUEUE_PENDING, next); err != nil {
+				if err := h.broker.PublishTask(ctx, broker.QUEUE_PENDING, next); err != nil {
 					return err
 				}
 			}
@@ -251,7 +251,7 @@ func (c *completedHandler) completeTopLevelTask(ctx context.Context, t *tork.Tas
 		if err := c.ds.CreateTask(ctx, next); err != nil {
 			return err
 		}
-		return c.broker.PublishTask(ctx, mq.QUEUE_PENDING, next)
+		return c.broker.PublishTask(ctx, broker.QUEUE_PENDING, next)
 	} else {
 		j.State = tork.JobStateCompleted
 		j.CompletedAt = &now

@@ -15,10 +15,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 )
 
 type Rexec func(args ...string) *exec.Cmd
@@ -39,7 +39,7 @@ type ShellRuntime struct {
 	uid    string
 	gid    string
 	reexec Rexec
-	broker mq.Broker
+	broker broker.Broker
 }
 
 type Config struct {
@@ -47,7 +47,7 @@ type Config struct {
 	UID    string
 	GID    string
 	Rexec  Rexec
-	Broker mq.Broker
+	Broker broker.Broker
 }
 
 func NewShellRuntime(cfg Config) *ShellRuntime {
@@ -100,7 +100,7 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if r.broker != nil {
-		logger = mq.NewLogShipper(r.broker, t.ID)
+		logger = broker.NewLogShipper(r.broker, t.ID)
 	} else {
 		logger = os.Stdout
 	}

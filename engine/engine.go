@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/coordinator"
@@ -22,8 +23,6 @@ import (
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
 	"github.com/runabol/tork/runtime"
-
-	"github.com/runabol/tork/mq"
 )
 
 const (
@@ -56,7 +55,7 @@ type Engine struct {
 	coordinator  *coordinator.Coordinator
 	worker       *worker.Worker
 	dsProviders  map[string]datastore.Provider
-	mqProviders  map[string]mq.Provider
+	mqProviders  map[string]broker.Provider
 }
 
 type Config struct {
@@ -86,7 +85,7 @@ func New(cfg Config) *Engine {
 		state:        StateIdle,
 		mounters:     make(map[string]*runtime.MultiMounter),
 		dsProviders:  make(map[string]datastore.Provider),
-		mqProviders:  make(map[string]mq.Provider),
+		mqProviders:  make(map[string]broker.Provider),
 		datastoreRef: &datastoreProxy{},
 		brokerRef:    &brokerProxy{},
 	}
@@ -316,7 +315,7 @@ func (e *Engine) RegisterDatastoreProvider(name string, provider datastore.Provi
 	e.dsProviders[name] = provider
 }
 
-func (e *Engine) RegisterBrokerProvider(name string, provider mq.Provider) {
+func (e *Engine) RegisterBrokerProvider(name string, provider broker.Provider) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
@@ -331,7 +330,7 @@ func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobL
 	if e.cfg.Mode != ModeStandalone && e.cfg.Mode != ModeCoordinator {
 		panic(errors.Errorf("engine not in coordinator/standalone mode"))
 	}
-	if err := e.brokerRef.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(ev any) {
+	if err := e.brokerRef.SubscribeForEvents(ctx, broker.TOPIC_JOB, func(ev any) {
 		j, ok := ev.(*tork.Job)
 		if !ok {
 			log.Error().Msg("unable to cast event to *tork.Job")
@@ -353,7 +352,7 @@ func (e *Engine) SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobL
 
 // Broker returns the broker used by the engine.
 // It is only available after the engine has been started.
-func (e *Engine) Broker() mq.Broker {
+func (e *Engine) Broker() broker.Broker {
 	return e.brokerRef
 }
 

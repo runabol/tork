@@ -5,12 +5,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/conf"
-	"github.com/runabol/tork/mq"
 )
 
 type brokerProxy struct {
-	broker mq.Broker
+	broker broker.Broker
 }
 
 func (b *brokerProxy) PublishTask(ctx context.Context, qname string, t *tork.Task) error {
@@ -97,7 +97,7 @@ func (b *brokerProxy) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart))
 	return b.broker.SubscribeForTaskLogPart(handler)
 }
 
-func (b *brokerProxy) Queues(ctx context.Context) ([]mq.QueueInfo, error) {
+func (b *brokerProxy) Queues(ctx context.Context) ([]broker.QueueInfo, error) {
 	if err := b.checkInit(); err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (b *brokerProxy) checkInit() error {
 }
 
 func (e *Engine) initBroker() error {
-	bt := conf.StringDefault("broker.type", mq.BROKER_INMEMORY)
+	bt := conf.StringDefault("broker.type", broker.BROKER_INMEMORY)
 	broker, err := e.createBroker(bt)
 	if err != nil {
 		return err
@@ -135,20 +135,20 @@ func (e *Engine) initBroker() error {
 	return nil
 }
 
-func (e *Engine) createBroker(btype string) (mq.Broker, error) {
+func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 	p, ok := e.mqProviders[btype]
 	if ok {
 		return p()
 	}
 	switch btype {
 	case "inmemory":
-		return mq.NewInMemoryBroker(), nil
+		return broker.NewInMemoryBroker(), nil
 	case "rabbitmq":
-		rb, err := mq.NewRabbitMQBroker(
-			conf.StringDefault("broker.rabbitmq.url", "amqp://guest:guest@localhost:5672/"),
-			mq.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitmq.consumer.timeout", mq.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
-			mq.WithManagementURL(conf.String("broker.rabbitmq.management.url")),
-			mq.WithDurableQueues(conf.Bool("broker.rabbitmq.durable.queues")),
+		rb, err := broker.NewRabbitMQBroker(
+			conf.StringDefault("broker.rabbitbroker.url", "amqp://guest:guest@localhost:5672/"),
+			broker.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitbroker.consumer.timeout", broker.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
+			broker.WithManagementURL(conf.String("broker.rabbitbroker.management.url")),
+			broker.WithDurableQueues(conf.Bool("broker.rabbitbroker.durable.queues")),
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")

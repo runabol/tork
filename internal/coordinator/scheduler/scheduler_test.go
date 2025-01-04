@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_scheduleRegularTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
@@ -58,7 +58,7 @@ func Test_scheduleRegularTask(t *testing.T) {
 
 func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
@@ -103,7 +103,7 @@ func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
 
 func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
@@ -152,10 +152,10 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 
 func Test_scheduleParallelTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := 0
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
 		processed = processed + 1
 		assert.Equal(t, "test-queue", tk.Queue)
 		return nil
@@ -206,11 +206,11 @@ func Test_scheduleParallelTask(t *testing.T) {
 
 func Test_scheduleEachTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any, 2)
 	var counter atomic.Int32
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
 		assert.Equal(t, "test-queue", tk.Queue)
 		assert.Equal(t, fmt.Sprintf("%d", counter.Load()), tk.Env["ITEM_INDEX"])
 		processed <- 1
@@ -266,7 +266,7 @@ func Test_scheduleEachTask(t *testing.T) {
 
 func Test_scheduleEachTaskNotaList(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	ds := inmemory.NewInMemoryDatastore()
 	s := NewScheduler(ds, b)
@@ -301,10 +301,10 @@ func Test_scheduleEachTaskNotaList(t *testing.T) {
 
 func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any, 1)
-	err := b.SubscribeForTasks(mq.QUEUE_ERROR, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
 		processed <- 1
 		return nil
 	})
@@ -344,10 +344,10 @@ func Test_scheduleEachTaskBadExpression(t *testing.T) {
 
 func Test_scheduleEachTaskCustomVar(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any, 2)
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
 		assert.Equal(t, "test-queue", tk.Queue)
 		assert.Equal(t, fmt.Sprintf("%d", len(processed)), tk.Env["ITEM_INDEX"])
 		processed <- 1
@@ -402,7 +402,7 @@ func Test_scheduleEachTaskCustomVar(t *testing.T) {
 
 func Test_scheduleSubJobTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
@@ -462,7 +462,7 @@ func Test_scheduleSubJobTask(t *testing.T) {
 
 func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
@@ -474,7 +474,7 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	completed := make(chan any)
-	err = b.SubscribeForTasks(mq.QUEUE_COMPLETED, func(tk *tork.Task) error {
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
 		close(completed)
 		return nil
 	})
@@ -529,11 +529,11 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 
 func Test_scheduleEachTaskConcurrency(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 
 	processed := make(chan any, 1)
 	var counter atomic.Int32
-	err := b.SubscribeForTasks(mq.QUEUE_PENDING, func(tk *tork.Task) error {
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
 		assert.Equal(t, "test-queue", tk.Queue)
 		assert.Equal(t, fmt.Sprintf("%d", counter.Load()), tk.Env["ITEM_INDEX"])
 		processed <- 1

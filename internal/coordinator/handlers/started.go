@@ -6,19 +6,19 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 )
 
 type startedHandler struct {
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 	onJob  job.HandlerFunc
 }
 
-func NewStartedHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
+func NewStartedHandler(ds datastore.Datastore, b broker.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
 	h := &startedHandler{
 		ds:     ds,
 		broker: b,

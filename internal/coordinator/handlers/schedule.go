@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/locker"
-	"github.com/runabol/tork/mq"
 )
 
 // minScheduledJobLockTTL is the minimum time a scheduled
@@ -21,7 +21,7 @@ const minScheduledJobLockTTL = 10 * time.Second
 
 type jobSchedulerHandler struct {
 	ds        datastore.Datastore
-	broker    mq.Broker
+	broker    broker.Broker
 	scheduler gocron.Scheduler
 	mu        sync.Mutex
 	m         map[string]gocron.Job
@@ -58,7 +58,7 @@ func (d glocker) Lock(ctx context.Context, key string) (gocron.Lock, error) {
 	return &glock{lock: lock, key: key, createdAt: time.Now()}, nil
 }
 
-func NewJobSchedulerHandler(ds datastore.Datastore, b mq.Broker, l locker.Locker) (func(ctx context.Context, s *tork.ScheduledJob) error, error) {
+func NewJobSchedulerHandler(ds datastore.Datastore, b broker.Broker, l locker.Locker) (func(ctx context.Context, s *tork.ScheduledJob) error, error) {
 	sc, err := gocron.NewScheduler(gocron.WithDistributedLocker(glocker{locker: l}))
 	if err != nil {
 		return nil, err

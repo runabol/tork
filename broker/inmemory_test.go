@@ -1,4 +1,4 @@
-package mq_test
+package broker_test
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/uuid"
-	"github.com/runabol/tork/mq"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTasks("test-queue", func(t *tork.Task) error {
 		close(processed)
@@ -40,7 +40,7 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 
 func TestInMemoryGetQueues(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
 	err := b.PublishTask(ctx, qname, &tork.Task{})
 	assert.NoError(t, err)
@@ -68,7 +68,7 @@ func TestInMemoryGetQueues(t *testing.T) {
 
 func TestInMemoryGetQueuesUnacked(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
 	err := b.PublishTask(ctx, qname, &tork.Task{})
 	assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestInMemoryGetQueuesUnacked(t *testing.T) {
 
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForHeartbeats(func(n *tork.Node) error {
 		close(processed)
@@ -115,7 +115,7 @@ func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 
 func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
 		close(processed)
@@ -129,7 +129,7 @@ func TestInMemoryPublishAndSubsribeForJob(t *testing.T) {
 
 func TestMultipleSubsSubsribeForJob(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any, 10)
 	mu := sync.Mutex{}
 	err := b.SubscribeForJobs(func(j *tork.Job) error {
@@ -164,11 +164,11 @@ func TestMultipleSubsSubsribeForJob(t *testing.T) {
 
 func TestInMemoryShutdown(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	mu := sync.Mutex{}
 	processed := make(chan any)
-	qname1 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	qname2 := fmt.Sprintf("%stest-%s", mq.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname1 := fmt.Sprintf("%stest-%s", broker.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	qname2 := fmt.Sprintf("%stest-%s", broker.QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
 	err := b.SubscribeForTasks(qname1, func(j *tork.Task) error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -197,20 +197,20 @@ func TestInMemoryShutdown(t *testing.T) {
 
 func TestInMemorSubsribeForEvent(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed1 := make(chan any, 20)
 	processed2 := make(chan any, 10)
 	j1 := &tork.Job{
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateCompleted,
 	}
-	err := b.SubscribeForEvents(ctx, mq.TOPIC_JOB, func(event any) {
+	err := b.SubscribeForEvents(ctx, broker.TOPIC_JOB, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
 		processed1 <- 1
 	})
 	assert.NoError(t, err)
-	err = b.SubscribeForEvents(ctx, mq.TOPIC_JOB_COMPLETED, func(event any) {
+	err = b.SubscribeForEvents(ctx, broker.TOPIC_JOB_COMPLETED, func(event any) {
 		j2 := event.(*tork.Job)
 		assert.Equal(t, j1.ID, j2.ID)
 		processed2 <- 1
@@ -218,9 +218,9 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		err = b.PublishEvent(ctx, mq.TOPIC_JOB_COMPLETED, j1)
+		err = b.PublishEvent(ctx, broker.TOPIC_JOB_COMPLETED, j1)
 		assert.NoError(t, err)
-		err = b.PublishEvent(ctx, mq.TOPIC_JOB_FAILED, j1)
+		err = b.PublishEvent(ctx, broker.TOPIC_JOB_FAILED, j1)
 		assert.NoError(t, err)
 	}
 
@@ -236,7 +236,7 @@ func TestInMemorSubsribeForEvent(t *testing.T) {
 
 func TestInMemoryHealthChech(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	assert.NoError(t, b.HealthCheck(ctx))
 	assert.NoError(t, b.Shutdown(ctx))
 	assert.Error(t, b.HealthCheck(ctx))
@@ -244,7 +244,7 @@ func TestInMemoryHealthChech(t *testing.T) {
 
 func TestInMemoryPublishAndSubsribeTaskLogPart(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
 		close(processed)
@@ -257,7 +257,7 @@ func TestInMemoryPublishAndSubsribeTaskLogPart(t *testing.T) {
 
 func TestInMemoryPublishAndSubsribeTaskProgress(t *testing.T) {
 	ctx := context.Background()
-	b := mq.NewInMemoryBroker()
+	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
 	err := b.SubscribeForTaskProgress(func(p *tork.Task) error {
 		close(processed)

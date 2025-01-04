@@ -7,21 +7,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/internal/eval"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
-	"github.com/runabol/tork/mq"
 )
 
 type errorHandler struct {
 	ds     datastore.Datastore
-	broker mq.Broker
+	broker broker.Broker
 	onJob  job.HandlerFunc
 }
 
-func NewErrorHandler(ds datastore.Datastore, b mq.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
+func NewErrorHandler(ds datastore.Datastore, b broker.Broker, mw ...job.MiddlewareFunc) task.HandlerFunc {
 	h := &errorHandler{
 		ds:     ds,
 		broker: b,
@@ -74,7 +74,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 		if err := h.ds.CreateTask(ctx, rt); err != nil {
 			return errors.Wrapf(err, "error creating a retry task")
 		}
-		if err := h.broker.PublishTask(ctx, mq.QUEUE_PENDING, rt); err != nil {
+		if err := h.broker.PublishTask(ctx, broker.QUEUE_PENDING, rt); err != nil {
 			log.Error().Err(err).Msg("error publishing retry task")
 		}
 	} else {
