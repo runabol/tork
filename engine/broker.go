@@ -120,7 +120,7 @@ func (b *brokerProxy) Shutdown(ctx context.Context) error {
 
 func (b *brokerProxy) checkInit() error {
 	if b.broker == nil {
-		return errors.New("broker not initialized")
+		return errors.New("Broker not initialized. You must call engine.Start() first")
 	}
 	return nil
 }

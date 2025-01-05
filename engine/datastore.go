@@ -241,7 +241,7 @@ func (ds *datastoreProxy) WithTx(ctx context.Context, f func(tx datastore.Datast
 
 func (ds *datastoreProxy) checkInit() error {
 	if ds.ds == nil {
-		return errors.New("datastore not initialized")
+		return errors.New("Datastore not initialized. You must call engine.Start() first")
 	}
 	return nil
 }
