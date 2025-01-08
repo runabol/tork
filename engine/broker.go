@@ -145,10 +145,10 @@ func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 		return broker.NewInMemoryBroker(), nil
 	case "rabbitmq":
 		rb, err := broker.NewRabbitMQBroker(
-			conf.StringDefault("broker.rabbitbroker.url", "amqp://guest:guest@localhost:5672/"),
-			broker.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitbroker.consumer.timeout", broker.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
-			broker.WithManagementURL(conf.String("broker.rabbitbroker.management.url")),
-			broker.WithDurableQueues(conf.Bool("broker.rabbitbroker.durable.queues")),
+			conf.StringDefault("broker.rabbitmq.url", "amqp://guest:guest@localhost:5672/"),
+			broker.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitmq.consumer.timeout", broker.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
+			broker.WithManagementURL(conf.String("broker.rabbitmq.management.url")),
+			broker.WithDurableQueues(conf.Bool("broker.rabbitmq.durable.queues")),
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
