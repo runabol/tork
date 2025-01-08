@@ -56,6 +56,14 @@ func SubmitJob(ctx context.Context, ij *input.Job, listeners ...JobListener) (*t
 	return defaultEngine.SubmitJob(ctx, ij, listeners...)
 }
 
+func Broker() broker.Broker {
+	return defaultEngine.Broker()
+}
+
+func Datastore() datastore.Datastore {
+	return defaultEngine.Datastore()
+}
+
 func Start() error {
 	return defaultEngine.Start()
 }
