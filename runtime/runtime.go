@@ -8,6 +8,7 @@ import (
 
 const (
 	Docker = "docker"
+	Podman = "podman"
 	Shell  = "shell"
 )
 

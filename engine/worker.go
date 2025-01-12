@@ -8,6 +8,7 @@ import (
 
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/runtime/docker"
+	"github.com/runabol/tork/runtime/podman"
 	"github.com/runabol/tork/runtime/shell"
 )
 
@@ -85,6 +86,22 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			GID:    conf.StringDefault("runtime.shell.gid", shell.DEFAULT_GID),
 			Broker: e.brokerRef,
 		}), nil
+	case runtime.Podman:
+		mounter, ok := e.mounters[runtime.Podman]
+		if !ok {
+			mounter = runtime.NewMultiMounter()
+		}
+		// register bind mounter
+		bm := docker.NewBindMounter(docker.BindConfig{
+			Allowed: conf.Bool("mounts.bind.allowed"),
+			Sources: conf.Strings("mounts.bind.sources"),
+		})
+		mounter.RegisterMounter("bind", bm)
+		mounter.RegisterMounter("volume", podman.NewVolumeMounter())
+		return podman.NewPodmanRuntime(
+			podman.WithBroker(e.brokerRef),
+			podman.WithMounter(mounter),
+		), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)
 	}
