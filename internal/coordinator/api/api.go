@@ -7,11 +7,8 @@ import (
 	"io"
 	"strconv"
 	"syscall"
-	"time"
 
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -120,9 +117,6 @@ func NewAPI(cfg Config) (*API, error) {
 	if v, ok := cfg.Enabled["tasks"]; !ok || v {
 		r.GET("/tasks/:id", s.getTask)
 		r.GET("/tasks/:id/log", s.getTaskLog)
-		r.Any("/tasks/:id/proxy/:port", s.proxy)
-		r.Any("/tasks/:id/proxy/:port/*", s.proxy)
-		r.PUT("/tasks/:id/complete", s.completeTask)
 	}
 	if v, ok := cfg.Enabled["queues"]; !ok || v {
 		r.GET("/queues", s.listQueues)
@@ -616,44 +610,6 @@ func (s *API) getTask(c echo.Context) error {
 	return c.JSON(http.StatusOK, t)
 }
 
-// Task
-// @Summary Manually complete a running task
-// @Tags tasks
-// @Produce application/json
-// @Success 200 {object} tork.Task
-// @Router /tasks/{id}/complete [put]
-// @Param id path string true "Task ID"
-// @Failure 404 {object} echo.HTTPError
-// @Failure 400 {object} echo.HTTPError
-func (s *API) completeTask(c echo.Context) error {
-	id := c.Param("id")
-	ctx := c.Request().Context()
-	t, err := s.ds.GetTaskByID(c.Request().Context(), id)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
-	}
-	if t.State != tork.TaskStateRunning && t.State != tork.TaskStateScheduled {
-		return echo.NewHTTPError(http.StatusBadRequest, "task is not running")
-	}
-	now := time.Now().UTC()
-	t.State = tork.TaskStateCompleted
-	t.CompletedAt = &now
-	if err := s.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t); err != nil {
-		log.Error().Err(err).Msgf("error publishing service task to completion queue")
-	}
-	// notify the node currently running the task to cancel it
-	node, err := s.ds.GetNodeByID(ctx, t.NodeID)
-	if err != nil {
-		return err
-	}
-	cancelTask := t.Clone()
-	cancelTask.State = tork.TaskStateCancelled
-	if err := s.broker.PublishTask(ctx, node.Queue, cancelTask); err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, t)
-}
-
 // getTaskLog
 // @Summary Get a task's log
 // @Tags tasks
@@ -807,40 +763,6 @@ func (s *API) createUser(c echo.Context) error {
 	} else {
 		return c.JSON(http.StatusOK, u)
 	}
-}
-
-func (a *API) proxy(c echo.Context) error {
-	id := c.Param("id")
-	port := c.Param("port")
-	ctx := c.Request().Context()
-	task, err := a.ds.GetTaskByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, datastore.ErrTaskNotFound) {
-			return echo.ErrNotFound
-		}
-		return err
-	}
-	if task.State != tork.TaskStateRunning {
-		return echo.NewHTTPError(http.StatusBadGateway, "task is not in a RUNNING state")
-	}
-	node, err := a.ds.GetNodeByID(ctx, task.NodeID)
-	if err != nil {
-		log.Error().Err(err).Msgf("error looking up node %s", task.NodeID)
-		return echo.ErrServiceUnavailable
-	}
-	backendURL, err := url.Parse(fmt.Sprintf("http://%s:%d", node.Hostname, node.Port))
-	if err != nil {
-		return err
-	}
-	proxy := httputil.NewSingleHostReverseProxy(backendURL)
-	req := c.Request()
-	path := strings.Join(strings.Split(req.URL.Path, "/")[5:], "/")
-	if path != "" && !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	req.URL.Path = fmt.Sprintf("/tasks/%s/%s%s", task.ID, port, path)
-	proxy.ServeHTTP(c.Response(), req)
-	return nil
 }
 
 func (s *API) Start() error {

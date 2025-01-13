@@ -47,9 +47,6 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 		Tags:        []string{"tag1", "tag2"},
 		Workdir:     "/some/dir",
 		Priority:    2,
-		Ports: []*tork.Port{{
-			Port: "1234",
-		}},
 	}
 	err = ds.CreateTask(ctx, &t1)
 	assert.NoError(t, err)
@@ -67,7 +64,6 @@ func TestPostgresCreateAndGetTask(t *testing.T) {
 	assert.Equal(t, []string([]string{"tag1", "tag2"}), t2.Tags)
 	assert.Equal(t, "/some/dir", t2.Workdir)
 	assert.Equal(t, 2, t2.Priority)
-	assert.Equal(t, "1234", t2.Ports[0].Port)
 }
 
 func TestPostgresCreateJob(t *testing.T) {

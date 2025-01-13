@@ -25,7 +25,6 @@ import (
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
-	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -288,21 +287,10 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		resources.DeviceRequests = gpuOpts.Value()
 	}
 
-	portBindings := nat.PortMap{}
-	exposedPorts := nat.PortSet{}
-	for _, p := range t.Ports {
-		exposedPorts[nat.Port(p.Port)] = struct{}{}
-		portBindings[nat.Port(p.Port)] = []nat.PortBinding{{
-			HostIP:   "localhost",
-			HostPort: fmt.Sprintf("%s/tcp", p.HostPort),
-		}}
-	}
-
 	hc := container.HostConfig{
 		PublishAllPorts: false,
 		Mounts:          mounts,
 		Resources:       resources,
-		PortBindings:    portBindings,
 	}
 
 	cmd := t.CMD
@@ -314,11 +302,10 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		entrypoint = []string{"sh", "-c"}
 	}
 	containerConf := container.Config{
-		Image:        t.Image,
-		Env:          env,
-		Cmd:          cmd,
-		Entrypoint:   entrypoint,
-		ExposedPorts: exposedPorts,
+		Image:      t.Image,
+		Env:        env,
+		Cmd:        cmd,
+		Entrypoint: entrypoint,
 	}
 	if d.sandbox && !t.Internal {
 		imageInspect, _, err := d.client.ImageInspectWithRaw(ctx, t.Image)
