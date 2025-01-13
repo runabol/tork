@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"net/http"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -565,80 +564,4 @@ func Test_reservePort(t *testing.T) {
 	assert.Contains(t, w.usedPorts, port)
 	w.releasePort(port)
 	assert.NotContains(t, w.usedPorts, port)
-}
-
-func Test_handleServiceTaskRun(t *testing.T) {
-	rt, err := docker.NewDockerRuntime()
-	assert.NoError(t, err)
-
-	b := broker.NewInMemoryBroker()
-
-	w, err := NewWorker(Config{
-		Broker:  b,
-		Runtime: rt,
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, w)
-
-	completions := make(chan any)
-	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
-		close(completions)
-		return nil
-	})
-	assert.NoError(t, err)
-
-	starts := make(chan any)
-	err = b.SubscribeForTasks(broker.QUEUE_STARTED, func(tk *tork.Task) error {
-		assert.Equal(t, int32(1), atomic.LoadInt32(&w.taskCount))
-		close(starts)
-		return nil
-	})
-	assert.NoError(t, err)
-
-	err = w.Start()
-	assert.NoError(t, err)
-
-	t1 := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Image: "node:lts-alpine3.20",
-		State: tork.TaskStateRunning,
-		Run:   "node server.js",
-		Ports: []*tork.Port{{
-			Port: "55000:8080",
-		}},
-		Files: map[string]string{
-			"server.js": `
-             const http = require('http');
-             const hostname = '0.0.0.0';
-             const port = 8080;
-             const server = http.createServer((req, res) => {
-               res.statusCode = 200;
-               res.setHeader('Content-Type', 'text/plain');
-               res.end('Hello World\n');
-             });
-            server.listen(port, hostname, () => {
-              console.log('server running');
-            });
-			`,
-		},
-	}
-
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-		defer cancel()
-		_ = w.doHandleTask(ctx, t1)
-	}()
-
-	var resp *http.Response
-	for i := 0; i < 30; i++ {
-		resp, err = http.Get("http://localhost:55000")
-		if err == nil && resp.StatusCode == 200 {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-
-	assert.Equal(t, 200, resp.StatusCode)
-	err = rt.Stop(context.Background(), t1)
-	assert.NoError(t, err)
 }

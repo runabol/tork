@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -123,38 +122,6 @@ func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 	}
 	if t.Timeout == "" {
 		t.Timeout = w.limits.DefaultTimeout
-	}
-	// assign host ports
-	for _, p := range t.Ports {
-		portMapping := strings.Split(p.Port, ":")
-		if len(portMapping) < 1 || len(portMapping) > 2 {
-			now := time.Now().UTC()
-			t.Error = fmt.Sprintf("invalid port mapping: %s", p.Port)
-			t.FailedAt = &now
-			t.State = tork.TaskStateFailed
-			return w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
-		}
-		var hostPort string
-		var containerPort string
-		if len(portMapping) == 2 {
-			hostPort = portMapping[0]
-			containerPort = portMapping[1]
-		} else {
-			reservedPort, err := w.reservePort()
-			if err != nil {
-				now := time.Now().UTC()
-				t.Error = err.Error()
-				t.FailedAt = &now
-				t.State = tork.TaskStateFailed
-				return w.broker.PublishTask(ctx, broker.QUEUE_ERROR, t)
-			}
-			hostPort = reservedPort
-			containerPort = portMapping[0]
-		}
-		log.Debug().Msgf("Port mapping %s->%s", hostPort, containerPort)
-		defer w.releasePort(hostPort)
-		p.HostPort = hostPort
-		p.Port = containerPort
 	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
 		return w.runTask(t)

@@ -91,9 +91,6 @@ func (d *PodmanRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if t.Image == "" {
 		return errors.New("task image is required")
 	}
-	if len(t.Ports) > 0 {
-		return errors.New("service tasks are not supported on the podman runtime")
-	}
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()

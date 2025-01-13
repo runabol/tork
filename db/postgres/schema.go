@@ -167,8 +167,7 @@ CREATE TABLE tasks (
     tags          text[],
     priority      int,
     workdir       varchar(256),
-    progress      numeric(5,2) default 0,
-    ports         jsonb
+    progress      numeric(5,2) default 0
 );
 
 CREATE INDEX idx_tasks_state ON tasks (state);

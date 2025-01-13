@@ -3,12 +3,9 @@ package worker
 import (
 	"context"
 	"fmt"
-	"strings"
 	"syscall"
 
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
@@ -45,8 +42,6 @@ func newAPI(cfg Config, tasks *syncx.Map[string, runningTask]) *api {
 		},
 	}
 	r.GET("/health", s.health)
-	r.Any("/tasks/:id/:port", s.proxy)
-	r.Any("/tasks/:id/:port/*", s.proxy)
 	return s
 }
 
@@ -60,35 +55,6 @@ func (s *api) health(c echo.Context) error {
 	} else {
 		return c.JSON(http.StatusOK, result)
 	}
-}
-
-func (s *api) proxy(c echo.Context) error {
-	taskID := c.Param("id")
-	port := c.Param("port")
-	rt, ok := s.tasks.Get(taskID)
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "task not found")
-	}
-	if rt.task.Ports == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "task does not expose any ports")
-	}
-	binding, ok := rt.task.Port(port)
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "port not found")
-	}
-	backendURL, err := url.Parse(fmt.Sprintf("http://localhost:%s", binding.HostPort))
-	if err != nil {
-		return err
-	}
-	proxy := httputil.NewSingleHostReverseProxy(backendURL)
-	req := c.Request()
-	path := strings.Join(strings.Split(req.URL.Path, "/")[4:], "/")
-	if path != "" && !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	req.URL.Path = path
-	proxy.ServeHTTP(c.Response(), req)
-	return nil
 }
 
 func (s *api) start() error {
