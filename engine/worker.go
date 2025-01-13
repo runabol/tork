@@ -101,6 +101,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		return podman.NewPodmanRuntime(
 			podman.WithBroker(e.brokerRef),
 			podman.WithMounter(mounter),
+			podman.WithSandbox(conf.BoolDefault("runtime.podman.sandbox", false)),
 		), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)
