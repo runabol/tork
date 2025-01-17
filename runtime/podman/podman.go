@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,8 +25,6 @@ const (
 	defaultWorkdir = "/tork/workdir"
 )
 
-var rootUserPattern = regexp.MustCompile(`^(|root|0|root(:root)?|root:0|0:root|0:0)$`)
-
 // PodmanRuntime is a runtime that uses podman to run tasks in containers
 // on the host machine using podman as the container runtime engine
 // and the podman CLI to manage containers.
@@ -37,7 +34,6 @@ type PodmanRuntime struct {
 	images  *syncx.Map[string, bool]
 	tasks   *syncx.Map[string, string]
 	mounter runtime.Mounter
-	sandbox bool
 }
 
 type pullRequest struct {
@@ -58,12 +54,6 @@ func WithBroker(broker broker.Broker) Option {
 func WithMounter(mounter runtime.Mounter) Option {
 	return func(rt *PodmanRuntime) {
 		rt.mounter = mounter
-	}
-}
-
-func WithSandbox(val bool) Option {
-	return func(rt *PodmanRuntime) {
-		rt.sandbox = val
 	}
 }
 
@@ -242,21 +232,6 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		if err := os.WriteFile(path.Join(workDir, "workdir", filename), []byte(contents), 0444); err != nil {
 			return err
 		}
-	}
-
-	// sandbox mode
-	if d.sandbox {
-		inspectCmd := exec.CommandContext(ctx, "podman", "inspect", "--format", "{{.Config.User}}", t.Image)
-		var inspectBuf bytes.Buffer
-		inspectCmd.Stdout = &inspectBuf
-		if err := inspectCmd.Run(); err != nil {
-			return fmt.Errorf("failed to inspect image user: %w", err)
-		}
-		runAsUser := strings.TrimSpace(inspectBuf.String())
-		if runAsUser == "" || rootUserPattern.MatchString(runAsUser) {
-			runAsUser = "1000:1000"
-		}
-		createCmd.Args = append(createCmd.Args, "-u", runAsUser)
 	}
 
 	// container image
