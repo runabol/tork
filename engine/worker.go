@@ -76,8 +76,6 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			docker.WithMounter(mounter),
 			docker.WithConfig(conf.String("runtime.docker.config")),
 			docker.WithBroker(e.brokerRef),
-			docker.WithSandbox(conf.BoolDefault("runtime.docker.sandbox", false)),
-			docker.WithBusyboxImage(conf.StringDefault("runtime.docker.busybox.image", "busybox:stable")),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
@@ -101,7 +99,6 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		return podman.NewPodmanRuntime(
 			podman.WithBroker(e.brokerRef),
 			podman.WithMounter(mounter),
-			podman.WithSandbox(conf.BoolDefault("runtime.podman.sandbox", false)),
 		), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)

@@ -72,7 +72,6 @@ type Task struct {
 	Workdir     string            `json:"workdir,omitempty"`
 	Priority    int               `json:"priority,omitempty"`
 	Progress    float64           `json:"progress,omitempty"`
-	Internal    bool              `json:"-"`
 }
 
 type TaskSummary struct {

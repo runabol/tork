@@ -11,7 +11,6 @@ import (
 	"io"
 	"math/big"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -38,22 +37,17 @@ import (
 // defaultWorkdir is the directory where `Task.File`s are
 // written to by default, should `Task.Workdir` not be set
 const (
-	defaultWorkdir     = "/tork/workdir"
-	defaultSandboxUser = "1000:1000"
+	defaultWorkdir = "/tork/workdir"
 )
 
-var rootUserPattern = regexp.MustCompile(`^(|root|0|root(:root)?|root:0|0:root|0:0)$`)
-
 type DockerRuntime struct {
-	client       *client.Client
-	tasks        *syncx.Map[string, string]
-	images       *syncx.Map[string, bool]
-	pullq        chan *pullRequest
-	mounter      runtime.Mounter
-	broker       broker.Broker
-	config       string
-	sandbox      bool
-	busyboxImage string
+	client  *client.Client
+	tasks   *syncx.Map[string, string]
+	images  *syncx.Map[string, bool]
+	pullq   chan *pullRequest
+	mounter runtime.Mounter
+	broker  broker.Broker
+	config  string
 }
 
 type dockerLogsReader struct {
@@ -93,18 +87,6 @@ func WithConfig(config string) Option {
 	}
 }
 
-func WithSandbox(val bool) Option {
-	return func(rt *DockerRuntime) {
-		rt.sandbox = val
-	}
-}
-
-func WithBusyboxImage(name string) Option {
-	return func(rt *DockerRuntime) {
-		rt.busyboxImage = name
-	}
-}
-
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -118,9 +100,6 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	for _, o := range opts {
 		o(rt)
-	}
-	if rt.busyboxImage == "" {
-		rt.busyboxImage = "busybox:stable"
 	}
 	// setup a default mounter
 	if rt.mounter == nil {
@@ -141,16 +120,6 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		err := d.mounter.Mount(ctx, &mnt)
 		if err != nil {
 			return err
-		}
-		if d.sandbox && mnt.Type == tork.MountTypeVolume {
-			// add a pre-task to adjust volume permissions
-			// to allow access to the tork user
-			t.Pre = append([]*tork.Task{{
-				Internal: true,
-				Image:    d.busyboxImage,
-				CMD:      []string{"sh", "-c", fmt.Sprintf("chmod 777 %s", mnt.Target)},
-				Mounts:   []tork.Mount{mnt},
-			}}, t.Pre...)
 		}
 		defer func(m tork.Mount) {
 			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -306,18 +275,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		Env:        env,
 		Cmd:        cmd,
 		Entrypoint: entrypoint,
-	}
-	if d.sandbox && !t.Internal {
-		imageInspect, _, err := d.client.ImageInspectWithRaw(ctx, t.Image)
-		if err != nil {
-			return err
-		}
-		user := imageInspect.Config.User
-		if rootUserPattern.MatchString(user) {
-			// set a sandboxed (non-root) user
-			// only if the default user is root
-			containerConf.User = defaultSandboxUser
-		}
 	}
 	// we want to override the default
 	// image WORKDIR only if the task
