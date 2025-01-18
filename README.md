@@ -70,6 +70,8 @@ See [tork.run](https://tork.run) for the full documentation.
 
 ### Hello World
 
+https://github.com/user-attachments/assets/d4f6f3ea-d067-49e7-a1a2-aecdc3baaa90
+
 Start in `standalone` mode:
 
 ```
