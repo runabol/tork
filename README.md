@@ -106,18 +106,6 @@ Query for the status of the job:
 
 ```bash
 curl -s http://localhost:8000/jobs/$JOB_ID | jq .
-
-{
-  "id": "ed0dba93d262492b8cf26e6c1c4f1c98",
-  "state": "COMPLETED",
-  ...
-  "execution": [
-    {
-      ...
-      "state": "COMPLETED",
-    }
-  ],
-}
 ```
 
 ### A slightly more interesting example
