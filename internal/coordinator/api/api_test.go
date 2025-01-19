@@ -896,3 +896,27 @@ func TestShutdown(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 }
+
+func Test_createJobAndWait(t *testing.T) {
+	api, err := NewAPI(Config{
+		DataStore: inmemory.NewInMemoryDatastore(),
+		Broker:    broker.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("POST", "/jobs", strings.NewReader(`{
+		"name":"test job",
+		"wait": {
+			"timeout": "1s"
+		},
+		"tasks":[{
+			"name":"test task",
+			"image":"some:image"
+		}]
+	}`))
+	req.Header.Add("Content-Type", "application/json")
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+}
