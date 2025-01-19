@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"syscall"
+	"time"
 
 	"net/http"
 	"strings"
@@ -253,21 +254,61 @@ func (s *API) createJob(c echo.Context) error {
 	contentType := c.Request().Header.Get("content-type")
 	var ji input.Job
 	switch contentType {
-	case "application/json":
+	case "application/json": // json
 		if err := bindInputJSON(&ji, c.Request().Body); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
-	case "text/yaml":
+	case "text/yaml", "application/x-yaml": // yaml
 		if err := bindInputYAML(&ji, c.Request().Body); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
+	case "": // no content type
+		return echo.NewHTTPError(http.StatusBadRequest, "missing content type")
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unknown content type: %s", contentType))
 	}
-	if j, err := s.SubmitJob(c.Request().Context(), &ji); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	if ji.Wait != nil { // wait for job to complete before responding
+		timeout, err := time.ParseDuration(ji.Wait.Timeout)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		ch := make(chan any)
+		if err := s.broker.SubscribeForEvents(c.Request().Context(), broker.TOPIC_JOB, func(ev any) {
+			j, ok := ev.(*tork.Job)
+			if !ok {
+				log.Error().Msg("unable to cast event to *tork.Job")
+			}
+			// check if the job is the one we are waiting for
+			// and if it's in a terminal state (completed, failed, cancelled)
+			if ji.ID() == j.ID && (j.State == tork.JobStateCompleted || j.State == tork.JobStateFailed || j.State == tork.JobStateCancelled) {
+				if err := c.JSON(http.StatusOK, j); err != nil {
+					log.Error().Msg("error sending job summary")
+				}
+				close(ch)
+			}
+
+		}); err != nil {
+			return errors.New("error subscribing for job events")
+		}
+		if _, err := s.SubmitJob(c.Request().Context(), &ji); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		select {
+		case <-c.Request().Context().Done():
+			return echo.NewHTTPError(http.StatusRequestTimeout, "request cancelled")
+		case <-s.terminate:
+			return echo.NewHTTPError(http.StatusInternalServerError, "server shutting down")
+		case <-time.After(timeout): // timeout
+			return echo.NewHTTPError(http.StatusRequestTimeout, "timeout waiting for job to complete")
+		case <-ch: // job terminated
+			return nil
+		}
 	} else {
-		return c.JSON(http.StatusOK, tork.NewJobSummary(j))
+		if j, err := s.SubmitJob(c.Request().Context(), &ji); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		} else {
+			return c.JSON(http.StatusOK, tork.NewJobSummary(j))
+		}
 	}
 }
 

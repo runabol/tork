@@ -21,6 +21,11 @@ type Job struct {
 	Webhooks    []Webhook         `json:"webhooks,omitempty" yaml:"webhooks,omitempty" validate:"dive"`
 	Permissions []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty" validate:"dive"`
 	AutoDelete  *AutoDelete       `json:"autoDelete,omitempty" yaml:"autoDelete,omitempty"`
+	Wait        *Wait             `json:"wait,omitempty" yaml:"wait,omitempty"`
+}
+
+type Wait struct {
+	Timeout string `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration,required"`
 }
 
 type ScheduledJob struct {
