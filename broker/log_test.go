@@ -48,3 +48,16 @@ func TestForwardBatch(t *testing.T) {
 
 	<-processed
 }
+
+func TestLogShipperWriteBufferFull(t *testing.T) {
+	b := NewInMemoryBroker()
+	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+
+	})
+	assert.NoError(t, err)
+	fwd := NewLogShipper(b, "some-task-id")
+	for i := 0; i < 10_000; i++ {
+		_, err := fwd.Write([]byte("some log message\n"))
+		assert.NoError(t, err)
+	}
+}
