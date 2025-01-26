@@ -2,7 +2,6 @@ package broker
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -29,12 +28,8 @@ func NewLogShipper(broker Broker, taskID string) *LogShipper {
 func (r *LogShipper) Write(p []byte) (int, error) {
 	pc := make([]byte, len(p))
 	copy(pc, p)
-	select {
-	case r.q <- pc:
-		return len(p), nil
-	default:
-		return 0, fmt.Errorf("buffer full, unable to write")
-	}
+	r.q <- pc
+	return len(p), nil
 }
 
 func (r *LogShipper) startFlushTimer() {
