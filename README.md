@@ -64,7 +64,7 @@ See [tork.run](https://tork.run) for the full documentation.
 
 ## Quick Start
 
-the [Quick Start Guide](https://www.tork.run/quick-start) for detailed instructions on how to get up and running with Tork.
+See the [Quick Start Guide](https://www.tork.run/quick-start) for detailed instructions on how to get up and running with Tork.
 
 ## REST API
 
