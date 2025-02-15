@@ -423,3 +423,12 @@ func (d *PodmanRuntime) imageExistsLocally(ctx context.Context, name string) (bo
 	}
 	return true, nil
 }
+
+func (d *PodmanRuntime) Shutdown(ctx context.Context) error {
+	d.tasks.Iterate(func(k string, v string) {
+		if err := d.Stop(ctx, &tork.Task{ID: k}); err != nil {
+			log.Error().Err(err).Msgf("error stopping task %s", k)
+		}
+	})
+	return nil
+}

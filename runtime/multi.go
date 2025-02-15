@@ -47,10 +47,13 @@ func (m *MultiMounter) Unmount(ctx context.Context, mnt *tork.Mount) error {
 	if !ok {
 		return errors.Errorf("unmounter not found for: %+v", mnt)
 	}
+	if err := mounter.Unmount(ctx, mnt); err != nil {
+		return errors.Wrapf(err, "failed to unmount %s", mnt.ID)
+	}
 	m.mu.Lock()
 	delete(m.mapping, mnt.ID)
 	m.mu.Unlock()
-	return mounter.Unmount(ctx, mnt)
+	return nil
 }
 
 func (m *MultiMounter) RegisterMounter(mtype string, mr Mounter) {

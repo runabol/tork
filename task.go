@@ -47,6 +47,7 @@ type Task struct {
 	CMD         []string          `json:"cmd,omitempty"`
 	Entrypoint  []string          `json:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty"`
+	Service     *Service          `json:"service,omitempty"`
 	Image       string            `json:"image,omitempty"`
 	Registry    *Registry         `json:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
@@ -143,6 +144,46 @@ type Registry struct {
 	Password string `json:"password,omitempty"`
 }
 
+type Service struct {
+	Name           string            `json:"name,omitempty"`
+	Method         string            `json:"method,omitempty"`
+	Path           string            `json:"path,omitempty"`
+	Port           string            `json:"port,omitempty"`
+	ReadinessProbe *Probe            `json:"readinessProbe,omitempty"`
+	Headers        map[string]string `json:"headers,omitempty"`
+	Body           string            `json:"body,omitempty"`
+	HostPort       string            `json:"-"`
+}
+
+type Probe struct {
+	Path string `json:"path,omitempty"`
+}
+
+func (s *Service) Clone() *Service {
+	if s == nil {
+		return nil
+	}
+	return &Service{
+		Name:           s.Name,
+		Method:         s.Method,
+		Path:           s.Path,
+		Port:           s.Port,
+		HostPort:       s.HostPort,
+		Headers:        maps.Clone(s.Headers),
+		Body:           s.Body,
+		ReadinessProbe: s.ReadinessProbe.Clone(),
+	}
+}
+
+func (p *Probe) Clone() *Probe {
+	if p == nil {
+		return nil
+	}
+	return &Probe{
+		Path: p.Path,
+	}
+}
+
 func (t *Task) IsActive() bool {
 	return slices.Contains(TaskStateActive, t.State)
 }
@@ -213,6 +254,7 @@ func (t *Task) Clone() *Task {
 		Workdir:     t.Workdir,
 		Priority:    t.Priority,
 		Progress:    t.Progress,
+		Service:     t.Service.Clone(),
 	}
 }
 

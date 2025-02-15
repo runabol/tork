@@ -310,3 +310,12 @@ func (r *ShellRuntime) Stop(ctx context.Context, t *tork.Task) error {
 func (r *ShellRuntime) HealthCheck(ctx context.Context) error {
 	return nil
 }
+
+func (r *ShellRuntime) Shutdown(ctx context.Context) error {
+	r.cmds.Iterate(func(key string, value *exec.Cmd) {
+		if err := r.Stop(ctx, &tork.Task{ID: key}); err != nil {
+			log.Error().Err(err).Msgf("error stopping task: %s", key)
+		}
+	})
+	return nil
+}

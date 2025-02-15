@@ -147,18 +147,18 @@ func TestProgress(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 500)
-	containerID, ok := rt.tasks.Get(tk.ID)
+	tc, ok := rt.tasks.Get(tk.ID)
 	assert.True(t, ok)
-	assert.NotEmpty(t, containerID)
+	assert.NotEmpty(t, tc.id)
 
-	p, err := rt.readProgress(ctx, containerID)
+	p, err := rt.readProgress(ctx, tc.id)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), p)
 
 	// wait for the task to complete
 	time.Sleep(time.Second * 1)
 
-	p, err = rt.readProgress(ctx, containerID)
+	p, err = rt.readProgress(ctx, tc.id)
 	var notFoundError errdefs.ErrNotFound
 	assert.ErrorAs(t, err, &notFoundError)
 	assert.Equal(t, float64(0), p)
