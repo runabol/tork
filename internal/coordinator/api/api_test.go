@@ -185,6 +185,8 @@ func Test_healthNotOK(t *testing.T) {
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
+	err = ds.Close()
+	assert.NoError(t, err)
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)

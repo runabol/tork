@@ -968,12 +968,6 @@ func TestPostgresHealthCheck(t *testing.T) {
 
 	err = ds.HealthCheck(ctx)
 	assert.NoError(t, err)
-
-	_, err = ds.db.Exec("drop table nodes cascade")
-	assert.NoError(t, err)
-
-	err = ds.HealthCheck(ctx)
-	assert.Error(t, err)
 }
 
 func TestPostgresCreateAndGetTaskLogs(t *testing.T) {
