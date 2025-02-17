@@ -30,7 +30,7 @@ func SetupLogging() error {
 	logFormat := strings.ToLower(conf.StringDefault("logging.format", "pretty"))
 	switch logFormat {
 	case "pretty":
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006-01-02 15:04:05"})
 	case "json":
 		log.Logger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 	default:
