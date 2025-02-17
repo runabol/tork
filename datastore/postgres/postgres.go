@@ -1481,16 +1481,14 @@ func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx datastore.Dat
 }
 
 func (ds *PostgresDatastore) HealthCheck(ctx context.Context) error {
-	if _, err := ds.db.ExecContext(ctx, "select 1 from jobs limit 1"); err != nil {
-		return errors.Wrapf(err, "error reading from jobs table")
-	}
-	if _, err := ds.db.ExecContext(ctx, "select 1 from tasks limit 1"); err != nil {
-		return errors.Wrapf(err, "error reading from tasks table")
-	}
-	if _, err := ds.db.ExecContext(ctx, "select 1 from nodes limit 1"); err != nil {
-		return errors.Wrapf(err, "error reading from nodes table")
+	if _, err := ds.db.ExecContext(ctx, "select 1"); err != nil {
+		return errors.Wrapf(err, "error connecting to the database")
 	}
 	return nil
+}
+
+func (ds *PostgresDatastore) Close() error {
+	return ds.db.Close()
 }
 
 func parseQuery(query string) (string, []string) {
