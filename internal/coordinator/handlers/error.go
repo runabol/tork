@@ -35,7 +35,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 	if err != nil {
 		return errors.Wrapf(err, "unknown job: %s", t.JobID)
 	}
-	log.Error().
+	log.Debug().
 		Str("task-id", t.ID).
 		Str("task-error", t.Error).
 		Str("task-state", string(t.State)).
