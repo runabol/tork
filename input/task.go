@@ -11,6 +11,7 @@ type Task struct {
 	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
 	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
 	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
+	Service     *Service          `json:"service,omitempty" yaml:"service,omitempty"`
 	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
 	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
@@ -32,6 +33,21 @@ type Task struct {
 	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Workdir     string            `json:"workdir,omitempty" yaml:"workdir,omitempty" validate:"max=256"`
 	Priority    int               `json:"priority,omitempty" yaml:"priority,omitempty" validate:"min=0,max=9"`
+}
+
+type Service struct {
+	Name           string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
+	Method         string            `json:"method,omitempty" yaml:"method,omitempty"`
+	Path           string            `json:"path,omitempty" yaml:"path,omitempty"`
+	Port           string            `json:"port,omitempty" yaml:"port,omitempty"`
+	ReadinessProbe *Probe            `json:"readinessProbe,omitempty" yaml:"readinessProbe,omitempty"`
+	Headers        map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	Body           string            `json:"body,omitempty" yaml:"body,omitempty"`
+	HostPort       string            `json:"-"`
+}
+
+type Probe struct {
+	Path string `json:"path,omitempty" yaml:"path,omitempty"`
 }
 
 type SubJob struct {
@@ -174,12 +190,33 @@ func (i Task) toTask() *tork.Task {
 			Password: i.Registry.Password,
 		}
 	}
+	var service *tork.Service
+	if i.Service != nil {
+		if i.Service.ReadinessProbe == nil {
+			i.Service.ReadinessProbe = &Probe{
+				Path: "/",
+			}
+		}
+		service = &tork.Service{
+			Name:     i.Service.Name,
+			Method:   i.Service.Method,
+			Path:     i.Service.Path,
+			Port:     i.Service.Port,
+			Headers:  i.Service.Headers,
+			Body:     i.Service.Body,
+			HostPort: i.Service.HostPort,
+			ReadinessProbe: &tork.Probe{
+				Path: i.Service.ReadinessProbe.Path,
+			},
+		}
+	}
 	return &tork.Task{
 		Name:        i.Name,
 		Description: i.Description,
 		CMD:         i.CMD,
 		Entrypoint:  i.Entrypoint,
 		Run:         i.Run,
+		Service:     service,
 		Image:       i.Image,
 		Registry:    registry,
 		Env:         i.Env,

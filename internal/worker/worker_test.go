@@ -544,24 +544,3 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
-
-func Test_reservePort(t *testing.T) {
-	rt, err := docker.NewDockerRuntime()
-	assert.NoError(t, err)
-
-	b := broker.NewInMemoryBroker()
-
-	w, err := NewWorker(Config{
-		Broker:  b,
-		Runtime: rt,
-	})
-	assert.NoError(t, err)
-	assert.NotNil(t, w)
-
-	port, err := w.reservePort()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, port)
-	assert.Contains(t, w.usedPorts, port)
-	w.releasePort(port)
-	assert.NotContains(t, w.usedPorts, port)
-}

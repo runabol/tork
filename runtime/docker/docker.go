@@ -24,6 +24,7 @@ import (
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -42,12 +43,17 @@ const (
 
 type DockerRuntime struct {
 	client  *client.Client
-	tasks   *syncx.Map[string, string]
+	tasks   *syncx.Map[string, *taskContainer]
 	images  *syncx.Map[string, bool]
 	pullq   chan *pullRequest
 	mounter runtime.Mounter
 	broker  broker.Broker
 	config  string
+}
+
+type taskContainer struct {
+	id      string
+	stopped chan struct{}
 }
 
 type dockerLogsReader struct {
@@ -94,7 +100,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	rt := &DockerRuntime{
 		client: dc,
-		tasks:  new(syncx.Map[string, string]),
+		tasks:  new(syncx.Map[string, *taskContainer]),
 		images: new(syncx.Map[string, bool]),
 		pullq:  make(chan *pullRequest, 1),
 	}
@@ -172,6 +178,9 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err := d.imagePull(ctx, t, logger); err != nil {
 		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
+
+	stopped := make(chan struct{})
+	defer close(stopped)
 
 	env := []string{}
 	for name, value := range t.Env {
@@ -256,10 +265,21 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		resources.DeviceRequests = gpuOpts.Value()
 	}
 
+	portBindings := nat.PortMap{}
+	exposedPorts := nat.PortSet{}
+	if t.Service != nil {
+		exposedPorts[nat.Port(t.Service.Port)] = struct{}{}
+		portBindings[nat.Port(t.Service.Port)] = []nat.PortBinding{{
+			HostIP:   "127.0.0.1",
+			HostPort: t.Service.HostPort,
+		}}
+	}
+
 	hc := container.HostConfig{
 		PublishAllPorts: false,
 		Mounts:          mounts,
 		Resources:       resources,
+		PortBindings:    portBindings,
 	}
 
 	cmd := t.CMD
@@ -271,10 +291,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		entrypoint = []string{"sh", "-c"}
 	}
 	containerConf := container.Config{
-		Image:      t.Image,
-		Env:        env,
-		Cmd:        cmd,
-		Entrypoint: entrypoint,
+		Image:        t.Image,
+		Env:          env,
+		Cmd:          cmd,
+		Entrypoint:   entrypoint,
+		ExposedPorts: exposedPorts,
 	}
 	// we want to override the default
 	// image WORKDIR only if the task
@@ -313,20 +334,25 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	// create a mapping between task id and container id
-	d.tasks.Set(t.ID, resp.ID)
+	d.tasks.Set(t.ID, &taskContainer{id: resp.ID, stopped: stopped})
 
 	log.Debug().Msgf("created container %s", resp.ID)
 
 	// remove the container
 	defer func() {
-		stopContext, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		removeCtx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 		defer cancel()
-		if err := d.Stop(stopContext, t); err != nil {
+		if err := d.client.ContainerRemove(removeCtx, resp.ID, container.RemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+			RemoveLinks:   false,
+		}); err != nil {
 			log.Error().
 				Err(err).
 				Str("container-id", resp.ID).
 				Msg("error removing container upon completion")
 		}
+		d.tasks.Delete(t.ID)
 	}()
 
 	// initialize the tork and, optionally, the work directory
@@ -563,17 +589,19 @@ func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *
 }
 
 func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
-	containerID, ok := d.tasks.Get(t.ID)
+	taskContainer, ok := d.tasks.Get(t.ID)
 	if !ok {
 		return nil
 	}
-	d.tasks.Delete(t.ID)
-	log.Debug().Msgf("Attempting to stop and remove container %v", containerID)
-	return d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
-		RemoveVolumes: true,
-		RemoveLinks:   false,
-		Force:         true,
-	})
+	log.Debug().Msgf("Attempting to stop and remove container %v", taskContainer.id)
+	nowait := 1
+	if err := d.client.ContainerStop(ctx, taskContainer.id, container.StopOptions{
+		Timeout: &nowait,
+	}); err != nil {
+		return errors.Wrapf(err, "error stopping container %s", taskContainer.id)
+	}
+	<-taskContainer.stopped
+	return nil
 }
 
 func (d *DockerRuntime) HealthCheck(ctx context.Context) error {
@@ -723,4 +751,13 @@ func (d *DockerRuntime) imageExistsLocally(ctx context.Context, name string) (bo
 		}
 	}
 	return false, nil
+}
+
+func (d *DockerRuntime) Shutdown(ctx context.Context) error {
+	d.tasks.Iterate(func(k string, _ *taskContainer) {
+		if err := d.Stop(ctx, &tork.Task{ID: k}); err != nil {
+			log.Error().Err(err).Msgf("error stopping task %s", k)
+		}
+	})
+	return nil
 }

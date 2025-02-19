@@ -51,6 +51,7 @@ type taskRecord struct {
 	Priority    int            `db:"priority"`
 	Workdir     string         `db:"workdir"`
 	Progress    float64        `db:"progress"`
+	Service     []byte         `db:"service"`
 }
 
 type jobRecord struct {
@@ -229,6 +230,13 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")
 		}
 	}
+	var service *tork.Service
+	if r.Service != nil {
+		service = &tork.Service{}
+		if err := json.Unmarshal(r.Service, service); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.service")
+		}
+	}
 	return &tork.Task{
 		ID:          r.ID,
 		JobID:       r.JobID,
@@ -270,6 +278,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Priority:    r.Priority,
 		Workdir:     r.Workdir,
 		Progress:    r.Progress,
+		Service:     service,
 	}, nil
 }
 

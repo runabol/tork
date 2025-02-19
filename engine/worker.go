@@ -9,6 +9,7 @@ import (
 	"github.com/runabol/tork/runtime"
 	"github.com/runabol/tork/runtime/docker"
 	"github.com/runabol/tork/runtime/podman"
+	"github.com/runabol/tork/runtime/service"
 	"github.com/runabol/tork/runtime/shell"
 )
 
@@ -100,6 +101,35 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			podman.WithBroker(e.brokerRef),
 			podman.WithMounter(mounter),
 		), nil
+	case runtime.Service:
+		mounter, ok := e.mounters[runtime.Docker]
+		if !ok {
+			mounter = runtime.NewMultiMounter()
+		}
+		// register bind mounter
+		bm := docker.NewBindMounter(docker.BindConfig{
+			Allowed: conf.Bool("mounts.bind.allowed"),
+			Sources: conf.Strings("mounts.bind.sources"),
+		})
+		mounter.RegisterMounter("bind", bm)
+		// register volume mounter
+		vm, err := docker.NewVolumeMounter()
+		if err != nil {
+			return nil, err
+		}
+		mounter.RegisterMounter("volume", vm)
+		// register tmpfs mounter
+		mounter.RegisterMounter("tmpfs", docker.NewTmpfsMounter())
+		backend, err := docker.NewDockerRuntime(
+			docker.WithMounter(mounter),
+			docker.WithConfig(conf.String("runtime.docker.config")),
+			docker.WithBroker(e.brokerRef),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return service.NewServiceRuntime(backend), nil
+
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)
 	}

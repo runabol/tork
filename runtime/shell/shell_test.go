@@ -186,3 +186,39 @@ func TestRunTaskCMDLogger(t *testing.T) {
 	assert.NoError(t, err)
 	<-processed
 }
+
+func TestShellRuntimeShutdown(t *testing.T) {
+	rt := NewShellRuntime(Config{
+		UID: DEFAULT_UID,
+		GID: DEFAULT_GID,
+		Rexec: func(args ...string) *exec.Cmd {
+			cmd := exec.Command(args[5], args[6:]...)
+			return cmd
+		},
+	})
+
+	tk1 := &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "sleep 5",
+	}
+
+	tk2 := &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "sleep 5",
+	}
+
+	go func() {
+		err := rt.Run(context.Background(), tk1)
+		assert.Error(t, err)
+	}()
+
+	go func() {
+		err := rt.Run(context.Background(), tk2)
+		assert.Error(t, err)
+	}()
+
+	time.Sleep(time.Second * 1)
+
+	err := rt.Shutdown(context.Background())
+	assert.NoError(t, err)
+}
