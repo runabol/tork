@@ -49,21 +49,21 @@ CREATE TABLE users_roles (
 CREATE UNIQUE INDEX idx_users_roles_uniq ON users_roles (user_id,role_id);
 
 CREATE TABLE scheduled_jobs (
-    id             varchar(32) not null primary key,
-    name           varchar(64) not null,
-	description    text        not null,
-    tags           text[]      not null default '{}',
-    cron_expr      varchar(64) not null,
-    inputs         jsonb       not null,
-	output_        text        not null,
-	tasks          jsonb       not null,
-    defaults       jsonb,
-    webhooks       jsonb,
-    auto_delete    jsonb,
-    secrets        jsonb,
-    created_at     timestamp   not null,
-	created_by     varchar(32) not null references users(id),
-	state          varchar(10) not null
+  id             varchar(32) not null primary key,
+  name           varchar(64) not null,
+  description    text        not null,
+  tags           text[]      not null default '{}',
+  cron_expr      varchar(64) not null,
+  inputs         jsonb       not null,
+  output_        text        not null,
+  tasks          jsonb       not null,
+  defaults       jsonb,
+  webhooks       jsonb,
+  auto_delete    jsonb,
+  secrets        jsonb,
+  created_at     timestamp   not null,
+  created_by     varchar(32) not null references users(id),
+  state          varchar(10) not null
 );
 
 CREATE TABLE scheduled_jobs_perms (

@@ -799,31 +799,41 @@ func (ds *PostgresDatastore) expungeExpiredJobs() (int, error) {
 		if err := ptx.select_(&ids, "select id from jobs where (delete_at < current_timestamp) OR (created_at < $1 AND (state = 'COMPLETED' or state = 'FAILED' or state = 'CANCELLED')) limit 1000", time.Now().UTC().Add(-*ds.jobsRetentionDuration)); err != nil {
 			return errors.Wrapf(err, "error getting list of expired job ids from the db")
 		}
-		if len(ids) == 0 {
-			return nil
-		}
-		if _, err := ptx.exec(`delete from jobs_perms where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
-			return errors.Wrapf(err, "error deleting expired job perms from the db")
-		}
-		if _, err := ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id = ANY($1));`, pq.StringArray(ids)); err != nil {
-			return errors.Wrapf(err, "error deleting expired task log parts from the db")
-		}
-		if _, err := ptx.exec(`delete from tasks where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
-			return errors.Wrapf(err, "error deleting expired tasks from the db")
-		}
-		res, err := ptx.exec(`delete from jobs where id = ANY($1);`, pq.StringArray(ids))
+		res, err := ds.deleteJobs(ptx, ids)
 		if err != nil {
-			return errors.Wrapf(err, "error deleting expired jobs from the db")
+			return err
 		}
-		rows, err := res.RowsAffected()
-		if err != nil {
-			return errors.Wrapf(err, "error getting the number of deleted jobs from the db")
-		}
-		n = int(rows)
+		n = res
 		return nil
 	}); err != nil {
 		return 0, err
 	}
+	return n, nil
+}
+
+func (ds *PostgresDatastore) deleteJobs(ptx *PostgresDatastore, ids []string) (int, error) {
+	var n int
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if _, err := ptx.exec(`delete from jobs_perms where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
+		return 0, errors.Wrapf(err, "error deleting expired job perms from the db")
+	}
+	if _, err := ptx.exec(`delete from tasks_log_parts where task_id in (select id from tasks where job_id = ANY($1));`, pq.StringArray(ids)); err != nil {
+		return 0, errors.Wrapf(err, "error deleting expired task log parts from the db")
+	}
+	if _, err := ptx.exec(`delete from tasks where job_id = ANY($1);`, pq.StringArray(ids)); err != nil {
+		return 0, errors.Wrapf(err, "error deleting expired tasks from the db")
+	}
+	res, err := ptx.exec(`delete from jobs where id = ANY($1);`, pq.StringArray(ids))
+	if err != nil {
+		return 0, errors.Wrapf(err, "error deleting expired jobs from the db")
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, errors.Wrapf(err, "error getting the number of deleted jobs from the db")
+	}
+	n = int(rows)
 	return n, nil
 }
 
@@ -1419,6 +1429,29 @@ func (ds *PostgresDatastore) UpdateScheduledJob(ctx context.Context, id string, 
 		q := `update scheduled_jobs set state = $1 where id = $2`
 		_, err = ptx.exec(q, j.State, j.ID)
 		return err
+	})
+}
+
+func (ds *PostgresDatastore) DeleteScheduledJob(ctx context.Context, id string) error {
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		ids := []string{}
+		if err := ptx.select_(&ids, "select id from jobs where scheduled_job_id = $1 ", id); err != nil {
+			return errors.Wrapf(err, "error getting list of scheduled job instance ids from the db")
+		}
+		if _, err := ds.deleteJobs(ptx, ids); err != nil {
+			return errors.Wrapf(err, "error deleting scheduled job instances from the db")
+		}
+		if _, err := ptx.exec(`delete from scheduled_jobs_perms where scheduled_job_id = $1`, id); err != nil {
+			return errors.Wrapf(err, "error deleting scheduled job perms from the db")
+		}
+		if _, err := ptx.exec(`delete from scheduled_jobs where id = $1`, id); err != nil {
+			return errors.Wrapf(err, "error deleting scheduled job from the db")
+		}
+		return nil
 	})
 }
 

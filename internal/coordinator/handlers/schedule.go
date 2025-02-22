@@ -151,9 +151,12 @@ func (h *jobSchedulerHandler) handlePaused(_ context.Context, s *tork.ScheduledJ
 	if !ok {
 		return errors.Errorf("unknown scheduled job: %s", s.ID)
 	}
-	log.Info().Msgf("Pausing scheduled job %s", s.ID)
+	log.Info().Msgf("Pausing scheduled job %s", gjob.ID())
 	if err := h.scheduler.RemoveJob(gjob.ID()); err != nil {
 		return err
 	}
+	h.mu.Lock()
+	delete(h.m, s.ID)
+	h.mu.Unlock()
 	return nil
 }

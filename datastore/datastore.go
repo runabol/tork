@@ -49,6 +49,7 @@ type Datastore interface {
 	GetScheduledJobs(ctx context.Context, currentUser string, page, size int) (*Page[*tork.ScheduledJobSummary], error)
 	GetScheduledJobByID(ctx context.Context, id string) (*tork.ScheduledJob, error)
 	UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error
+	DeleteScheduledJob(ctx context.Context, id string) error
 
 	CreateUser(ctx context.Context, u *tork.User) error
 	GetUser(ctx context.Context, username string) (*tork.User, error)
