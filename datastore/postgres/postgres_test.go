@@ -1604,3 +1604,26 @@ func TestPostgresExpungeExpiredJobs(t *testing.T) {
 		}
 	}
 }
+
+func TestPostgresDeleteScheduledJob(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	sj := tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		Name:      "Test Scheduled Job",
+		CreatedAt: now,
+		State:     tork.ScheduledJobStateActive,
+	}
+	err = ds.CreateScheduledJob(ctx, &sj)
+	assert.NoError(t, err)
+
+	err = ds.DeleteScheduledJob(ctx, sj.ID)
+	assert.NoError(t, err)
+
+	_, err = ds.GetScheduledJobByID(ctx, sj.ID)
+	assert.Error(t, err)
+}

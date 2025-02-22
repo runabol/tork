@@ -137,6 +137,7 @@ func NewAPI(cfg Config) (*API, error) {
 		r.GET("/scheduled-jobs", s.listScheduledJobs)
 		r.PUT("/scheduled-jobs/:id/pause", s.pauseScheduledJob)
 		r.PUT("/scheduled-jobs/:id/resume", s.resumeScheduledJob)
+		r.DELETE("/scheduled-jobs/:id", s.deleteScheduledJob)
 	}
 	if v, ok := cfg.Enabled["metrics"]; !ok || v {
 		r.GET("/metrics", s.getMetrics)
@@ -624,6 +625,25 @@ func (s *API) resumeScheduledJob(c echo.Context) error {
 		u.State = tork.ScheduledJobStateActive
 		return nil
 	}); err != nil {
+		return err
+	}
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
+}
+
+func (s *API) deleteScheduledJob(c echo.Context) error {
+	id := c.Param("id")
+	j, err := s.ds.GetScheduledJobByID(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	if j.State != tork.ScheduledJobStateActive {
+		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not active")
+	}
+	j.State = tork.ScheduledJobStatePaused
+	if err := s.ds.DeleteScheduledJob(c.Request().Context(), id); err != nil {
 		return err
 	}
 	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {

@@ -1422,6 +1422,25 @@ func (ds *PostgresDatastore) UpdateScheduledJob(ctx context.Context, id string, 
 	})
 }
 
+func (ds *PostgresDatastore) DeleteScheduledJob(ctx context.Context, id string) error {
+	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
+		ptx, ok := tx.(*PostgresDatastore)
+		if !ok {
+			return errors.New("unable to cast to a postgres datastore")
+		}
+		if _, err := ptx.exec(`delete from scheduled_jobs_perms where scheduled_job_id = $1`, id); err != nil {
+			return errors.Wrapf(err, "error deleting scheduled job perms from the db")
+		}
+		if _, err := ptx.exec(`delete from jobs where scheduled_job_id = $1`, id); err != nil {
+			return errors.Wrapf(err, "error deleting jobs from the db")
+		}
+		if _, err := ptx.exec(`delete from scheduled_jobs where id = $1`, id); err != nil {
+			return errors.Wrapf(err, "error deleting scheduled job from the db")
+		}
+		return nil
+	})
+}
+
 func (ds *PostgresDatastore) get(dest interface{}, query string, args ...interface{}) error {
 	if ds.tx != nil {
 		return ds.tx.Get(dest, query, args...)

@@ -870,3 +870,30 @@ func TestInMemoryUpdateScheduledJob(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, datastore.ErrJobNotFound, err)
 }
+
+func TestInMemoryDeleteScheduledJob(t *testing.T) {
+	ctx := context.Background()
+	ds := inmemory.NewInMemoryDatastore()
+
+	// Create a scheduled job
+	scheduledJob := &tork.ScheduledJob{
+		ID:   uuid.NewUUID(),
+		Name: "Test Scheduled Job",
+	}
+	err := ds.CreateScheduledJob(ctx, scheduledJob)
+	assert.NoError(t, err)
+
+	// Verify the scheduled job exists
+	retrievedJob, err := ds.GetScheduledJobByID(ctx, scheduledJob.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, scheduledJob.ID, retrievedJob.ID)
+
+	// Delete the scheduled job
+	err = ds.DeleteScheduledJob(ctx, scheduledJob.ID)
+	assert.NoError(t, err)
+
+	// Verify the scheduled job no longer exists
+	_, err = ds.GetScheduledJobByID(ctx, scheduledJob.ID)
+	assert.Error(t, err)
+	assert.Equal(t, datastore.ErrJobNotFound, err)
+}

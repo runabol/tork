@@ -720,6 +720,16 @@ func (ds *InMemoryDatastore) UpdateScheduledJob(ctx context.Context, id string, 
 	return nil
 }
 
+func (ds *InMemoryDatastore) DeleteScheduledJob(ctx context.Context, id string) error {
+	ds.jobs.Iterate(func(_ string, j *tork.Job) {
+		if j.Schedule != nil && j.Schedule.ID == id {
+			ds.jobs.Delete(j.ID)
+		}
+	})
+	ds.scheduledJobs.Delete(id)
+	return nil
+}
+
 func (ds *InMemoryDatastore) WithTx(ctx context.Context, f func(tx datastore.Datastore) error) error {
 	return f(ds)
 }

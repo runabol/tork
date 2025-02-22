@@ -162,6 +162,13 @@ func (ds *datastoreProxy) UpdateScheduledJob(ctx context.Context, id string, mod
 	return ds.ds.UpdateScheduledJob(ctx, id, modify)
 }
 
+func (ds *datastoreProxy) DeleteScheduledJob(ctx context.Context, id string) error {
+	if err := ds.checkInit(); err != nil {
+		return err
+	}
+	return ds.ds.DeleteScheduledJob(ctx, id)
+}
+
 func (ds *datastoreProxy) CreateUser(ctx context.Context, u *tork.User) error {
 	if err := ds.checkInit(); err != nil {
 		return err
