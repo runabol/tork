@@ -7,7 +7,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,8 @@ import (
 func Test_cancelActiveTasks(t *testing.T) {
 	ctx := context.Background()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	b := broker.NewInMemoryBroker()
 
 	j1 := &tork.Job{
@@ -28,7 +29,7 @@ func Test_cancelActiveTasks(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -52,4 +53,5 @@ func Test_cancelActiveTasks(t *testing.T) {
 	actives, err = ds.GetActiveTasks(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, actives, 0)
+	assert.NoError(t, ds.Close())
 }

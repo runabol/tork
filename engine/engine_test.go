@@ -10,7 +10,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/internal/hash"
 	"github.com/runabol/tork/internal/uuid"
@@ -28,13 +28,21 @@ func TestStartStandalone(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.State())
 
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	err = eng.Start()
 	assert.NoError(t, err)
 
 	assert.Equal(t, StateRunning, eng.State())
 	err = eng.Terminate()
 	assert.NoError(t, err)
 	assert.Equal(t, StateTerminated, eng.State())
+	assert.NoError(t, ds.Close())
 }
 
 func TestRunStandalone(t *testing.T) {
@@ -44,13 +52,21 @@ func TestRunStandalone(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	err = eng.Start()
 	assert.NoError(t, err)
 
 	assert.Equal(t, StateRunning, eng.State())
 	err = eng.Terminate()
 	assert.NoError(t, err)
 	assert.Equal(t, StateTerminated, eng.State())
+	assert.NoError(t, ds.Close())
 }
 
 func TestStartCoordinator(t *testing.T) {
@@ -58,13 +74,21 @@ func TestStartCoordinator(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
 	assert.Equal(t, StateTerminated, eng.state)
+	assert.NoError(t, ds.Close())
 }
 
 func TestStartWorker(t *testing.T) {
@@ -82,7 +106,8 @@ func TestStartWorker(t *testing.T) {
 }
 
 func Test_basicAuthWrongPassword(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	password := uuid.NewShortUUID()
 	hashedPassword, err := hash.Password(password)
 	assert.NoError(t, err)
@@ -106,10 +131,12 @@ func Test_basicAuthWrongPassword(t *testing.T) {
 	x := mw(h)
 	err = x(ctx)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_basicCorrectPassword(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	password := uuid.NewShortUUID()
 	hashedPassword, err := hash.Password(password)
 	assert.NoError(t, err)
@@ -133,6 +160,7 @@ func Test_basicCorrectPassword(t *testing.T) {
 	x := mw(h)
 	err = x(ctx)
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_rateLimit(t *testing.T) {
@@ -186,7 +214,14 @@ func TestSubmitJob(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
@@ -215,6 +250,7 @@ func TestSubmitJob(t *testing.T) {
 	err = eng.Broker().PublishEvent(context.Background(), broker.TOPIC_JOB_COMPLETED, j)
 	assert.NoError(t, err)
 	<-c
+	assert.NoError(t, ds.Close())
 }
 
 func TestSubmitJobPanics(t *testing.T) {
@@ -229,7 +265,14 @@ func TestSubmitInvalidJob(t *testing.T) {
 
 	assert.Equal(t, StateIdle, eng.state)
 
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
@@ -237,20 +280,29 @@ func TestSubmitInvalidJob(t *testing.T) {
 
 	_, err = eng.SubmitJob(ctx, &input.Job{})
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestRegisterMounter(t *testing.T) {
 	eng := New(Config{Mode: ModeStandalone})
 	assert.Equal(t, StateIdle, eng.state)
 
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
 	eng.RegisterMounter(runtime.Docker, "bind2", docker.NewBindMounter(docker.BindConfig{}))
 
-	err := eng.Start()
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestRegisterRuntime(t *testing.T) {
@@ -258,29 +310,19 @@ func TestRegisterRuntime(t *testing.T) {
 	assert.Equal(t, StateIdle, eng.state)
 
 	eng.RegisterRuntime(shell.NewShellRuntime(shell.Config{}))
-
-	err := eng.Start()
+	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
-	assert.Equal(t, StateRunning, eng.state)
-
-	err = eng.Terminate()
-	assert.NoError(t, err)
-}
-
-func TestRegisterDatastoreProvider(t *testing.T) {
-	eng := New(Config{Mode: ModeStandalone})
-	assert.Equal(t, StateIdle, eng.state)
-
-	eng.RegisterDatastoreProvider("inmem2", func() (datastore.Datastore, error) {
-		return inmemory.NewInMemoryDatastore(), nil
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
 	})
 
-	err := eng.Start()
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestOnBrokerInit(t *testing.T) {
@@ -289,9 +331,16 @@ func TestOnBrokerInit(t *testing.T) {
 
 	b := eng.Broker()
 
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
 	assert.Error(t, b.HealthCheck(context.Background()))
 
-	err := eng.Start()
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 
@@ -299,20 +348,30 @@ func TestOnBrokerInit(t *testing.T) {
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
+
+	assert.NoError(t, ds.Close())
 }
 
 func TestOnDatastoreInit(t *testing.T) {
 	eng := New(Config{Mode: ModeStandalone})
 	assert.Equal(t, StateIdle, eng.state)
 
-	ds := eng.Datastore()
-	assert.Error(t, ds.HealthCheck(context.Background()))
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 
-	err := eng.Start()
+	eng.RegisterDatastoreProvider(datastore.DATASTORE_POSTGRES, func() (datastore.Datastore, error) {
+		return ds, nil
+	})
+
+	ds2 := eng.Datastore()
+	assert.Error(t, ds2.HealthCheck(context.Background()))
+
+	err = eng.Start()
 	assert.NoError(t, err)
 	assert.Equal(t, StateRunning, eng.state)
 	assert.NoError(t, ds.HealthCheck(context.Background()))
 
 	err = eng.Terminate()
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }

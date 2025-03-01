@@ -7,7 +7,6 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/conf"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/datastore/postgres"
 )
 
@@ -254,7 +253,7 @@ func (ds *datastoreProxy) checkInit() error {
 }
 
 func (e *Engine) initDatastore() error {
-	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
+	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_POSTGRES)
 	ds, err := e.createDatastore(dstype)
 	if err != nil {
 		return err
@@ -269,8 +268,6 @@ func (e *Engine) createDatastore(dstype string) (datastore.Datastore, error) {
 		return dsp()
 	}
 	switch dstype {
-	case datastore.DATASTORE_INMEMORY:
-		return inmemory.NewInMemoryDatastore(), nil
 	case datastore.DATASTORE_POSTGRES:
 		dsn := conf.StringDefault(
 			"datastore.postgres.dsn",

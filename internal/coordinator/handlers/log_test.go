@@ -3,9 +3,10 @@ package handlers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,7 +14,8 @@ import (
 func Test_handleLog(t *testing.T) {
 	ctx := context.Background()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewLogHandler(ds)
 	assert.NotNil(t, handler)
 
@@ -21,13 +23,16 @@ func Test_handleLog(t *testing.T) {
 		ID:   uuid.NewUUID(),
 		Name: "test job",
 	}
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Queue: "test-queue",
-		JobID: j1.ID,
+		ID:        uuid.NewUUID(),
+		Queue:     "test-queue",
+		JobID:     j1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -45,4 +50,5 @@ func Test_handleLog(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, n11.TotalItems)
 	assert.Equal(t, "line 1", n11.Items[0].Contents)
+	assert.NoError(t, ds.Close())
 }

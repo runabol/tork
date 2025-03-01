@@ -7,7 +7,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,8 @@ func Test_handleJobs(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -31,7 +32,7 @@ func Test_handleJobs(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	err = handler(ctx, job.StateChange, j1)
@@ -40,13 +41,15 @@ func Test_handleJobs(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.JobStateScheduled, j2.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleCancelJob(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -62,7 +65,7 @@ func Test_handleCancelJob(t *testing.T) {
 			},
 		},
 	}
-	err := ds.CreateJob(ctx, pj)
+	err = ds.CreateJob(ctx, pj)
 	assert.NoError(t, err)
 
 	err = b.SubscribeForJobs(func(j *tork.Job) error {
@@ -113,13 +116,15 @@ func Test_handleCancelJob(t *testing.T) {
 	// wait for the cancellation
 	// to propagate to the parent job
 	time.Sleep(time.Millisecond * 100)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleRestartJob(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -137,7 +142,7 @@ func Test_handleRestartJob(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	// start the job
@@ -170,13 +175,15 @@ func Test_handleRestartJob(t *testing.T) {
 	j1.State = tork.JobStateRestart
 	err = handler(ctx, job.StateChange, j1)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -193,7 +200,7 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	err = handler(ctx, job.StateChange, j1)
@@ -202,6 +209,7 @@ func Test_handleJobWithTaskEvalFailure(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.JobStateFailed, j2.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleCompleteJob(t *testing.T) {
@@ -217,7 +225,8 @@ func Test_handleCompleteJob(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -250,6 +259,7 @@ func Test_handleCompleteJob(t *testing.T) {
 	assert.Nil(t, j1.DeleteAt)
 
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
@@ -265,7 +275,8 @@ func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -301,6 +312,7 @@ func Test_handleCompleteJobWithAutoDelete(t *testing.T) {
 	assert.NotNil(t, j1.DeleteAt)
 
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleCompleteJobWithBadOutput(t *testing.T) {
@@ -316,7 +328,8 @@ func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -348,12 +361,14 @@ func Test_handleCompleteJobWithBadOutput(t *testing.T) {
 	assert.Contains(t, j1.Error, "unknown name bad_function")
 
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleJobProgress(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewJobHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -371,7 +386,7 @@ func Test_handleJobProgress(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	err = handler(ctx, job.Progress, j1)
@@ -382,4 +397,5 @@ func Test_handleJobProgress(t *testing.T) {
 	assert.Equal(t, tork.JobStateRunning, j2.State)
 	assert.Empty(t, j1.Result)
 	assert.Nil(t, j1.DeleteAt)
+	assert.NoError(t, ds.Close())
 }

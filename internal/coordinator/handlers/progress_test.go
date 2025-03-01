@@ -3,9 +3,10 @@ package handlers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
@@ -14,7 +15,8 @@ import (
 
 func Test_handleProgress(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewProgressHandler(ds, job.NoOpHandlerFunc)
 	assert.NotNil(t, handler)
 
@@ -28,11 +30,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: 0,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  0,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -60,11 +65,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: 5,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  5,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -92,11 +100,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: 50,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  50,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -124,11 +135,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: 100,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  100,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -156,11 +170,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: -10,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  -10,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -188,11 +205,14 @@ func Test_handleProgress(t *testing.T) {
 		err := ds.CreateJob(ctx, j1)
 		assert.NoError(t, err)
 
+		now := time.Now().UTC()
+
 		tk := &tork.Task{
-			ID:       uuid.NewUUID(),
-			Queue:    "test-queue",
-			JobID:    j1.ID,
-			Progress: 101,
+			ID:        uuid.NewUUID(),
+			Queue:     "test-queue",
+			JobID:     j1.ID,
+			Progress:  101,
+			CreatedAt: &now,
 		}
 
 		err = ds.CreateTask(ctx, tk)
@@ -209,5 +229,7 @@ func Test_handleProgress(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, float64(50), j2.Progress)
 	})
+
+	assert.NoError(t, ds.Close())
 
 }

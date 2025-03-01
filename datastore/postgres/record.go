@@ -289,7 +289,7 @@ func (r nodeRecord) toNode() *tork.Node {
 	}
 	// if we hadn't seen an heartbeat for two or more
 	// consecutive periods we consider the node as offline
-	if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-tork.HEARTBEAT_RATE * 2)) {
+	if n.LastHeartbeatAt.Before(time.Now().UTC().Add(-tork.HEARTBEAT_RATE*2)) && n.Status == tork.NodeStatusUP {
 		n.Status = tork.NodeStatusOffline
 	}
 	return &n

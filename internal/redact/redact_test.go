@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRedactTask(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	ctx := context.Background()
 	j1 := tork.Job{
 		ID: uuid.NewUUID(),
@@ -19,7 +20,7 @@ func TestRedactTask(t *testing.T) {
 			"hush": "shhhhh",
 		},
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	ta := tork.Task{
@@ -88,6 +89,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
+	assert.NoError(t, ds.Close())
 }
 
 func TestRedactJob(t *testing.T) {
@@ -147,7 +149,9 @@ func TestRedactJob(t *testing.T) {
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds)
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
@@ -185,13 +189,17 @@ func TestRedactJobContains(t *testing.T) {
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter(inmemory.NewInMemoryDatastore(), Contains("secret"))
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds)
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
-	assert.Equal(t, "password", j.Tasks[0].Env["PASSword"])
+	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["PASSword"])
 	assert.Equal(t, "hello world", j.Tasks[0].Env["harmless"])
+	assert.NoError(t, ds.Close())
 }
+
 func TestRedactJobWildcard(t *testing.T) {
 	o := &tork.Job{
 		Tasks: []*tork.Task{
@@ -207,11 +215,14 @@ func TestRedactJobWildcard(t *testing.T) {
 	}
 	j := o.Clone()
 
-	redacter := NewRedacter(inmemory.NewInMemoryDatastore(), Wildcard("secret*"))
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds, Wildcard("secret*"))
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
 	assert.Equal(t, "secret", j.Tasks[0].Env["_secret_2"])
 	assert.Equal(t, "password", j.Tasks[0].Env["PASSword"])
 	assert.Equal(t, "hello world", j.Tasks[0].Env["harmless"])
+	assert.NoError(t, ds.Close())
 }

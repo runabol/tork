@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/webhook"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookOK(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 
@@ -84,7 +85,7 @@ func TestWebhookOK(t *testing.T) {
 		}},
 	}
 
-	err := ds.CreateJob(context.Background(), j)
+	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 
 	tk := &tork.Task{
@@ -106,10 +107,12 @@ func TestWebhookOK(t *testing.T) {
 	<-received
 	<-received
 	<-received
+	assert.NoError(t, ds.Close())
 }
 
 func TestWebhookNoEvent(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 
@@ -125,7 +128,7 @@ func TestWebhookNoEvent(t *testing.T) {
 		}},
 	}
 
-	err := ds.CreateJob(context.Background(), j)
+	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 
 	tk := &tork.Task{
@@ -134,16 +137,20 @@ func TestWebhookNoEvent(t *testing.T) {
 	}
 
 	assert.NoError(t, hm(context.Background(), StateChange, tk))
+	assert.NoError(t, ds.Close())
 }
 
 func TestWebhookIgnored(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	assert.NoError(t, hm(context.Background(), Read, nil))
+	assert.NoError(t, ds.Close())
 }
 
 func TestWebhookIfTrue(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	received := make(chan any)
 	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +166,7 @@ func TestWebhookIfTrue(t *testing.T) {
 			If:    "true",
 		}},
 	}
-	err := ds.CreateJob(context.Background(), j)
+	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 	tk := &tork.Task{
 		ID:    "2",
@@ -168,10 +175,12 @@ func TestWebhookIfTrue(t *testing.T) {
 	}
 	assert.NoError(t, hm(context.Background(), StateChange, tk))
 	<-received
+	assert.NoError(t, ds.Close())
 }
 
 func TestWebhookIfFalse(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	received := make(chan any)
 	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +196,7 @@ func TestWebhookIfFalse(t *testing.T) {
 			If:    "false",
 		}},
 	}
-	err := ds.CreateJob(context.Background(), j)
+	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 	tk := &tork.Task{
 		ID:    "2",
@@ -200,10 +209,12 @@ func TestWebhookIfFalse(t *testing.T) {
 		t.Error("Received a webhook call when it should not have been called")
 	case <-time.After(500 * time.Millisecond):
 	}
+	assert.NoError(t, ds.Close())
 }
 
 func TestWebhookState(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Webhook(ds)})
 	received := make(chan any)
 	callbackState := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +230,7 @@ func TestWebhookState(t *testing.T) {
 			If:    "{{ task.State == 'COMPLETED' && job.State == 'COMPLETED' }}",
 		}},
 	}
-	err := ds.CreateJob(context.Background(), j)
+	err = ds.CreateJob(context.Background(), j)
 	assert.NoError(t, err)
 	tk := &tork.Task{
 		ID:    "2",
@@ -228,4 +239,5 @@ func TestWebhookState(t *testing.T) {
 	}
 	assert.NoError(t, hm(context.Background(), StateChange, tk))
 	<-received
+	assert.NoError(t, ds.Close())
 }

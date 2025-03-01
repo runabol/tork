@@ -7,7 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,8 +22,11 @@ func TestValidateMinJob(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobNoTasks(t *testing.T) {
@@ -31,8 +34,11 @@ func TestValidateJobNoTasks(t *testing.T) {
 		Name:  "test job",
 		Tasks: []Task{},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateQueue(t *testing.T) {
@@ -46,7 +52,9 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -59,7 +67,7 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -72,8 +80,9 @@ func TestValidateQueue(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobNoName(t *testing.T) {
@@ -85,8 +94,11 @@ func TestValidateJobNoName(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateVar(t *testing.T) {
@@ -99,7 +111,9 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -111,7 +125,7 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -123,8 +137,9 @@ func TestValidateVar(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobDefaults(t *testing.T) {
@@ -140,10 +155,13 @@ func TestValidateJobDefaults(t *testing.T) {
 			Timeout: "1234",
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
 	errs := err.(validator.ValidationErrors)
 	assert.Equal(t, "Timeout", errs[0].Field())
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobTaskNoName(t *testing.T) {
@@ -155,8 +173,11 @@ func TestValidateJobTaskNoName(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobTaskNoImage(t *testing.T) {
@@ -168,8 +189,11 @@ func TestValidateJobTaskNoImage(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobTaskRetry(t *testing.T) {
@@ -185,7 +209,9 @@ func TestValidateJobTaskRetry(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -200,8 +226,9 @@ func TestValidateJobTaskRetry(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateJobTaskTimeout(t *testing.T) {
@@ -215,8 +242,11 @@ func TestValidateJobTaskTimeout(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateSubJob(t *testing.T) {
@@ -238,8 +268,11 @@ func TestValidateSubJob(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateSubJobBadWebhook(t *testing.T) {
@@ -261,8 +294,11 @@ func TestValidateSubJobBadWebhook(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateParallelOrEachTaskType(t *testing.T) {
@@ -281,7 +317,9 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -300,7 +338,7 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -328,8 +366,9 @@ func TestValidateParallelOrEachTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateParallelOrSubJobTaskType(t *testing.T) {
@@ -349,7 +388,9 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -376,8 +417,9 @@ func TestValidateParallelOrSubJobTaskType(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateExpr(t *testing.T) {
@@ -396,7 +438,9 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -414,7 +458,7 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -432,8 +476,9 @@ func TestValidateExpr(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateMounts(t *testing.T) {
@@ -453,7 +498,9 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -472,7 +519,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -491,7 +538,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -511,7 +558,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -531,7 +578,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -551,7 +598,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -571,7 +618,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -591,7 +638,7 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
 
 	j = Job{
@@ -611,8 +658,9 @@ func TestValidateMounts(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.NoError(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateWebhook(t *testing.T) {
@@ -628,7 +676,9 @@ func TestValidateWebhook(t *testing.T) {
 			},
 		},
 	}
-	err := j.Validate(inmemory.NewInMemoryDatastore())
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = j.Validate(ds)
 	assert.NoError(t, err)
 
 	j = Job{
@@ -643,8 +693,9 @@ func TestValidateWebhook(t *testing.T) {
 			},
 		},
 	}
-	err = j.Validate(inmemory.NewInMemoryDatastore())
+	err = j.Validate(ds)
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func TestValidateCron(t *testing.T) {
