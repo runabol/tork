@@ -20,7 +20,6 @@ var (
 )
 
 const (
-	DATASTORE_INMEMORY = "inmemory"
 	DATASTORE_POSTGRES = "postgres"
 )
 

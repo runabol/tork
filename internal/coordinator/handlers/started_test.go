@@ -7,7 +7,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,8 @@ func Test_handleStartedTask(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewStartedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -27,7 +28,7 @@ func Test_handleStartedTask(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		State: tork.JobStateScheduled,
 	}
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
@@ -36,6 +37,7 @@ func Test_handleStartedTask(t *testing.T) {
 		StartedAt: &now,
 		NodeID:    uuid.NewUUID(),
 		JobID:     j1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -47,13 +49,14 @@ func Test_handleStartedTask(t *testing.T) {
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, t2.State)
-	assert.Equal(t, t1.StartedAt, t2.StartedAt)
+	assert.Equal(t, t1.StartedAt.Unix(), t2.StartedAt.Unix())
 	assert.Equal(t, t1.NodeID, t2.NodeID)
 
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleStartedTaskOfFailedJob(t *testing.T) {
@@ -69,7 +72,8 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewStartedHandler(ds, b)
 	assert.NotNil(t, handler)
 
@@ -95,6 +99,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 		StartedAt: &now,
 		JobID:     j1.ID,
 		NodeID:    n1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -108,6 +113,7 @@ func Test_handleStartedTaskOfFailedJob(t *testing.T) {
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, t2.State)
-	assert.Equal(t, t1.StartedAt, t2.StartedAt)
+	assert.Equal(t, t1.StartedAt.Unix(), t2.StartedAt.Unix())
 	assert.Equal(t, t1.NodeID, t2.NodeID)
+	assert.NoError(t, ds.Close())
 }

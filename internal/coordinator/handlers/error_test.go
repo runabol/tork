@@ -7,7 +7,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,8 @@ func Test_handleFailedTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 
 	handler := NewErrorHandler(ds, b)
 	assert.NotNil(t, handler)
@@ -45,6 +46,7 @@ func Test_handleFailedTask(t *testing.T) {
 		State:     tork.JobStateRunning,
 		CreatedAt: now,
 		Position:  1,
+		TaskCount: 1,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -62,6 +64,7 @@ func Test_handleFailedTask(t *testing.T) {
 		NodeID:      node.ID,
 		JobID:       j1.ID,
 		Position:    1,
+		CreatedAt:   &now,
 	}
 
 	t2 := &tork.Task{
@@ -72,6 +75,7 @@ func Test_handleFailedTask(t *testing.T) {
 		NodeID:      node.ID,
 		JobID:       j1.ID,
 		Position:    1,
+		CreatedAt:   &now,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -92,7 +96,7 @@ func Test_handleFailedTask(t *testing.T) {
 	t11, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateFailed, t11.State)
-	assert.Equal(t, t1.CompletedAt, t11.CompletedAt)
+	assert.Equal(t, t1.CompletedAt.Unix(), t11.CompletedAt.Unix())
 
 	// verify that the job was
 	// marked as FAILED
@@ -105,6 +109,7 @@ func Test_handleFailedTask(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, actives, 0)
 	assert.True(t, j2.FailedAt.After(j1.CreatedAt))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_handleFailedTaskRetry(t *testing.T) {
@@ -119,7 +124,8 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 
 	handler := NewErrorHandler(ds, b)
 	assert.NotNil(t, handler)
@@ -127,9 +133,10 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	now := time.Now().UTC()
 
 	j1 := &tork.Job{
-		ID:       uuid.NewUUID(),
-		State:    tork.JobStateRunning,
-		Position: 1,
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		Position:  1,
+		TaskCount: 1,
 		Tasks: []*tork.Task{
 			{
 				Name: "task-1",
@@ -150,6 +157,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 		Retry: &tork.TaskRetry{
 			Limit: 1,
 		},
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, t1)
@@ -163,7 +171,7 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	t2, err := ds.GetTaskByID(ctx, t1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateFailed, t2.State)
-	assert.Equal(t, t1.CompletedAt, t2.CompletedAt)
+	assert.Equal(t, t1.CompletedAt.Unix(), t2.CompletedAt.Unix())
 
 	// verify that the job was
 	// NOT marked as FAILED
@@ -171,4 +179,5 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.NoError(t, ds.Close())
 }

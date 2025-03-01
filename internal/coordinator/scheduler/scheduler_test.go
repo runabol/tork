@@ -9,7 +9,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +25,8 @@ func Test_scheduleRegularTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -37,10 +38,13 @@ func Test_scheduleRegularTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Queue: "test-queue",
-		JobID: j1.ID,
+		ID:        uuid.NewUUID(),
+		Queue:     "test-queue",
+		JobID:     j1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -54,6 +58,7 @@ func Test_scheduleRegularTask(t *testing.T) {
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
@@ -67,7 +72,8 @@ func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -82,10 +88,13 @@ func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Queue: "test-queue",
-		JobID: j1.ID,
+		ID:        uuid.NewUUID(),
+		Queue:     "test-queue",
+		JobID:     j1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -99,13 +108,15 @@ func Test_scheduleRegularTaskOverrideDefaultQueue(t *testing.T) {
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateScheduled, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 
 	j1 := &tork.Job{
@@ -125,12 +136,15 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 		},
 	}
 
-	err := ds.CreateJob(ctx, j1)
+	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j1.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j1.ID,
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -148,6 +162,7 @@ func Test_scheduleRegularTaskJobDefaults(t *testing.T) {
 	assert.Equal(t, "10m", tk.Limits.Memory)
 	assert.Equal(t, "5s", tk.Timeout)
 	assert.Equal(t, 3, tk.Priority)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleParallelTask(t *testing.T) {
@@ -162,7 +177,8 @@ func Test_scheduleParallelTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -175,6 +191,8 @@ func Test_scheduleParallelTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
 		JobID: j.ID,
@@ -186,6 +204,7 @@ func Test_scheduleParallelTask(t *testing.T) {
 				},
 			},
 		},
+		CreatedAt: &now,
 	}
 
 	err = ds.CreateTask(ctx, tk)
@@ -202,6 +221,7 @@ func Test_scheduleParallelTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
 	assert.Equal(t, 1, processed)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleEachTask(t *testing.T) {
@@ -219,7 +239,8 @@ func Test_scheduleEachTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -232,9 +253,12 @@ func Test_scheduleEachTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
 		Each: &tork.EachTask{
 			List: "{{ sequence (1,3) }}",
 			Task: &tork.Task{
@@ -262,13 +286,15 @@ func Test_scheduleEachTask(t *testing.T) {
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
 	assert.Equal(t, int32(2), counter.Load())
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleEachTaskNotaList(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NotNil(t, s)
 
@@ -277,13 +303,16 @@ func Test_scheduleEachTaskNotaList(t *testing.T) {
 		Name: "test job",
 	}
 
-	err := ds.CreateJob(ctx, j)
+	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
-		State: tork.TaskStatePending,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		State:     tork.TaskStatePending,
+		CreatedAt: &now,
 		Each: &tork.EachTask{
 			List: "1",
 			Task: &tork.Task{},
@@ -297,6 +326,7 @@ func Test_scheduleEachTaskNotaList(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, tork.TaskStateFailed, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleEachTaskBadExpression(t *testing.T) {
@@ -310,7 +340,8 @@ func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -323,10 +354,13 @@ func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
-		State: tork.TaskStatePending,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		State:     tork.TaskStatePending,
+		CreatedAt: &now,
 		Each: &tork.EachTask{
 			List: "{{ bad_expression }}",
 			Task: &tork.Task{},
@@ -340,6 +374,7 @@ func Test_scheduleEachTaskBadExpression(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, tork.TaskStateFailed, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleEachTaskCustomVar(t *testing.T) {
@@ -355,7 +390,8 @@ func Test_scheduleEachTaskCustomVar(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -368,9 +404,12 @@ func Test_scheduleEachTaskCustomVar(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
 		Each: &tork.EachTask{
 			Var:  "myItem",
 			List: "{{ sequence (1,3) }}",
@@ -398,6 +437,7 @@ func Test_scheduleEachTaskCustomVar(t *testing.T) {
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
 	assert.Len(t, processed, 2)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleSubJobTask(t *testing.T) {
@@ -414,7 +454,8 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -427,9 +468,12 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
 		SubJob: &tork.SubJobTask{
 			Name: "my sub job",
 			Inputs: map[string]string{
@@ -458,6 +502,7 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleDetachedSubJobTask(t *testing.T) {
@@ -480,7 +525,8 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -493,9 +539,12 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
 		SubJob: &tork.SubJobTask{
 			Name:     "my sub job",
 			Detached: true,
@@ -525,6 +574,7 @@ func Test_scheduleDetachedSubJobTask(t *testing.T) {
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_scheduleEachTaskConcurrency(t *testing.T) {
@@ -542,7 +592,8 @@ func Test_scheduleEachTaskConcurrency(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	s := NewScheduler(ds, b)
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
@@ -555,9 +606,12 @@ func Test_scheduleEachTaskConcurrency(t *testing.T) {
 	err = ds.CreateJob(ctx, j)
 	assert.NoError(t, err)
 
+	now := time.Now().UTC()
+
 	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		JobID: j.ID,
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
 		Each: &tork.EachTask{
 			List:        "{{ sequence (1,3) }}",
 			Concurrency: 1,
@@ -585,4 +639,5 @@ func Test_scheduleEachTaskConcurrency(t *testing.T) {
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
 	// task should only be processed once
 	assert.Equal(t, int32(1), counter.Load())
+	assert.NoError(t, ds.Close())
 }

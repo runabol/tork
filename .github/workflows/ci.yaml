@@ -63,6 +63,10 @@ jobs:
         run: |
           go build -o tork cmd/main.go
 
+      - name: Run DB migration
+        run: |
+          TORK_CONFIG=configs/config.ci.toml ./tork migration
+
       - name: Test Tork
         run: |
           # start tork
@@ -114,10 +118,6 @@ jobs:
 
           # terminate Tork
           kill -9 $PID
-
-      - name: Run DB migration
-        run: |
-          TORK_CONFIG=configs/config.ci.toml ./tork migration
 
       - name: Run tests
         run: go test ./... -v -race

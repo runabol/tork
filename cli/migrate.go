@@ -19,7 +19,7 @@ func (c *CLI) migrationCmd() *ucli.Command {
 }
 
 func migration(ctx *ucli.Context) error {
-	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_INMEMORY)
+	dstype := conf.StringDefault("datastore.type", datastore.DATASTORE_POSTGRES)
 	switch dstype {
 	case datastore.DATASTORE_POSTGRES:
 		dsn := conf.StringDefault(

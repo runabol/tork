@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
+	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/internal/slices"
 	"github.com/runabol/tork/internal/uuid"
 )
@@ -55,6 +56,22 @@ func WithDisableCleanup(val bool) Option {
 	return func(ds *PostgresDatastore) {
 		ds.disableCleanup = val
 	}
+}
+
+func NewTestDatastore() (*PostgresDatastore, error) {
+	schemaName := fmt.Sprintf("tork%s", uuid.NewUUID())
+	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
+	ds, err := NewPostgresDataStore(fmt.Sprintf(dsn, schemaName))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ds.db.Exec(fmt.Sprintf("create schema %s", schemaName)); err != nil {
+		return nil, errors.Wrapf(err, "error creating schema %s", schemaName)
+	}
+	if err := ds.ExecScript(postgres.SCHEMA); err != nil {
+		return nil, errors.Wrapf(err, "error initializing schema %s", schemaName)
+	}
+	return ds, nil
 }
 
 func NewPostgresDataStore(dsn string, opts ...Option) (*PostgresDatastore, error) {
@@ -415,8 +432,9 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 				timeout = $14,
 				retry = $15,
 				queue = $16,
-				progress = $17
-			  where id = $18`
+				progress = $17,
+				priority = $18
+			  where id = $19`
 		_, err = ptx.exec(q,
 			t.Position,               // $1
 			t.State,                  // $2
@@ -435,7 +453,8 @@ func (ds *PostgresDatastore) UpdateTask(ctx context.Context, id string, modify f
 			retry,                    // $15
 			t.Queue,                  // $16
 			t.Progress,               // $17
-			t.ID,                     // $18
+			t.Priority,               // $18
+			t.ID,                     // $19
 		)
 		if err != nil {
 			return errors.Wrapf(err, "error updating task %s", t.ID)

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/runabol/tork"
-	"github.com/runabol/tork/datastore/inmemory"
+	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +14,8 @@ import (
 func Test_handleHeartbeat(t *testing.T) {
 	ctx := context.Background()
 
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	handler := NewHeartbeatHandler(ds)
 	assert.NotNil(t, handler)
 
@@ -26,14 +27,14 @@ func Test_handleHeartbeat(t *testing.T) {
 		Status:          tork.NodeStatusUP,
 	}
 
-	err := handler(ctx, &n1)
+	err = handler(ctx, &n1)
 	assert.NoError(t, err)
 
 	n11, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, n1.LastHeartbeatAt, n11.LastHeartbeatAt)
+	assert.Equal(t, n1.LastHeartbeatAt.Unix(), n11.LastHeartbeatAt.Unix())
 	assert.Equal(t, n1.CPUPercent, n11.CPUPercent)
-	assert.Equal(t, n1.Status, n11.Status)
+	assert.Equal(t, tork.NodeStatusOffline, n11.Status)
 	assert.Equal(t, n1.TaskCount, n11.TaskCount)
 
 	n2 := tork.Node{
@@ -49,7 +50,7 @@ func Test_handleHeartbeat(t *testing.T) {
 
 	n22, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, n2.LastHeartbeatAt, n22.LastHeartbeatAt)
+	assert.Equal(t, n2.LastHeartbeatAt.Unix(), n22.LastHeartbeatAt.Unix())
 	assert.Equal(t, n2.CPUPercent, n22.CPUPercent)
 	assert.Equal(t, n2.Status, n22.Status)
 	assert.Equal(t, n2.TaskCount, n22.TaskCount)
@@ -65,7 +66,7 @@ func Test_handleHeartbeat(t *testing.T) {
 
 	n33, err := ds.GetNodeByID(ctx, n1.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, n2.LastHeartbeatAt, n33.LastHeartbeatAt) // should keep the latest
+	assert.Equal(t, n2.LastHeartbeatAt.Unix(), n33.LastHeartbeatAt.Unix()) // should keep the latest
 	assert.Equal(t, n3.CPUPercent, n33.CPUPercent)
-
+	assert.NoError(t, ds.Close())
 }

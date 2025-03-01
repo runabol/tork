@@ -16,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
-	"github.com/runabol/tork/datastore/inmemory"
 	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/middleware/web"
 
@@ -32,8 +31,10 @@ func Test_getQueues(t *testing.T) {
 		return nil
 	})
 	assert.NoError(t, err)
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 	})
 	assert.NoError(t, err)
@@ -52,11 +53,13 @@ func Test_getQueues(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(qs))
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_listJobs(t *testing.T) {
 	b := broker.NewInMemoryBroker()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
 		Broker:    b,
@@ -119,10 +122,12 @@ func Test_listJobs(t *testing.T) {
 	assert.Equal(t, 6, js.TotalPages)
 	assert.Equal(t, 1, js.Number)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_getActiveNodes(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	active := &tork.Node{
 		ID:              "1234",
 		LastHeartbeatAt: time.Now().UTC(),
@@ -131,7 +136,7 @@ func Test_getActiveNodes(t *testing.T) {
 		ID:              "2345",
 		LastHeartbeatAt: time.Now().UTC().Add(-time.Hour),
 	}
-	err := ds.CreateNode(context.Background(), active)
+	err = ds.CreateNode(context.Background(), active)
 	assert.NoError(t, err)
 	err = ds.CreateNode(context.Background(), inactive)
 	assert.NoError(t, err)
@@ -155,11 +160,14 @@ func Test_getActiveNodes(t *testing.T) {
 	assert.Equal(t, 1, len(nrs))
 	assert.Equal(t, "1234", nrs[0].ID)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_healthOK(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -173,6 +181,7 @@ func Test_healthOK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "\"status\":\"UP\"")
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_healthNotOK(t *testing.T) {
@@ -197,11 +206,14 @@ func Test_healthNotOK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "\"status\":\"DOWN\"")
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_getUnknownTask(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -213,15 +225,42 @@ func Test_getUnknownTask(t *testing.T) {
 	_, err = io.ReadAll(w.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_getTask(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
-	ta := tork.Task{
-		ID:   "1234",
-		Name: "test task",
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
 	}
-	err := ds.CreateTask(context.Background(), &ta)
+	err = ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		CreatedBy: u,
+		Tags:      []string{"tag-a", "tag-b"},
+		AutoDelete: &tork.AutoDelete{
+			After: "5h",
+		},
+		Secrets: map[string]string{
+			"password": "secret",
+		},
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	ta := tork.Task{
+		ID:        "1234",
+		Name:      "test task",
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &ta)
 	assert.NoError(t, err)
 	api, err := NewAPI(Config{
 		DataStore: ds,
@@ -241,11 +280,14 @@ func Test_getTask(t *testing.T) {
 	assert.Equal(t, "1234", tr.ID)
 	assert.Equal(t, "test task", tr.Name)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_createJob(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -268,11 +310,14 @@ func Test_createJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.JobStatePending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_createJobInvalidProperty(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -288,11 +333,13 @@ func Test_createJobInvalidProperty(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_getJob(t *testing.T) {
-	ds := inmemory.NewInMemoryDatastore()
-	err := ds.CreateJob(context.Background(), &tork.Job{
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = ds.CreateJob(context.Background(), &tork.Job{
 		ID:    "1234",
 		State: tork.JobStatePending,
 	})
@@ -316,17 +363,19 @@ func Test_getJob(t *testing.T) {
 	assert.Equal(t, "1234", j.ID)
 	assert.Equal(t, tork.JobStatePending, j.State)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_cancelRunningJob(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateRunning,
 		CreatedAt: time.Now().UTC(),
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -384,17 +433,19 @@ func Test_cancelRunningJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_cancelScheduledJob(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateScheduled,
 		CreatedAt: time.Now().UTC(),
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -452,11 +503,13 @@ func Test_cancelScheduledJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_restartJob(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateCancelled,
@@ -468,7 +521,7 @@ func Test_restartJob(t *testing.T) {
 			},
 		},
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -501,11 +554,13 @@ func Test_restartJob(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_restartRunningJob(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateRunning,
@@ -517,7 +572,7 @@ func Test_restartRunningJob(t *testing.T) {
 			},
 		},
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -547,11 +602,13 @@ func Test_restartRunningJob(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 	ctx := context.Background()
-	ds := inmemory.NewInMemoryDatastore()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	j1 := tork.Job{
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateFailed,
@@ -563,7 +620,7 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 			},
 		},
 	}
-	err := ds.CreateJob(ctx, &j1)
+	err = ds.CreateJob(ctx, &j1)
 	assert.NoError(t, err)
 
 	now := time.Now().UTC()
@@ -593,6 +650,7 @@ func Test_restartRunningNoMoreTasksJob(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_middleware(t *testing.T) {
@@ -605,8 +663,10 @@ func Test_middleware(t *testing.T) {
 		}
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw},
@@ -624,12 +684,15 @@ func Test_middleware(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_echoMiddleware(t *testing.T) {
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Middleware: Middleware{
 			Echo: []echo.MiddlewareFunc{
@@ -653,6 +716,7 @@ func Test_echoMiddleware(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_middlewareMultiple(t *testing.T) {
@@ -673,8 +737,10 @@ func Test_middlewareMultiple(t *testing.T) {
 		}
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw1, mw2},
@@ -704,6 +770,7 @@ func Test_middlewareMultiple(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK2", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_2CustomEndpoints(t *testing.T) {
@@ -714,8 +781,10 @@ func Test_2CustomEndpoints(t *testing.T) {
 		return c.String(http.StatusOK, "OK 2")
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint":       h,
@@ -744,6 +813,7 @@ func Test_2CustomEndpoints(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK 2", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_customEndpoint(t *testing.T) {
@@ -751,8 +821,10 @@ func Test_customEndpoint(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
@@ -770,6 +842,7 @@ func Test_customEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "OK", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_customEndpointInvalidSpec(t *testing.T) {
@@ -777,14 +850,17 @@ func Test_customEndpointInvalidSpec(t *testing.T) {
 		return c.String(http.StatusOK, "OK")
 	}
 	b := broker.NewInMemoryBroker()
-	_, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	_, err = NewAPI(Config{
+		DataStore: ds,
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"xyz": h,
 		},
 	})
 	assert.Error(t, err)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_customEndpointError(t *testing.T) {
@@ -793,8 +869,10 @@ func Test_customEndpointError(t *testing.T) {
 		return nil
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"GET /myendpoint": h,
@@ -812,6 +890,7 @@ func Test_customEndpointError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Equal(t, `{"message":"bad stuff happened"}`, strings.TrimSpace(string(body)))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_customEndpointBind(t *testing.T) {
@@ -826,8 +905,10 @@ func Test_customEndpointBind(t *testing.T) {
 		return c.String(http.StatusOK, s.Name)
 	}
 	b := broker.NewInMemoryBroker()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    b,
 		Endpoints: map[string]web.HandlerFunc{
 			"POST /myendpoint": h,
@@ -846,11 +927,14 @@ func Test_customEndpointBind(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "Me", string(body))
+	assert.NoError(t, ds.Close())
 }
 
 func Test_disableEndpoint(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 		Enabled:   map[string]bool{"health": false},
 	})
@@ -864,6 +948,7 @@ func Test_disableEndpoint(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.NoError(t, ds.Close())
 }
 
 func TestShutdown(t *testing.T) {
@@ -877,8 +962,10 @@ func TestShutdown(t *testing.T) {
 		}
 	}
 
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 		Middleware: Middleware{
 			Web: []web.MiddlewareFunc{mw},
@@ -897,11 +984,14 @@ func TestShutdown(t *testing.T) {
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
+	assert.NoError(t, ds.Close())
 }
 
 func Test_createJobAndWait(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
 	api, err := NewAPI(Config{
-		DataStore: inmemory.NewInMemoryDatastore(),
+		DataStore: ds,
 		Broker:    broker.NewInMemoryBroker(),
 	})
 	assert.NoError(t, err)
@@ -921,4 +1011,5 @@ func Test_createJobAndWait(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusRequestTimeout, w.Code)
+	assert.NoError(t, ds.Close())
 }
