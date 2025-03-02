@@ -559,3 +559,35 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestRunTaskWithPrivilegedModeOn(t *testing.T) {
+	rt, err := NewDockerRuntime(WithPrivileged(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "alpine:3.18.3",
+		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "Can modify kernel params\n", t1.Result)
+}
+
+func TestRunTaskWithPrivilegedModeOff(t *testing.T) {
+	rt, err := NewDockerRuntime(WithPrivileged(false))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "alpine:3.18.3",
+		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "Cannot modify kernel params\n", t1.Result)
+}

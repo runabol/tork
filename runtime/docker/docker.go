@@ -41,13 +41,14 @@ const (
 )
 
 type DockerRuntime struct {
-	client  *client.Client
-	tasks   *syncx.Map[string, string]
-	images  *syncx.Map[string, bool]
-	pullq   chan *pullRequest
-	mounter runtime.Mounter
-	broker  broker.Broker
-	config  string
+	client     *client.Client
+	tasks      *syncx.Map[string, string]
+	images     *syncx.Map[string, bool]
+	pullq      chan *pullRequest
+	mounter    runtime.Mounter
+	broker     broker.Broker
+	config     string
+	privileged bool
 }
 
 type dockerLogsReader struct {
@@ -78,6 +79,12 @@ func WithMounter(mounter runtime.Mounter) Option {
 func WithBroker(broker broker.Broker) Option {
 	return func(rt *DockerRuntime) {
 		rt.broker = broker
+	}
+}
+
+func WithPrivileged(privileged bool) Option {
+	return func(rt *DockerRuntime) {
+		rt.privileged = privileged
 	}
 }
 
@@ -260,6 +267,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		PublishAllPorts: false,
 		Mounts:          mounts,
 		Resources:       resources,
+		Privileged:      d.privileged,
 	}
 
 	cmd := t.CMD

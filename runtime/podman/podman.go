@@ -29,11 +29,12 @@ const (
 // on the host machine using podman as the container runtime engine
 // and the podman CLI to manage containers.
 type PodmanRuntime struct {
-	broker  broker.Broker
-	pullq   chan *pullRequest
-	images  *syncx.Map[string, bool]
-	tasks   *syncx.Map[string, string]
-	mounter runtime.Mounter
+	broker     broker.Broker
+	pullq      chan *pullRequest
+	images     *syncx.Map[string, bool]
+	tasks      *syncx.Map[string, string]
+	mounter    runtime.Mounter
+	privileged bool
 }
 
 type pullRequest struct {
@@ -48,6 +49,12 @@ type Option = func(rt *PodmanRuntime)
 func WithBroker(broker broker.Broker) Option {
 	return func(rt *PodmanRuntime) {
 		rt.broker = broker
+	}
+}
+
+func WithPrivileged(privileged bool) Option {
+	return func(rt *PodmanRuntime) {
+		rt.privileged = privileged
 	}
 }
 
@@ -232,6 +239,10 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		if err := os.WriteFile(path.Join(workDir, "workdir", filename), []byte(contents), 0444); err != nil {
 			return err
 		}
+	}
+
+	if d.privileged {
+		createCmd.Args = append(createCmd.Args, "--privileged")
 	}
 
 	// container image

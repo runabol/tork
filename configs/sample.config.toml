@@ -119,5 +119,7 @@ gid = ""             # set the gid for the the task process (recommended)
 
 [runtime.docker]
 config = ""
+privileged = false # run containers in privileged mode (not recommended)
 
 [runtime.podman]
+privileged = false # run containers in privileged mode (not recommended)
