@@ -26,6 +26,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
@@ -41,14 +42,15 @@ const (
 )
 
 type DockerRuntime struct {
-	client     *client.Client
-	tasks      *syncx.Map[string, string]
-	images     *syncx.Map[string, bool]
-	pullq      chan *pullRequest
-	mounter    runtime.Mounter
-	broker     broker.Broker
-	config     string
-	privileged bool
+	client      *client.Client
+	tasks       *syncx.Map[string, string]
+	images      *syncx.Map[string, bool]
+	pullq       chan *pullRequest
+	mounter     runtime.Mounter
+	broker      broker.Broker
+	config      string
+	privileged  bool
+	logToStdout bool
 }
 
 type dockerLogsReader struct {
@@ -79,6 +81,12 @@ func WithMounter(mounter runtime.Mounter) Option {
 func WithBroker(broker broker.Broker) Option {
 	return func(rt *DockerRuntime) {
 		rt.broker = broker
+	}
+}
+
+func WithLogToStdout(logToStdout bool) Option {
+	return func(rt *DockerRuntime) {
+		rt.logToStdout = logToStdout
 	}
 }
 
@@ -141,9 +149,13 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if d.broker != nil {
-		logger = broker.NewLogShipper(d.broker, t.ID)
+		if d.logToStdout {
+			logger = io.MultiWriter(zerolog.ConsoleWriter{Out: os.Stdout}, broker.NewLogShipper(d.broker, t.ID))
+		} else {
+			logger = broker.NewLogShipper(d.broker, t.ID)
+		}
 	} else {
-		logger = os.Stdout
+		logger = zerolog.ConsoleWriter{Out: os.Stdout}
 	}
 	// excute pre-tasks
 	for _, pre := range t.Pre {

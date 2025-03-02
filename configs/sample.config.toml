@@ -120,6 +120,7 @@ gid = ""             # set the gid for the the task process (recommended)
 [runtime.docker]
 config = ""
 privileged = false # run containers in privileged mode (not recommended)
+verbose = false # enable verbose logging container execution
 
 [runtime.podman]
 privileged = false # run containers in privileged mode (not recommended)

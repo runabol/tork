@@ -77,6 +77,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			docker.WithConfig(conf.String("runtime.docker.config")),
 			docker.WithBroker(e.brokerRef),
 			docker.WithPrivileged(conf.Bool("runtime.docker.privileged")),
+			docker.WithLogToStdout(conf.Bool("runtime.docker.log_to_stdout")),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{
