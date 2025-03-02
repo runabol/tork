@@ -21,7 +21,6 @@ func NewLogHandler(ds datastore.Datastore) func(p *tork.TaskLogPart) {
 
 func (h *logHandler) handle(p *tork.TaskLogPart) {
 	ctx := context.Background()
-	log.Debug().Msgf("[Task][%s] %s", p.TaskID, p.Contents)
 	if err := h.ds.CreateTaskLogPart(ctx, p); err != nil {
 		log.Error().Err(err).Msgf("error writing task log: %s", err.Error())
 	}

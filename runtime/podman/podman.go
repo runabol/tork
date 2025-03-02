@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
+	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/runtime"
@@ -109,10 +111,14 @@ func (d *PodmanRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// setup logging
 	var logger io.Writer
 	if d.broker != nil {
-		logger = broker.NewLogShipper(d.broker, t.ID)
+		logger = io.MultiWriter(
+			broker.NewLogShipper(d.broker, t.ID),
+			logging.NewZerologWriter(t.ID, zerolog.DebugLevel),
+		)
 	} else {
-		logger = os.Stdout
+		logger = logging.NewZerologWriter(t.ID, zerolog.DebugLevel)
 	}
+
 	// excute pre-tasks
 	for _, pre := range t.Pre {
 		pre.ID = uuid.NewUUID()
