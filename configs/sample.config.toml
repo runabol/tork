@@ -18,7 +18,7 @@ management.url = ""                        # default: http://{rabbit_host}:15672
 durable.queues = false
 
 [datastore]
-type = "inmemory" # inmemory | postgres
+type = "postgres"
 
 [datastore.retention]
 logs.duration = "168h" # 1 week
