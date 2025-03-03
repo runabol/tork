@@ -13,9 +13,11 @@ import (
 	"os/exec"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
+	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
@@ -100,9 +102,12 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	var logger io.Writer
 	if r.broker != nil {
-		logger = broker.NewLogShipper(r.broker, t.ID)
+		logger = io.MultiWriter(
+			broker.NewLogShipper(r.broker, t.ID),
+			logging.NewZerologWriter(t.ID, zerolog.DebugLevel),
+		)
 	} else {
-		logger = os.Stdout
+		logger = logging.NewZerologWriter(t.ID, zerolog.DebugLevel)
 	}
 	// excute pre-tasks
 	for _, pre := range t.Pre {
