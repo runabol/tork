@@ -8,7 +8,7 @@ require (
 	github.com/docker/cli v26.1.5+incompatible
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/expr-lang/expr v1.16.5
+	github.com/expr-lang/expr v1.17.2
 	github.com/fatih/color v1.16.0
 	github.com/go-co-op/gocron/v2 v2.13.0
 	github.com/go-playground/validator/v10 v10.19.0
