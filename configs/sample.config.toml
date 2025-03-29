@@ -120,6 +120,7 @@ gid = ""             # set the gid for the the task process (recommended)
 [runtime.docker]
 config = ""
 privileged = false # run containers in privileged mode (not recommended)
+image.ttl = "24h" # Time-to-live for cached images since their last use
 
 [runtime.podman]
 privileged = false # run containers in privileged mode (not recommended)
