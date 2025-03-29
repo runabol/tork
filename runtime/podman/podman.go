@@ -286,7 +286,9 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}()
 
 	// Start a goroutine to report user-reported progress
-	go d.reportProgress(ctx, progressFile, t)
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go d.reportProgress(pctx, progressFile, t)
 
 	// Start the container
 	log.Debug().Msgf("Starting container %s", containerID)
@@ -350,18 +352,21 @@ func (d *PodmanRuntime) HealthCheck(ctx context.Context) error {
 func (d *PodmanRuntime) reportProgress(ctx context.Context, progressFile string, t *tork.Task) {
 	for {
 		progress, err := d.readProgress(progressFile)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return
+			}
 			log.Error().Err(err).Msgf("error reading progress value")
 		} else {
 			if progress != t.Progress {
 				t.Progress = progress
 				if err := d.broker.PublishTaskProgress(ctx, t); err != nil {
-					log.Error().Err(err).Msgf("error publishing task progress")
+					log.Warn().Err(err).Msgf("error publishing task progress")
 				}
 			}
 		}
 		select {
-		case <-time.After(time.Second * 5):
+		case <-time.After(time.Second * 10):
 		case <-ctx.Done():
 			return
 		}

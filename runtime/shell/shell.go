@@ -194,28 +194,31 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		}
 	}()
 
-	go func() {
+	pctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func(ctx context.Context) {
 		for {
 			progress, err := r.readProgress(workdir)
 			if err != nil {
-				if !os.IsNotExist(err) {
-					log.Error().Err(err).Msgf("error reading progress value")
+				if os.IsNotExist(err) {
+					return // progress file does not exist
 				}
+				log.Warn().Err(err).Msgf("error reading progress value")
 			} else {
 				if progress != t.Progress {
 					t.Progress = progress
 					if err := r.broker.PublishTaskProgress(ctx, t); err != nil {
-						log.Error().Err(err).Msgf("error publishing task progress")
+						log.Warn().Err(err).Msgf("error publishing task progress")
 					}
 				}
 			}
 			select {
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 10):
 			case <-ctx.Done():
 				return
 			}
 		}
-	}()
+	}(pctx)
 
 	errChan := make(chan error)
 	doneChan := make(chan any)

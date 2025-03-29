@@ -364,7 +364,9 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	// report task progress
-	go d.reportProgress(ctx, resp.ID, t)
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go d.reportProgress(pctx, resp.ID, t)
 
 	// read the container's stdout
 	out, err := d.client.ContainerLogs(
@@ -438,19 +440,23 @@ func (d *DockerRuntime) reportProgress(ctx context.Context, containerID string, 
 		progress, err := d.readProgress(ctx, containerID)
 		if err != nil {
 			var notFoundError errdefs.ErrNotFound
-			if !errors.As(err, &notFoundError) {
-				log.Error().Err(err).Msgf("error reading progress value")
+			if errors.As(err, &notFoundError) {
+				return // progress file not found
 			}
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			log.Warn().Err(err).Msgf("error reading progress value")
 		} else {
 			if progress != t.Progress {
 				t.Progress = progress
 				if err := d.broker.PublishTaskProgress(ctx, t); err != nil {
-					log.Error().Err(err).Msgf("error publishing task progress")
+					log.Warn().Err(err).Msgf("error publishing task progress")
 				}
 			}
 		}
 		select {
-		case <-time.After(time.Second * 5):
+		case <-time.After(time.Second * 10):
 		case <-ctx.Done():
 			return
 		}
