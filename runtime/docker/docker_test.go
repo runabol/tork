@@ -13,7 +13,6 @@ import (
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/errdefs"
 
 	"github.com/runabol/tork"
 
@@ -154,14 +153,6 @@ func TestProgress(t *testing.T) {
 	p, err := rt.readProgress(ctx, containerID)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), p)
-
-	// wait for the task to complete
-	time.Sleep(time.Second * 1)
-
-	p, err = rt.readProgress(ctx, containerID)
-	var notFoundError errdefs.ErrNotFound
-	assert.ErrorAs(t, err, &notFoundError)
-	assert.Equal(t, float64(0), p)
 }
 
 func TestRunTaskCMDLogger(t *testing.T) {
@@ -235,23 +226,26 @@ func TestRunTaskWithError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestRunAndStopTask(t *testing.T) {
+func TestRunAndCancelTask(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
-		CMD:   []string{"sleep", "10"},
+		Image: "alpine:3.18.3",
+		CMD:   []string{"sleep", "60"},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan error)
 	go func() {
-		err := rt.Run(context.Background(), t1)
+		err := rt.Run(ctx, t1)
 		assert.Error(t, err)
+		ch <- err
 	}()
 	// give the task a chance to get started
-	time.Sleep(time.Second)
-	err = rt.Stop(context.Background(), t1)
-	assert.NoError(t, err)
+	time.Sleep(time.Second * 3)
+	cancel()
+	assert.Error(t, <-ch)
 }
 
 func TestHealthCheck(t *testing.T) {

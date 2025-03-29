@@ -339,7 +339,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// remove the container
 	defer func() {
-		if err := d.Stop(context.Background(), t); err != nil {
+		if err := d.stop(context.Background(), t); err != nil {
 			log.Error().
 				Err(err).
 				Str("container-id", resp.ID).
@@ -381,18 +381,19 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err != nil {
 		return errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
 	}
+	// close the stdout reader
 	defer func() {
 		if err := out.Close(); err != nil {
 			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
 		}
 	}()
-
-	// read the task's output
-	_, err = io.Copy(logger, dockerLogsReader{reader: out})
-	if err != nil {
-		return errors.Wrapf(err, "error reading the std out")
-	}
-
+	// copy the container's stdout to the logger
+	go func() {
+		_, err = io.Copy(logger, dockerLogsReader{reader: out})
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msgf("error reading the std out")
+		}
+	}()
 	// wait for the task to finish execution
 	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
@@ -586,7 +587,7 @@ func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *
 	return nil
 }
 
-func (d *DockerRuntime) Stop(ctx context.Context, t *tork.Task) error {
+func (d *DockerRuntime) stop(ctx context.Context, t *tork.Task) error {
 	containerID, ok := d.tasks.Get(t.ID)
 	if !ok {
 		return nil
