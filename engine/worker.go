@@ -77,6 +77,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			docker.WithConfig(conf.String("runtime.docker.config")),
 			docker.WithBroker(e.brokerRef),
 			docker.WithPrivileged(conf.Bool("runtime.docker.privileged")),
+			docker.WithImageTTL(conf.DurationDefault("runtime.docker.image.ttl", docker.DefaultImageTTL)),
 		)
 	case runtime.Shell:
 		return shell.NewShellRuntime(shell.Config{

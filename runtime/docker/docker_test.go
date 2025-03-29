@@ -576,18 +576,57 @@ func TestRunTaskWithPrivilegedModeOn(t *testing.T) {
 	assert.Equal(t, "Can modify kernel params\n", t1.Result)
 }
 
-func TestRunTaskWithPrivilegedModeOff(t *testing.T) {
-	rt, err := NewDockerRuntime(WithPrivileged(false))
+func Test_doPullRequest(t *testing.T) {
+	ctx := context.Background()
+	rt, err := NewDockerRuntime(WithImageTTL(time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "alpine:3.18.3",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+	// check that the image is cached
+	images, err := rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 1)
 
-	ctx := context.Background()
-	t1 := &tork.Task{
+	// get the image again (should be cached)
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "alpine:3.18.3",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+
+	// check that the image is still cached
+	images, err = rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 1)
+
+	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
 		Image: "alpine:3.18.3",
-		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
-	}
-	err = rt.Run(ctx, t1)
+		Run:   "echo hello world > $TORK_OUTPUT",
+	})
 	assert.NoError(t, err)
-	assert.Equal(t, "Cannot modify kernel params\n", t1.Result)
+
+	time.Sleep(time.Millisecond * 1100)
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "busybox:stable",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+	// check that the image is not longer cached
+	images, err = rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 0)
 }

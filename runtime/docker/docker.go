@@ -38,18 +38,20 @@ import (
 // defaultWorkdir is the directory where `Task.File`s are
 // written to by default, should `Task.Workdir` not be set
 const (
-	defaultWorkdir = "/tork/workdir"
+	defaultWorkdir  = "/tork/workdir"
+	DefaultImageTTL = time.Hour * 24
 )
 
 type DockerRuntime struct {
 	client     *client.Client
 	tasks      *syncx.Map[string, string]
-	images     *syncx.Map[string, bool]
+	images     map[string]time.Time
 	pullq      chan *pullRequest
 	mounter    runtime.Mounter
 	broker     broker.Broker
 	config     string
 	privileged bool
+	imageTTL   time.Duration
 }
 
 type dockerLogsReader struct {
@@ -95,6 +97,12 @@ func WithConfig(config string) Option {
 	}
 }
 
+func WithImageTTL(ttl time.Duration) Option {
+	return func(rt *DockerRuntime) {
+		rt.imageTTL = ttl
+	}
+}
+
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -103,7 +111,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	rt := &DockerRuntime{
 		client: dc,
 		tasks:  new(syncx.Map[string, string]),
-		images: new(syncx.Map[string, bool]),
+		images: make(map[string]time.Time),
 		pullq:  make(chan *pullRequest, 1),
 	}
 	for _, o := range opts {
@@ -116,6 +124,9 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 			return nil, err
 		}
 		rt.mounter = vmounter
+	}
+	if rt.imageTTL == 0 {
+		rt.imageTTL = DefaultImageTTL
 	}
 	go rt.puller()
 	return rt, nil
@@ -636,10 +647,6 @@ func (r dockerLogsReader) Read(p []byte) (int, error) {
 }
 
 func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {
-	_, ok := d.images.Get(t.Image)
-	if ok {
-		return nil
-	}
 	pr := &pullRequest{
 		ctx:    ctx,
 		image:  t.Image,
@@ -654,9 +661,6 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.W
 	}
 	d.pullq <- pr
 	err := <-pr.done
-	if err == nil {
-		d.images.Set(t.Image, true)
-	}
 	return err
 }
 
@@ -668,7 +672,19 @@ func (d *DockerRuntime) puller() {
 	}
 }
 
+// doPullRequest handles the pull queue requests.
+// Relies on the fact that pull requests are handled serially
 func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
+	// prune old images
+	if err := d.pruneImages(context.Background(), pr.image); err != nil {
+		log.Error().Err(err).Msg("error pruning images")
+	}
+	// check if we have the image already
+	_, ok := d.images[pr.image]
+	if ok {
+		d.images[pr.image] = time.Now()
+		return nil
+	}
 	// let's check if we have the image locally already
 	imageExists, err := d.imageExistsLocally(pr.ctx, pr.image)
 	if err != nil {
@@ -715,6 +731,25 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		}
 	}
 
+	d.images[pr.image] = time.Now()
+
+	return nil
+}
+
+// pruneImages removes all expired images from the local docker
+// image store except for the one specified in the exclude argument
+func (d *DockerRuntime) pruneImages(ctx context.Context, exclude string) error {
+	for img, t := range d.images {
+		if img != exclude && time.Since(t) > d.imageTTL {
+			// remove the image if it's last use was more than
+			// the imageTTL duration ago and is not currently in use
+			if _, err := d.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
+				return err
+			}
+			log.Debug().Msgf("pruned image %s", img)
+			delete(d.images, img)
+		}
+	}
 	return nil
 }
 
