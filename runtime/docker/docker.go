@@ -242,9 +242,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		return err
 	}
 	defer func() {
-		uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		if err := d.mounter.Unmount(uctx, torkdir); err != nil {
+		if err := d.mounter.Unmount(context.Background(), torkdir); err != nil {
 			log.Error().Err(err).Msgf("error unmounting workdir")
 		}
 	}()
@@ -341,9 +339,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// remove the container
 	defer func() {
-		stopContext, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		if err := d.Stop(stopContext, t); err != nil {
+		if err := d.Stop(context.Background(), t); err != nil {
 			log.Error().
 				Err(err).
 				Str("container-id", resp.ID).
