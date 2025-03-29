@@ -277,7 +277,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// Ensure the container is removed after execution
 	defer func() {
-		if err := d.Stop(context.Background(), t); err != nil {
+		if err := d.stop(context.Background(), t); err != nil {
 			log.Error().
 				Err(err).
 				Str("container-id", containerID).
@@ -327,7 +327,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	return nil
 }
 
-func (d *PodmanRuntime) Stop(ctx context.Context, t *tork.Task) error {
+func (d *PodmanRuntime) stop(ctx context.Context, t *tork.Task) error {
 	containerID, ok := d.tasks.Get(t.ID)
 	if !ok {
 		return nil

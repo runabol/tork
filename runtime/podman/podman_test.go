@@ -181,21 +181,25 @@ func TestPodmanRunTaskWithError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestPodmanRunAndStopTask(t *testing.T) {
+func TestRunAndCancelTask(t *testing.T) {
 	rt := NewPodmanRuntime()
+	assert.NotNil(t, rt)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:latest",
-		CMD:   []string{"sleep", "10"},
+		Image: "alpine:3.18.3",
+		CMD:   []string{"sleep", "60"},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan error)
 	go func() {
-		err := rt.Run(context.Background(), t1)
+		err := rt.Run(ctx, t1)
 		assert.Error(t, err)
+		ch <- err
 	}()
 	// give the task a chance to get started
-	time.Sleep(time.Second)
-	err := rt.Stop(context.Background(), t1)
-	assert.NoError(t, err)
+	time.Sleep(time.Second * 3)
+	cancel()
+	assert.Error(t, <-ch)
 }
 
 func TesPodmantHealthCheck(t *testing.T) {

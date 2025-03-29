@@ -304,17 +304,6 @@ func reexecRun() {
 	}
 }
 
-func (r *ShellRuntime) Stop(ctx context.Context, t *tork.Task) error {
-	proc, ok := r.cmds.Get(t.ID)
-	if !ok {
-		return nil
-	}
-	if err := proc.Process.Kill(); err != nil {
-		return errors.Wrapf(err, "error stopping process for task: %s", t.ID)
-	}
-	return nil
-}
-
 func (r *ShellRuntime) HealthCheck(ctx context.Context) error {
 	return nil
 }
