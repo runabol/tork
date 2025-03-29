@@ -130,9 +130,8 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 			return err
 		}
 		defer func(m tork.Mount) {
-			uctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			defer cancel()
-			if err := d.mounter.Unmount(uctx, &m); err != nil {
+			log.Debug().Msgf("Unmounting %s: %s", m.Type, m.Target)
+			if err := d.mounter.Unmount(context.Background(), &m); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error deleting mount: %s", m)
