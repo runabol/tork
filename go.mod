@@ -5,7 +5,7 @@ go 1.21
 retract v0.1.0
 
 require (
-	github.com/docker/cli v26.1.5+incompatible
+	github.com/docker/cli v28.0.4+incompatible
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/expr-lang/expr v1.17.2
