@@ -2,6 +2,7 @@ package shell
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -155,4 +156,26 @@ func TestRunTaskCMDLogger(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	<-processed
+}
+
+func TestBuildEnv(t *testing.T) {
+	// Set up environment variables with the REEXEC_ prefix
+	os.Setenv("REEXEC_VAR1", "value1")
+	os.Setenv("REEXEC_VAR2", "value2")
+	os.Setenv("NON_REEXEC_VAR", "should_not_be_included")
+	os.Setenv("REEXEC_URL", "{\"POSTGRES_DB\":\"somedb\",\"POSTGRES_URL\":\"postgres://user:password@localhost:5432/todos?sslmode=disable\"}")
+
+	env, err := buildEnv()
+
+	// Clean up environment variables
+	os.Unsetenv("REEXEC_VAR1")
+	os.Unsetenv("REEXEC_VAR2")
+	os.Unsetenv("REEXEC_URL")
+	os.Unsetenv("NON_REEXEC_VAR")
+
+	assert.NoError(t, err)
+	assert.Contains(t, env, "VAR1=value1")
+	assert.Contains(t, env, `URL={"POSTGRES_DB":"somedb","POSTGRES_URL":"postgres://user:password@localhost:5432/todos?sslmode=disable"}`)
+	assert.Contains(t, env, "VAR2=value2")
+	assert.NotContains(t, env, "NON_REEXEC_VAR=should_not_be_included")
 }
