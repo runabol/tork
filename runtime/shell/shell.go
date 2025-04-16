@@ -277,17 +277,9 @@ func reexecRun() {
 		log.Fatal().Msg("work dir not set")
 	}
 
-	env := []string{}
-	for _, entry := range os.Environ() {
-		kv := strings.Split(entry, "=")
-		if len(kv) != 2 {
-			log.Fatal().Msgf("invalid env var: %s", entry)
-		}
-		if strings.HasPrefix(kv[0], envVarPrefix) {
-			k := strings.TrimPrefix(kv[0], envVarPrefix)
-			v := kv[1]
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
-		}
+	env, err := buildEnv()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error building env")
 	}
 	env = append(env, fmt.Sprintf("WORKDIR=%s", workdir))
 	env = append(env, fmt.Sprintf("PATH=%s", os.Getenv("PATH")))
@@ -302,6 +294,22 @@ func reexecRun() {
 	if err := cmd.Run(); err != nil {
 		log.Fatal().Err(err).Msgf("error reexecing: %s", strings.Join(flag.Args(), " "))
 	}
+}
+
+func buildEnv() ([]string, error) {
+	env := []string{}
+	for _, entry := range os.Environ() {
+		kv := strings.SplitN(entry, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid env var: %s", entry)
+		}
+		if strings.HasPrefix(kv[0], envVarPrefix) {
+			k := strings.TrimPrefix(kv[0], envVarPrefix)
+			v := kv[1]
+			env = append(env, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	return env, nil
 }
 
 func (r *ShellRuntime) HealthCheck(ctx context.Context) error {
