@@ -87,6 +87,7 @@ type AuxTask struct {
 	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
 	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	Files       map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
@@ -115,6 +116,7 @@ func (i AuxTask) toTask() *tork.Task {
 		Image:       i.Image,
 		Env:         i.Env,
 		Timeout:     i.Timeout,
+		Files:       i.Files,
 		Registry:    registry,
 	}
 }
