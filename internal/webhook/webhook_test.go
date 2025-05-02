@@ -12,28 +12,34 @@ import (
 func TestCall(t *testing.T) {
 	// Test Cases
 	tests := []struct {
-		name            string
-		responseCodes   []int // Sequence of response codes to return
-		expectedRetries int   // Expected retry attempts
-		expectedError   bool  // Should the function return an error?
+		name          string
+		responseCodes []int // Sequence of response codes to return
+		numRequests   int   // Number of requests expected
+		expectedError bool  // Should the function return an error?
 	}{
 		{
-			name:            "Successful Response",
-			responseCodes:   []int{http.StatusOK},
-			expectedRetries: 1,
-			expectedError:   false,
+			name:          "Successful Response",
+			responseCodes: []int{http.StatusOK},
+			numRequests:   1,
+			expectedError: false,
 		},
 		{
-			name:            "Retryable Response - 500 Internal Server Error",
-			responseCodes:   []int{http.StatusInternalServerError, http.StatusInternalServerError, http.StatusOK},
-			expectedRetries: 3,
-			expectedError:   false,
+			name:          "Successful Response",
+			responseCodes: []int{http.StatusNoContent},
+			numRequests:   1,
+			expectedError: false,
 		},
 		{
-			name:            "Non-Retryable Response - 400 Bad Request",
-			responseCodes:   []int{http.StatusBadRequest},
-			expectedRetries: 1,
-			expectedError:   false,
+			name:          "Retryable Response - 500 Internal Server Error",
+			responseCodes: []int{http.StatusInternalServerError, http.StatusInternalServerError, http.StatusOK},
+			numRequests:   3,
+			expectedError: false,
+		},
+		{
+			name:          "Non-Retryable Response - 400 Bad Request",
+			responseCodes: []int{http.StatusBadRequest},
+			numRequests:   1,
+			expectedError: true,
 		},
 	}
 
@@ -59,7 +65,7 @@ func TestCall(t *testing.T) {
 			err := Call(wh, body)
 
 			// Check retries and errors
-			assert.Equal(t, tt.expectedRetries, requestCount, "Number of retries should match expected")
+			assert.Equal(t, tt.numRequests, requestCount, "Number of requests sent does not match expected")
 			if tt.expectedError {
 				assert.Error(t, err, "Expected an error but got nil")
 			} else {

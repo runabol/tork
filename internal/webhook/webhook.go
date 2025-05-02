@@ -63,14 +63,15 @@ func Call(wh *tork.Webhook, body any) error {
 			attempts++
 			continue
 		}
-		// Success
-		if resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		// Success (2xx)
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return nil
 		}
 		// Check if the status code is retryable
 		if !isRetryable(resp.StatusCode) {
 			log.Error().Msgf("[Webhook] request to %s failed with non-retryable status %d", wh.URL, resp.StatusCode)
-			return nil
+			return errors.Errorf("[Webhook] request to %s failed with non-retryable status %d", wh.URL, resp.StatusCode)
 		}
 		log.Warn().Msgf("[Webhook] request to %s failed with %d", wh.URL, resp.StatusCode)
 		// sleep a little before retrying
