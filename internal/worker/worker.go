@@ -16,6 +16,7 @@ import (
 	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/middleware/task"
 
+	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/host"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/runtime"
@@ -299,7 +300,7 @@ func (w *Worker) reservePort() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer listener.Close()
+	defer fns.CloseIgnore(listener)
 
 	maxAttempts := 10
 

@@ -52,8 +52,7 @@ func LoadConfig() error {
 	}
 	// load configs from env vars
 	if err := konf.Load(env.Provider("TORK_", ".", func(s string) string {
-		return strings.Replace(strings.ToLower(
-			strings.TrimPrefix(s, "TORK_")), "_", ".", -1)
+		return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(s, "TORK_")), "_", ".")
 	}), nil); err != nil {
 		return errors.Wrapf(err, "error loading config from env")
 	}

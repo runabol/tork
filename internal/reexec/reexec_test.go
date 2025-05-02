@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/runabol/tork/internal/fns"
 	"gotest.tools/v3/assert"
 )
 
@@ -28,7 +29,7 @@ func TestCommand(t *testing.T) {
 	cmd := Command("reexec")
 	w, err := cmd.StdinPipe()
 	assert.NilError(t, err, "Error on pipe creation: %v", err)
-	defer w.Close()
+	defer fns.CloseIgnore(w)
 
 	err = cmd.Start()
 	assert.NilError(t, err, "Error on re-exec cmd: %v", err)

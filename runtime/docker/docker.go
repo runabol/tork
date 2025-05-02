@@ -29,6 +29,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
+	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
@@ -727,7 +728,7 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		if err != nil {
 			return err
 		}
-		defer reader.Close()
+		defer fns.CloseIgnore(reader)
 
 		if _, err := io.Copy(pr.logger, reader); err != nil {
 			return err

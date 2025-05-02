@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/broker"
+	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/logging"
 	"github.com/runabol/tork/internal/reexec"
 	"github.com/runabol/tork/internal/syncx"
@@ -137,7 +138,11 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(workdir)
+	defer func() {
+		if err := os.RemoveAll(workdir); err != nil {
+			log.Error().Err(err).Msgf("error removing workdir %s", workdir)
+		}
+	}()
 
 	log.Debug().Msgf("Created workdir %s", workdir)
 
@@ -178,7 +183,7 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 	if err != nil {
 		return err
 	}
-	defer stdout.Close()
+	defer fns.CloseIgnore(stdout)
 	cmd.Stderr = cmd.Stdout
 
 	if err := cmd.Start(); err != nil {
