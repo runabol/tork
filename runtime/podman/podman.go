@@ -151,7 +151,11 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err := os.MkdirAll(workDir, 0777); err != nil {
 		return err
 	}
-	defer os.RemoveAll(workDir)
+	defer func() {
+		if err := os.RemoveAll(workDir); err != nil {
+			log.Error().Err(err).Str("workdir", workDir).Msg("error removing workdir")
+		}
+	}()
 
 	// Create the output file
 	outputFile := fmt.Sprintf("%s/output", workDir)

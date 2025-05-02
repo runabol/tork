@@ -42,7 +42,7 @@ func TestForwardBatch(t *testing.T) {
 	fwd := NewLogShipper(b, "some-task-id")
 
 	for i := 0; i < 5; i++ {
-		_, err = fwd.Write([]byte(fmt.Sprintf("hello %d\n", i)))
+		_, err = fmt.Fprintf(fwd, "hello %d\n", i)
 		assert.NoError(t, err)
 	}
 

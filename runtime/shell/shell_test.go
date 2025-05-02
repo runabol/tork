@@ -160,18 +160,18 @@ func TestRunTaskCMDLogger(t *testing.T) {
 
 func TestBuildEnv(t *testing.T) {
 	// Set up environment variables with the REEXEC_ prefix
-	os.Setenv("REEXEC_VAR1", "value1")
-	os.Setenv("REEXEC_VAR2", "value2")
-	os.Setenv("NON_REEXEC_VAR", "should_not_be_included")
-	os.Setenv("REEXEC_URL", "{\"POSTGRES_DB\":\"somedb\",\"POSTGRES_URL\":\"postgres://user:password@localhost:5432/todos?sslmode=disable\"}")
+	assert.NoError(t, os.Setenv("REEXEC_VAR1", "value1"))
+	assert.NoError(t, os.Setenv("REEXEC_VAR2", "value2"))
+	assert.NoError(t, os.Setenv("NON_REEXEC_VAR", "should_not_be_included"))
+	assert.NoError(t, os.Setenv("REEXEC_URL", "{\"POSTGRES_DB\":\"somedb\",\"POSTGRES_URL\":\"postgres://user:password@localhost:5432/todos?sslmode=disable\"}"))
 
 	env, err := buildEnv()
 
 	// Clean up environment variables
-	os.Unsetenv("REEXEC_VAR1")
-	os.Unsetenv("REEXEC_VAR2")
-	os.Unsetenv("REEXEC_URL")
-	os.Unsetenv("NON_REEXEC_VAR")
+	assert.NoError(t, os.Unsetenv("REEXEC_VAR1"))
+	assert.NoError(t, os.Unsetenv("REEXEC_VAR2"))
+	assert.NoError(t, os.Unsetenv("REEXEC_URL"))
+	assert.NoError(t, os.Unsetenv("NON_REEXEC_VAR"))
 
 	assert.NoError(t, err)
 	assert.Contains(t, env, "VAR1=value1")

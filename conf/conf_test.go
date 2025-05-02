@@ -15,9 +15,9 @@ func TestLoadConfigNotExist(t *testing.T) {
 }
 
 func TestLoadConfigNotExistUserDefined(t *testing.T) {
-	os.Setenv("TORK_CONFIG", "no.such.thing")
+	assert.NoError(t, os.Setenv("TORK_CONFIG", "no.such.thing"))
 	defer func() {
-		os.Unsetenv("TORK_CONFIG")
+		assert.NoError(t, os.Unsetenv("TORK_CONFIG"))
 	}()
 	err := conf.LoadConfig()
 	assert.Error(t, err)
@@ -70,9 +70,9 @@ func TestStrings(t *testing.T) {
 	defer func() {
 		assert.NoError(t, os.Remove("config_strings.toml"))
 	}()
-	os.Setenv("TORK_CONFIG", "config_strings.toml")
+	assert.NoError(t, os.Setenv("TORK_CONFIG", "config_strings.toml"))
 	defer func() {
-		os.Unsetenv("TORK_CONFIG")
+		assert.NoError(t, os.Unsetenv("TORK_CONFIG"))
 	}()
 	err = conf.LoadConfig()
 	assert.NoError(t, err)
@@ -80,9 +80,9 @@ func TestStrings(t *testing.T) {
 }
 
 func TestStringsEnv(t *testing.T) {
-	os.Setenv("TORK_MAIN_STRINGS_KEYS", "a,b,c")
+	assert.NoError(t, os.Setenv("TORK_MAIN_STRINGS_KEYS", "a,b,c"))
 	defer func() {
-		os.Unsetenv("TORK_MAIN_STRINGS_KEYS")
+		assert.NoError(t, os.Unsetenv("TORK_MAIN_STRINGS_KEYS"))
 	}()
 	err := conf.LoadConfig()
 	assert.NoError(t, err)
@@ -126,9 +126,9 @@ func TestLoadConfigCustomPath(t *testing.T) {
 	defer func() {
 		assert.NoError(t, os.Remove("myconfig.toml"))
 	}()
-	os.Setenv("TORK_CONFIG", "myconfig.toml")
+	assert.NoError(t, os.Setenv("TORK_CONFIG", "myconfig.toml"))
 	defer func() {
-		os.Unsetenv("TORK_CONFIG")
+		assert.NoError(t, os.Unsetenv("TORK_CONFIG"))
 	}()
 	err = conf.LoadConfig()
 	assert.Error(t, err)
@@ -145,9 +145,9 @@ func TestLoadConfigWithOverridingEnv(t *testing.T) {
 	defer func() {
 		assert.NoError(t, os.Remove("config_with_override.toml"))
 	}()
-	os.Setenv("TORK_CONFIG", "config_with_override.toml")
+	assert.NoError(t, os.Setenv("TORK_CONFIG", "config_with_override.toml"))
 	defer func() {
-		os.Unsetenv("TORK_CONFIG")
+		assert.NoError(t, os.Unsetenv("TORK_CONFIG"))
 	}()
 	assert.NoError(t, os.Setenv("TORK_MAIN_KEY1", "value2"))
 	defer func() {
@@ -237,11 +237,11 @@ func TestDurationDefault(t *testing.T) {
 }
 
 func TestBoolMap(t *testing.T) {
-	os.Setenv("TORK_BOOLMAP_KEY1", "false")
-	os.Setenv("TORK_BOOLMAP_KEY2", "true")
+	assert.NoError(t, os.Setenv("TORK_BOOLMAP_KEY1", "false"))
+	assert.NoError(t, os.Setenv("TORK_BOOLMAP_KEY2", "true"))
 	defer func() {
-		os.Unsetenv("TORK_BOOLMAP_KEY1")
-		os.Unsetenv("TORK_BOOLMAP_KEY2")
+		assert.NoError(t, os.Unsetenv("TORK_BOOLMAP_KEY1"))
+		assert.NoError(t, os.Unsetenv("TORK_BOOLMAP_KEY2"))
 	}()
 
 	err := conf.LoadConfig()

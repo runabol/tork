@@ -14,6 +14,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
 )
@@ -179,7 +180,7 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
-	defer ch.Close()
+	defer fns.CloseIgnore(ch)
 	return b.publish(ctx, exchangeDefault, qname, t)
 }
 
@@ -379,7 +380,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
-	defer ch.Close()
+	defer fns.CloseIgnore(ch)
 	body, err := serialize(msg)
 	if err != nil {
 		return err
@@ -499,7 +500,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	for _, conn := range b.connPool {
 		log.Debug().
 			Msgf("shutting down connection to %s", conn.RemoteAddr())
-		var done chan int = make(chan int)
+		done := make(chan int)
 		go func(c *amqp.Connection) {
 			if err := c.Close(); err != nil {
 				log.Error().
@@ -541,7 +542,7 @@ func (b *RabbitMQBroker) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
 	}
-	defer ch.Close()
+	defer fns.CloseIgnore(ch)
 	return nil
 }
 

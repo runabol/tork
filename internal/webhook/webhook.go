@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
+	"github.com/runabol/tork/internal/fns"
 )
 
 const (
@@ -63,7 +64,7 @@ func Call(wh *tork.Webhook, body any) error {
 			attempts++
 			continue
 		}
-		defer resp.Body.Close()
+		defer fns.CloseIgnore(resp.Body)
 		// Success (2xx)
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return nil

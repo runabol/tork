@@ -11,9 +11,9 @@ import (
 
 func TestHostEnv1(t *testing.T) {
 	mw, err := NewHostEnv("TORK_HOST_VAR1")
-	os.Setenv("TORK_HOST_VAR1", "value1")
+	assert.NoError(t, os.Setenv("TORK_HOST_VAR1", "value1"))
 	defer func() {
-		os.Unsetenv("TORK_HOST_VAR1")
+		assert.NoError(t, os.Unsetenv("TORK_HOST_VAR1"))
 	}()
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
@@ -26,9 +26,9 @@ func TestHostEnv1(t *testing.T) {
 
 func TestHostEnv2(t *testing.T) {
 	mw, err := NewHostEnv("TORK_HOST_VAR2")
-	os.Setenv("TORK_HOST_VAR2", "value2")
+	assert.NoError(t, os.Setenv("TORK_HOST_VAR2", "value2"))
 	defer func() {
-		os.Unsetenv("TORK_HOST_VAR2")
+		assert.NoError(t, os.Unsetenv("TORK_HOST_VAR2"))
 	}()
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
@@ -45,9 +45,9 @@ func TestHostEnv2(t *testing.T) {
 
 func TestHostEnv3(t *testing.T) {
 	mw, err := NewHostEnv("TORK_HOST_VAR3:VAR3")
-	os.Setenv("TORK_HOST_VAR3", "value3")
+	assert.NoError(t, os.Setenv("TORK_HOST_VAR3", "value3"))
 	defer func() {
-		os.Unsetenv("TORK_HOST_VAR3")
+		assert.NoError(t, os.Unsetenv("TORK_HOST_VAR3"))
 	}()
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
@@ -69,9 +69,9 @@ func TestHostEnv4(t *testing.T) {
 
 func TestHostEnv5(t *testing.T) {
 	mw, err := NewHostEnv("TORK_HOST_VAR5:VAR5")
-	os.Setenv("TORK_HOST_VAR5", "value5")
+	assert.NoError(t, os.Setenv("TORK_HOST_VAR5", "value5"))
 	defer func() {
-		os.Unsetenv("TORK_HOST_VAR5")
+		assert.NoError(t, os.Unsetenv("TORK_HOST_VAR5"))
 	}()
 	assert.NoError(t, err)
 	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{mw.Execute})
