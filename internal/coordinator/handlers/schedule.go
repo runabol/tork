@@ -112,6 +112,7 @@ func (h *jobSchedulerHandler) handleActive(ctx context.Context, s *tork.Schedule
 					CreatedBy:   s.CreatedBy,
 					CreatedAt:   now,
 					Permissions: s.Permissions,
+					Tags:        s.Tags,
 					Name:        s.Name,
 					Description: s.Description,
 					State:       tork.JobStatePending,
