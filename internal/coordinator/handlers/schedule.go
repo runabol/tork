@@ -111,6 +111,7 @@ func (h *jobSchedulerHandler) handleActive(ctx context.Context, s *tork.Schedule
 					ID:          uuid.NewUUID(),
 					CreatedBy:   s.CreatedBy,
 					CreatedAt:   now,
+					Permissions: s.Permissions,
 					Name:        s.Name,
 					Description: s.Description,
 					State:       tork.JobStatePending,
