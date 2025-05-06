@@ -59,7 +59,7 @@ func Call(wh *tork.Webhook, body any) error {
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Error().Msgf("[Webhook] request to %s failed with error: %v", wh.URL, err)
+			log.Info().Msgf("[Webhook] request to %s failed with error: %v", wh.URL, err)
 			time.Sleep(time.Second * time.Duration(attempts*2))
 			attempts++
 			continue
