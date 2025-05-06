@@ -1013,3 +1013,43 @@ func Test_createJobAndWait(t *testing.T) {
 	assert.Equal(t, http.StatusRequestTimeout, w.Code)
 	assert.NoError(t, ds.Close())
 }
+
+func Test_deleteScheduledJob(t *testing.T) {
+	ctx := context.Background()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	// Create a scheduled job
+	sj := tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		State:     tork.ScheduledJobStateActive,
+		CreatedAt: time.Now().UTC(),
+	}
+	err = ds.CreateScheduledJob(ctx, &sj)
+	assert.NoError(t, err)
+
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    broker.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+
+	// Send DELETE request to delete the scheduled job
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("/scheduled-jobs/%s", sj.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	// Verify response
+	assert.Equal(t, "{\"status\":\"OK\"}\n", string(body))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify the job state is updated to paused
+	_, err = ds.GetScheduledJobByID(ctx, sj.ID)
+	assert.Error(t, err)
+
+	assert.NoError(t, ds.Close())
+}

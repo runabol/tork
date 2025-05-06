@@ -639,13 +639,10 @@ func (s *API) deleteScheduledJob(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	if j.State != tork.ScheduledJobStateActive {
-		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not active")
-	}
-	j.State = tork.ScheduledJobStatePaused
 	if err := s.ds.DeleteScheduledJob(c.Request().Context(), id); err != nil {
 		return err
 	}
+	j.State = tork.ScheduledJobStatePaused
 	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
 		return err
 	}
