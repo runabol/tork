@@ -281,7 +281,7 @@ func (c *Coordinator) Start() error {
 			return
 		}
 		if err := c.onScheduledJob(context.Background(), sj); err != nil {
-			log.Error().Msgf("error handling scheduled job: %s", sj.ID)
+			log.Error().Err(err).Msgf("error handling scheduled job: %s", sj.ID)
 		}
 	}); err != nil {
 		return err
