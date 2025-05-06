@@ -40,7 +40,7 @@ services:
     environment:
       BACKEND_URL: "http://host.docker.internal:8000"
   migration:
-    image: golang:1.21
+    image: golang:1.23
     working_dir: /code
     environment:
       - TORK_CONFIG=configs/config.compose.toml

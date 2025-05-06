@@ -140,6 +140,9 @@ func (h *jobSchedulerHandler) handleActive(ctx context.Context, s *tork.Schedule
 		),
 		gocron.WithName(s.ID),
 	)
+	if err != nil {
+		return errors.Wrapf(err, "error scheduling job %s", s.ID)
+	}
 	h.mu.Lock()
 	h.m[s.ID] = cj
 	h.mu.Unlock()
