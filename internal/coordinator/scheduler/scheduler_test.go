@@ -463,6 +463,11 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	j := &tork.Job{
 		ID:   uuid.NewUUID(),
 		Name: "test job",
+		Permissions: []*tork.Permission{{
+			User: &tork.User{
+				Username: tork.USER_GUEST,
+			},
+		}},
 	}
 
 	err = ds.CreateJob(ctx, j)
@@ -502,6 +507,13 @@ func Test_scheduleSubJobTask(t *testing.T) {
 	tk, err = ds.GetTaskByID(ctx, tk.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.TaskStateRunning, tk.State)
+
+	subjob, err := ds.GetJobByID(ctx, tk.SubJob.ID)
+	assert.NoError(t, err)
+	assert.NotNil(t, subjob)
+	assert.Equal(t, tk.ID, subjob.ParentID)
+	assert.Equal(t, j.Permissions[0].User.Username, subjob.Permissions[0].User.Username)
+
 	assert.NoError(t, ds.Close())
 }
 
