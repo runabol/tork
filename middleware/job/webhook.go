@@ -67,6 +67,6 @@ func callWebhook(wh *tork.Webhook, job *tork.Job) {
 	}
 	summary := tork.NewJobSummary(job)
 	if err := webhook.Call(wh, summary); err != nil {
-		log.Error().Err(err).Msgf("[Webhook] error calling job webhook %s", wh.URL)
+		log.Info().Err(err).Msgf("[Webhook] error calling job webhook %s", wh.URL)
 	}
 }

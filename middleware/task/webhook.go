@@ -89,6 +89,6 @@ func callWebhook(wh *tork.Webhook, job *tork.Job, summary *tork.TaskSummary) {
 		wh.Headers[name] = newv
 	}
 	if err := webhook.Call(wh, summary); err != nil {
-		log.Error().Err(err).Msgf("[Webhook] error calling task webhook %s", wh.URL)
+		log.Info().Err(err).Msgf("[Webhook] error calling task webhook %s", wh.URL)
 	}
 }
