@@ -14,7 +14,7 @@ const (
 	TOPIC_JOB           = "job.*"
 	TOPIC_JOB_COMPLETED = "job.completed"
 	TOPIC_JOB_FAILED    = "job.failed"
-	TOPIC_JOB_SCHEDULED = "job.scheduled"
+	TOPIC_SCHEDULED_JOB = "scheduled.job"
 )
 
 // Broker is the message-queue, pub/sub mechanism used for delivering tasks.

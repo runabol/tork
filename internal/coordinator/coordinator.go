@@ -274,7 +274,7 @@ func (c *Coordinator) Start() error {
 			}
 		}
 	}
-	if err := c.broker.SubscribeForEvents(context.Background(), broker.TOPIC_JOB_SCHEDULED, func(ev any) {
+	if err := c.broker.SubscribeForEvents(context.Background(), broker.TOPIC_SCHEDULED_JOB, func(ev any) {
 		sj, ok := ev.(*tork.ScheduledJob)
 		if !ok {
 			log.Error().Msgf("error casting scheduled job: %v", ev)
