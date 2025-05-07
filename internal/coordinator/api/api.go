@@ -534,7 +534,6 @@ func (s *API) submitScheduledJob(ctx context.Context, ji *input.ScheduledJob) (*
 	if err := s.ds.CreateScheduledJob(ctx, sj); err != nil {
 		return nil, err
 	}
-	log.Info().Str("job-id", sj.ID).Msg("created scheduled job")
 	if err := s.broker.PublishEvent(ctx, broker.TOPIC_SCHEDULED_JOB, sj); err != nil {
 		return nil, err
 	}
