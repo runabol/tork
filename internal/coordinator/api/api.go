@@ -333,7 +333,6 @@ func (s *API) SubmitJob(ctx context.Context, ji *input.Job) (*tork.Job, error) {
 	if err := s.ds.CreateJob(ctx, j); err != nil {
 		return nil, err
 	}
-	log.Info().Str("job-id", j.ID).Msg("created job")
 	if err := s.broker.PublishJob(ctx, j); err != nil {
 		return nil, err
 	}
