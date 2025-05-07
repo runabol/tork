@@ -535,7 +535,7 @@ func (s *API) submitScheduledJob(ctx context.Context, ji *input.ScheduledJob) (*
 		return nil, err
 	}
 	log.Info().Str("job-id", sj.ID).Msg("created scheduled job")
-	if err := s.broker.PublishEvent(ctx, broker.TOPIC_JOB_SCHEDULED, sj); err != nil {
+	if err := s.broker.PublishEvent(ctx, broker.TOPIC_SCHEDULED_JOB, sj); err != nil {
 		return nil, err
 	}
 	return sj, nil
@@ -604,7 +604,7 @@ func (s *API) pauseScheduledJob(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_SCHEDULED_JOB, j); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
@@ -626,7 +626,7 @@ func (s *API) resumeScheduledJob(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_SCHEDULED_JOB, j); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
@@ -642,7 +642,7 @@ func (s *API) deleteScheduledJob(c echo.Context) error {
 		return err
 	}
 	j.State = tork.ScheduledJobStatePaused
-	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_JOB_SCHEDULED, j); err != nil {
+	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_SCHEDULED_JOB, j); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
