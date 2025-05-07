@@ -30,7 +30,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.2
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sys v0.32.0
 	golang.org/x/time v0.8.0
@@ -93,6 +93,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.26.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.26.0 // indirect
 	go.opentelemetry.io/otel/trace v1.26.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 )
