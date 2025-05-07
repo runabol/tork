@@ -640,9 +640,13 @@ func (s *API) deleteScheduledJob(c echo.Context) error {
 	if err := s.ds.DeleteScheduledJob(c.Request().Context(), id); err != nil {
 		return err
 	}
-	j.State = tork.ScheduledJobStatePaused
-	if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_SCHEDULED_JOB, j); err != nil {
-		return err
+	// if the job is active, we need to publish
+	// an event to remove it from the scheduler
+	if j.State == tork.ScheduledJobStateActive {
+		j.State = tork.ScheduledJobStatePaused
+		if err := s.broker.PublishEvent(c.Request().Context(), broker.TOPIC_SCHEDULED_JOB, j); err != nil {
+			return err
+		}
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 }
