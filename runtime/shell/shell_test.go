@@ -50,7 +50,7 @@ func TestShellRuntimeRunPath(t *testing.T) {
 	}
 	err := rt.Run(context.Background(), tk)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, "hello world", tk.Result)
+	assert.NotEmpty(t, tk.Result)
 }
 
 func TestShellRuntimeRunFile(t *testing.T) {
@@ -178,4 +178,53 @@ func TestBuildEnv(t *testing.T) {
 	assert.Contains(t, env, `URL={"POSTGRES_DB":"somedb","POSTGRES_URL":"postgres://user:password@localhost:5432/todos?sslmode=disable"}`)
 	assert.Contains(t, env, "VAR2=value2")
 	assert.NotContains(t, env, "NON_REEXEC_VAR=should_not_be_included")
+}
+
+func TestRunTaskWithPrePost(t *testing.T) {
+	rt := NewShellRuntime(Config{
+		UID: DEFAULT_UID,
+		GID: DEFAULT_GID,
+		Rexec: func(args ...string) *exec.Cmd {
+			cmd := exec.Command(args[5], args[6:]...)
+			return cmd
+		},
+	})
+
+	t1 := &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "cat /tmp/pre.txt > $REEXEC_TORK_OUTPUT",
+		Pre: []*tork.Task{{
+			Run: "echo hello pre > /tmp/pre.txt",
+		}},
+		Post: []*tork.Task{{
+			Run: "echo bye bye",
+		}},
+	}
+
+	err := rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello pre\n", t1.Result)
+}
+
+func TestRunTaskWithSidecar(t *testing.T) {
+	rt := NewShellRuntime(Config{
+		UID: DEFAULT_UID,
+		GID: DEFAULT_GID,
+		Rexec: func(args ...string) *exec.Cmd {
+			cmd := exec.Command(args[5], args[6:]...)
+			return cmd
+		},
+	})
+
+	t1 := &tork.Task{
+		ID:  uuid.NewUUID(),
+		Run: "sleep 1.5; cat /tmp/sidecar > $REEXEC_TORK_OUTPUT",
+		Sidecars: []*tork.Task{{
+			Run: "echo hello sidecar > /tmp/sidecar",
+		}},
+	}
+
+	err := rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello sidecar\n", t1.Result)
 }

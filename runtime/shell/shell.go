@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"fmt"
@@ -225,24 +226,45 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		}
 	}(pctx)
 
-	errChan := make(chan error)
-	doneChan := make(chan any)
+	errCh := make(chan error, len(t.Sidecars)+1) // +1 for the main task
+	doneCh := make(chan any)
+
+	// create a context for the sidecars
+	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
+	// execute the sidecars
+	var sidecarsWG sync.WaitGroup
+	for _, sidecar := range t.Sidecars {
+		sidecar.ID = uuid.NewUUID()
+		sidecar.Mounts = t.Mounts
+		sidecar.Limits = t.Limits
+		sidecarsWG.Add(1)
+		go func(st *tork.Task) {
+			defer sidecarsWG.Done()
+			if err := r.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
+				errCh <- err
+			}
+		}(sidecar)
+	}
+	defer sidecarsWG.Wait() // wait for all sidecars to exit
+	defer sidecarCancel()   // cancel the sidecars context when the task is done
+
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			errChan <- err
+			errCh <- err
 			return
 		}
-		close(doneChan)
+		close(doneCh)
 	}()
 	select {
-	case err := <-errChan:
+	case err := <-errCh:
 		return errors.Wrapf(err, "error executing command")
 	case <-ctx.Done():
 		if err := cmd.Process.Kill(); err != nil {
 			return errors.Wrapf(err, "error cancelling command")
 		}
 		return ctx.Err()
-	case <-doneChan:
+	case <-doneCh:
 	}
 
 	output, err := os.ReadFile(fmt.Sprintf("%s/stdout", workdir))

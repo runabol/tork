@@ -32,6 +32,7 @@ type taskRecord struct {
 	Error       string         `db:"error_"`
 	Pre         []byte         `db:"pre_tasks"`
 	Post        []byte         `db:"post_tasks"`
+	Sidecars    []byte         `db:"sidecars"`
 	Mounts      []byte         `db:"mounts"`
 	Networks    pq.StringArray `db:"networks"`
 	NodeID      string         `db:"node_id"`
@@ -181,6 +182,12 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.post")
 		}
 	}
+	var sidecars []*tork.Task
+	if r.Sidecars != nil {
+		if err := json.Unmarshal(r.Sidecars, &sidecars); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing task.sidecars")
+		}
+	}
 	var retry *tork.TaskRetry
 	if r.Retry != nil {
 		retry = &tork.TaskRetry{}
@@ -251,6 +258,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 		Error:       r.Error,
 		Pre:         pre,
 		Post:        post,
+		Sidecars:    sidecars,
 		Mounts:      mounts,
 		Networks:    r.Networks,
 		NodeID:      r.NodeID,
