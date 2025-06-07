@@ -18,6 +18,7 @@ type Task struct {
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Pre         []AuxTask         `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
 	Post        []AuxTask         `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
+	Sidecars    []AuxTask         `json:"sidecars,omitempty" yaml:"sidecars,omitempty" validate:"dive"`
 	Mounts      []Mount           `json:"mounts,omitempty" yaml:"mounts,omitempty" validate:"dive"`
 	Networks    []string          `json:"networks,omitempty" yaml:"networks,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
@@ -124,6 +125,7 @@ func (i AuxTask) toTask() *tork.Task {
 func (i Task) toTask() *tork.Task {
 	pre := toAuxTasks(i.Pre)
 	post := toAuxTasks(i.Post)
+	sidecars := toAuxTasks(i.Sidecars)
 	var retry *tork.TaskRetry
 	if i.Retry != nil {
 		retry = i.Retry.toTaskRetry()
@@ -189,6 +191,7 @@ func (i Task) toTask() *tork.Task {
 		Queue:       i.Queue,
 		Pre:         pre,
 		Post:        post,
+		Sidecars:    sidecars,
 		Mounts:      toMounts(i.Mounts),
 		Networks:    i.Networks,
 		Retry:       retry,

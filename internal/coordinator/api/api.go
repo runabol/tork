@@ -766,6 +766,7 @@ func (s *API) restartJob(c echo.Context) error {
 // @Failure 400 {object} echo.HTTPError
 func (s *API) cancelJob(c echo.Context) error {
 	id := c.Param("id")
+	log.Debug().Msgf("cancel job %s", id)
 	j, err := s.ds.GetJobByID(c.Request().Context(), id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())

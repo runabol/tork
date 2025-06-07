@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -294,6 +295,29 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	defer cancel()
 	go d.reportProgress(pctx, progressFile, t)
 
+	// create a context for the sidecars
+	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
+	// execute the sidecars
+	var sidecarsWG sync.WaitGroup
+	errCh := make(chan error, len(t.Sidecars)+1)
+	for _, sidecar := range t.Sidecars {
+		sidecar.ID = uuid.NewUUID()
+		sidecar.Mounts = t.Mounts
+		// add the task container network to the sidecar
+		sidecar.Networks = append(t.Networks, fmt.Sprintf("container:%s", containerID))
+		sidecar.Limits = t.Limits
+		sidecarsWG.Add(1)
+		go func(st *tork.Task) {
+			defer sidecarsWG.Done()
+			if err := d.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
+				errCh <- err
+			}
+		}(sidecar)
+	}
+	defer sidecarsWG.Wait() // wait for all sidecars to exit
+	defer sidecarCancel()   // cancel the sidecars context when the task is done
+
 	// Start the container
 	log.Debug().Msgf("Starting container %s", containerID)
 	startCmd := exec.CommandContext(ctx, "podman", "start", containerID)
@@ -302,11 +326,23 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	// read logs
-	logsCmd := exec.CommandContext(ctx, "podman", "logs", "--follow", containerID)
-	logsCmd.Stdout = logger
-	logsCmd.Stderr = logger
-	if err := logsCmd.Run(); err != nil {
-		return fmt.Errorf("failed to read logs: %w", err)
+	done := make(chan struct{})
+	go func() {
+		logsCmd := exec.CommandContext(ctx, "podman", "logs", "--follow", containerID)
+		logsCmd.Stdout = logger
+		logsCmd.Stderr = logger
+		if err := logsCmd.Run(); err != nil {
+			errCh <- fmt.Errorf("failed to read logs: %w", err)
+		} else {
+			done <- struct{}{}
+		}
+	}()
+
+	// Wait for the container to exit
+	select {
+	case <-done:
+	case err := <-errCh:
+		return err
 	}
 
 	// check the exit code

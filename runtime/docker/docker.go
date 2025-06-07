@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cliopts "github.com/docker/cli/opts"
@@ -313,7 +314,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	for _, nw := range t.Networks {
-		nc.EndpointsConfig[nw] = &network.EndpointSettings{NetworkID: nw}
+		if strings.HasPrefix(nw, "container:") {
+			hc.NetworkMode = container.NetworkMode(nw)
+		} else {
+			nc.EndpointsConfig[nw] = &network.EndpointSettings{NetworkID: nw}
+		}
 	}
 
 	// we want to create the container using a background context
@@ -356,6 +361,29 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		return errors.Wrapf(err, "error initializing workdir")
 	}
 
+	// create a context for the sidecars
+	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
+	// execute the sidecars
+	var sidecarsWG sync.WaitGroup
+	var sidecarErrCh = make(chan error, len(t.Sidecars))
+	for _, sidecar := range t.Sidecars {
+		sidecar.ID = uuid.NewUUID()
+		sidecar.Mounts = t.Mounts
+		// add the task container network to the sidecar
+		sidecar.Networks = append(t.Networks, fmt.Sprintf("container:%s", resp.ID))
+		sidecar.Limits = t.Limits
+		sidecarsWG.Add(1)
+		go func(st *tork.Task) {
+			defer sidecarsWG.Done()
+			if err := d.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
+				sidecarErrCh <- err
+			}
+		}(sidecar)
+	}
+	defer sidecarsWG.Wait() // wait for all sidecars to exit
+	defer sidecarCancel()   // cancel the sidecars context when the task is done
+
 	// start the container
 	log.Debug().Msgf("Starting container %s", resp.ID)
 	err = d.client.ContainerStart(
@@ -395,13 +423,16 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 			log.Error().Err(err).Msgf("error reading the std out")
 		}
 	}()
+
 	// wait for the task to finish execution
 	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
-	case err := <-errCh:
+	case err := <-errCh: // error waiting for the container to finish
 		if err != nil {
 			return err
 		}
+	case sidecarErr := <-sidecarErrCh: // sidecar error
+		return sidecarErr
 	case status := <-statusCh:
 		if status.StatusCode != 0 { // error
 			out, err := d.client.ContainerLogs(

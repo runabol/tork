@@ -424,3 +424,57 @@ func TestRunTaskWithPrivilegedModeOff(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "Cannot modify kernel params\n", t1.Result)
 }
+
+func TestRunTaskWithPrePost(t *testing.T) {
+	rt := NewPodmanRuntime(WithPrivileged(true))
+	assert.NotNil(t, rt)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "cat /mnt/pre.txt > $TORK_OUTPUT",
+		Pre: []*tork.Task{{
+			Image: "ubuntu:mantic",
+			Run:   "echo hello pre > /mnt/pre.txt",
+		}},
+		Post: []*tork.Task{{
+			Image: "ubuntu:mantic",
+			Run:   "echo bye bye",
+		}},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/mnt",
+			},
+		},
+	}
+
+	err := rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello pre\n", t1.Result)
+}
+
+func TestRunTaskWithSidecar(t *testing.T) {
+	rt := NewPodmanRuntime(WithPrivileged(true))
+	assert.NotNil(t, rt)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "ubuntu:mantic",
+		Run:   "sleep 1.5; cat /mnt/sidecar > $TORK_OUTPUT",
+		Sidecars: []*tork.Task{{
+			Image: "ubuntu:mantic",
+			Run:   "echo hello sidecar > /mnt/sidecar",
+		}},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/mnt",
+			},
+		},
+	}
+
+	err := rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello sidecar\n", t1.Result)
+}

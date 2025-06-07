@@ -149,6 +149,7 @@ CREATE TABLE tasks (
     error_        text,
     pre_tasks     jsonb,
     post_tasks    jsonb,
+    sidecars      jsonb,
     mounts        jsonb,
     node_id       varchar(32),
     retry         jsonb,
