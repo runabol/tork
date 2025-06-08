@@ -25,6 +25,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-units"
+	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -135,6 +136,24 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 }
 
 func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
+	// create a shared network for the task and its sidecars
+	networkCreateResp, err := d.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
+		CheckDuplicate: true,
+		Driver:         "bridge",
+	})
+	if err != nil {
+		return errors.Wrapf(err, "error creating network")
+	}
+	log.Debug().Msgf("Created network with ID %s", networkCreateResp.ID)
+	defer func() {
+		// remove the network when the task is done
+		log.Debug().Msgf("Removing network with ID %s", networkCreateResp.ID)
+		if err := d.client.NetworkRemove(context.Background(), networkCreateResp.ID); err != nil {
+			log.Error().Err(err).Msgf("error removing network")
+		}
+	}()
+	t.Networks = append(t.Networks, networkCreateResp.ID)
+
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()
@@ -195,7 +214,6 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	if err := d.imagePull(ctx, t, logger); err != nil {
 		return errors.Wrapf(err, "error pulling image: %s", t.Image)
 	}
-
 	env := []string{}
 	for name, value := range t.Env {
 		env = append(env, fmt.Sprintf("%s=%s", name, value))
@@ -314,11 +332,11 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	for _, nw := range t.Networks {
-		if strings.HasPrefix(nw, "container:") {
-			hc.NetworkMode = container.NetworkMode(nw)
-		} else {
-			nc.EndpointsConfig[nw] = &network.EndpointSettings{NetworkID: nw}
+		endpoint := &network.EndpointSettings{
+			NetworkID: nw,
+			Aliases:   []string{slug.Make(t.Name)},
 		}
+		nc.EndpointsConfig[nw] = endpoint
 	}
 
 	// we want to create the container using a background context
@@ -369,8 +387,7 @@ func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	for _, sidecar := range t.Sidecars {
 		sidecar.ID = uuid.NewUUID()
 		sidecar.Mounts = t.Mounts
-		// add the task container network to the sidecar
-		sidecar.Networks = append(t.Networks, fmt.Sprintf("container:%s", resp.ID))
+		sidecar.Networks = t.Networks
 		sidecar.Limits = t.Limits
 		sidecarsWG.Add(1)
 		go func(st *tork.Task) {

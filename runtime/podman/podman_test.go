@@ -3,12 +3,14 @@ package podman
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
 
 	"github.com/runabol/tork/broker"
@@ -24,6 +26,7 @@ func TestPodmanRunTaskCMD(t *testing.T) {
 
 	err := rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
+		Name:  "Some task",
 		Image: "busybox:stable",
 		CMD:   []string{"ls"},
 	})
@@ -35,6 +38,7 @@ func TestPodmanRunTaskRun(t *testing.T) {
 
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
+		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "echo hello world > $TORK_OUTPUT",
 	}
@@ -48,9 +52,10 @@ func TestPodmanCoustomEntrypoint(t *testing.T) {
 
 	tk := &tork.Task{
 		ID:         uuid.NewUUID(),
-		Image:      "ubuntu:mantic",
+		Name:       "Some task",
+		Image:      "busybox:stable",
 		Run:        "echo hello world > $TORK_OUTPUT",
-		Entrypoint: []string{"/bin/bash", "-c"},
+		Entrypoint: []string{"/bin/sh", "-c"},
 	}
 	err := rt.Run(context.Background(), tk)
 	assert.NoError(t, err)
@@ -62,15 +67,18 @@ func TestPodmanRunPrePost(t *testing.T) {
 
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
+		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "cat /somedir/thing > $TORK_OUTPUT",
 		Pre: []*tork.Task{{
 			ID:    uuid.NewUUID(),
+			Name:  "Some task",
 			Image: "busybox:stable",
 			Run:   "echo hello > /somedir/thing",
 		}},
 		Post: []*tork.Task{{
 			ID:    uuid.NewUUID(),
+			Name:  "Some task",
 			Image: "busybox:stable",
 			Run:   "echo post",
 		}},
@@ -89,10 +97,11 @@ func TestPodmanProgress(t *testing.T) {
 
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:latest",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run: `
 		  echo 5 > $TORK_PROGRESS
-		  sleep 2
+		  sleep 1
 		`,
 	}
 
@@ -103,7 +112,7 @@ func TestPodmanProgress(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 	containerID, ok := rt.tasks.Get(tk.ID)
 	assert.True(t, ok)
 	assert.NotEmpty(t, containerID)
@@ -129,7 +138,8 @@ func TestPodmanRunTaskCMDLogger(t *testing.T) {
 
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:latest",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
@@ -146,7 +156,8 @@ func TestPodmanRunTaskConcurrently(t *testing.T) {
 			defer wg.Done()
 			tk := &tork.Task{
 				ID:    uuid.NewUUID(),
-				Image: "alpine:latest",
+				Name:  "Some task",
+				Image: "busybox:stable",
 				Run:   "echo -n hello > $TORK_OUTPUT",
 			}
 			err := rt.Run(context.Background(), tk)
@@ -163,7 +174,8 @@ func TestPodmanRunTaskWithTimeout(t *testing.T) {
 	defer cancel()
 	err := rt.Run(ctx, &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:latest",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		CMD:   []string{"sleep", "10"},
 	})
 	assert.Error(t, err)
@@ -175,7 +187,8 @@ func TestPodmanRunTaskWithError(t *testing.T) {
 	defer cancel()
 	err := rt.Run(ctx, &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:latest",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "not_a_thing",
 	})
 	assert.Error(t, err)
@@ -186,7 +199,8 @@ func TestRunAndCancelTask(t *testing.T) {
 	assert.NotNil(t, rt)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:3.18.3",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		CMD:   []string{"sleep", "60"},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,12 +211,12 @@ func TestRunAndCancelTask(t *testing.T) {
 		ch <- err
 	}()
 	// give the task a chance to get started
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 	cancel()
 	assert.Error(t, <-ch)
 }
 
-func TesPodmantHealthCheck(t *testing.T) {
+func TestPodmantHealthCheck(t *testing.T) {
 	rt := NewPodmanRuntime()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -217,12 +231,23 @@ func TestPodmanHealthCheckFailed(t *testing.T) {
 }
 
 func TestRunTaskWithNetwork(t *testing.T) {
+	networkName := uuid.NewUUID()
+	ctx := context.Background()
+	createNetworkCmd := exec.CommandContext(ctx, "podman", "network", "create", networkName)
+	assert.NoError(t, createNetworkCmd.Run(), "error creating network")
+	defer func() {
+		// remove the network when the task is done
+		log.Debug().Msgf("Removing network with name %s", networkName)
+		removeNetworkCmd := exec.CommandContext(context.Background(), "podman", "network", "rm", networkName)
+		assert.NoError(t, removeNetworkCmd.Run(), "error removing network")
+	}()
 	rt := NewPodmanRuntime()
 	err := rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
-		Image:    "alpine:latest",
+		Image:    "busybox:stable",
+		Name:     "Some task",
 		CMD:      []string{"ls"},
-		Networks: []string{"default"},
+		Networks: []string{networkName},
 	})
 	assert.NoError(t, err)
 	rt = NewPodmanRuntime()
@@ -230,7 +255,8 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	assert.NotNil(t, rt)
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
-		Image:    "alpine:latest",
+		Image:    "busybox:stable",
+		Name:     "Some task",
 		CMD:      []string{"ls"},
 		Networks: []string{"no-such-network"},
 	})
@@ -242,7 +268,8 @@ func TestPodmanRunTaskWithVolume(t *testing.T) {
 	ctx := context.Background()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{
 			{
@@ -262,7 +289,8 @@ func TestPodmanRunTaskWithVolumeAndCustomWorkdir(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run: `echo hello world > /xyz/thing
               ls > $TORK_OUTPUT`,
 		Mounts: []tork.Mount{
@@ -288,7 +316,8 @@ func TestPodmanRunTaskWithBind(t *testing.T) {
 	dir := path.Join(os.TempDir(), uuid.NewUUID())
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{{
 			Type:   tork.MountTypeBind,
@@ -305,7 +334,8 @@ func TestPodmanRunTaskWithVolumeAndWorkdir(t *testing.T) {
 	ctx := context.Background()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
 		Mounts: []tork.Mount{
 			{
@@ -323,7 +353,8 @@ func TestPodmanRunTaskInitWorkdir(t *testing.T) {
 	rt := NewPodmanRuntime()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "cat hello.txt > $TORK_OUTPUT",
 		Files: map[string]string{
 			"hello.txt": "hello world",
@@ -340,7 +371,8 @@ func TestPodmanRunTaskInitWorkdirLs(t *testing.T) {
 	rt := NewPodmanRuntime()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "ls > $TORK_OUTPUT",
 		Files: map[string]string{
 			"hello.txt": "hello world",
@@ -360,7 +392,8 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 	rt := NewPodmanRuntime(WithMounter(mounter))
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{
 			{
@@ -388,7 +421,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err := rt.imagePull(ctx, &tork.Task{Image: "alpine:latest"}, os.Stdout)
+			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:stable"}, os.Stdout)
 			assert.NoError(t, err)
 		}()
 	}
@@ -402,7 +435,8 @@ func TestRunTaskWithPrivilegedModeOn(t *testing.T) {
 	ctx := context.Background()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:3.18.3",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
 	}
 	err := rt.Run(ctx, t1)
@@ -417,7 +451,8 @@ func TestRunTaskWithPrivilegedModeOff(t *testing.T) {
 	ctx := context.Background()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:3.18.3",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
 	}
 	err := rt.Run(ctx, t1)
@@ -426,19 +461,20 @@ func TestRunTaskWithPrivilegedModeOff(t *testing.T) {
 }
 
 func TestRunTaskWithPrePost(t *testing.T) {
-	rt := NewPodmanRuntime(WithPrivileged(true))
+	rt := NewPodmanRuntime()
 	assert.NotNil(t, rt)
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Name:  "Some task",
+		Image: "busybox:stable",
 		Run:   "cat /mnt/pre.txt > $TORK_OUTPUT",
 		Pre: []*tork.Task{{
-			Image: "ubuntu:mantic",
+			Image: "busybox:stable",
 			Run:   "echo hello pre > /mnt/pre.txt",
 		}},
 		Post: []*tork.Task{{
-			Image: "ubuntu:mantic",
+			Image: "busybox:stable",
 			Run:   "echo bye bye",
 		}},
 		Mounts: []tork.Mount{
@@ -454,27 +490,32 @@ func TestRunTaskWithPrePost(t *testing.T) {
 	assert.Equal(t, "hello pre\n", t1.Result)
 }
 
-func TestRunTaskWithSidecar(t *testing.T) {
-	rt := NewPodmanRuntime(WithPrivileged(true))
+func TestRunTaskWithHTTPServerSidecar(t *testing.T) {
+	rt := NewPodmanRuntime()
 	assert.NotNil(t, rt)
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
-		Run:   "sleep 1.5; cat /mnt/sidecar > $TORK_OUTPUT",
+		Name:  "Some task",
+		Image: "curlimages/curl:latest",
+		Run:   "curl --retry 5 --retry-max-time 5 http://myserver:9000/ > $TORK_OUTPUT",
 		Sidecars: []*tork.Task{{
-			Image: "ubuntu:mantic",
-			Run:   "echo hello sidecar > /mnt/sidecar",
-		}},
-		Mounts: []tork.Mount{
-			{
-				Type:   tork.MountTypeVolume,
-				Target: "/mnt",
+			Name:  "myserver",
+			Image: "python:3.11-alpine",
+			Run:   "python server.py",
+			Files: map[string]string{
+				"server.py": `
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class Handler(BaseHTTPRequestHandler):
+	def do_GET(self):
+	  self.send_response(200); self.send_header('Content-type', 'text/plain'); self.end_headers()
+	  self.wfile.write(f'Hello from sidecar'.encode())
+HTTPServer(('0.0.0.0', 9000), Handler).serve_forever()`,
 			},
-		},
+		}},
 	}
 
 	err := rt.Run(context.Background(), t1)
 	assert.NoError(t, err)
-	assert.Equal(t, "hello sidecar\n", t1.Result)
+	assert.Equal(t, "Hello from sidecar", t1.Result)
 }
