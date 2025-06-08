@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork"
 
@@ -121,7 +123,7 @@ func TestRunTaskCMD(t *testing.T) {
 
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
@@ -134,7 +136,7 @@ func TestProgress(t *testing.T) {
 
 	tk := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "sleep 1",
 	}
 
@@ -168,7 +170,7 @@ func TestRunTaskCMDLogger(t *testing.T) {
 
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		CMD:   []string{"ls"},
 	})
 	assert.NoError(t, err)
@@ -187,7 +189,7 @@ func TestRunTaskConcurrently(t *testing.T) {
 			defer wg.Done()
 			tk := &tork.Task{
 				ID:    uuid.NewUUID(),
-				Image: "ubuntu:mantic",
+				Image: "busybox:stable",
 				Run:   "echo -n hello > $TORK_OUTPUT",
 			}
 			err := rt.Run(context.Background(), tk)
@@ -206,7 +208,7 @@ func TestRunTaskWithTimeout(t *testing.T) {
 	defer cancel()
 	err = rt.Run(ctx, &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		CMD:   []string{"sleep", "10"},
 	})
 	assert.Error(t, err)
@@ -220,7 +222,7 @@ func TestRunTaskWithError(t *testing.T) {
 	defer cancel()
 	err = rt.Run(ctx, &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "not_a_thing",
 	})
 	assert.Error(t, err)
@@ -232,7 +234,7 @@ func TestRunAndCancelTask(t *testing.T) {
 	assert.NotNil(t, rt)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:3.18.3",
+		Image: "busybox:stable",
 		CMD:   []string{"sleep", "60"},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -270,11 +272,27 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+
+	nw := uuid.NewUUID()
+	networkCreateResp, err := rt.client.NetworkCreate(ctx, nw, types.NetworkCreate{
+		CheckDuplicate: true,
+		Driver:         "bridge",
+	})
+	assert.NoError(t, err)
+	log.Debug().Msgf("Created network %s with ID %s", nw, networkCreateResp.ID)
+	defer func() {
+		if err := rt.client.NetworkRemove(context.Background(), nw); err != nil {
+			log.Error().Err(err).Msgf("error removing network %s", nw)
+		}
+	}()
+
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
-		Image:    "ubuntu:mantic",
+		Image:    "busybox:stable",
 		CMD:      []string{"ls"},
-		Networks: []string{"default"},
+		Networks: []string{nw},
 	})
 	assert.NoError(t, err)
 	rt, err = NewDockerRuntime()
@@ -282,7 +300,7 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	assert.NotNil(t, rt)
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:       uuid.NewUUID(),
-		Image:    "ubuntu:mantic",
+		Image:    "busybox:stable",
 		CMD:      []string{"ls"},
 		Networks: []string{"no-such-network"},
 	})
@@ -297,7 +315,7 @@ func TestRunTaskWithVolume(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{
 			{
@@ -318,7 +336,7 @@ func TestRunTaskWithVolumeAndCustomWorkdir(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run: `echo hello world > /xyz/thing
               ls > $TORK_OUTPUT`,
 		Mounts: []tork.Mount{
@@ -346,7 +364,7 @@ func TestRunTaskWithBind(t *testing.T) {
 	dir := path.Join(os.TempDir(), uuid.NewUUID())
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{{
 			Type:   tork.MountTypeBind,
@@ -368,7 +386,7 @@ func TestRunTaskWithTempfs(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{
 			{
@@ -389,7 +407,7 @@ func TestRunTaskWithVolumeAndWorkdir(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
 		Mounts: []tork.Mount{
 			{
@@ -413,7 +431,7 @@ func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
 		Mounts: []tork.Mount{
 			{
@@ -432,7 +450,7 @@ func TestRunTaskInitWorkdir(t *testing.T) {
 	assert.NoError(t, err)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "cat hello.txt > $TORK_OUTPUT",
 		Files: map[string]string{
 			"hello.txt": "hello world",
@@ -450,7 +468,7 @@ func TestRunTaskInitWorkdirLs(t *testing.T) {
 	assert.NoError(t, err)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "ls > $TORK_OUTPUT",
 		Files: map[string]string{
 			"hello.txt": "hello world",
@@ -472,7 +490,7 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 	assert.NoError(t, err)
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
 		Mounts: []tork.Mount{
 			{
@@ -494,7 +512,7 @@ func Test_imagePull(t *testing.T) {
 	assert.NotNil(t, rt)
 
 	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "debian:*")),
+		Filters: filters.NewArgs(filters.Arg("reference", "busybox:*")),
 	})
 	assert.NoError(t, err)
 
@@ -512,7 +530,7 @@ func Test_imagePull(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		go func() {
 			defer wg.Done()
-			err := rt.imagePull(ctx, &tork.Task{Image: "debian:jessie-slim"}, os.Stdout)
+			err := rt.imagePull(ctx, &tork.Task{Image: "busybox:stable"}, os.Stdout)
 			assert.NoError(t, err)
 		}()
 	}
@@ -526,25 +544,25 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 
-	r1, err := rt.client.ImagePull(ctx, "alpine:3.18.3", image.PullOptions{})
+	r1, err := rt.client.ImagePull(ctx, "busybox:stable", image.PullOptions{})
 	assert.NoError(t, err)
 	assert.NoError(t, r1.Close())
 
 	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+		Filters: filters.NewArgs(filters.Arg("reference", "busybox:stable")),
 	})
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
 
-	err = rt.client.ImageTag(ctx, "alpine:3.18.3", "localhost:5001/tork/alpine:3.18.3")
+	err = rt.client.ImageTag(ctx, "busybox:stable", "localhost:5001/tork/busybox:stable")
 	assert.NoError(t, err)
 
-	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/alpine:3.18.3", image.PushOptions{RegistryAuth: "noauth"})
+	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/busybox:stable", image.PushOptions{RegistryAuth: "noauth"})
 	assert.NoError(t, err)
 	assert.NoError(t, r2.Close())
 
 	err = rt.imagePull(ctx, &tork.Task{
-		Image: "localhost:5001/tork/alpine:3.18.3",
+		Image: "localhost:5001/tork/busybox:stable",
 		Registry: &tork.Registry{
 			Username: "username",
 			Password: "password",
@@ -562,7 +580,7 @@ func TestRunTaskWithPrivilegedModeOn(t *testing.T) {
 	ctx := context.Background()
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "alpine:3.18.3",
+		Image: "busybox:stable",
 		Run:   "RESULT=$(sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1 && echo 'Can modify kernel params' || echo 'Cannot modify kernel params'); echo $RESULT > $TORK_OUTPUT",
 	}
 	err = rt.Run(ctx, t1)
@@ -632,14 +650,14 @@ func TestRunTaskWithPrePost(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
+		Image: "busybox:stable",
 		Run:   "cat /mnt/pre.txt > $TORK_OUTPUT",
 		Pre: []*tork.Task{{
-			Image: "ubuntu:mantic",
+			Image: "busybox:stable",
 			Run:   "echo hello pre > /mnt/pre.txt",
 		}},
 		Post: []*tork.Task{{
-			Image: "ubuntu:mantic",
+			Image: "busybox:stable",
 			Run:   "echo bye bye",
 		}},
 		Mounts: []tork.Mount{
@@ -662,10 +680,30 @@ func TestRunTaskWithSidecar(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID:    uuid.NewUUID(),
-		Image: "ubuntu:mantic",
-		Run:   "sleep 1.5; cat /mnt/sidecar > $TORK_OUTPUT",
+		Image: "alpine:3.18.3",
+		Run:   "echo hello > $TORK_OUTPUT",
 		Sidecars: []*tork.Task{{
-			Image: "ubuntu:mantic",
+			Image: "busybox:stable",
+			Run:   "echo hello sidecar",
+		}},
+	}
+
+	err = rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello\n", t1.Result)
+}
+
+func TestRunTaskWithSidecarAndMount(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "sleep 1; cat /mnt/sidecar > $TORK_OUTPUT",
+		Sidecars: []*tork.Task{{
+			Image: "busybox:stable",
 			Run:   "echo hello sidecar > /mnt/sidecar",
 		}},
 		Mounts: []tork.Mount{
@@ -679,4 +717,35 @@ func TestRunTaskWithSidecar(t *testing.T) {
 	err = rt.Run(context.Background(), t1)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello sidecar\n", t1.Result)
+}
+
+func TestRunTaskWithHTTPServerSidecar(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Name:  "Some task",
+		Image: "curlimages/curl:latest",
+		Run:   "curl --retry 3 --retry-max-time 5 http://myserver:9000/ > $TORK_OUTPUT",
+		Sidecars: []*tork.Task{{
+			Name:  "myserver",
+			Image: "python:3.11-alpine",
+			Run:   "python server.py",
+			Files: map[string]string{
+				"server.py": `
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class Handler(BaseHTTPRequestHandler):
+	def do_GET(self):
+	  self.send_response(200); self.send_header('Content-type', 'text/plain'); self.end_headers()
+	  self.wfile.write(f'Hello from sidecar'.encode())
+HTTPServer(('0.0.0.0', 9000), Handler).serve_forever()`,
+			},
+		}},
+	}
+
+	err = rt.Run(context.Background(), t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello from sidecar", t1.Result)
 }

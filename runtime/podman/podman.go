@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -91,6 +92,27 @@ func (d *PodmanRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if t.Image == "" {
 		return errors.New("task image is required")
 	}
+	if t.Name == "" {
+		return errors.New("task name is required")
+	}
+
+	// create a shared network for the task and its sidecars
+	networkName := uuid.NewUUID()
+	createNetworkCmd := exec.CommandContext(ctx, "podman", "network", "create", networkName)
+	if err := createNetworkCmd.Run(); err != nil {
+		return errors.Wrapf(err, "error creating network")
+	}
+	log.Debug().Msgf("Created network with name %s", networkName)
+	defer func() {
+		// remove the network when the task is done
+		log.Debug().Msgf("Removing network with name %s", networkName)
+		removeNetworkCmd := exec.CommandContext(context.Background(), "podman", "network", "rm", networkName)
+		if err := removeNetworkCmd.Run(); err != nil {
+			log.Error().Err(err).Msgf("error removing network")
+		}
+	}()
+	t.Networks = append(t.Networks, networkName)
+
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()
@@ -217,7 +239,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// add networks to the container
 	for _, network := range t.Networks {
-		createCmd.Args = append(createCmd.Args, "--network", network)
+		createCmd.Args = append(createCmd.Args, "--network", network, "--network-alias", slug.Make(t.Name))
 	}
 
 	// add mounts to the container
@@ -303,9 +325,8 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	for _, sidecar := range t.Sidecars {
 		sidecar.ID = uuid.NewUUID()
 		sidecar.Mounts = t.Mounts
-		// add the task container network to the sidecar
-		sidecar.Networks = append(t.Networks, fmt.Sprintf("container:%s", containerID))
 		sidecar.Limits = t.Limits
+		sidecar.Networks = t.Networks
 		sidecarsWG.Add(1)
 		go func(st *tork.Task) {
 			defer sidecarsWG.Done()
@@ -382,7 +403,7 @@ func (d *PodmanRuntime) stop(ctx context.Context, t *tork.Task) error {
 }
 
 func (d *PodmanRuntime) HealthCheck(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "podman", "info")
+	cmd := exec.CommandContext(ctx, "podman", "version")
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, "podman is not running")
 	}

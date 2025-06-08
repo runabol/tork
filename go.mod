@@ -15,6 +15,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.13.0
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/uuid v1.6.0
+	github.com/gosimple/slug v1.15.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/knadh/koanf/parsers/toml v0.1.0
 	github.com/knadh/koanf/providers/env v0.1.0
@@ -58,6 +59,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.0.0-alpha.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
