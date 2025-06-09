@@ -10,7 +10,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gosimple/slug"
@@ -95,23 +94,9 @@ func (d *PodmanRuntime) Run(ctx context.Context, t *tork.Task) error {
 	if t.Name == "" {
 		return errors.New("task name is required")
 	}
-
-	// create a shared network for the task and its sidecars
-	networkName := uuid.NewUUID()
-	createNetworkCmd := exec.CommandContext(ctx, "podman", "network", "create", networkName)
-	if err := createNetworkCmd.Run(); err != nil {
-		return errors.Wrapf(err, "error creating network")
+	if len(t.Sidecars) > 0 {
+		return errors.New("sidecars are not supported in podman runtime")
 	}
-	log.Debug().Msgf("Created network with name %s", networkName)
-	defer func() {
-		// remove the network when the task is done
-		log.Debug().Msgf("Removing network with name %s", networkName)
-		removeNetworkCmd := exec.CommandContext(context.Background(), "podman", "network", "rm", networkName)
-		if err := removeNetworkCmd.Run(); err != nil {
-			log.Error().Err(err).Msgf("error removing network")
-		}
-	}()
-	t.Networks = append(t.Networks, networkName)
 
 	// prepare mounts
 	for i, mnt := range t.Mounts {
@@ -317,28 +302,6 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	defer cancel()
 	go d.reportProgress(pctx, progressFile, t)
 
-	// create a context for the sidecars
-	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
-	// execute the sidecars
-	var sidecarsWG sync.WaitGroup
-	errCh := make(chan error, len(t.Sidecars)+1)
-	for _, sidecar := range t.Sidecars {
-		sidecar.ID = uuid.NewUUID()
-		sidecar.Mounts = t.Mounts
-		sidecar.Limits = t.Limits
-		sidecar.Networks = t.Networks
-		sidecarsWG.Add(1)
-		go func(st *tork.Task) {
-			defer sidecarsWG.Done()
-			if err := d.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
-				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
-				errCh <- err
-			}
-		}(sidecar)
-	}
-	defer sidecarsWG.Wait() // wait for all sidecars to exit
-	defer sidecarCancel()   // cancel the sidecars context when the task is done
-
 	// Start the container
 	log.Debug().Msgf("Starting container %s", containerID)
 	startCmd := exec.CommandContext(ctx, "podman", "start", containerID)
@@ -347,6 +310,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	}
 
 	// read logs
+	errCh := make(chan error, 1)
 	done := make(chan struct{})
 	go func() {
 		logsCmd := exec.CommandContext(ctx, "podman", "logs", "--follow", containerID)

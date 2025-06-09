@@ -148,11 +148,11 @@ func TestProgress(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 500)
-	containerID, ok := rt.tasks.Get(tk.ID)
+	tc, ok := rt.tasks.Get(tk.ID)
 	assert.True(t, ok)
-	assert.NotEmpty(t, containerID)
+	assert.NotEmpty(t, tc)
 
-	p, err := rt.readProgress(ctx, containerID)
+	p, err := tc.readProgress(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), p)
 }
@@ -728,11 +728,15 @@ func TestRunTaskWithHTTPServerSidecar(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Name:  "Some task",
 		Image: "curlimages/curl:latest",
-		Run:   "curl --retry 3 --retry-max-time 5 http://myserver:9000/ > $TORK_OUTPUT",
+		Run:   "curl --retry 3 --retry-max-time 5 http://myserver:9090/ > $TORK_OUTPUT",
 		Sidecars: []*tork.Task{{
 			Name:  "myserver",
 			Image: "python:3.11-alpine",
 			Run:   "python server.py",
+			Probe: &tork.Probe{
+				Path: "/",
+				Port: 9090,
+			},
 			Files: map[string]string{
 				"server.py": `
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -740,7 +744,7 @@ class Handler(BaseHTTPRequestHandler):
 	def do_GET(self):
 	  self.send_response(200); self.send_header('Content-type', 'text/plain'); self.end_headers()
 	  self.wfile.write(f'Hello from sidecar'.encode())
-HTTPServer(('0.0.0.0', 9000), Handler).serve_forever()`,
+HTTPServer(('0.0.0.0', 9090), Handler).serve_forever()`,
 			},
 		}},
 	}

@@ -18,7 +18,7 @@ type Task struct {
 	Queue       string            `json:"queue,omitempty" yaml:"queue,omitempty" validate:"queue"`
 	Pre         []AuxTask         `json:"pre,omitempty" yaml:"pre,omitempty" validate:"dive"`
 	Post        []AuxTask         `json:"post,omitempty" yaml:"post,omitempty" validate:"dive"`
-	Sidecars    []AuxTask         `json:"sidecars,omitempty" yaml:"sidecars,omitempty" validate:"dive"`
+	Sidecars    []SidecarTask     `json:"sidecars,omitempty" yaml:"sidecars,omitempty" validate:"dive"`
 	Mounts      []Mount           `json:"mounts,omitempty" yaml:"mounts,omitempty" validate:"dive"`
 	Networks    []string          `json:"networks,omitempty" yaml:"networks,omitempty"`
 	Retry       *Retry            `json:"retry,omitempty" yaml:"retry,omitempty"`
@@ -92,6 +92,26 @@ type AuxTask struct {
 	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
+type SidecarTask struct {
+	Name        string            `json:"name,omitempty" yaml:"name,omitempty" validate:"required"`
+	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
+	CMD         []string          `json:"cmd,omitempty" yaml:"cmd,omitempty"`
+	Entrypoint  []string          `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
+	Run         string            `json:"run,omitempty" yaml:"run,omitempty"`
+	Image       string            `json:"image,omitempty" yaml:"image,omitempty"`
+	Registry    *Registry         `json:"registry,omitempty" yaml:"registry,omitempty"`
+	Env         map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	Files       map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
+	Timeout     string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Probe       *Probe            `json:"probe,omitempty" yaml:"probe,omitempty"`
+}
+
+type Probe struct {
+	Path    string `json:"path,omitempty" yaml:"path,omitempty" validate:"required,max=256"`
+	Port    int    `json:"port,omitempty" yaml:"port,omitempty" validate:"required,min=1,max=65535"`
+	Timeout string `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
+}
+
 func (m Mount) toMount() tork.Mount {
 	return tork.Mount{
 		Type:   m.Type,
@@ -122,10 +142,41 @@ func (i AuxTask) toTask() *tork.Task {
 	}
 }
 
+func (i SidecarTask) toTask() *tork.Task {
+	var registry *tork.Registry
+	if i.Registry != nil {
+		registry = &tork.Registry{
+			Username: i.Registry.Username,
+			Password: i.Registry.Password,
+		}
+	}
+	var probe *tork.Probe
+	if i.Probe != nil {
+		probe = &tork.Probe{
+			Path:    i.Probe.Path,
+			Port:    i.Probe.Port,
+			Timeout: i.Probe.Timeout,
+		}
+	}
+	return &tork.Task{
+		Name:        i.Name,
+		Description: i.Description,
+		CMD:         i.CMD,
+		Entrypoint:  i.Entrypoint,
+		Run:         i.Run,
+		Image:       i.Image,
+		Env:         i.Env,
+		Timeout:     i.Timeout,
+		Files:       i.Files,
+		Registry:    registry,
+		Probe:       probe,
+	}
+}
+
 func (i Task) toTask() *tork.Task {
 	pre := toAuxTasks(i.Pre)
 	post := toAuxTasks(i.Post)
-	sidecars := toAuxTasks(i.Sidecars)
+	sidecars := toSidecarTasks(i.Sidecars)
 	var retry *tork.TaskRetry
 	if i.Retry != nil {
 		retry = i.Retry.toTaskRetry()
@@ -225,6 +276,13 @@ func toAuxTasks(tis []AuxTask) []*tork.Task {
 	return result
 }
 
+func toSidecarTasks(tis []SidecarTask) []*tork.Task {
+	result := make([]*tork.Task, len(tis))
+	for i, ti := range tis {
+		result[i] = ti.toTask()
+	}
+	return result
+}
 func toTasks(tis []Task) []*tork.Task {
 	result := make([]*tork.Task, len(tis))
 	for i, ti := range tis {

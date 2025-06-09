@@ -205,26 +205,3 @@ func TestRunTaskWithPrePost(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello pre\n", t1.Result)
 }
-
-func TestRunTaskWithSidecar(t *testing.T) {
-	rt := NewShellRuntime(Config{
-		UID: DEFAULT_UID,
-		GID: DEFAULT_GID,
-		Rexec: func(args ...string) *exec.Cmd {
-			cmd := exec.Command(args[5], args[6:]...)
-			return cmd
-		},
-	})
-
-	t1 := &tork.Task{
-		ID:  uuid.NewUUID(),
-		Run: "sleep 1.5; cat /tmp/sidecar > $REEXEC_TORK_OUTPUT",
-		Sidecars: []*tork.Task{{
-			Run: "echo hello sidecar > /tmp/sidecar",
-		}},
-	}
-
-	err := rt.Run(context.Background(), t1)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello sidecar\n", t1.Result)
-}

@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"fmt"
@@ -101,6 +100,9 @@ func (r *ShellRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}
 	if len(t.CMD) > 0 {
 		return errors.New("cmd is not supported on shell runtime")
+	}
+	if len(t.Sidecars) > 0 {
+		return errors.New("sidecars are not supported on shell runtime")
 	}
 	var logger io.Writer
 	if r.broker != nil {
@@ -226,28 +228,8 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		}
 	}(pctx)
 
-	errCh := make(chan error, len(t.Sidecars)+1) // +1 for the main task
+	errCh := make(chan error, 1)
 	doneCh := make(chan any)
-
-	// create a context for the sidecars
-	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
-	// execute the sidecars
-	var sidecarsWG sync.WaitGroup
-	for _, sidecar := range t.Sidecars {
-		sidecar.ID = uuid.NewUUID()
-		sidecar.Mounts = t.Mounts
-		sidecar.Limits = t.Limits
-		sidecarsWG.Add(1)
-		go func(st *tork.Task) {
-			defer sidecarsWG.Done()
-			if err := r.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
-				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
-				errCh <- err
-			}
-		}(sidecar)
-	}
-	defer sidecarsWG.Wait() // wait for all sidecars to exit
-	defer sidecarCancel()   // cancel the sidecars context when the task is done
 
 	go func() {
 		if err := cmd.Wait(); err != nil {

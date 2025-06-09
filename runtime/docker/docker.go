@@ -1,8 +1,6 @@
 package docker
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -10,22 +8,14 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"strconv"
-	"strings"
-	"sync"
 	"time"
 
-	cliopts "github.com/docker/cli/opts"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-units"
-	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -47,7 +37,7 @@ const (
 
 type DockerRuntime struct {
 	client     *client.Client
-	tasks      *syncx.Map[string, string]
+	tasks      *syncx.Map[string, *tcontainer]
 	images     map[string]time.Time
 	pullq      chan *pullRequest
 	mounter    runtime.Mounter
@@ -113,7 +103,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	rt := &DockerRuntime{
 		client: dc,
-		tasks:  new(syncx.Map[string, string]),
+		tasks:  new(syncx.Map[string, *tcontainer]),
 		images: make(map[string]time.Time),
 		pullq:  make(chan *pullRequest, 1),
 	}
@@ -135,35 +125,37 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	return rt, nil
 }
 
-func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
-	// create a shared network for the task and its sidecars
-	networkCreateResp, err := d.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
-		CheckDuplicate: true,
-		Driver:         "bridge",
-	})
-	if err != nil {
-		return errors.Wrapf(err, "error creating network")
-	}
-	log.Debug().Msgf("Created network with ID %s", networkCreateResp.ID)
-	defer func() {
-		// remove the network when the task is done
-		log.Debug().Msgf("Removing network with ID %s", networkCreateResp.ID)
-		if err := d.client.NetworkRemove(context.Background(), networkCreateResp.ID); err != nil {
-			log.Error().Err(err).Msgf("error removing network")
+func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
+	if len(t.Sidecars) > 0 {
+		// create a shared network for the task and its sidecars
+		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
+			CheckDuplicate: true,
+			Driver:         "bridge",
+		})
+		if err != nil {
+			return errors.Wrapf(err, "error creating network")
 		}
-	}()
-	t.Networks = append(t.Networks, networkCreateResp.ID)
+		log.Debug().Msgf("Created network with ID %s", networkCreateResp.ID)
+		defer func() {
+			// remove the network when the task is done
+			log.Debug().Msgf("Removing network with ID %s", networkCreateResp.ID)
+			if err := rt.client.NetworkRemove(context.Background(), networkCreateResp.ID); err != nil {
+				log.Error().Err(err).Msgf("error removing network")
+			}
+		}()
+		t.Networks = append(t.Networks, networkCreateResp.ID)
+	}
 
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()
-		err := d.mounter.Mount(ctx, &mnt)
+		err := rt.mounter.Mount(ctx, &mnt)
 		if err != nil {
 			return err
 		}
 		defer func(m tork.Mount) {
 			log.Debug().Msgf("Unmounting %s: %s", m.Type, m.Target)
-			if err := d.mounter.Unmount(context.Background(), &m); err != nil {
+			if err := rt.mounter.Unmount(context.Background(), &m); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error deleting mount: %s", m)
@@ -172,9 +164,9 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		t.Mounts[i] = mnt
 	}
 	var logger io.Writer
-	if d.broker != nil {
+	if rt.broker != nil {
 		logger = io.MultiWriter(
-			broker.NewLogShipper(d.broker, t.ID),
+			broker.NewLogShipper(rt.broker, t.ID),
 			logging.NewZerologWriter(t.ID, zerolog.DebugLevel),
 		)
 	} else {
@@ -186,12 +178,12 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		pre.Mounts = t.Mounts
 		pre.Networks = t.Networks
 		pre.Limits = t.Limits
-		if err := d.doRun(ctx, pre, logger); err != nil {
+		if err := rt.doRun(ctx, pre, logger); err != nil {
 			return err
 		}
 	}
 	// run the actual task
-	if err := d.doRun(ctx, t, logger); err != nil {
+	if err := rt.doRun(ctx, t, logger); err != nil {
 		return err
 	}
 	// execute post tasks
@@ -200,458 +192,70 @@ func (d *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		post.Mounts = t.Mounts
 		post.Networks = t.Networks
 		post.Limits = t.Limits
-		if err := d.doRun(ctx, post, logger); err != nil {
+		if err := rt.doRun(ctx, post, logger); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (d *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer) error {
-	if t.ID == "" {
-		return errors.New("task id is required")
-	}
-	if err := d.imagePull(ctx, t, logger); err != nil {
-		return errors.Wrapf(err, "error pulling image: %s", t.Image)
-	}
-	env := []string{}
-	for name, value := range t.Env {
-		env = append(env, fmt.Sprintf("%s=%s", name, value))
-	}
-	env = append(env, "TORK_OUTPUT=/tork/stdout")
-	env = append(env, "TORK_PROGRESS=/tork/progress")
-
-	var mounts []mount.Mount
-
-	for _, m := range t.Mounts {
-		var mt mount.Type
-		switch m.Type {
-		case tork.MountTypeVolume:
-			mt = mount.TypeVolume
-			if m.Target == "" {
-				return errors.Errorf("volume target is required")
-			}
-		case tork.MountTypeBind:
-			mt = mount.TypeBind
-			if m.Target == "" {
-				return errors.Errorf("bind target is required")
-			}
-			if m.Source == "" {
-				return errors.Errorf("bind source is required")
-			}
-		case tork.MountTypeTmpfs:
-			mt = mount.TypeTmpfs
-		default:
-			return errors.Errorf("unknown mount type: %s", m.Type)
-		}
-		mount := mount.Mount{
-			Type:   mt,
-			Source: m.Source,
-			Target: m.Target,
-		}
-		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
-		mounts = append(mounts, mount)
+func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer) error {
+	// create a container for the main task
+	tc, err := createTaskContainer(ctx, rt, t, logger)
+	if err != nil {
+		return errors.Wrapf(err, "error creating task container")
 	}
 
-	torkdir := &tork.Mount{
-		ID:     uuid.NewUUID(),
-		Type:   tork.MountTypeVolume,
-		Target: "/tork",
-	}
-	if err := d.mounter.Mount(ctx, torkdir); err != nil {
-		return err
-	}
+	// keep track of the task container
+	rt.tasks.Set(t.ID, tc)
+
+	// remove the container when the task is done
 	defer func() {
-		if err := d.mounter.Unmount(context.Background(), torkdir); err != nil {
-			log.Error().Err(err).Msgf("error unmounting workdir")
+		if err := tc.Remove(context.Background()); err != nil {
+			log.Error().Err(err).Msgf("error removing container %s", tc.id)
 		}
-	}()
-	mounts = append(mounts, mount.Mount{
-		Type:   mount.TypeVolume,
-		Source: torkdir.Source,
-		Target: torkdir.Target,
-	})
-
-	// parse task limits
-	cpus, err := parseCPUs(t.Limits)
-	if err != nil {
-		return errors.Wrapf(err, "invalid CPUs value")
-	}
-	mem, err := parseMemory(t.Limits)
-	if err != nil {
-		return errors.Wrapf(err, "invalid memory value")
-	}
-
-	resources := container.Resources{
-		NanoCPUs: cpus,
-		Memory:   mem,
-	}
-
-	if t.GPUs != "" {
-		gpuOpts := cliopts.GpuOpts{}
-		if err := gpuOpts.Set(t.GPUs); err != nil {
-			return errors.Wrapf(err, "error setting GPUs")
-		}
-		resources.DeviceRequests = gpuOpts.Value()
-	}
-
-	hc := container.HostConfig{
-		PublishAllPorts: false,
-		Mounts:          mounts,
-		Resources:       resources,
-		Privileged:      d.privileged,
-	}
-
-	cmd := t.CMD
-	if len(cmd) == 0 {
-		cmd = []string{"/tork/entrypoint"}
-	}
-	entrypoint := t.Entrypoint
-	if len(entrypoint) == 0 && t.Run != "" {
-		entrypoint = []string{"sh", "-c"}
-	}
-	containerConf := container.Config{
-		Image:      t.Image,
-		Env:        env,
-		Cmd:        cmd,
-		Entrypoint: entrypoint,
-	}
-	// we want to override the default
-	// image WORKDIR only if the task
-	// introduces work files _or_ if the
-	// user specifies a WORKDIR
-	if t.Workdir != "" {
-		containerConf.WorkingDir = t.Workdir
-	} else if len(t.Files) > 0 {
-		t.Workdir = defaultWorkdir
-		containerConf.WorkingDir = t.Workdir
-	}
-
-	nc := network.NetworkingConfig{
-		EndpointsConfig: make(map[string]*network.EndpointSettings),
-	}
-
-	for _, nw := range t.Networks {
-		endpoint := &network.EndpointSettings{
-			NetworkID: nw,
-			Aliases:   []string{slug.Make(t.Name)},
-		}
-		nc.EndpointsConfig[nw] = endpoint
-	}
-
-	// we want to create the container using a background context
-	// in case the task is being cancelled while the container is
-	// being created. This could lead to a situation where the
-	// container is created in a "zombie" state leading to a situation
-	// where the attached volumes can't be removed and cleaned up.
-	createCtx, createCancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer createCancel()
-	resp, err := d.client.ContainerCreate(
-		createCtx, &containerConf, &hc, &nc, nil, "")
-	if err != nil {
-		log.Error().Msgf(
-			"Error creating container using image %s: %v\n",
-			t.Image, err,
-		)
-		return err
-	}
-
-	// create a mapping between task id and container id
-	d.tasks.Set(t.ID, resp.ID)
-
-	log.Debug().Msgf("created container %s", resp.ID)
-
-	// remove the container
-	defer func() {
-		if err := d.stop(context.Background(), t); err != nil {
-			log.Error().
-				Err(err).
-				Str("container-id", resp.ID).
-				Msg("error removing container upon completion")
-		}
+		rt.tasks.Delete(t.ID)
 	}()
 
-	// initialize the tork and, optionally, the work directory
-	if err := d.initTorkdir(ctx, resp.ID, t); err != nil {
-		return errors.Wrapf(err, "error initializing torkdir")
-	}
-	if err := d.initWorkDir(ctx, resp.ID, t); err != nil {
-		return errors.Wrapf(err, "error initializing workdir")
-	}
-
-	// create a context for the sidecars
-	sidecarCtx, sidecarCancel := context.WithCancel(ctx)
-	// execute the sidecars
-	var sidecarsWG sync.WaitGroup
-	var sidecarErrCh = make(chan error, len(t.Sidecars))
+	// start the sidecar containers
 	for _, sidecar := range t.Sidecars {
 		sidecar.ID = uuid.NewUUID()
 		sidecar.Mounts = t.Mounts
 		sidecar.Networks = t.Networks
 		sidecar.Limits = t.Limits
-		sidecarsWG.Add(1)
-		go func(st *tork.Task) {
-			defer sidecarsWG.Done()
-			if err := d.doRun(sidecarCtx, st, logger); err != nil && !errors.Is(err, context.Canceled) {
-				log.Error().Err(err).Msgf("error running sidecar %s", st.ID)
-				sidecarErrCh <- err
+		sctc, err := createTaskContainer(ctx, rt, sidecar, logger)
+		if err != nil {
+			return errors.Wrapf(err, "error creating sidecar container")
+		}
+		// remove the sidecar container when the main task is done
+		defer func() {
+			if err := sctc.Remove(context.Background()); err != nil {
+				log.Error().Err(err).Msgf("error removing sidecar container %s", sctc.id)
 			}
-		}(sidecar)
+		}()
+		if err := sctc.Start(ctx); err != nil {
+			return errors.Wrapf(err, "error starting sidecar container")
+		}
 	}
-	defer sidecarsWG.Wait() // wait for all sidecars to exit
-	defer sidecarCancel()   // cancel the sidecars context when the task is done
 
-	// start the container
-	log.Debug().Msgf("Starting container %s", resp.ID)
-	err = d.client.ContainerStart(
-		ctx, resp.ID, container.StartOptions{})
+	// start the main task container
+	if err := tc.Start(ctx); err != nil {
+		return errors.Wrapf(err, "error starting task container")
+	}
+
+	// wait for the task container to finish
+	result, err := tc.Wait(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "error starting container %s: %v\n", resp.ID, err)
+		return errors.Wrapf(err, "error waiting for task container to finish")
 	}
 
-	// report task progress
-	pctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go d.reportProgress(pctx, resp.ID, t)
-
-	// read the container's stdout
-	out, err := d.client.ContainerLogs(
-		ctx,
-		resp.ID,
-		container.LogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-			Follow:     true,
-		},
-	)
-	if err != nil {
-		return errors.Wrapf(err, "error getting logs for container %s: %v\n", resp.ID, err)
-	}
-	// close the stdout reader
-	defer func() {
-		if err := out.Close(); err != nil {
-			log.Error().Err(err).Msgf("error closing stdout on container %s", resp.ID)
-		}
-	}()
-	// copy the container's stdout to the logger
-	go func() {
-		_, err = io.Copy(logger, dockerLogsReader{reader: out})
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msgf("error reading the std out")
-		}
-	}()
-
-	// wait for the task to finish execution
-	statusCh, errCh := d.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh: // error waiting for the container to finish
-		if err != nil {
-			return err
-		}
-	case sidecarErr := <-sidecarErrCh: // sidecar error
-		return sidecarErr
-	case status := <-statusCh:
-		if status.StatusCode != 0 { // error
-			out, err := d.client.ContainerLogs(
-				ctx,
-				resp.ID,
-				container.LogsOptions{
-					ShowStdout: true,
-					ShowStderr: true,
-					Tail:       "10",
-				},
-			)
-			if err != nil {
-				log.Error().Err(err).Msg("error tailing the log")
-				return errors.Errorf("exit code %d", status.StatusCode)
-			}
-			buf, err := io.ReadAll(dockerLogsReader{reader: out})
-			if err != nil {
-				log.Error().Err(err).Msg("error copying the output")
-			}
-			return errors.Errorf("exit code %d: %s", status.StatusCode, string(buf))
-		} else {
-			stdout, err := d.readOutput(ctx, resp.ID)
-			if err != nil {
-				return err
-			}
-			t.Result = stdout
-		}
-		log.Debug().
-			Int64("status-code", status.StatusCode).
-			Str("task-id", t.ID).
-			Msg("task completed")
-	}
-	return nil
-}
-
-func (d *DockerRuntime) reportProgress(ctx context.Context, containerID string, t *tork.Task) {
-	for {
-		progress, err := d.readProgress(ctx, containerID)
-		if err != nil {
-			var notFoundError errdefs.ErrNotFound
-			if errors.As(err, &notFoundError) {
-				return // progress file not found
-			}
-			if errors.Is(err, context.Canceled) {
-				return
-			}
-			log.Warn().Err(err).Msgf("error reading progress value")
-		} else {
-			if progress != t.Progress {
-				t.Progress = progress
-				if err := d.broker.PublishTaskProgress(ctx, t); err != nil {
-					log.Warn().Err(err).Msgf("error publishing task progress")
-				}
-			}
-		}
-		select {
-		case <-time.After(time.Second * 10):
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (d *DockerRuntime) readOutput(ctx context.Context, containerID string) (string, error) {
-	r, _, err := d.client.CopyFromContainer(ctx, containerID, "/tork/stdout")
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		err := r.Close()
-		if err != nil {
-			log.Error().Err(err).Msgf("error closing /tork/stdout reader")
-		}
-	}()
-	tr := tar.NewReader(r)
-	var buf bytes.Buffer
-	for {
-		_, err := tr.Next()
-		if err == io.EOF {
-			break // End of archive
-		}
-		if err != nil {
-			return "", err
-		}
-
-		if _, err := io.Copy(&buf, tr); err != nil {
-			return "", err
-		}
-	}
-	return buf.String(), nil
-}
-
-func (d *DockerRuntime) readProgress(ctx context.Context, containerID string) (float64, error) {
-	r, _, err := d.client.CopyFromContainer(ctx, containerID, "/tork/progress")
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		err := r.Close()
-		if err != nil {
-			log.Error().Err(err).Msgf("error closing /tork/progress reader")
-		}
-	}()
-	tr := tar.NewReader(r)
-	var buf bytes.Buffer
-	for {
-		_, err := tr.Next()
-		if err == io.EOF {
-			break // End of archive
-		}
-		if err != nil {
-			return 0, err
-		}
-
-		if _, err := io.Copy(&buf, tr); err != nil {
-			return 0, err
-		}
-	}
-	s := strings.TrimSpace(buf.String())
-	if s == "" {
-		return 0, nil
-	}
-	return strconv.ParseFloat(s, 32)
-}
-
-func (d *DockerRuntime) initTorkdir(ctx context.Context, containerID string, t *tork.Task) error {
-	ar, err := NewTempArchive()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err := ar.Remove(); err != nil {
-			log.Error().Err(err).Msgf("error removing temp archive: %s", ar.Name())
-		}
-	}()
-
-	if err := ar.WriteFile("stdout", 0222, []byte{}); err != nil {
-		return err
-	}
-	if err := ar.WriteFile("progress", 0222, []byte{}); err != nil {
-		return err
-	}
-
-	if t.Run != "" {
-		if err := ar.WriteFile("entrypoint", 0555, []byte(t.Run)); err != nil {
-			return err
-		}
-	}
-
-	if err := d.client.CopyToContainer(ctx, containerID, "/tork", ar, types.CopyToContainerOptions{}); err != nil {
-		return err
-	}
+	t.Result = result
 
 	return nil
 }
 
-func (d *DockerRuntime) initWorkDir(ctx context.Context, containerID string, t *tork.Task) (err error) {
-	if len(t.Files) == 0 {
-		return
-	}
-
-	ar, err := NewTempArchive()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err := ar.Remove(); err != nil {
-			log.Error().Err(err).Msgf("error removing temp archive: %s", ar.Name())
-		}
-	}()
-
-	for filename, contents := range t.Files {
-		if err := ar.WriteFile(filename, 0444, []byte(contents)); err != nil {
-			return err
-		}
-	}
-
-	if err := d.client.CopyToContainer(ctx, containerID, t.Workdir, ar, types.CopyToContainerOptions{}); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *DockerRuntime) stop(ctx context.Context, t *tork.Task) error {
-	containerID, ok := d.tasks.Get(t.ID)
-	if !ok {
-		return nil
-	}
-	d.tasks.Delete(t.ID)
-	log.Debug().Msgf("Attempting to stop and remove container %v", containerID)
-	return d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
-		RemoveVolumes: true,
-		RemoveLinks:   false,
-		Force:         true,
-	})
-}
-
-func (d *DockerRuntime) HealthCheck(ctx context.Context) error {
-	_, err := d.client.ContainerList(ctx, container.ListOptions{})
+func (rt *DockerRuntime) HealthCheck(ctx context.Context) error {
+	_, err := rt.client.ContainerList(ctx, container.ListOptions{})
 	return err
 }
 
@@ -698,7 +302,7 @@ func (r dockerLogsReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {
+func (rt *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {
 	pr := &pullRequest{
 		ctx:    ctx,
 		image:  t.Image,
@@ -711,16 +315,16 @@ func (d *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.W
 			password: t.Registry.Password,
 		}
 	}
-	d.pullq <- pr
+	rt.pullq <- pr
 	err := <-pr.done
 	return err
 }
 
 // puller is a goroutine that serializes all requests
 // to pull images from the docker repo
-func (d *DockerRuntime) puller() {
-	for pr := range d.pullq {
-		pr.done <- d.doPullRequest(pr)
+func (rt *DockerRuntime) puller() {
+	for pr := range rt.pullq {
+		pr.done <- rt.doPullRequest(pr)
 	}
 }
 
@@ -790,23 +394,23 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 
 // pruneImages removes all expired images from the local docker
 // image store except for the one specified in the exclude argument
-func (d *DockerRuntime) pruneImages(ctx context.Context, exclude string) error {
-	for img, t := range d.images {
-		if img != exclude && time.Since(t) > d.imageTTL {
+func (rt *DockerRuntime) pruneImages(ctx context.Context, exclude string) error {
+	for img, t := range rt.images {
+		if img != exclude && time.Since(t) > rt.imageTTL {
 			// remove the image if it's last use was more than
 			// the imageTTL duration ago and is not currently in use
-			if _, err := d.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
+			if _, err := rt.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
 				return err
 			}
 			log.Debug().Msgf("pruned image %s", img)
-			delete(d.images, img)
+			delete(rt.images, img)
 		}
 	}
 	return nil
 }
 
-func (d *DockerRuntime) imageExistsLocally(ctx context.Context, name string) (bool, error) {
-	images, err := d.client.ImageList(
+func (rt *DockerRuntime) imageExistsLocally(ctx context.Context, name string) (bool, error) {
+	images, err := rt.client.ImageList(
 		ctx,
 		image.ListOptions{All: true},
 	)
