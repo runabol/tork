@@ -1509,6 +1509,7 @@ func TestPostgresGetActiveScheduledJobs(t *testing.T) {
 	sj1 := &tork.ScheduledJob{
 		ID:        uuid.NewUUID(),
 		Name:      "Scheduled Job 1",
+		Cron:      "* * * * *",
 		CreatedAt: now,
 		CreatedBy: u,
 		State:     tork.ScheduledJobStateActive,
@@ -1519,6 +1520,7 @@ func TestPostgresGetActiveScheduledJobs(t *testing.T) {
 	sj2 := &tork.ScheduledJob{
 		ID:        uuid.NewUUID(),
 		Name:      "Scheduled Job 2",
+		Cron:      "* * * * *",
 		CreatedAt: now,
 		CreatedBy: u,
 		State:     tork.ScheduledJobStatePaused,

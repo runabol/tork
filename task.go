@@ -73,6 +73,7 @@ type Task struct {
 	Workdir     string            `json:"workdir,omitempty"`
 	Priority    int               `json:"priority,omitempty"`
 	Progress    float64           `json:"progress,omitempty"`
+	Probe       *Probe            `json:"probe,omitempty"`
 }
 
 type TaskSummary struct {
@@ -144,6 +145,12 @@ type Registry struct {
 	Password string `json:"password,omitempty"`
 }
 
+type Probe struct {
+	Path    string `json:"path,omitempty"`
+	Port    int    `json:"port,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+}
+
 func (t *Task) IsActive() bool {
 	return slices.Contains(TaskStateActive, t.State)
 }
@@ -172,6 +179,10 @@ func (t *Task) Clone() *Task {
 	var registry *Registry
 	if t.Registry != nil {
 		registry = t.Registry.Clone()
+	}
+	var probe *Probe
+	if t.Probe != nil {
+		probe = t.Probe.Clone()
 	}
 	return &Task{
 		ID:          t.ID,
@@ -215,6 +226,7 @@ func (t *Task) Clone() *Task {
 		Workdir:     t.Workdir,
 		Priority:    t.Priority,
 		Progress:    t.Progress,
+		Probe:       probe,
 	}
 }
 
@@ -282,6 +294,14 @@ func (r *Registry) Clone() *Registry {
 	return &Registry{
 		Username: r.Username,
 		Password: r.Password,
+	}
+}
+
+func (p *Probe) Clone() *Probe {
+	return &Probe{
+		Path:    p.Path,
+		Port:    p.Port,
+		Timeout: p.Timeout,
 	}
 }
 

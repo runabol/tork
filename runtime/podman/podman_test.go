@@ -489,33 +489,3 @@ func TestRunTaskWithPrePost(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello pre\n", t1.Result)
 }
-
-func TestRunTaskWithHTTPServerSidecar(t *testing.T) {
-	rt := NewPodmanRuntime()
-	assert.NotNil(t, rt)
-
-	t1 := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Name:  "Some task",
-		Image: "curlimages/curl:latest",
-		Run:   "curl --retry 5 --retry-max-time 5 http://myserver:9000/ > $TORK_OUTPUT",
-		Sidecars: []*tork.Task{{
-			Name:  "myserver",
-			Image: "python:3.11-alpine",
-			Run:   "python server.py",
-			Files: map[string]string{
-				"server.py": `
-from http.server import BaseHTTPRequestHandler, HTTPServer
-class Handler(BaseHTTPRequestHandler):
-	def do_GET(self):
-	  self.send_response(200); self.send_header('Content-type', 'text/plain'); self.end_headers()
-	  self.wfile.write(f'Hello from sidecar'.encode())
-HTTPServer(('0.0.0.0', 9000), Handler).serve_forever()`,
-			},
-		}},
-	}
-
-	err := rt.Run(context.Background(), t1)
-	assert.NoError(t, err)
-	assert.Equal(t, "Hello from sidecar", t1.Result)
-}

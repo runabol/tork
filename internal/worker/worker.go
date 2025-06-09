@@ -3,9 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,7 +14,6 @@ import (
 	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/middleware/task"
 
-	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/host"
 	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/runtime"
@@ -37,8 +34,6 @@ type Worker struct {
 	api        *api
 	taskCount  int32
 	middleware []task.MiddlewareFunc
-	usedPorts  map[string]struct{}
-	mu         sync.Mutex
 }
 
 type Config struct {
@@ -85,7 +80,6 @@ func NewWorker(cfg Config) (*Worker, error) {
 		api:        newAPI(cfg, tasks),
 		stop:       make(chan any),
 		middleware: cfg.Middleware,
-		usedPorts:  make(map[string]struct{}),
 	}
 	return w, nil
 }
@@ -291,40 +285,4 @@ func (w *Worker) Stop() error {
 		return errors.Wrapf(err, "error shutting down worker %s", w.id)
 	}
 	return nil
-}
-
-func (w *Worker) reservePort() (string, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return "", err
-	}
-	defer fns.CloseIgnore(listener)
-
-	maxAttempts := 10
-
-	var port int
-	var attempt int
-	for ; attempt < maxAttempts; attempt++ {
-		port = listener.Addr().(*net.TCPAddr).Port
-		if _, exists := w.usedPorts[fmt.Sprintf("%d", port)]; !exists {
-			break
-		}
-	}
-
-	if attempt >= maxAttempts {
-		return "", errors.New("could not find an available port to reserve")
-	}
-
-	w.usedPorts[fmt.Sprintf("%d", port)] = struct{}{}
-
-	return fmt.Sprintf("%d", port), nil
-}
-
-func (w *Worker) releasePort(port string) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	delete(w.usedPorts, port)
 }
