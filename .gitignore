@@ -29,3 +29,4 @@ config.local.toml
 
 # Binaries
 tork
+tmp/
