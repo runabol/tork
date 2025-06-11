@@ -91,15 +91,15 @@ services:
       migration:
         condition: service_completed_successfully
       
-  # web:
-  #   image: runabol/tork-web
-  #   platform: linux/amd64
-  #   restart: always
-  #   ports:
-  #     - 3000:3000
-  #   extra_hosts:
-  #     - "host.docker.internal:host-gateway"
-  #   environment:
-  #     BACKEND_URL: "http://host.docker.internal:8000"
-  #   networks:
-  #     - tork_network
+  web:
+    image: runabol/tork-web
+    platform: linux/amd64
+    restart: always
+    ports:
+      - 8100:8100
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BACKEND_URL: "http://host.docker.internal:8000"
+    networks:
+      - tork_network
