@@ -1,0 +1,48 @@
+{
+  "name": "tork",
+  "build": {
+    "context": ".",
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/tork",
+  "containerEnv": {
+    "DISPLAY": "host.docker.internal:0.0",
+    "LIBGL_ALWAYS_INDIRECT": "0"
+  },
+  "forwardPorts": [8080],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        },
+        "workbench.iconTheme": "vscode-icons",
+        "editor.tabSize": 2,
+        "editor.formatOnSave": true,
+        "files.insertFinalNewline": true,
+        "editor.defaultFormatter": "golang.Go",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "telemetry.telemetryLevel": "off",
+        "editor.bracketPairColorization.enabled": true,
+        "editor.guides.bracketPairs": "active"
+      },
+      "extensions": [
+        "golang.Go",
+        "redhat.vscode-yaml",
+        "vscode-icons-team.vscode-icons",
+        "eamodio.gitlens",
+        "aaron-bond.better-comments",
+        "oderwat.indent-rainbow",
+        "evondev.indent-rainbow-palettes",
+        "IronGeek.vscode-env",
+        "github.vscode-github-actions",
+        "Gruntfuggly.todo-tree",
+        "ms-vscode.makefile-tools",
+        "docker.docker"
+      ]
+    }
+  }
+}
