@@ -11,7 +11,7 @@ This devcontainer provides a quick and easy setup for anyone using VSCode to get
 Once you have this repo cloned to your local system, you will need to install the VSCode extension [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack).
 
 Then run the following command from the command palette:
-`Dev Containers: Open Folder in Container...` and select your Kestra root folder.
+`Dev Containers: Open Folder in Container...` and select your Tork root folder.
 
 This will then put you inside a docker container ready for development.
 
