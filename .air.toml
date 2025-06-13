@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = ["run", "standalone"]
-  bin = "./tork"
+  bin = "./tmp/tork"
   cmd = "make"
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]

@@ -12,7 +12,7 @@ format = "pretty" # pretty | json
 type = "inmemory" # inmemory | rabbitmq
 
 [broker.rabbitmq]
-url = "amqp://guest:guest@localhost:5672/"
+url = "amqp://guest:guest@localhost:5672/" # or "amqp://guest:guest@host.docker.internal:5672/" if using devcontainers
 consumer.timeout = "30m"
 management.url = ""                        # default: http://{rabbit_host}:15672/
 durable.queues = false
@@ -28,7 +28,7 @@ jobs.duration = "8760h" # 1 year
 dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 
 [coordinator]
-address = "localhost:8000"
+address = "localhost:8000" # or "host.docker.internal:8000" if using devcontainers
 name = "Coordinator"
 
 [coordinator.api]
