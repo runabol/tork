@@ -1,6 +1,6 @@
 # Makefile for building Tork
 GITCOMMIT:=$(shell git describe --dirty --always)
-BINARY:=tork
+BINARY:=./tmp/tork
 SYSTEM:=
 CHECKS:=check
 BUILDOPTS:=-v

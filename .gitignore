@@ -28,6 +28,5 @@ go.work
 config.local.toml
 
 # Binaries
-tork
 tmp/
 config.toml
