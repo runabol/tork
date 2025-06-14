@@ -41,35 +41,20 @@ type natsTopic struct {
 	mu   sync.RWMutex
 }
 
-// Config holds NATS broker configuration.
-type NATSConfig struct {
-	// NATSURL is the NATS server URL (e.g., "nats://localhost:4222").
-	// If empty and Embedded is false, defaults to nats.DefaultURL.
-	NATSURL string
-	// Embedded indicates whether to run an embedded NATS server.
-	Embedded bool
-	// DataDir is the directory for embedded server persistence (optional).
-	DataDir string
-}
-
-// NewNATSBroker creates a new NATS-based broker.
-func NewNATSBroker(cfg NATSConfig) (*NATSBroker, error) {
+func NewNATSBroker(url string) (*NATSBroker, error) {
 	b := &NATSBroker{
 		queues:    new(syncx.Map[string, *natsQueue]),
 		topics:    new(syncx.Map[string, *natsTopic]),
 		terminate: new(atomic.Bool),
 	}
 
-	// Start embedded NATS server if configured
-	if cfg.Embedded {
+	// Start embedded NATS server if no URL is provided
+	if url == "" {
 		opts := &server.Options{
 			Host:   "localhost",
 			Port:   4222,
 			NoLog:  false,
 			NoSigs: true,
-		}
-		if cfg.DataDir != "" {
-			opts.StoreDir = cfg.DataDir
 		}
 		srv, err := server.NewServer(opts)
 		if err != nil {
@@ -81,15 +66,11 @@ func NewNATSBroker(cfg NATSConfig) (*NATSBroker, error) {
 			return nil, errors.New("embedded NATS server failed to start")
 		}
 		b.server = srv
-		cfg.NATSURL = srv.Addr().String()
+		url = srv.Addr().String()
 	}
 
 	// Connect to NATS server
-	natsURL := cfg.NATSURL
-	if natsURL == "" {
-		natsURL = nats.DefaultURL
-	}
-	conn, err := nats.Connect(natsURL, nats.Timeout(10*time.Second))
+	conn, err := nats.Connect(url, nats.Timeout(10*time.Second))
 	if err != nil {
 		if b.server != nil {
 			b.server.Shutdown()
@@ -101,7 +82,6 @@ func NewNATSBroker(cfg NATSConfig) (*NATSBroker, error) {
 	return b, nil
 }
 
-// PublishTask publishes a task to a NATS queue.
 func (b *NATSBroker) PublishTask(ctx context.Context, qname string, t *tork.Task) error {
 	log.Debug().Msgf("publish task %s to %s queue", t.ID, qname)
 	data, err := json.Marshal(t)
@@ -111,7 +91,6 @@ func (b *NATSBroker) PublishTask(ctx context.Context, qname string, t *tork.Task
 	return b.conn.Publish(qname, data)
 }
 
-// SubscribeForTasks subscribes to a NATS queue for tasks.
 func (b *NATSBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
 	return b.subscribe(qname, func(m any) error {
 		data, ok := m.(*nats.Msg)
@@ -126,7 +105,6 @@ func (b *NATSBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) 
 	})
 }
 
-// subscribe creates a NATS queue subscription.
 func (b *NATSBroker) subscribe(qname string, handler func(m any) error) error {
 	log.Debug().Msgf("subscribing for tasks on %s", qname)
 	q, ok := b.queues.Get(qname)
@@ -135,7 +113,6 @@ func (b *NATSBroker) subscribe(qname string, handler func(m any) error) error {
 		b.queues.Set(qname, q)
 	}
 
-	// Create queue subscription
 	sub, err := b.conn.QueueSubscribe(qname, qname, func(msg *nats.Msg) {
 		atomic.AddInt32(&q.unacked, 1)
 		if err := handler(msg); err != nil {
@@ -147,7 +124,6 @@ func (b *NATSBroker) subscribe(qname string, handler func(m any) error) error {
 		return errors.Wrap(err, "failed to subscribe to queue")
 	}
 
-	// Store subscription
 	q.mu.Lock()
 	q.subs = append(q.subs, sub)
 	q.mu.Unlock()
@@ -156,7 +132,6 @@ func (b *NATSBroker) subscribe(qname string, handler func(m any) error) error {
 	return nil
 }
 
-// Queues returns information about active queues.
 func (b *NATSBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	qi := make([]QueueInfo, 0)
 	b.queues.Iterate(func(_ string, q *natsQueue) {
@@ -170,7 +145,6 @@ func (b *NATSBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qi, nil
 }
 
-// PublishHeartbeat publishes a node heartbeat.
 func (b *NATSBroker) PublishHeartbeat(_ context.Context, n *tork.Node) error {
 	data, err := json.Marshal(n)
 	if err != nil {
@@ -194,7 +168,6 @@ func (b *NATSBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) er
 	})
 }
 
-// PublishJob publishes a job.
 func (b *NATSBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	data, err := json.Marshal(j)
 	if err != nil {
@@ -203,7 +176,6 @@ func (b *NATSBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 	return b.conn.Publish(QUEUE_JOBS, data)
 }
 
-// SubscribeForJobs subscribes to jobs.
 func (b *NATSBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
 	return b.subscribe(QUEUE_JOBS, func(m any) error {
 		msg, ok := m.(*nats.Msg)
@@ -218,7 +190,6 @@ func (b *NATSBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
 	})
 }
 
-// Shutdown gracefully shuts down the broker.
 func (b *NATSBroker) Shutdown(ctx context.Context) error {
 	if !b.terminate.CompareAndSwap(false, true) {
 		return nil
@@ -255,7 +226,6 @@ func (b *NATSBroker) Shutdown(ctx context.Context) error {
 	}
 }
 
-// SubscribeForEvents subscribes to a NATS subject for events.
 func (b *NATSBroker) SubscribeForEvents(ctx context.Context, topic string, handler func(event any)) error {
 	log.Debug().Msgf("subscribing for events on %s", topic)
 	t, ok := b.topics.Get(topic)
@@ -286,7 +256,6 @@ func (b *NATSBroker) SubscribeForEvents(ctx context.Context, topic string, handl
 	return nil
 }
 
-// PublishEvent publishes an event to matching NATS subjects.
 func (b *NATSBroker) PublishEvent(ctx context.Context, topicName string, event any) error {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -302,7 +271,6 @@ func (b *NATSBroker) PublishEvent(ctx context.Context, topicName string, event a
 	return nil
 }
 
-// HealthCheck checks the broker's health.
 func (b *NATSBroker) HealthCheck(ctx context.Context) error {
 	if b.terminate.Load() {
 		return errors.New("broker is terminated")
@@ -313,7 +281,6 @@ func (b *NATSBroker) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// PublishTaskLogPart publishes a task log part.
 func (b *NATSBroker) PublishTaskLogPart(ctx context.Context, p *tork.TaskLogPart) error {
 	data, err := json.Marshal(p)
 	if err != nil {
@@ -322,7 +289,6 @@ func (b *NATSBroker) PublishTaskLogPart(ctx context.Context, p *tork.TaskLogPart
 	return b.conn.Publish(QUEUE_LOGS, data)
 }
 
-// SubscribeForTaskLogPart subscribes to task log parts.
 func (b *NATSBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart)) error {
 	return b.subscribe(QUEUE_LOGS, func(m any) error {
 		msg, ok := m.(*nats.Msg)
@@ -338,7 +304,6 @@ func (b *NATSBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart)) 
 	})
 }
 
-// PublishTaskProgress publishes task progress.
 func (b *NATSBroker) PublishTaskProgress(ctx context.Context, tp *tork.Task) error {
 	data, err := json.Marshal(tp)
 	if err != nil {
@@ -347,7 +312,6 @@ func (b *NATSBroker) PublishTaskProgress(ctx context.Context, tp *tork.Task) err
 	return b.conn.Publish(QUEUE_PROGRESS, data)
 }
 
-// SubscribeForTaskProgress subscribes to task progress.
 func (b *NATSBroker) SubscribeForTaskProgress(handler func(tp *tork.Task) error) error {
 	return b.subscribe(QUEUE_PROGRESS, func(m any) error {
 		msg, ok := m.(*nats.Msg)

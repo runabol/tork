@@ -156,13 +156,7 @@ func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 		return rb, nil
 	case broker.BROKER_NATS:
 		natsURL := conf.StringDefault("broker.nats.url", "")
-		embedded := conf.BoolDefault("broker.nats.embedded", true)
-		dataDir := conf.StringDefault("broker.nats.data_dir", "")
-		natsBroker, err := broker.NewNATSBroker(broker.NATSConfig{
-			NATSURL:  natsURL,
-			Embedded: embedded,
-			DataDir:  dataDir,
-		})
+		natsBroker, err := broker.NewNATSBroker(natsURL)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to connect to NATS")
 		}
