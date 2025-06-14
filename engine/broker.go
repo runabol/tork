@@ -141,9 +141,9 @@ func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 		return p()
 	}
 	switch btype {
-	case "inmemory":
+	case broker.BROKER_INMEMORY:
 		return broker.NewInMemoryBroker(), nil
-	case "rabbitmq":
+	case broker.BROKER_RABBITMQ:
 		rb, err := broker.NewRabbitMQBroker(
 			conf.StringDefault("broker.rabbitmq.url", "amqp://guest:guest@localhost:5672/"),
 			broker.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitmq.consumer.timeout", broker.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
@@ -154,6 +154,13 @@ func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
 		}
 		return rb, nil
+	case broker.BROKER_NATS:
+		natsURL := conf.StringDefault("broker.nats.url", "")
+		natsBroker, err := broker.NewNATSBroker(natsURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to connect to NATS")
+		}
+		return natsBroker, nil
 	default:
 		return nil, errors.Errorf("invalid broker type: %s", btype)
 	}
