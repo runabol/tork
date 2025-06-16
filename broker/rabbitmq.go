@@ -37,7 +37,7 @@ type RabbitMQBroker struct {
 	nextConn        int
 	queues          *syncx.Map[string, string]
 	topics          *syncx.Map[string, string]
-	subscriptions   []*subscription
+	subscriptions   map[string]*subscription
 	mu              sync.RWMutex
 	url             string
 	shuttingDown    bool
@@ -48,10 +48,11 @@ type RabbitMQBroker struct {
 }
 
 type subscription struct {
-	qname string
-	ch    *amqp.Channel
-	name  string
-	done  chan int
+	qname  string
+	ch     *amqp.Channel
+	name   string
+	done   chan struct{}
+	cancel chan struct{}
 }
 
 type rabbitq struct {
@@ -111,7 +112,7 @@ func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 		topics:          new(syncx.Map[string, string]),
 		url:             url,
 		connPool:        connPool,
-		subscriptions:   make([]*subscription, 0),
+		subscriptions:   make(map[string]*subscription),
 		heartbeatTTL:    defaultHeartbeatTTL,
 		consumerTimeout: int(RABBITMQ_DEFAULT_CONSUMER_TIMEOUT.Milliseconds()),
 	}
@@ -185,7 +186,7 @@ func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.
 }
 
 func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Task) error) error {
-	return b.subscribe(exchangeDefault, keyDefault, qname, func(msg any) error {
+	return b.subscribe(context.Background(), exchangeDefault, keyDefault, qname, func(msg any) error {
 		t, ok := msg.(*tork.Task)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Task but got %T", t)
@@ -194,7 +195,7 @@ func (b *RabbitMQBroker) SubscribeForTasks(qname string, handler func(t *tork.Ta
 	})
 }
 
-func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(msg any) error) error {
+func (b *RabbitMQBroker) subscribe(ctx context.Context, exchange, key, qname string, handler func(msg any) error) error {
 	conn, err := b.getConnection()
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
@@ -223,58 +224,100 @@ func (b *RabbitMQBroker) subscribe(exchange, key, qname string, handler func(msg
 		return errors.Wrapf(err, "unable to subscribe on q: %s", qname)
 	}
 	log.Debug().Msgf("created channel %s for queue: %s", cname, qname)
+	id := uuid.NewUUID()
 	sub := &subscription{
-		ch:    ch,
-		qname: qname,
-		name:  cname,
-		done:  make(chan int),
+		ch:     ch,
+		qname:  qname,
+		name:   cname,
+		done:   make(chan struct{}),
+		cancel: make(chan struct{}),
 	}
 	b.mu.Lock()
-	b.subscriptions = append(b.subscriptions, sub)
+	b.subscriptions[id] = sub
 	b.mu.Unlock()
 	go func() {
-		for d := range msgs {
-			if msg, err := deserialize(d.Type, d.Body); err != nil {
-				log.Error().
-					Err(err).
-					Str("queue", qname).
-					Str("body", (string(d.Body))).
-					Str("type", (string(d.Type))).
-					Msg("failed to deserialized message")
-			} else {
-				if err := handler(msg); err != nil {
+		for {
+			select {
+			case <-sub.cancel:
+				log.Debug().Msgf("subscription for queue %s canceled", qname)
+				b.mu.Lock()
+				delete(b.subscriptions, id)
+				b.mu.Unlock()
+				if err := ch.Cancel(cname, false); err != nil {
+					log.Error().
+						Err(err).
+						Msgf("error closing channel for queue: %s", qname)
+				}
+				// close the channel and connection cleanly
+				log.Debug().Msgf("closing channel %s for queue: %s", cname, qname)
+				fns.CloseIgnore(ch)
+				// signal that the subscription is done
+				sub.done <- struct{}{}
+				return
+			case <-ctx.Done():
+				log.Debug().Msgf("context canceled, stopping subscription for queue: %s", qname)
+				b.mu.Lock()
+				delete(b.subscriptions, id)
+				b.mu.Unlock()
+				if err := ch.Cancel(cname, false); err != nil {
+					log.Error().
+						Err(err).
+						Msgf("error closing channel for queue: %s", qname)
+				}
+				// close the channel and connection cleanly
+				log.Debug().Msgf("closing channel %s for queue: %s", cname, qname)
+				fns.CloseIgnore(ch)
+				// signal that the subscription is done
+				sub.done <- struct{}{}
+				return
+			case d, ok := <-msgs:
+				if !ok {
+					log.Warn().Msgf("message channel closed for queue: %s", qname)
+					// if the channel is closed, we need to re-subscribe
+					maxAttempts := 20
+					for attempt := 1; !b.shuttingDown && attempt <= maxAttempts; attempt++ {
+						log.Info().Msgf("%s channel closed. reconnecting", qname)
+						if err := b.subscribe(ctx, exchange, key, qname, handler); err != nil {
+							log.Error().
+								Err(err).
+								Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
+							time.Sleep(time.Second * time.Duration(attempt))
+						} else {
+							return
+						}
+					}
+					sub.done <- struct{}{}
+					return
+				}
+				if msg, err := deserialize(d.Type, d.Body); err != nil {
 					log.Error().
 						Err(err).
 						Str("queue", qname).
 						Str("body", (string(d.Body))).
-						Msg("failed to handle message")
-					if err := d.Reject(false); err != nil {
-						log.Error().
-							Err(err).
-							Msg("failed to ack message")
-					}
+						Str("type", (string(d.Type))).
+						Msg("failed to deserialize message")
 				} else {
-					if err := d.Ack(false); err != nil {
+					if err := handler(msg); err != nil {
 						log.Error().
 							Err(err).
-							Msg("failed to ack message")
+							Str("queue", qname).
+							Str("body", (string(d.Body))).
+							Msg("failed to handle message")
+						if err := d.Reject(false); err != nil {
+							log.Error().
+								Err(err).
+								Msg("failed to reject message")
+						}
+					} else {
+						if err := d.Ack(false); err != nil {
+							log.Error().
+								Err(err).
+								Msg("failed to ack message")
+						}
 					}
 				}
 			}
 		}
-		maxAttempts := 20
-		for attempt := 1; !b.shuttingDown && attempt <= maxAttempts; attempt++ {
-			log.Info().Msgf("%s channel closed. reconnecting", qname)
-			if err := b.subscribe(exchange, key, qname, handler); err != nil {
-				log.Error().
-					Err(err).
-					Msgf("error reconnecting to %s (attempt %d/%d)", qname, attempt, maxAttempts)
-				time.Sleep(time.Second * time.Duration(attempt))
-			} else {
-				return
-			}
-		}
-		sub.done <- 1
 	}()
 	return nil
 }
@@ -403,7 +446,7 @@ func (b *RabbitMQBroker) publish(ctx context.Context, exchange, key string, msg 
 }
 
 func (b *RabbitMQBroker) SubscribeForHeartbeats(handler func(n *tork.Node) error) error {
-	return b.subscribe(exchangeDefault, keyDefault, QUEUE_HEARTBEAT, func(msg any) error {
+	return b.subscribe(context.Background(), exchangeDefault, keyDefault, QUEUE_HEARTBEAT, func(msg any) error {
 		n, ok := msg.(*tork.Node)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Node but got %T", msg)
@@ -417,7 +460,7 @@ func (b *RabbitMQBroker) PublishJob(ctx context.Context, j *tork.Job) error {
 }
 
 func (b *RabbitMQBroker) SubscribeForJobs(handler func(j *tork.Job) error) error {
-	return b.subscribe(exchangeDefault, keyDefault, QUEUE_JOBS, func(msg any) error {
+	return b.subscribe(context.Background(), exchangeDefault, keyDefault, QUEUE_JOBS, func(msg any) error {
 		j, ok := msg.(*tork.Job)
 		if !ok {
 			return errors.Errorf("expecting a *tork.Job but got %T", msg)
@@ -469,16 +512,6 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.mu.Lock()
 	b.shuttingDown = true
 	b.mu.Unlock()
-	// close channels cleanly
-	for _, sub := range b.subscriptions {
-		log.Debug().
-			Msgf("shutting down subscription on %s", sub.qname)
-		if err := sub.ch.Cancel(sub.name, false); err != nil {
-			log.Error().
-				Err(err).
-				Msgf("error closing channel for %s", sub.qname)
-		}
-	}
 	// let's give the subscribers a grace
 	// period to allow them to cleanly exit
 	for _, sub := range b.subscriptions {
@@ -486,6 +519,7 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 		if !IsCoordinatorQueue(sub.qname) {
 			continue
 		}
+		sub.cancel <- struct{}{}
 		log.Debug().
 			Msgf("waiting for subscription %s to terminate", sub.qname)
 		select {
@@ -493,9 +527,6 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 		case <-sub.done:
 		}
 	}
-	b.mu.Lock()
-	b.subscriptions = []*subscription{}
-	b.mu.Unlock()
 	// terminate connections cleanly
 	for _, conn := range b.connPool {
 		log.Debug().
@@ -522,8 +553,8 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 
 func (b *RabbitMQBroker) SubscribeForEvents(ctx context.Context, pattern string, handler func(event any)) error {
 	key := strings.ReplaceAll(pattern, "*", "#")
-	qname := fmt.Sprintf("%s-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
-	return b.subscribe(exchangeTopic, key, qname, func(msg any) error {
+	qname := fmt.Sprintf("%s%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewShortUUID())
+	return b.subscribe(ctx, exchangeTopic, key, qname, func(msg any) error {
 		handler(msg)
 		return nil
 	})
@@ -551,7 +582,7 @@ func (b *RabbitMQBroker) PublishTaskLogPart(ctx context.Context, p *tork.TaskLog
 }
 
 func (b *RabbitMQBroker) SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart)) error {
-	return b.subscribe(exchangeDefault, keyDefault, QUEUE_LOGS, func(msg any) error {
+	return b.subscribe(context.Background(), exchangeDefault, keyDefault, QUEUE_LOGS, func(msg any) error {
 		p, ok := msg.(*tork.TaskLogPart)
 		if !ok {
 			return errors.Errorf("expecting a *tork.TaskLogPart but got %T", msg)
@@ -566,7 +597,7 @@ func (b *RabbitMQBroker) PublishTaskProgress(ctx context.Context, tp *tork.Task)
 }
 
 func (b *RabbitMQBroker) SubscribeForTaskProgress(handler func(t *tork.Task) error) error {
-	return b.subscribe(exchangeDefault, keyDefault, QUEUE_PROGRESS, func(msg any) error {
+	return b.subscribe(context.Background(), exchangeDefault, keyDefault, QUEUE_PROGRESS, func(msg any) error {
 		p, ok := msg.(*tork.Task)
 		if !ok {
 			return errors.Errorf("expecting a *tork.TaskProgress but got %T", msg)
