@@ -753,3 +753,28 @@ HTTPServer(('0.0.0.0', 9090), Handler).serve_forever()`,
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello from sidecar", t1.Result)
 }
+
+func TestRunTaskWithPreWithError(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "echo hello",
+		Pre: []*tork.Task{{
+			Image: "busybox:stable",
+			Run:   "bad_thing",
+		}},
+		Mounts: []tork.Mount{
+			{
+				Type:   tork.MountTypeVolume,
+				Target: "/mnt",
+			},
+		},
+	}
+
+	err = rt.Run(context.Background(), t1)
+	assert.Error(t, err)
+}

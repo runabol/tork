@@ -203,7 +203,7 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 	// create a container for the main task
 	tc, err := createTaskContainer(ctx, rt, t, logger)
 	if err != nil {
-		return errors.Wrapf(err, "error creating task container")
+		return err
 	}
 
 	// keep track of the task container
@@ -240,13 +240,13 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 
 	// start the main task container
 	if err := tc.Start(ctx); err != nil {
-		return errors.Wrapf(err, "error starting task container")
+		return err
 	}
 
 	// wait for the task container to finish
 	result, err := tc.Wait(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "error waiting for task container to finish")
+		return err
 	}
 
 	t.Result = result
