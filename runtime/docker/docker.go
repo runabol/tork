@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -23,7 +24,6 @@ import (
 	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/logging"
-	"github.com/runabol/tork/internal/syncx"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/runtime"
 )
@@ -37,7 +37,7 @@ const (
 
 type DockerRuntime struct {
 	client      *client.Client
-	tasks       *syncx.Map[string, *tcontainer]
+	tasks       map[string]*tcontainer
 	images      map[string]time.Time
 	pullq       chan *pullRequest
 	mounter     runtime.Mounter
@@ -46,6 +46,7 @@ type DockerRuntime struct {
 	privileged  bool
 	imageTTL    time.Duration
 	imageVerify bool
+	mu          sync.Mutex
 }
 
 type dockerLogsReader struct {
@@ -110,7 +111,7 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	rt := &DockerRuntime{
 		client: dc,
-		tasks:  new(syncx.Map[string, *tcontainer]),
+		tasks:  make(map[string]*tcontainer),
 		images: make(map[string]time.Time),
 		pullq:  make(chan *pullRequest, 1),
 	}
@@ -133,8 +134,15 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 }
 
 func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
+	// prune the docker system before running the task
+	rt.mu.Lock()
+	err := rt.prune(context.Background())
+	rt.mu.Unlock()
+	if err != nil {
+		return errors.Wrapf(err, "error pruning images")
+	}
+	// if the tasks has sidecars, we need to create a network
 	if len(t.Sidecars) > 0 {
-		// create a shared network for the task and its sidecars
 		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
 			CheckDuplicate: true,
 			Driver:         "bridge",
@@ -214,14 +222,18 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 	}
 
 	// keep track of the task container
-	rt.tasks.Set(t.ID, tc)
+	rt.mu.Lock()
+	rt.tasks[t.ID] = tc
+	rt.mu.Unlock()
 
 	// remove the container when the task is done
 	defer func() {
 		if err := tc.Remove(context.Background()); err != nil {
 			log.Error().Err(err).Msgf("error removing container %s", tc.id)
 		}
-		rt.tasks.Delete(t.ID)
+		rt.mu.Lock()
+		delete(rt.tasks, t.ID)
+		rt.mu.Unlock()
 	}()
 
 	// start the sidecar containers
@@ -338,14 +350,14 @@ func (rt *DockerRuntime) puller() {
 // doPullRequest handles the pull queue requests.
 // Relies on the fact that pull requests are handled serially
 func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
-	// prune old images
-	if err := d.pruneImages(context.Background(), pr.image); err != nil {
-		log.Error().Err(err).Msg("error pruning images")
-	}
 	// check if we have the image already
+	d.mu.Lock()
 	_, ok := d.images[pr.image]
+	d.mu.Unlock()
 	if ok {
+		d.mu.Lock()
 		d.images[pr.image] = time.Now()
+		d.mu.Unlock()
 		return nil
 	}
 	// let's check if we have the image locally already
@@ -403,7 +415,9 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		}
 	}
 
+	d.mu.Lock()
 	d.images[pr.image] = time.Now()
+	d.mu.Unlock()
 
 	return nil
 }
@@ -425,11 +439,12 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
 	return nil
 }
 
-// pruneImages removes all expired images from the local docker
-// image store except for the one specified in the exclude argument
-func (rt *DockerRuntime) pruneImages(ctx context.Context, exclude string) error {
+func (rt *DockerRuntime) prune(ctx context.Context) error {
+	if len(rt.tasks) > 0 {
+		return nil
+	}
 	for img, t := range rt.images {
-		if img != exclude && time.Since(t) > rt.imageTTL {
+		if time.Since(t) > rt.imageTTL {
 			// remove the image if it's last use was more than
 			// the imageTTL duration ago and is not currently in use
 			if _, err := rt.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
