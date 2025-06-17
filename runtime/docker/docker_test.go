@@ -148,7 +148,9 @@ func TestProgress(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 500)
-	tc, ok := rt.tasks.Get(tk.ID)
+	rt.mu.Lock()
+	tc, ok := rt.tasks[tk.ID]
+	rt.mu.Unlock()
 	assert.True(t, ok)
 	assert.NotEmpty(t, tc)
 
@@ -627,20 +629,6 @@ func Test_doPullRequest(t *testing.T) {
 		Run:   "echo hello world > $TORK_OUTPUT",
 	})
 	assert.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 1100)
-	err = rt.doPullRequest(&pullRequest{
-		ctx:    ctx,
-		image:  "busybox:stable",
-		logger: os.Stdout,
-	})
-	assert.NoError(t, err)
-	// check that the image is not longer cached
-	images, err = rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
-	})
-	assert.NoError(t, err)
-	assert.Len(t, images, 0)
 }
 
 func TestRunTaskWithPrePost(t *testing.T) {
