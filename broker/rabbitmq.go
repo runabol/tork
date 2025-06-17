@@ -264,6 +264,14 @@ func (b *RabbitMQBroker) subscribe(ctx context.Context, exchange, key, qname str
 						Err(err).
 						Msgf("error closing channel for queue: %s", qname)
 				}
+				// delete the queue if it's an exclusive queue
+				if strings.HasPrefix(sub.qname, QUEUE_EXCLUSIVE_PREFIX) {
+					if _, err := ch.QueueDelete(sub.qname, false, false, false); err != nil {
+						log.Error().
+							Err(err).
+							Msgf("error deleting queue: %s", qname)
+					}
+				}
 				// close the channel and connection cleanly
 				log.Debug().Msgf("closing channel %s for queue: %s", cname, qname)
 				fns.CloseIgnore(ch)
