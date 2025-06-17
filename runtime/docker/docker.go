@@ -36,15 +36,16 @@ const (
 )
 
 type DockerRuntime struct {
-	client     *client.Client
-	tasks      *syncx.Map[string, *tcontainer]
-	images     map[string]time.Time
-	pullq      chan *pullRequest
-	mounter    runtime.Mounter
-	broker     broker.Broker
-	config     string
-	privileged bool
-	imageTTL   time.Duration
+	client      *client.Client
+	tasks       *syncx.Map[string, *tcontainer]
+	images      map[string]time.Time
+	pullq       chan *pullRequest
+	mounter     runtime.Mounter
+	broker      broker.Broker
+	config      string
+	privileged  bool
+	imageTTL    time.Duration
+	imageVerify bool
 }
 
 type dockerLogsReader struct {
@@ -93,6 +94,12 @@ func WithConfig(config string) Option {
 func WithImageTTL(ttl time.Duration) Option {
 	return func(rt *DockerRuntime) {
 		rt.imageTTL = ttl
+	}
+}
+
+func WithImageVerify(verify bool) Option {
+	return func(rt *DockerRuntime) {
+		rt.imageVerify = verify
 	}
 }
 
@@ -384,6 +391,18 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 
 		if _, err := io.Copy(pr.logger, reader); err != nil {
 			return err
+		}
+
+		if d.imageVerify {
+			// Verify the image using ImageSave
+			r, err := d.client.ImageSave(pr.ctx, []string{pr.image})
+			if err != nil {
+				return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
+			}
+			defer fns.CloseIgnore(r)
+			if _, err := io.Copy(io.Discard, r); err != nil {
+				return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
+			}
 		}
 	}
 
