@@ -84,6 +84,7 @@ func (h *jobHandler) startJob(ctx context.Context, j *tork.Job) error {
 		n := time.Now().UTC()
 		j.FailedAt = &n
 		j.State = tork.JobStateFailed
+		j.Error = t.Error
 		return h.handle(ctx, job.StateChange, j)
 	}
 	return h.onPending(ctx, task.StateChange, t)
@@ -195,6 +196,7 @@ func (h *jobHandler) restartJob(ctx context.Context, j *tork.Job) error {
 }
 
 func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
+	log.Error().Msgf("job %s failed: %s", j.ID, j.Error)
 	// mark the job as FAILED
 	if err := h.ds.UpdateJob(ctx, j.ID, func(u *tork.Job) error {
 		// we only want to make the job as FAILED

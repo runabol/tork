@@ -80,6 +80,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 	} else {
 		j.State = tork.JobStateFailed
 		j.FailedAt = t.FailedAt
+		j.Error = t.Error
 		return h.onJob(ctx, job.StateChange, j)
 	}
 	return nil
