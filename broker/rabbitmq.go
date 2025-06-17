@@ -280,7 +280,7 @@ func (b *RabbitMQBroker) subscribe(ctx context.Context, exchange, key, qname str
 				return
 			case d, ok := <-msgs:
 				if !ok {
-					log.Warn().Msgf("message channel closed for queue: %s", qname)
+					log.Debug().Msgf("message channel closed for queue: %s", qname)
 					// if the channel is closed, we need to re-subscribe
 					maxAttempts := 20
 					for attempt := 1; !b.shuttingDown && attempt <= maxAttempts; attempt++ {
