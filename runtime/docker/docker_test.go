@@ -778,3 +778,32 @@ func TestRunTaskWithPreWithError(t *testing.T) {
 	err = rt.Run(context.Background(), t1)
 	assert.Error(t, err)
 }
+
+func Test_imagePullWithVerify(t *testing.T) {
+	ctx := context.Background()
+
+	rt, err := NewDockerRuntime(WithImageVerify(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	// Pull the image
+	err = rt.imagePull(ctx, &tork.Task{Image: "busybox:stable"}, os.Stdout)
+	assert.NoError(t, err)
+
+	// Verify the image exists
+	images, err := rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "busybox:stable")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 1)
+
+	// Run a task using the pulled image
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "echo hello world > $TORK_OUTPUT",
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world\n", t1.Result)
+}
