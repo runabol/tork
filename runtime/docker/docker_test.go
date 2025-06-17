@@ -807,3 +807,16 @@ func Test_imagePullWithVerify(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world\n", t1.Result)
 }
+
+func Test_doPullRequestBadImage(t *testing.T) {
+	ctx := context.Background()
+	rt, err := NewDockerRuntime(WithImageVerify(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "alpine:no_such_tag",
+		logger: os.Stdout,
+	})
+	assert.Error(t, err)
+}

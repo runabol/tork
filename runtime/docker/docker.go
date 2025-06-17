@@ -392,22 +392,36 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		if _, err := io.Copy(pr.logger, reader); err != nil {
 			return err
 		}
+	}
 
-		if d.imageVerify {
-			// Verify the image using ImageSave
-			r, err := d.client.ImageSave(pr.ctx, []string{pr.image})
-			if err != nil {
-				return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
-			}
-			defer fns.CloseIgnore(r)
-			if _, err := io.Copy(io.Discard, r); err != nil {
-				return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
+	// verify the intergrity of the image
+	if d.imageVerify {
+		if err := d.verifyImage(pr.ctx, pr.image); err != nil {
+			if _, err := d.client.ImageRemove(context.Background(), pr.image, image.RemoveOptions{Force: true}); err != nil {
+				log.Error().Err(err).Msgf("error removing image %s after failed verification", pr.image)
 			}
 		}
 	}
 
 	d.images[pr.image] = time.Now()
 
+	return nil
+}
+
+// verifyImage checks if the image is valid by reading it and checking if it can be saved.
+func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
+	now := time.Now()
+	// check if the image is not corrupted by reading
+	// the image and checking if it can be saved
+	r, err := rt.client.ImageSave(ctx, []string{image})
+	if err != nil {
+		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
+	}
+	defer fns.CloseIgnore(r)
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
+	}
+	log.Debug().Msgf("image %s verified in %s", image, time.Since(now))
 	return nil
 }
 
