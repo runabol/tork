@@ -72,9 +72,7 @@ See the [REST API](https://www.tork.run/rest) documentation.
 
 ## Web UI
 
-[Tork Web](https://www.tork.run/web-ui) is a web based tool for interacting with Tork.
-
-![Web UI](docs/webui.png "Web UI")
+[Tork Web UI](https://www.tork.run/web-ui) is a web based tool for interacting with Tork. Run jobs, debug and visualize them with an intuitive GUI.
 
 ## License
 

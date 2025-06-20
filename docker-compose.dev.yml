@@ -1,0 +1,104 @@
+version: "3.8"
+
+networks:
+  tork_network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:17
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tork -d tork"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: tork
+      POSTGRES_USER: tork
+      POSTGRES_DB: tork
+    networks:
+      - tork_network
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks:
+      - tork_network
+
+  swagger:
+    image: swaggerapi/swagger-ui
+    restart: always
+    ports:
+      - 8200:8080
+    environment:
+      SWAGGER_JSON: /code/docs/swagger.json
+    volumes:
+      - .:/code
+    networks:
+      - tork_network
+
+  registry:
+    image: registry:2
+    restart: always
+    ports:
+      - 5001:5000
+    networks:
+      - tork_network
+
+  migration:
+    image: golang:1.24
+    working_dir: /code
+    environment:
+      - TORK_CONFIG=configs/config.compose.toml
+    command: go run cmd/main.go migration
+    volumes:
+      - .:/code
+    networks:
+      - tork_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: always
+    ports:
+      - 8000:8000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app
+    networks:
+      - tork_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+
+  web:
+    image: runabol/tork-web
+    restart: always
+    ports:
+      - 3000:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BACKEND_URL: "http://backend:8000"
+      BASE_URL: "http://localhost:3000"
+    networks:
+      - tork_network

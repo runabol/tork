@@ -71,15 +71,12 @@ services:
         condition: service_healthy
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+    image: runabol/tork
     restart: always
     ports:
       - 8000:8000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - .:/app
     networks:
       - tork_network
     depends_on:
