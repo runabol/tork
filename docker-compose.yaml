@@ -69,26 +69,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    restart: always
-    ports:
-      - 8000:8000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - .:/app
-    networks:
-      - tork_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      migration:
-        condition: service_completed_successfully
       
   web:
     image: runabol/tork-web
