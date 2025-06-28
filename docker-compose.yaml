@@ -36,18 +36,6 @@ services:
     networks:
       - tork_network
 
-  swagger:
-    image: swaggerapi/swagger-ui
-    restart: always
-    ports:
-      - 8200:8080
-    environment:
-      SWAGGER_JSON: /code/docs/swagger.json
-    volumes:
-      - .:/code
-    networks:
-      - tork_network
-
   registry:
     image: registry:2
     restart: always
@@ -69,16 +57,3 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      
-  web:
-    image: runabol/tork-web
-    restart: always
-    ports:
-      - 3000:3000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      BACKEND_URL: "http://backend:8000"
-      BASE_URL: "http://localhost:3000"
-    networks:
-      - tork_network
