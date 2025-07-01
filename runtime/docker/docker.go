@@ -37,7 +37,7 @@ const (
 
 type DockerRuntime struct {
 	client      *client.Client
-	tasks       map[string]*tcontainer
+	tasks       int
 	images      map[string]time.Time
 	pullq       chan *pullRequest
 	mounter     runtime.Mounter
@@ -111,7 +111,6 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 	}
 	rt := &DockerRuntime{
 		client: dc,
-		tasks:  make(map[string]*tcontainer),
 		images: make(map[string]time.Time),
 		pullq:  make(chan *pullRequest, 1),
 	}
@@ -130,17 +129,21 @@ func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
 		rt.imageTTL = DefaultImageTTL
 	}
 	go rt.puller()
+	go rt.pruner()
 	return rt, nil
 }
 
 func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
-	// prune the docker system before running the task
 	rt.mu.Lock()
-	err := rt.prune(context.Background())
+	rt.tasks++
 	rt.mu.Unlock()
-	if err != nil {
-		return errors.Wrapf(err, "error pruning images")
-	}
+
+	defer func() {
+		rt.mu.Lock()
+		rt.tasks--
+		rt.mu.Unlock()
+	}()
+
 	// if the tasks has sidecars, we need to create a network
 	if len(t.Sidecars) > 0 {
 		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
@@ -221,19 +224,11 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 		return err
 	}
 
-	// keep track of the task container
-	rt.mu.Lock()
-	rt.tasks[t.ID] = tc
-	rt.mu.Unlock()
-
 	// remove the container when the task is done
 	defer func() {
 		if err := tc.Remove(context.Background()); err != nil {
 			log.Error().Err(err).Msgf("error removing container %s", tc.id)
 		}
-		rt.mu.Lock()
-		delete(rt.tasks, t.ID)
-		rt.mu.Unlock()
 	}()
 
 	// start the sidecar containers
@@ -439,13 +434,25 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
 	return nil
 }
 
+func (rt *DockerRuntime) pruner() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := rt.prune(context.Background()); err != nil {
+			log.Error().Err(err).Msg("error pruning images")
+		}
+	}
+}
+
 func (rt *DockerRuntime) prune(ctx context.Context) error {
-	if len(rt.tasks) > 0 {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if rt.tasks > 0 {
 		return nil
 	}
 	for img, t := range rt.images {
 		if time.Since(t) > rt.imageTTL {
-			// remove the image if it's last use was more than
+			// remove the image if its last use was more than
 			// the imageTTL duration ago and is not currently in use
 			if _, err := rt.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
 				return err

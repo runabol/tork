@@ -129,36 +129,6 @@ func TestRunTaskCMD(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestProgress(t *testing.T) {
-	rt, err := NewDockerRuntime()
-	assert.NoError(t, err)
-	assert.NotNil(t, rt)
-
-	tk := &tork.Task{
-		ID:    uuid.NewUUID(),
-		Image: "busybox:stable",
-		Run:   "sleep 1",
-	}
-
-	ctx := context.Background()
-
-	go func() {
-		err := rt.Run(ctx, tk)
-		assert.NoError(t, err)
-	}()
-
-	time.Sleep(time.Millisecond * 500)
-	rt.mu.Lock()
-	tc, ok := rt.tasks[tk.ID]
-	rt.mu.Unlock()
-	assert.True(t, ok)
-	assert.NotEmpty(t, tc)
-
-	p, err := tc.readProgress(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, float64(0), p)
-}
-
 func TestRunTaskCMDLogger(t *testing.T) {
 	b := broker.NewInMemoryBroker()
 	processed := make(chan any)
@@ -807,4 +777,40 @@ func Test_doPullRequestBadImage(t *testing.T) {
 		logger: os.Stdout,
 	})
 	assert.Error(t, err)
+}
+
+func Test_prune(t *testing.T) {
+	ctx := context.Background()
+	rt, err := NewDockerRuntime(WithImageTTL(time.Second))
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	// Pull an image to ensure it exists
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "alpine:3.18.3",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+
+	// Check that the image is cached
+	images, err := rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 1)
+
+	// Wait for the image to expire
+	time.Sleep(2 * time.Second)
+
+	// Run the prune method
+	err = rt.prune(ctx)
+	assert.NoError(t, err)
+
+	// Check that the image has been removed
+	images, err = rt.client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	})
+	assert.NoError(t, err)
+	assert.Len(t, images, 0)
 }
