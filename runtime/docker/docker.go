@@ -404,9 +404,11 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 	// verify the intergrity of the image
 	if d.imageVerify {
 		if err := d.verifyImage(pr.ctx, pr.image); err != nil {
+			log.Error().Err(err).Msgf("image %s is invalid or corrupted", pr.image)
 			if _, err := d.client.ImageRemove(context.Background(), pr.image, image.RemoveOptions{Force: true}); err != nil {
 				log.Error().Err(err).Msgf("error removing image %s after failed verification", pr.image)
 			}
+			return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
 		}
 	}
 
