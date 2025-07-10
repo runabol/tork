@@ -403,7 +403,7 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 
 	// verify the intergrity of the image
 	if d.imageVerify {
-		if err := d.verifyImage(pr.ctx, pr.image); err != nil {
+		if err := d.verifyImage(pr.ctx, pr.image, pr.logger); err != nil {
 			log.Error().Err(err).Msgf("image %s is invalid or corrupted", pr.image)
 			if _, err := d.client.ImageRemove(context.Background(), pr.image, image.RemoveOptions{Force: true}); err != nil {
 				log.Error().Err(err).Msgf("error removing image %s after failed verification", pr.image)
@@ -420,18 +420,15 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 }
 
 // verifyImage checks if the image is valid by inspecting its metadata and doing a partial read.
-func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
+func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger io.Writer) error {
 	now := time.Now()
 
-	// First, do a quick metadata check
-	_, _, err := rt.client.ImageInspectWithRaw(ctx, image)
-	if err != nil {
-		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
-	}
+	_, _ = fmt.Fprintf(logger, "verifying image %s...", image)
 
 	// Do a partial read to verify the image data is accessible
 	r, err := rt.client.ImageSave(ctx, []string{image})
 	if err != nil {
+		_, _ = fmt.Fprintf(logger, "image %s is invalid or corrupted: %v", image, err)
 		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
 	}
 	defer fns.CloseIgnore(r)
@@ -439,10 +436,14 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
 	// Read only first 1MB to verify the image stream is readable
 	_, err = io.CopyN(io.Discard, r, 1024*1024)
 	if err != nil && err != io.EOF {
+		_, _ = fmt.Fprintf(logger, "image %s is invalid or corrupted: %v", image, err)
 		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
 	}
 
-	log.Debug().Msgf("image %s verified in %s", image, time.Since(now))
+	// Log the verification time
+	verificationDuration := time.Since(now)
+	_, _ = fmt.Fprintf(logger, "image %s verified successfully in %s", image, verificationDuration)
+
 	return nil
 }
 
