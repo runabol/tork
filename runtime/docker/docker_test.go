@@ -830,7 +830,7 @@ func TestVerifyImage_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should succeed
-	err = rt.verifyImage(ctx, "busybox:stable")
+	err = rt.verifyImage(ctx, "busybox:stable", io.Discard)
 	assert.NoError(t, err)
 }
 
@@ -841,7 +841,7 @@ func TestVerifyImage_ImageDoesNotExist(t *testing.T) {
 
 	ctx := context.Background()
 	// Should fail for non-existent image
-	err = rt.verifyImage(ctx, "no_such_image:latest")
+	err = rt.verifyImage(ctx, "no_such_image:latest", io.Discard)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid or corrupted")
 }
@@ -865,6 +865,6 @@ func TestVerifyImage_PartialReadError(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Now verifyImage should fail
-	err = rt.verifyImage(ctx, "busybox:stable")
+	err = rt.verifyImage(ctx, "busybox:stable", io.Discard)
 	assert.Error(t, err)
 }
