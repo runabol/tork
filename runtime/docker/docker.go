@@ -419,19 +419,29 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 	return nil
 }
 
-// verifyImage checks if the image is valid by reading it and checking if it can be saved.
+// verifyImage checks if the image is valid by inspecting its metadata and doing a partial read.
 func (rt *DockerRuntime) verifyImage(ctx context.Context, image string) error {
 	now := time.Now()
-	// check if the image is not corrupted by reading
-	// the image and checking if it can be saved
+
+	// First, do a quick metadata check
+	_, _, err := rt.client.ImageInspectWithRaw(ctx, image)
+	if err != nil {
+		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
+	}
+
+	// Do a partial read to verify the image data is accessible
 	r, err := rt.client.ImageSave(ctx, []string{image})
 	if err != nil {
 		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
 	}
 	defer fns.CloseIgnore(r)
-	if _, err := io.Copy(io.Discard, r); err != nil {
+
+	// Read only first 1MB to verify the image stream is readable
+	_, err = io.CopyN(io.Discard, r, 1024*1024)
+	if err != nil && err != io.EOF {
 		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
 	}
+
 	log.Debug().Msgf("image %s verified in %s", image, time.Since(now))
 	return nil
 }
