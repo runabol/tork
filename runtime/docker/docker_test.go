@@ -814,3 +814,57 @@ func Test_prune(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, images, 0)
 }
+
+func TestVerifyImage_Success(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	// Pull a known good image
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "busybox:stable",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+
+	// Should succeed
+	err = rt.verifyImage(ctx, "busybox:stable")
+	assert.NoError(t, err)
+}
+
+func TestVerifyImage_ImageDoesNotExist(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	// Should fail for non-existent image
+	err = rt.verifyImage(ctx, "no_such_image:latest")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid or corrupted")
+}
+
+func TestVerifyImage_PartialReadError(t *testing.T) {
+	// This test simulates a partial read error by removing the image after pulling
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	err = rt.doPullRequest(&pullRequest{
+		ctx:    ctx,
+		image:  "busybox:stable",
+		logger: os.Stdout,
+	})
+	assert.NoError(t, err)
+
+	// Remove the image forcibly to simulate a read error
+	_, err = rt.client.ImageRemove(ctx, "busybox:stable", image.RemoveOptions{Force: true})
+	assert.NoError(t, err)
+
+	// Now verifyImage should fail
+	err = rt.verifyImage(ctx, "busybox:stable")
+	assert.Error(t, err)
+}
