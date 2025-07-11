@@ -423,26 +423,27 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger io.Writer) error {
 	now := time.Now()
 
-	_, _ = fmt.Fprintf(logger, "verifying image %s...", image)
+	_, _ = fmt.Fprintf(logger, "verifying image %s with container test...", image)
 
-	// Do a partial read to verify the image data is accessible
-	r, err := rt.client.ImageSave(ctx, []string{image})
+	// Create a test container without starting it
+	resp, err := rt.client.ContainerCreate(ctx, &container.Config{
+		Image: image,
+		Cmd:   []string{"true"}, // minimal command
+	}, nil, nil, nil, "")
 	if err != nil {
-		_, _ = fmt.Fprintf(logger, "image %s is invalid or corrupted: %v", image, err)
-		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
-	}
-	defer fns.CloseIgnore(r)
-
-	// Read only first 1MB to verify the image stream is readable
-	_, err = io.CopyN(io.Discard, r, 1024*1024)
-	if err != nil && err != io.EOF {
-		_, _ = fmt.Fprintf(logger, "image %s is invalid or corrupted: %v", image, err)
-		return errors.Wrapf(err, "image %s is invalid or corrupted", image)
+		_, _ = fmt.Fprintf(logger, "image %s failed verification test: %v", image, err)
+		return errors.Wrapf(err, "image %s failed verification test", image)
 	}
 
-	// Log the verification time
+	// Clean up the test container
+	defer func() {
+		if err := rt.client.ContainerRemove(context.Background(), resp.ID, container.RemoveOptions{Force: true}); err != nil {
+			log.Error().Err(err).Msgf("error removing test container %s", resp.ID)
+		}
+	}()
+
 	verificationDuration := time.Since(now)
-	_, _ = fmt.Fprintf(logger, "image %s verified successfully in %s", image, verificationDuration)
+	_, _ = fmt.Fprintf(logger, "image %s verified with container test in %s", image, verificationDuration)
 
 	return nil
 }
