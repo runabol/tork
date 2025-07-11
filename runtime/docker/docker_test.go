@@ -843,7 +843,7 @@ func TestVerifyImage_ImageDoesNotExist(t *testing.T) {
 	// Should fail for non-existent image
 	err = rt.verifyImage(ctx, "no_such_image:latest", io.Discard)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid or corrupted")
+	assert.Contains(t, err.Error(), "failed verification test")
 }
 
 func TestVerifyImage_PartialReadError(t *testing.T) {
