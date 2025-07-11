@@ -31,8 +31,10 @@ import (
 // defaultWorkdir is the directory where `Task.File`s are
 // written to by default, should `Task.Workdir` not be set
 const (
-	defaultWorkdir  = "/tork/workdir"
-	DefaultImageTTL = time.Hour * 24
+	defaultWorkdir = "/tork/workdir"
+	// DefaultImageTTL is the default time to live for images in the Docker runtime
+	// after which they are pruned if not used.
+	DefaultImageTTL = time.Hour * 72 // 3 days
 )
 
 type DockerRuntime struct {
