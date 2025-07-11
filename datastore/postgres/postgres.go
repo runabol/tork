@@ -1150,7 +1150,7 @@ func (ds *PostgresDatastore) GetMetrics(ctx context.Context) (*tork.Metrics, err
 		return nil, errors.Wrapf(err, "error getting the running jobs count")
 	}
 
-	if err := ds.get(&s.Tasks.Running, "select count(*) from tasks where state = 'RUNNING'"); err != nil {
+	if err := ds.get(&s.Tasks.Running, "select count(*) from tasks t join jobs j on t.job_id = j.id where t.state = 'RUNNING' and j.state = 'RUNNING'"); err != nil {
 		return nil, errors.Wrapf(err, "error getting the running tasks count")
 	}
 
