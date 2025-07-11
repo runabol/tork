@@ -425,7 +425,7 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger io.Writer) error {
 	now := time.Now()
 
-	_, _ = fmt.Fprintf(logger, "verifying image %s with container test...", image)
+	_, _ = fmt.Fprintf(logger, "verifying image %s\n", image)
 
 	// Create a test container without starting it
 	resp, err := rt.client.ContainerCreate(ctx, &container.Config{
@@ -433,7 +433,7 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger i
 		Cmd:   []string{"true"}, // minimal command
 	}, nil, nil, nil, "")
 	if err != nil {
-		_, _ = fmt.Fprintf(logger, "image %s failed verification test: %v", image, err)
+		_, _ = fmt.Fprintf(logger, "image %s failed verification test: %v\n", image, err)
 		return errors.Wrapf(err, "image %s failed verification test", image)
 	}
 
@@ -445,7 +445,7 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger i
 	}()
 
 	verificationDuration := time.Since(now)
-	_, _ = fmt.Fprintf(logger, "image %s verified with container test in %s", image, verificationDuration)
+	_, _ = fmt.Fprintf(logger, "image %s verified in %s\n", image, verificationDuration)
 
 	return nil
 }
