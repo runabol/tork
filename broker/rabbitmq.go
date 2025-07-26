@@ -21,12 +21,15 @@ import (
 
 const (
 	RABBITMQ_DEFAULT_CONSUMER_TIMEOUT = time.Minute * 30
+	RABBITMQ_QUEUE_TYPE_CLASSIC       = "classic"
+	RABBITMQ_QUEUE_TYPE_QUORUM        = "quorum"
 )
 
 const (
 	exchangeTopic       = "amq.topic"
 	exchangeDefault     = ""
 	keyDefault          = ""
+	defaultQueueType    = RABBITMQ_QUEUE_TYPE_CLASSIC
 	defaultHeartbeatTTL = 60000
 	defaultPriority     = uint8(0)
 	maxPriority         = uint8(9)
@@ -43,6 +46,7 @@ type RabbitMQBroker struct {
 	shuttingDown    bool
 	heartbeatTTL    int
 	consumerTimeout int
+	queueType       string
 	managementURL   string
 	durable         bool
 }
@@ -64,6 +68,12 @@ type rabbitq struct {
 }
 
 type Option = func(b *RabbitMQBroker)
+
+func WithQueueType(qtype string) Option {
+	return func(b *RabbitMQBroker) {
+		b.queueType = qtype
+	}
+}
 
 // WithHeartbeatTTL sets the TTL for a heartbeat pending in the queue.
 // The value of the TTL argument or policy must be a non-negative integer (0 <= n),
@@ -115,6 +125,7 @@ func NewRabbitMQBroker(url string, opts ...Option) (*RabbitMQBroker, error) {
 		subscriptions:   make(map[string]*subscription),
 		heartbeatTTL:    defaultHeartbeatTTL,
 		consumerTimeout: int(RABBITMQ_DEFAULT_CONSUMER_TIMEOUT.Milliseconds()),
+		queueType:       defaultQueueType,
 	}
 	for _, o := range opts {
 		o(b)
@@ -388,13 +399,16 @@ func (b *RabbitMQBroker) declareQueue(exchange, key, qname string, ch *amqp.Chan
 	if qname == QUEUE_HEARTBEAT {
 		args["x-message-ttl"] = b.heartbeatTTL
 	}
-	if IsTaskQueue(qname) {
+	if IsTaskQueue(qname) && b.queueType == RABBITMQ_QUEUE_TYPE_CLASSIC {
 		args["x-max-priority"] = maxPriority
+	}
+	if !strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX) {
+		args["x-queue-type"] = b.queueType
 	}
 	args["x-consumer-timeout"] = b.consumerTimeout
 	_, err := ch.QueueDeclare(
 		qname,
-		b.durable,
+		b.durable || b.queueType == RABBITMQ_QUEUE_TYPE_QUORUM, // durable
 		false, // delete when unused
 		strings.HasPrefix(qname, QUEUE_EXCLUSIVE_PREFIX), // exclusive
 		false, // no-wait

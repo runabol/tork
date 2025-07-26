@@ -16,6 +16,7 @@ url = "amqp://guest:guest@localhost:5672/" # or "amqp://guest:guest@host.docker.
 consumer.timeout = "30m"
 management.url = ""                        # default: http://{rabbit_host}:15672/
 durable.queues = false
+queue.type = "classic"
 
 [datastore]
 type = "postgres"

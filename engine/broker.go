@@ -149,6 +149,7 @@ func (e *Engine) createBroker(btype string) (broker.Broker, error) {
 			broker.WithConsumerTimeoutMS(conf.DurationDefault("broker.rabbitmq.consumer.timeout", broker.RABBITMQ_DEFAULT_CONSUMER_TIMEOUT)),
 			broker.WithManagementURL(conf.String("broker.rabbitmq.management.url")),
 			broker.WithDurableQueues(conf.Bool("broker.rabbitmq.durable.queues")),
+			broker.WithQueueType(conf.StringDefault("broker.rabbitmq.queue.type", broker.RABBITMQ_QUEUE_TYPE_CLASSIC)),
 		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to connect to RabbitMQ")
