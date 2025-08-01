@@ -198,6 +198,10 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 	go func() {
 		_, err := io.Copy(logger, stdout)
 		if err != nil {
+			// Ignore closed pipe or closed file errors
+			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
+				return
+			}
 			log.Error().Err(err).Msgf("[shell] error logging stdout")
 		}
 	}()
