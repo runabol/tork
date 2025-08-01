@@ -31,7 +31,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/stretchr/testify v1.10.0
-	github.com/urfave/cli/v2 v2.27.2
+	github.com/urfave/cli/v2 v2.27.7
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sys v0.32.0
@@ -44,7 +44,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -87,7 +87,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 // indirect
 	go.opentelemetry.io/otel v1.26.0 // indirect
