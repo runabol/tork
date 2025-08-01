@@ -199,6 +199,7 @@ func (r *ShellRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writer
 		_, err := io.Copy(logger, stdout)
 		if err != nil {
 			// Ignore closed pipe or closed file errors
+			// as they can happen if the command exits before we read all output.
 			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
 				return
 			}
