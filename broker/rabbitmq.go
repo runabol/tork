@@ -591,6 +591,7 @@ func (b *RabbitMQBroker) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error getting a connection")
 	}
+	defer fns.CloseIgnore(conn)
 	ch, err := conn.Channel()
 	if err != nil {
 		return errors.Wrapf(err, "error creating channel")
