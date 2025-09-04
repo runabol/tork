@@ -18,6 +18,7 @@ import (
 
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/middleware/job"
+	logmw "github.com/runabol/tork/middleware/log"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
@@ -67,6 +68,7 @@ type Middleware struct {
 	Task []task.MiddlewareFunc
 	Job  []job.MiddlewareFunc
 	Node []node.MiddlewareFunc
+	Log  []logmw.MiddlewareFunc
 	Echo []echo.MiddlewareFunc
 }
 
@@ -122,6 +124,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 			Echo: cfg.Middleware.Echo,
 			Job:  cfg.Middleware.Job,
 			Task: cfg.Middleware.Task,
+			Log:  cfg.Middleware.Log,
 		},
 		Endpoints: cfg.Endpoints,
 		Enabled:   cfg.Enabled,
