@@ -8,6 +8,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/input"
 	"github.com/runabol/tork/middleware/job"
+	logmw "github.com/runabol/tork/middleware/log"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
@@ -30,6 +31,10 @@ func RegisterJobMiddleware(mw job.MiddlewareFunc) {
 
 func RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	defaultEngine.RegisterNodeMiddleware(mw)
+}
+
+func RegisterLogMiddleware(mw logmw.MiddlewareFunc) {
+	defaultEngine.RegisterLogMiddleware(mw)
 }
 
 func RegisterMounter(runtime, name string, mounter runtime.Mounter) {
