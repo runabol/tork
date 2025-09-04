@@ -24,6 +24,7 @@ import (
 	"github.com/runabol/tork/internal/hash"
 	"github.com/runabol/tork/internal/httpx"
 	"github.com/runabol/tork/middleware/job"
+	logmw "github.com/runabol/tork/middleware/log"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
 
@@ -49,6 +50,7 @@ type API struct {
 	terminate  chan any
 	onReadJob  job.HandlerFunc
 	onReadTask task.HandlerFunc
+	onReadLog  logmw.HandlerFunc
 }
 
 type Config struct {
@@ -64,6 +66,7 @@ type Middleware struct {
 	Web  []web.MiddlewareFunc
 	Job  []job.MiddlewareFunc
 	Task []task.MiddlewareFunc
+	Log  []logmw.MiddlewareFunc
 	Echo []echo.MiddlewareFunc
 }
 
@@ -98,6 +101,10 @@ func NewAPI(cfg Config) (*API, error) {
 		onReadTask: task.ApplyMiddleware(
 			task.NoOpHandlerFunc,
 			cfg.Middleware.Task,
+		),
+		onReadLog: logmw.ApplyMiddleware(
+			logmw.NoOpHandlerFunc,
+			cfg.Middleware.Log,
 		),
 	}
 
@@ -431,6 +438,9 @@ func (s *API) getJobLog(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
+	if err := s.onReadLog(c.Request().Context(), logmw.Read, l.Items); err != nil {
+		return err
+	}
 	return c.JSON(http.StatusOK, l)
 }
 
@@ -714,6 +724,9 @@ func (s *API) getTaskLog(c echo.Context) error {
 	l, err := s.ds.GetTaskLogParts(c.Request().Context(), id, q, page, size)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	if err := s.onReadLog(c.Request().Context(), logmw.Read, l.Items); err != nil {
+		return err
 	}
 	return c.JSON(http.StatusOK, l)
 }

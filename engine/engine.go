@@ -19,6 +19,7 @@ import (
 	"github.com/runabol/tork/internal/worker"
 	"github.com/runabol/tork/locker"
 	"github.com/runabol/tork/middleware/job"
+	logmw "github.com/runabol/tork/middleware/log"
 	"github.com/runabol/tork/middleware/node"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/runabol/tork/middleware/web"
@@ -69,6 +70,7 @@ type Middleware struct {
 	Task []task.MiddlewareFunc
 	Job  []job.MiddlewareFunc
 	Node []node.MiddlewareFunc
+	Log  []logmw.MiddlewareFunc
 }
 
 type JobListener func(j *tork.Job)
@@ -274,6 +276,13 @@ func (e *Engine) RegisterNodeMiddleware(mw node.MiddlewareFunc) {
 	defer e.mu.Unlock()
 	e.mustState(StateIdle)
 	e.cfg.Middleware.Node = append(e.cfg.Middleware.Node, mw)
+}
+
+func (e *Engine) RegisterLogMiddleware(mw logmw.MiddlewareFunc) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.mustState(StateIdle)
+	e.cfg.Middleware.Log = append(e.cfg.Middleware.Log, mw)
 }
 
 func (e *Engine) RegisterEndpoint(method, path string, handler web.HandlerFunc) {

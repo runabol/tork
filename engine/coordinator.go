@@ -20,6 +20,7 @@ import (
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/runabol/tork/internal/wildcard"
 	"github.com/runabol/tork/middleware/job"
+	logmw "github.com/runabol/tork/middleware/log"
 	"github.com/runabol/tork/middleware/task"
 	"golang.org/x/time/rate"
 )
@@ -39,6 +40,7 @@ func (e *Engine) initCoordinator() error {
 			Task: e.cfg.Middleware.Task,
 			Job:  e.cfg.Middleware.Job,
 			Node: e.cfg.Middleware.Node,
+			Log:  e.cfg.Middleware.Log,
 			Echo: echoMiddleware(e.datastoreRef),
 		},
 		Endpoints: e.cfg.Endpoints,
@@ -56,6 +58,7 @@ func (e *Engine) initCoordinator() error {
 		redacter := redact.NewRedacter(e.datastoreRef, matchers...)
 		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact(redacter))
 		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact(redacter))
+		cfg.Middleware.Log = append(cfg.Middleware.Log, logmw.Redact(e.datastoreRef))
 	}
 
 	// webhook middleware

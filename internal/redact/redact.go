@@ -58,6 +58,14 @@ func (r *Redacter) RedactTask(t *tork.Task) {
 	r.doRedactTask(t, job.Secrets)
 }
 
+func (r *Redacter) RedactTaskLogPart(p *tork.TaskLogPart, secrets map[string]string) {
+	contents := p.Contents
+	for _, secret := range secrets {
+		contents = strings.ReplaceAll(contents, secret, redactedStr)
+	}
+	p.Contents = contents
+}
+
 func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
 	redacted := t
 	// redact env vars
