@@ -25,6 +25,9 @@ type = "postgres"
 logs.duration = "168h" # 1 week
 jobs.duration = "8760h" # 1 year
 
+[datastore.encryption]
+key = "" # the encryption key for job secrets at rest
+
 [datastore.postgres]
 dsn = "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
 
