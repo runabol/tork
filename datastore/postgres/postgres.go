@@ -16,6 +16,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
+	"github.com/runabol/tork/internal/encrypt"
 	"github.com/runabol/tork/internal/slices"
 	"github.com/runabol/tork/internal/uuid"
 )
@@ -28,6 +29,7 @@ type PostgresDatastore struct {
 	cleanupInterval       *time.Duration
 	rand                  *rand.Rand
 	disableCleanup        bool
+	encryptionKey         *string
 }
 
 var (
@@ -55,6 +57,15 @@ func WithJobsRetentionDuration(dur time.Duration) Option {
 func WithDisableCleanup(val bool) Option {
 	return func(ds *PostgresDatastore) {
 		ds.disableCleanup = val
+	}
+}
+
+func WithEncryptionKey(val string) Option {
+	return func(ds *PostgresDatastore) {
+		if val == "" {
+			return
+		}
+		ds.encryptionKey = &val
 	}
 }
 
@@ -588,7 +599,11 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 	}
 	var secrets *string
 	if j.Secrets != nil {
-		b, err := json.Marshal(j.Secrets)
+		encSecrets, err := encryptSecrets(j.Secrets, ds.encryptionKey)
+		if err != nil {
+			return errors.Wrapf(err, "failed to encrypt job.secrets")
+		}
+		b, err := json.Marshal(encSecrets)
 		if err != nil {
 			return errors.Wrapf(err, "failed to serialize job.secrets")
 		}
@@ -635,8 +650,44 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 		}
 		return nil
 	})
-
 }
+
+func encryptSecrets(secrets map[string]string, encryptionKey *string) (map[string]string, error) {
+	if encryptionKey == nil {
+		return secrets, nil
+	}
+	encSecrets := make(map[string]string)
+	for k, v := range secrets {
+		enc, err := encrypt.Encrypt(v, *encryptionKey)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to encrypt job.secrets")
+		}
+		encSecrets[k] = fmt.Sprintf("enc:%s", enc)
+	}
+	return encSecrets, nil
+}
+
+func decryptSecrets(secrets map[string]string, encryptionKey *string) (map[string]string, error) {
+	decSecrets := make(map[string]string)
+	for k, v := range secrets {
+		if !strings.HasPrefix(v, "enc:") {
+			decSecrets[k] = v
+			continue
+		}
+		if encryptionKey == nil {
+			decSecrets[k] = "[encrypted]"
+			continue
+		}
+		v = strings.TrimPrefix(v, "enc:")
+		dec, err := encrypt.Decrypt(v, *encryptionKey)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to decrypt job.secrets")
+		}
+		decSecrets[k] = dec
+	}
+	return decSecrets, nil
+}
+
 func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify func(u *tork.Job) error) error {
 	return ds.WithTx(ctx, func(tx datastore.Datastore) error {
 		ptx, ok := tx.(*PostgresDatastore)
@@ -655,7 +706,13 @@ func (ds *PostgresDatastore) UpdateJob(ctx context.Context, id string, modify fu
 		if err != nil {
 			return err
 		}
-		j, err := r.toJob(tasks, []*tork.Task{}, createdBy, []*tork.Permission{})
+		j, err := r.toJob(
+			tasks,
+			[]*tork.Task{},
+			createdBy,
+			[]*tork.Permission{},
+			ds.encryptionKey,
+		)
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert jobRecord")
 		}
@@ -740,7 +797,7 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 		}
 		perms[i] = p
 	}
-	return r.toJob(tasks, exec, u, perms)
+	return r.toJob(tasks, exec, u, perms, ds.encryptionKey)
 }
 
 func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
@@ -988,7 +1045,13 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 		if err != nil {
 			return nil, err
 		}
-		j, err := r.toJob([]*tork.Task{}, []*tork.Task{}, createdBy, []*tork.Permission{})
+		j, err := r.toJob(
+			[]*tork.Task{},
+			[]*tork.Task{},
+			createdBy,
+			[]*tork.Permission{},
+			ds.encryptionKey,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -1211,7 +1274,11 @@ func (ds *PostgresDatastore) CreateScheduledJob(ctx context.Context, sj *tork.Sc
 	}
 	var secrets *string
 	if sj.Secrets != nil {
-		b, err := json.Marshal(sj.Secrets)
+		encSecrets, err := encryptSecrets(sj.Secrets, ds.encryptionKey)
+		if err != nil {
+			return errors.Wrapf(err, "failed to encrypt job.secrets")
+		}
+		b, err := json.Marshal(encSecrets)
 		if err != nil {
 			return errors.Wrapf(err, "failed to serialize secrets")
 		}
@@ -1271,7 +1338,7 @@ func (ds *PostgresDatastore) GetActiveScheduledJobs(ctx context.Context) ([]*tor
 		if err != nil {
 			return nil, err
 		}
-		sj, err := sjr.toScheduledJob(tasks, u, []*tork.Permission{})
+		sj, err := sjr.toScheduledJob(tasks, u, []*tork.Permission{}, ds.encryptionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1325,7 +1392,7 @@ func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser s
 		if err != nil {
 			return nil, err
 		}
-		j, err := r.toScheduledJob([]*tork.Task{}, createdBy, []*tork.Permission{})
+		j, err := r.toScheduledJob([]*tork.Task{}, createdBy, []*tork.Permission{}, ds.encryptionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -1423,7 +1490,7 @@ func (ds *PostgresDatastore) GetScheduledJobByID(ctx context.Context, id string)
 		}
 		perms[i] = p
 	}
-	return r.toScheduledJob(tasks, u, perms)
+	return r.toScheduledJob(tasks, u, perms, ds.encryptionKey)
 }
 
 func (ds *PostgresDatastore) UpdateScheduledJob(ctx context.Context, id string, modify func(u *tork.ScheduledJob) error) error {
@@ -1444,7 +1511,7 @@ func (ds *PostgresDatastore) UpdateScheduledJob(ctx context.Context, id string, 
 		if err != nil {
 			return err
 		}
-		j, err := r.toScheduledJob(tasks, createdBy, []*tork.Permission{})
+		j, err := r.toScheduledJob(tasks, createdBy, []*tork.Permission{}, ds.encryptionKey)
 		if err != nil {
 			return errors.Wrapf(err, "failed to convert jobRecord")
 		}

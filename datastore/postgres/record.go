@@ -313,7 +313,13 @@ func (r taskLogPartRecord) toTaskLogPart() *tork.TaskLogPart {
 	}
 }
 
-func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, perms []*tork.Permission) (*tork.Job, error) {
+func (r jobRecord) toJob(
+	tasks,
+	execution []*tork.Task,
+	createdBy *tork.User,
+	perms []*tork.Permission,
+	encryptionKey *string,
+) (*tork.Job, error) {
 	var c tork.JobContext
 	if err := json.Unmarshal(r.Context, &c); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.context")
@@ -345,6 +351,11 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 		if err := json.Unmarshal(r.Secrets, &secrets); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing job.secrets")
 		}
+		decryptedSecrets, err := decryptSecrets(secrets, encryptionKey)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error decrypting job.secrets")
+		}
+		secrets = decryptedSecrets
 	}
 	var schedule *tork.JobSchedule
 	if r.ScheduledJobID != nil {
@@ -384,7 +395,7 @@ func (r jobRecord) toJob(tasks, execution []*tork.Task, createdBy *tork.User, pe
 	}, nil
 }
 
-func (r scheduledJobRecord) toScheduledJob(tasks []*tork.Task, createdBy *tork.User, perms []*tork.Permission) (*tork.ScheduledJob, error) {
+func (r scheduledJobRecord) toScheduledJob(tasks []*tork.Task, createdBy *tork.User, perms []*tork.Permission, encryptionKey *string) (*tork.ScheduledJob, error) {
 	var inputs map[string]string
 	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
 		return nil, errors.Wrapf(err, "error deserializing job.inputs")
@@ -412,6 +423,11 @@ func (r scheduledJobRecord) toScheduledJob(tasks []*tork.Task, createdBy *tork.U
 		if err := json.Unmarshal(r.Secrets, &secrets); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing job.secrets")
 		}
+		decryptedSecrets, err := decryptSecrets(secrets, encryptionKey)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error decrypting job.secrets")
+		}
+		secrets = decryptedSecrets
 	}
 	return &tork.ScheduledJob{
 		ID:          r.ID,

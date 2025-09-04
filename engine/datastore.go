@@ -276,6 +276,7 @@ func (e *Engine) createDatastore(dstype string) (datastore.Datastore, error) {
 		return postgres.NewPostgresDataStore(dsn,
 			postgres.WithLogsRetentionDuration(conf.DurationDefault("datastore.retention.logs.duration", postgres.DefaultLogsRetentionDuration)),
 			postgres.WithJobsRetentionDuration(conf.DurationDefault("datastore.retention.jobs.duration", postgres.DefaultJobsRetentionDuration)),
+			postgres.WithEncryptionKey(conf.String("datastore.encryption.key")),
 		)
 	default:
 		return nil, errors.Errorf("unknown datastore type: %s", dstype)

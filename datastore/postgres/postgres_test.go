@@ -1422,6 +1422,14 @@ func TestPostgresUpdateScheduledJob(t *testing.T) {
 		Name:      "Test Scheduled Job",
 		CreatedAt: now,
 		State:     tork.ScheduledJobStateActive,
+		Secrets: map[string]string{
+			"password": "secret",
+		},
+		Tasks: []*tork.Task{
+			{
+				Name: "Test Task",
+			},
+		},
 	}
 	err = ds.CreateScheduledJob(ctx, &sj)
 	assert.NoError(t, err)
@@ -1435,6 +1443,7 @@ func TestPostgresUpdateScheduledJob(t *testing.T) {
 	updatedSJ, err := ds.GetScheduledJobByID(ctx, sj.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.ScheduledJobStatePaused, updatedSJ.State)
+	assert.Equal(t, map[string]string{"password": "secret"}, updatedSJ.Secrets)
 }
 
 func TestPostgresGetScheduledJobs(t *testing.T) {
@@ -1513,6 +1522,11 @@ func TestPostgresGetActiveScheduledJobs(t *testing.T) {
 		CreatedAt: now,
 		CreatedBy: u,
 		State:     tork.ScheduledJobStateActive,
+		Tasks: []*tork.Task{
+			{
+				Name: "Test Task",
+			},
+		},
 	}
 	err = ds.CreateScheduledJob(ctx, sj1)
 	assert.NoError(t, err)
@@ -1524,6 +1538,11 @@ func TestPostgresGetActiveScheduledJobs(t *testing.T) {
 		CreatedAt: now,
 		CreatedBy: u,
 		State:     tork.ScheduledJobStatePaused,
+		Tasks: []*tork.Task{
+			{
+				Name: "Test Task",
+			},
+		},
 	}
 	err = ds.CreateScheduledJob(ctx, sj2)
 	assert.NoError(t, err)
@@ -1619,6 +1638,11 @@ func TestPostgresDeleteScheduledJob(t *testing.T) {
 		Name:      "Test Scheduled Job",
 		CreatedAt: now,
 		State:     tork.ScheduledJobStateActive,
+		Tasks: []*tork.Task{
+			{
+				Name: "Test Task",
+			},
+		},
 	}
 	err = ds.CreateScheduledJob(ctx, &sj)
 	assert.NoError(t, err)
@@ -1628,4 +1652,77 @@ func TestPostgresDeleteScheduledJob(t *testing.T) {
 
 	_, err = ds.GetScheduledJobByID(ctx, sj.ID)
 	assert.Error(t, err)
+}
+
+func TestPostgresCreateJobWithEncryptedSecrets(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn, WithEncryptionKey("secret"))
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	u := &tork.User{
+		ID:        uuid.NewUUID(),
+		Username:  uuid.NewShortUUID(),
+		Name:      "Tester",
+		CreatedAt: &now,
+	}
+	err = ds.CreateUser(ctx, u)
+	assert.NoError(t, err)
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		CreatedBy: u,
+		Tags:      []string{"tag-a", "tag-b"},
+		AutoDelete: &tork.AutoDelete{
+			After: "5h",
+		},
+		Secrets: map[string]string{
+			"password": "secret",
+		},
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j1.CreatedBy.Username)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, u.Username, j2.CreatedBy.Username)
+	assert.Equal(t, []string{"tag-a", "tag-b"}, j2.Tags)
+	assert.Equal(t, "5h", j2.AutoDelete.After)
+	assert.Equal(t, map[string]string{"password": "secret"}, j2.Secrets)
+}
+
+func TestPostgresUpdateScheduledJobWithEncryptedSecrets(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn, WithEncryptionKey("secret"))
+	assert.NoError(t, err)
+
+	now := time.Now().UTC()
+	sj := tork.ScheduledJob{
+		ID:        uuid.NewUUID(),
+		Name:      "Test Scheduled Job",
+		CreatedAt: now,
+		State:     tork.ScheduledJobStateActive,
+		Secrets: map[string]string{
+			"password": "secret",
+		},
+		Tasks: []*tork.Task{
+			{
+				Name: "Test Task",
+			},
+		},
+	}
+	err = ds.CreateScheduledJob(ctx, &sj)
+	assert.NoError(t, err)
+
+	err = ds.UpdateScheduledJob(ctx, sj.ID, func(u *tork.ScheduledJob) error {
+		u.State = tork.ScheduledJobStatePaused
+		return nil
+	})
+	assert.NoError(t, err)
+
+	updatedSJ, err := ds.GetScheduledJobByID(ctx, sj.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.ScheduledJobStatePaused, updatedSJ.State)
+	assert.Equal(t, map[string]string{"password": "secret"}, updatedSJ.Secrets)
 }
