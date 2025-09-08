@@ -7,7 +7,7 @@ toolchain go1.24.2
 retract v0.1.0
 
 require (
-	github.com/docker/cli v26.1.5+incompatible
+	github.com/docker/cli v28.4.0+incompatible
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-connections v0.4.1-0.20231031175723-0b8c1f4e07a0
 	github.com/docker/go-units v0.5.0
