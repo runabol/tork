@@ -13,21 +13,51 @@ import (
 )
 
 type VolumeMounter struct {
-	client *client.Client
+	client      *client.Client
+	allowOpts   bool
+	allowDriver bool
 }
 
-func NewVolumeMounter() (*VolumeMounter, error) {
+type Opt = func(m *VolumeMounter)
+
+func WithAllowOpts(allowOpts bool) Opt {
+	return func(m *VolumeMounter) {
+		m.allowOpts = allowOpts
+	}
+}
+
+func WithAllowDriver(allowDriver bool) Opt {
+	return func(m *VolumeMounter) {
+		m.allowDriver = allowDriver
+	}
+}
+
+func NewVolumeMounter(opts ...Opt) (*VolumeMounter, error) {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
-	return &VolumeMounter{client: dc}, nil
+	vm := &VolumeMounter{client: dc}
+	for _, o := range opts {
+		o(vm)
+	}
+	return vm, nil
 }
 
 func (m *VolumeMounter) Mount(ctx context.Context, mn *tork.Mount) error {
 	name := uuid.NewUUID()
+	if !m.allowDriver && mn.Driver != "" {
+		return errors.Errorf("driver is not allowed for volume mounts")
+	}
+	if !m.allowOpts && len(mn.Opts) > 0 {
+		return errors.Errorf("opts are not allowed for volume mounts")
+	}
 	mn.Source = name
-	v, err := m.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
+	v, err := m.client.VolumeCreate(ctx, volume.CreateOptions{
+		Name:       name,
+		Driver:     mn.Driver,
+		DriverOpts: mn.Opts,
+	})
 	if err != nil {
 		return err
 	}

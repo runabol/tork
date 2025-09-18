@@ -169,13 +169,13 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()
-		err := rt.mounter.Mount(ctx, &mnt)
+		err := rt.mounter.Mount(ctx, mnt)
 		if err != nil {
 			return err
 		}
-		defer func(m tork.Mount) {
+		defer func(m *tork.Mount) {
 			log.Debug().Msgf("Unmounting %s: %s", m.Type, m.Target)
-			if err := rt.mounter.Unmount(context.Background(), &m); err != nil {
+			if err := rt.mounter.Unmount(context.Background(), m); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error deleting mount: %s", m)

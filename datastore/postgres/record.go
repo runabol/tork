@@ -230,7 +230,7 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")
 		}
 	}
-	var mounts []tork.Mount
+	var mounts []*tork.Mount
 	if r.Mounts != nil {
 		if err := json.Unmarshal(r.Mounts, &mounts); err != nil {
 			return nil, errors.Wrapf(err, "error deserializing task.registry")

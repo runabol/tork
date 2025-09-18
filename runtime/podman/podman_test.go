@@ -82,7 +82,7 @@ func TestPodmanRunPrePost(t *testing.T) {
 			Image: "busybox:stable",
 			Run:   "echo post",
 		}},
-		Mounts: []tork.Mount{{
+		Mounts: []*tork.Mount{{
 			Type:   tork.MountTypeVolume,
 			Target: "/somedir",
 		}},
@@ -271,7 +271,7 @@ func TestPodmanRunTaskWithVolume(t *testing.T) {
 		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -293,7 +293,7 @@ func TestPodmanRunTaskWithVolumeAndCustomWorkdir(t *testing.T) {
 		Image: "busybox:stable",
 		Run: `echo hello world > /xyz/thing
               ls > $TORK_OUTPUT`,
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -319,7 +319,7 @@ func TestPodmanRunTaskWithBind(t *testing.T) {
 		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{{
+		Mounts: []*tork.Mount{{
 			Type:   tork.MountTypeBind,
 			Target: "/xyz",
 			Source: dir,
@@ -337,7 +337,7 @@ func TestPodmanRunTaskWithVolumeAndWorkdir(t *testing.T) {
 		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -395,7 +395,7 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 		Name:  "Some task",
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -477,7 +477,7 @@ func TestRunTaskWithPrePost(t *testing.T) {
 			Image: "busybox:stable",
 			Run:   "echo bye bye",
 		}},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/mnt",
