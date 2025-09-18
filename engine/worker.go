@@ -65,7 +65,10 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 		})
 		mounter.RegisterMounter("bind", bm)
 		// register volume mounter
-		vm, err := docker.NewVolumeMounter()
+		vm, err := docker.NewVolumeMounter(
+			docker.WithAllowOpts(conf.Bool("mounts.volume.opts.allowed")),
+			docker.WithAllowDriver(conf.Bool("mounts.volume.driver.allowed")),
+		)
 		if err != nil {
 			return nil, err
 		}

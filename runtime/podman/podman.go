@@ -101,13 +101,13 @@ func (d *PodmanRuntime) Run(ctx context.Context, t *tork.Task) error {
 	// prepare mounts
 	for i, mnt := range t.Mounts {
 		mnt.ID = uuid.NewUUID()
-		err := d.mounter.Mount(ctx, &mnt)
+		err := d.mounter.Mount(ctx, mnt)
 		if err != nil {
 			return err
 		}
-		defer func(m tork.Mount) {
+		defer func(m *tork.Mount) {
 			log.Debug().Msgf("Unmounting %s: %s", m.Type, m.Target)
-			if err := d.mounter.Unmount(context.Background(), &m); err != nil {
+			if err := d.mounter.Unmount(context.Background(), m); err != nil {
 				log.Error().
 					Err(err).
 					Msgf("error deleting mount: %s", m)

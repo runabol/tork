@@ -289,7 +289,7 @@ func TestRunTaskWithVolume(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -311,7 +311,7 @@ func TestRunTaskWithVolumeAndCustomWorkdir(t *testing.T) {
 		Image: "busybox:stable",
 		Run: `echo hello world > /xyz/thing
               ls > $TORK_OUTPUT`,
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -338,7 +338,7 @@ func TestRunTaskWithBind(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{{
+		Mounts: []*tork.Mount{{
 			Type:   tork.MountTypeBind,
 			Target: "/xyz",
 			Source: dir,
@@ -360,7 +360,7 @@ func TestRunTaskWithTempfs(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeTmpfs,
 				Target: "/xyz",
@@ -381,7 +381,7 @@ func TestRunTaskWithVolumeAndWorkdir(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -405,7 +405,7 @@ func TestRunTaskWithTempfsAndWorkdir(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > ./thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeTmpfs,
 				Target: "/xyz",
@@ -464,7 +464,7 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 		ID:    uuid.NewUUID(),
 		Image: "busybox:stable",
 		Run:   "echo hello world > /xyz/thing",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/xyz",
@@ -618,7 +618,7 @@ func TestRunTaskWithPrePost(t *testing.T) {
 			Image: "busybox:stable",
 			Run:   "echo bye bye",
 		}},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/mnt",
@@ -664,7 +664,7 @@ func TestRunTaskWithSidecarAndMount(t *testing.T) {
 			Image: "busybox:stable",
 			Run:   "echo hello sidecar > /mnt/sidecar",
 		}},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/mnt",
@@ -725,7 +725,7 @@ func TestRunTaskWithPreWithError(t *testing.T) {
 			Image: "busybox:stable",
 			Run:   "bad_thing",
 		}},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/mnt",

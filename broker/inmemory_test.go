@@ -25,7 +25,7 @@ func TestInMemoryPublishAndSubsribeForTask(t *testing.T) {
 
 	t1 := &tork.Task{
 		ID: uuid.NewUUID(),
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
