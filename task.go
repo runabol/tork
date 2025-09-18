@@ -57,7 +57,7 @@ type Task struct {
 	Pre         []*Task           `json:"pre,omitempty"`
 	Post        []*Task           `json:"post,omitempty"`
 	Sidecars    []*Task           `json:"sidecars,omitempty"`
-	Mounts      []Mount           `json:"mounts,omitempty"`
+	Mounts      []*Mount          `json:"mounts,omitempty"`
 	Networks    []string          `json:"networks,omitempty"`
 	NodeID      string            `json:"nodeId,omitempty"`
 	Retry       *TaskRetry        `json:"retry,omitempty"`
@@ -209,7 +209,7 @@ func (t *Task) Clone() *Task {
 		Pre:         CloneTasks(t.Pre),
 		Post:        CloneTasks(t.Post),
 		Sidecars:    CloneTasks(t.Sidecars),
-		Mounts:      slices.Clone(t.Mounts),
+		Mounts:      CloneMounts(t.Mounts),
 		Networks:    t.Networks,
 		NodeID:      t.NodeID,
 		Retry:       retry,
