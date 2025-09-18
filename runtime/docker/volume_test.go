@@ -57,3 +57,22 @@ func Test_createMountVolume(t *testing.T) {
 	assert.Equal(t, "/somevol", mnt.Target)
 	assert.NotEmpty(t, mnt.Source)
 }
+
+func Test_createMountVolumeWithOpts(t *testing.T) {
+	m, err := NewVolumeMounter()
+	assert.NoError(t, err)
+
+	mnt := &tork.Mount{
+		Type:   tork.MountTypeVolume,
+		Target: "/somevol",
+		Opts:   map[string]string{"type": "tmpfs", "device": "tmpfs"},
+	}
+	err = m.Mount(context.Background(), mnt)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, m.Unmount(context.Background(), mnt))
+	}()
+	assert.Equal(t, "/somevol", mnt.Target)
+	assert.NotEmpty(t, mnt.Source)
+	assert.Equal(t, map[string]string{"type": "tmpfs", "device": "tmpfs"}, mnt.Opts)
+}

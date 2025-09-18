@@ -27,7 +27,7 @@ func NewVolumeMounter() (*VolumeMounter, error) {
 func (m *VolumeMounter) Mount(ctx context.Context, mn *tork.Mount) error {
 	name := uuid.NewUUID()
 	mn.Source = name
-	v, err := m.client.VolumeCreate(ctx, volume.CreateOptions{Name: name})
+	v, err := m.client.VolumeCreate(ctx, volume.CreateOptions{Name: name, DriverOpts: mn.Opts})
 	if err != nil {
 		return err
 	}

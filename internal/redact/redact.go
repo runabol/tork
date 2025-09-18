@@ -70,6 +70,10 @@ func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
 	redacted := t
 	// redact env vars
 	redacted.Env = r.redactVars(redacted.Env, secrets)
+	// redact mounts
+	for _, m := range redacted.Mounts {
+		m.Opts = r.redactVars(m.Opts, secrets)
+	}
 	// redact pre tasks
 	for _, p := range redacted.Pre {
 		r.doRedactTask(p, secrets)

@@ -81,7 +81,7 @@ func Test_handleTaskRun(t *testing.T) {
 		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"ls"},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
@@ -154,7 +154,7 @@ func Test_handleTaskRunWithPrePost(t *testing.T) {
 		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		Run:   "cat /somevolume/pre > $TORK_OUTPUT",
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
@@ -472,7 +472,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "5"},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",
@@ -528,7 +528,7 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 		State: tork.TaskStateRunning,
 		Image: "ubuntu:mantic",
 		CMD:   []string{"sleep", "1"},
-		Mounts: []tork.Mount{
+		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
 				Target: "/somevolume",

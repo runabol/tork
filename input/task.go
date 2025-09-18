@@ -74,9 +74,10 @@ type Registry struct {
 }
 
 type Mount struct {
-	Type   string `json:"type,omitempty" yaml:"type,omitempty"`
-	Source string `json:"source,omitempty" yaml:"source,omitempty"`
-	Target string `json:"target,omitempty" yaml:"target,omitempty"`
+	Type   string            `json:"type,omitempty" yaml:"type,omitempty"`
+	Source string            `json:"source,omitempty" yaml:"source,omitempty"`
+	Target string            `json:"target,omitempty" yaml:"target,omitempty"`
+	Opts   map[string]string `json:"opts,omitempty" yaml:"opts,omitempty"`
 }
 
 type AuxTask struct {
@@ -112,11 +113,12 @@ type Probe struct {
 	Timeout string `json:"timeout,omitempty" yaml:"timeout,omitempty" validate:"duration"`
 }
 
-func (m Mount) toMount() tork.Mount {
-	return tork.Mount{
+func (m Mount) toMount() *tork.Mount {
+	return &tork.Mount{
 		Type:   m.Type,
 		Source: m.Source,
 		Target: m.Target,
+		Opts:   maps.Clone(m.Opts),
 	}
 }
 
@@ -260,8 +262,8 @@ func (i Task) toTask() *tork.Task {
 	}
 }
 
-func toMounts(ms []Mount) []tork.Mount {
-	result := make([]tork.Mount, len(ms))
+func toMounts(ms []Mount) []*tork.Mount {
+	result := make([]*tork.Mount, len(ms))
 	for i, m := range ms {
 		result[i] = m.toMount()
 	}

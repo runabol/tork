@@ -68,6 +68,13 @@ func TestRedactTask(t *testing.T) {
 			Username: "me",
 			Password: "secret",
 		},
+		Mounts: []*tork.Mount{
+			{
+				Opts: map[string]string{
+					"secret": "secret",
+				},
+			},
+		},
 	}
 
 	redacter := NewRedacter(ds)
@@ -89,6 +96,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
+	assert.Equal(t, "[REDACTED]", ta.Mounts[0].Opts["secret"])
 	assert.NoError(t, ds.Close())
 }
 
