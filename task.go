@@ -52,6 +52,7 @@ type Task struct {
 	Env         map[string]string `json:"env,omitempty"`
 	Files       map[string]string `json:"files,omitempty"`
 	Queue       string            `json:"queue,omitempty"`
+	Redelivered int               `json:"redelivered,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Pre         []*Task           `json:"pre,omitempty"`
 	Post        []*Task           `json:"post,omitempty"`
