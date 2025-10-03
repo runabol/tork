@@ -271,7 +271,7 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 }
 
 func (rt *DockerRuntime) HealthCheck(ctx context.Context) error {
-	_, err := rt.client.ContainerList(ctx, container.ListOptions{})
+	_, err := rt.client.Ping(ctx)
 	return err
 }
 
