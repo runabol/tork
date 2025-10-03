@@ -203,7 +203,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	createCtx, createCancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer createCancel()
 	if len(t.Entrypoint) == 0 {
-		t.Entrypoint = []string{"sh", "-c"}
+		t.Entrypoint = []string{"sh"}
 	}
 	createCmd := exec.CommandContext(createCtx,
 		"podman", "create",
