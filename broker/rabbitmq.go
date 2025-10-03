@@ -308,6 +308,29 @@ func (b *RabbitMQBroker) subscribe(ctx context.Context, exchange, key, qname str
 					sub.done <- struct{}{}
 					return
 				}
+				// if the message is redelivered, we need to publish it to the redeliveries queue
+				if d.Redelivered && d.Type == "*tork.Task" {
+					if msg, err := deserialize(d.Type, d.Body); err != nil {
+						log.Error().
+							Err(err).
+							Str("queue", qname).
+							Str("body", (string(d.Body))).
+							Str("type", (string(d.Type))).
+							Msg("failed to deserialize message")
+					} else {
+						if err := b.publish(ctx, exchangeDefault, QUEUE_REDELIVERIES, msg); err != nil {
+							log.Error().
+								Err(err).
+								Msgf("error publishing redelivered message to %s", QUEUE_REDELIVERIES)
+						}
+					}
+					if err := d.Ack(false); err != nil {
+						log.Error().
+							Err(err).
+							Msg("failed to ack redelivered message")
+					}
+					continue
+				}
 				if msg, err := deserialize(d.Type, d.Body); err != nil {
 					log.Error().
 						Err(err).

@@ -16,6 +16,8 @@ const (
 	// Handler can inspect the task's State property
 	// in order to determine what state the task is at.
 	StateChange = "STATE_CHANGE"
+	// Redelivered event occurs when a task is redelivered.
+	Redelivered = "REDELIVERED"
 	// Progress event occurs when a task's progress changes.
 	Progress = "PROGRESS"
 	// Read occurs when a task is read by the client

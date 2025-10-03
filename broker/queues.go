@@ -32,6 +32,8 @@ const (
 	// The queue used by workers to send task
 	// progress to the Coordinator
 	QUEUE_PROGRESS = "progress"
+	// The queue used when a message is redelivered
+	QUEUE_REDELIVERIES = "redeliveries"
 	// The prefix used for queues that
 	// are exclusive
 	QUEUE_EXCLUSIVE_PREFIX = "x-"
@@ -54,6 +56,7 @@ func IsCoordinatorQueue(qname string) bool {
 		QUEUE_JOBS,
 		QUEUE_LOGS,
 		QUEUE_PROGRESS,
+		QUEUE_REDELIVERIES,
 	}
 	return slices.Contains(coordQueues, qname)
 }

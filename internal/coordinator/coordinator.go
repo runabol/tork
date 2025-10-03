@@ -46,6 +46,7 @@ type Coordinator struct {
 	onHeartbeat    node.HandlerFunc
 	onCompleted    task.HandlerFunc
 	onLogPart      func(*tork.TaskLogPart)
+	onRedelivered  task.HandlerFunc
 	onProgress     task.HandlerFunc
 	onScheduledJob func(ctx context.Context, s *tork.ScheduledJob) error
 	stop           chan any
@@ -115,6 +116,9 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 	if cfg.Queues[broker.QUEUE_PROGRESS] < 1 {
 		cfg.Queues[broker.QUEUE_PROGRESS] = 1
 	}
+	if cfg.Queues[broker.QUEUE_REDELIVERIES] < 1 {
+		cfg.Queues[broker.QUEUE_REDELIVERIES] = 1
+	}
 	api, err := api.NewAPI(api.Config{
 		Broker:    cfg.Broker,
 		DataStore: cfg.DataStore,
@@ -135,6 +139,11 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 
 	onPending := task.ApplyMiddleware(
 		handlers.NewPendingHandler(cfg.DataStore, cfg.Broker),
+		cfg.Middleware.Task,
+	)
+
+	onRedelivered := task.ApplyMiddleware(
+		handlers.NewRedeliveredHandler(cfg.DataStore, cfg.Broker),
 		cfg.Middleware.Task,
 	)
 
@@ -204,6 +213,7 @@ func NewCoordinator(cfg Config) (*Coordinator, error) {
 		queues:         cfg.Queues,
 		onPending:      onPending,
 		onStarted:      onStarted,
+		onRedelivered:  onRedelivered,
 		onError:        onError,
 		onJob:          onJob,
 		onHeartbeat:    onHeartbeat,
@@ -233,6 +243,10 @@ func (c *Coordinator) Start() error {
 		for i := 0; i < conc; i++ {
 			var err error
 			switch qname {
+			case broker.QUEUE_REDELIVERIES:
+				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
+					return c.onRedelivered(context.Background(), task.Redelivered, t)
+				})
 			case broker.QUEUE_PENDING:
 				pendingHandler := c.taskHandler(c.onPending)
 				err = c.broker.SubscribeForTasks(qname, func(t *tork.Task) error {
