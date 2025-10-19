@@ -32,12 +32,13 @@ const (
 // on the host machine using podman as the container runtime engine
 // and the podman CLI to manage containers.
 type PodmanRuntime struct {
-	broker     broker.Broker
-	pullq      chan *pullRequest
-	images     *syncx.Map[string, bool]
-	tasks      *syncx.Map[string, string]
-	mounter    runtime.Mounter
-	privileged bool
+	broker      broker.Broker
+	pullq       chan *pullRequest
+	images      *syncx.Map[string, bool]
+	tasks       *syncx.Map[string, string]
+	mounter     runtime.Mounter
+	privileged  bool
+	hostNetwork bool
 }
 
 type pullRequest struct {
@@ -58,6 +59,12 @@ func WithBroker(broker broker.Broker) Option {
 func WithPrivileged(privileged bool) Option {
 	return func(rt *PodmanRuntime) {
 		rt.privileged = privileged
+	}
+}
+
+func WithHostNetwork(hostNetwork bool) Option {
+	return func(rt *PodmanRuntime) {
+		rt.hostNetwork = hostNetwork
 	}
 }
 
@@ -224,7 +231,16 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// add networks to the container
 	for _, network := range t.Networks {
-		createCmd.Args = append(createCmd.Args, "--network", network, "--network-alias", slug.Make(t.Name))
+		// host networking requires explicit permission
+		if network == "host" {
+			if !d.hostNetwork {
+				return errors.New("host networking is not enabled")
+			}
+			// network aliases are not supported with host networking
+			createCmd.Args = append(createCmd.Args, "--network", network)
+		} else {
+			createCmd.Args = append(createCmd.Args, "--network", network, "--network-alias", slug.Make(t.Name))
+		}
 	}
 
 	// add mounts to the container

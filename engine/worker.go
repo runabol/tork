@@ -103,6 +103,7 @@ func (e *Engine) initRuntime() (runtime.Runtime, error) {
 			podman.WithBroker(e.brokerRef),
 			podman.WithMounter(mounter),
 			podman.WithPrivileged(conf.Bool("runtime.podman.privileged")),
+			podman.WithHostNetwork(conf.Bool("runtime.podman.host.network")),
 		), nil
 	default:
 		return nil, errors.Errorf("unknown runtime type: %s", runtimeType)
