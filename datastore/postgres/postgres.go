@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -920,7 +921,7 @@ func (ds *PostgresDatastore) deleteJobs(ptx *PostgresDatastore, ids []string) (i
 }
 
 func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
-	searchTerm, _ := parseQuery(q)
+	searchTerm, _ := parseQuery(prepareQuery(q))
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select * 
@@ -954,7 +955,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 }
 
 func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
-	searchTerm, _ := parseQuery(q)
+	searchTerm, _ := parseQuery(prepareQuery(q))
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select tlp.* 
@@ -1630,4 +1631,18 @@ func parseQuery(query string) (string, []string) {
 		}
 	}
 	return strings.Join(terms, " "), tags
+}
+
+func prepareQuery(q string) string {
+	searchQueryRE := regexp.MustCompile(`[^a-zA-Z0-9@.\-\s]+`)
+	q = searchQueryRE.ReplaceAllString(q, "")
+	tokens := strings.Fields(q)
+	q = ""
+	for i, token := range tokens {
+		if i > 0 {
+			q = q + " & "
+		}
+		q = q + token + ":*"
+	}
+	return q
 }
