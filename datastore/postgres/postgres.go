@@ -17,6 +17,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
 	"github.com/runabol/tork/internal/encrypt"
+	"github.com/runabol/tork/fts"
 	"github.com/runabol/tork/internal/slices"
 	"github.com/runabol/tork/internal/uuid"
 )
@@ -925,7 +926,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select * 
 	      from tasks_log_parts 
-		  where task_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('english', $2))
+		  where task_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('simple', $2))
 		  order by number_ DESC
 		  offset %d limit %d`, offset, size)
 
@@ -954,14 +955,14 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 }
 
 func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
-	searchTerm, _ := parseQuery(q)
+	searchTerm, _ := parseQuery(fts.PrepareQuery(q))
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select tlp.* 
 	      from tasks_log_parts tlp
 		  join tasks t
 		  on t.id = tlp.task_id
-		  where t.job_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('english', $2))
+		  where t.job_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('simple', $2))
 		  order by t.position desc, t.created_at desc, tlp.number_ desc, tlp.created_at DESC
 		  offset %d limit %d`, offset, size)
 
