@@ -1726,3 +1726,85 @@ func TestPostgresUpdateScheduledJobWithEncryptedSecrets(t *testing.T) {
 	assert.Equal(t, tork.ScheduledJobStatePaused, updatedSJ.State)
 	assert.Equal(t, map[string]string{"password": "secret"}, updatedSJ.Secrets)
 }
+
+func TestPostgresQueryTaskLogsSpecialChars(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("\\line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	_, err = ds.GetTaskLogParts(ctx, t1.ID, "\\", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetTaskLogParts(ctx, t1.ID, "&&\\0", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetTaskLogParts(ctx, t1.ID, "\\", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetTaskLogParts(ctx, t1.ID, "\\\\\\", 1, 10)
+	assert.NoError(t, err)
+}
+
+func TestPostgresQueryJobLogsSpecialChars(t *testing.T) {
+	ctx := context.Background()
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID: uuid.NewUUID(),
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	for i := 1; i <= 100; i++ {
+		err := ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+			Number:   i,
+			TaskID:   t1.ID,
+			Contents: fmt.Sprintf("\\line %d", i),
+		})
+		assert.NoError(t, err)
+	}
+
+	_, err = ds.GetJobLogParts(ctx, t1.ID, "\\", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetJobLogParts(ctx, t1.ID, "&&\\0", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetJobLogParts(ctx, t1.ID, "\\", 1, 10)
+	assert.NoError(t, err)
+
+	_, err = ds.GetJobLogParts(ctx, t1.ID, "\\\\\\", 1, 10)
+	assert.NoError(t, err)
+}
