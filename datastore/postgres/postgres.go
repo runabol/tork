@@ -16,6 +16,7 @@ import (
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
+	"github.com/runabol/tork/fts"
 	"github.com/runabol/tork/internal/encrypt"
 	"github.com/runabol/tork/internal/slices"
 	"github.com/runabol/tork/internal/uuid"
@@ -920,7 +921,7 @@ func (ds *PostgresDatastore) deleteJobs(ptx *PostgresDatastore, ids []string) (i
 }
 
 func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
-	searchTerm, _ := parseQuery(q)
+	searchTerm, _ := parseQuery(fts.PrepareQuery(q))
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select * 
@@ -954,7 +955,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 }
 
 func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
-	searchTerm, _ := parseQuery(q)
+	searchTerm, _ := parseQuery(fts.PrepareQuery(q))
 	offset := (page - 1) * size
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select tlp.* 
