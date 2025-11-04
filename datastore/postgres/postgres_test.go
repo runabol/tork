@@ -1808,3 +1808,11 @@ func TestPostgresQueryJobLogsSpecialChars(t *testing.T) {
 	_, err = ds.GetJobLogParts(ctx, t1.ID, "\\\\\\", 1, 10)
 	assert.NoError(t, err)
 }
+
+func TestPrepareQuery(t *testing.T) {
+	assert.Equal(t, "", PrepareQuery(""))
+	assert.Equal(t, "Hello:*", PrepareQuery("Hello"))
+	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello World"))
+	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello ! World"))
+	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello ! World    "))
+}
