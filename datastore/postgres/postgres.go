@@ -926,7 +926,7 @@ func (ds *PostgresDatastore) GetTaskLogParts(ctx context.Context, taskID, q stri
 	rs := []taskLogPartRecord{}
 	qry := fmt.Sprintf(`select * 
 	      from tasks_log_parts 
-		  where task_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('simple', $2))
+		  where task_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('english', $2))
 		  order by number_ DESC
 		  offset %d limit %d`, offset, size)
 
@@ -962,7 +962,7 @@ func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID, q string
 	      from tasks_log_parts tlp
 		  join tasks t
 		  on t.id = tlp.task_id
-		  where t.job_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('simple', $2))
+		  where t.job_id = $1 and ($2 = '' OR ts @@ plainto_tsquery('english', $2))
 		  order by t.position desc, t.created_at desc, tlp.number_ desc, tlp.created_at DESC
 		  offset %d limit %d`, offset, size)
 
