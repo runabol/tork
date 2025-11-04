@@ -1810,9 +1810,9 @@ func TestPostgresQueryJobLogsSpecialChars(t *testing.T) {
 }
 
 func TestPrepareQuery(t *testing.T) {
-	assert.Equal(t, "", PrepareQuery(""))
-	assert.Equal(t, "Hello:*", PrepareQuery("Hello"))
-	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello World"))
-	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello ! World"))
-	assert.Equal(t, "Hello:* & World:*", PrepareQuery("Hello ! World    "))
+	assert.Equal(t, "", prepareQuery(""))
+	assert.Equal(t, "Hello:*", prepareQuery("Hello"))
+	assert.Equal(t, "Hello:* & World:*", prepareQuery("Hello World"))
+	assert.Equal(t, "Hello:* & World:*", prepareQuery("Hello ! World"))
+	assert.Equal(t, "Hello:* & World:*", prepareQuery("Hello ! World    "))
 }
