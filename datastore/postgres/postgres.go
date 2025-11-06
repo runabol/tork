@@ -39,6 +39,8 @@ var (
 	maxCleanupInterval           = time.Hour
 	DefaultLogsRetentionDuration = time.Hour * 24 * 7   // 1 week
 	DefaultJobsRetentionDuration = time.Hour * 24 * 365 // 1 year
+	// regex to sanitize search queries for postgres tsvector
+	searchQuerySanitizer = regexp.MustCompile(`[^a-zA-Z0-9@.\-\s]+`)
 )
 
 type Option = func(ds *PostgresDatastore)
@@ -1634,15 +1636,13 @@ func parseQuery(query string) (string, []string) {
 }
 
 func prepareQuery(q string) string {
-	searchQueryRE := regexp.MustCompile(`[^a-zA-Z0-9@.\-\s]+`)
-	q = searchQueryRE.ReplaceAllString(q, "")
-	tokens := strings.Fields(q)
-	q = ""
+	tokens := strings.Fields(searchQuerySanitizer.ReplaceAllString(q, ""))
+	result := ""
 	for i, token := range tokens {
 		if i > 0 {
-			q = q + " & "
+			result = result + " & "
 		}
-		q = q + token + ":*"
+		result = result + token + ":*"
 	}
-	return q
+	return result
 }
