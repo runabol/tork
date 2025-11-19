@@ -489,3 +489,35 @@ func TestRunTaskWithPrePost(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello pre\n", t1.Result)
 }
+
+func TestRunTaskWithHostNetworkDisabled(t *testing.T) {
+	rt := NewPodmanRuntime(WithHostNetwork(false))
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	t1 := &tork.Task{
+		ID:       uuid.NewUUID(),
+		Name:     "Some task",
+		Image:    "busybox:stable",
+		CMD:      []string{"ls"},
+		Networks: []string{"host"},
+	}
+	err := rt.Run(ctx, t1)
+	assert.Error(t, err)
+}
+
+func TestRunTaskWithHostNetworkEnabled(t *testing.T) {
+	rt := NewPodmanRuntime(WithHostNetwork(true))
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+	t1 := &tork.Task{
+		ID:       uuid.NewUUID(),
+		Name:     "Some task",
+		Image:    "busybox:stable",
+		CMD:      []string{"ls"},
+		Networks: []string{"host"},
+	}
+	err := rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
