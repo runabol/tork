@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	defaultWorkdir = "/tork/workdir"
+	defaultWorkdir  = "/tork/workdir"
+	hostNetworkName = "host" // hostNetworkName is the podman network mode name for host networking
 )
 
 // PodmanRuntime is a runtime that uses podman to run tasks in containers
@@ -232,7 +233,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	// add networks to the container
 	for _, network := range t.Networks {
 		// host networking requires explicit permission
-		if network == "host" {
+		if network == hostNetworkName {
 			if !d.hostNetwork {
 				return errors.New("host networking is not enabled")
 			}
