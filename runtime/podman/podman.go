@@ -224,7 +224,11 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 
 	// add networks to the container
 	for _, network := range t.Networks {
-		createCmd.Args = append(createCmd.Args, "--network", network, "--network-alias", slug.Make(t.Name))
+		createCmd.Args = append(createCmd.Args, "--network", network)
+		// network aliases are not supported with host networking
+		if network != "host" {
+			createCmd.Args = append(createCmd.Args, "--network-alias", slug.Make(t.Name))
+		}
 	}
 
 	// add mounts to the container
