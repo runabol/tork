@@ -28,6 +28,7 @@ func TestRedactTask(t *testing.T) {
 		Env: map[string]string{
 			"secret_1":          "secret",
 			"SecrET_2":          "secret",
+			"something_3":       "some shhhhh",
 			"PASSword":          "password",
 			"AWS_ACCESS_KEY_ID": "some-key",
 			"harmless":          "hello world",
@@ -66,7 +67,7 @@ func TestRedactTask(t *testing.T) {
 			Webhooks: []*tork.Webhook{
 				{
 					Headers: map[string]string{
-						"secret": "secret",
+						"token": "bearer shhhhh",
 					},
 				},
 			},
@@ -90,6 +91,7 @@ func TestRedactTask(t *testing.T) {
 
 	assert.Equal(t, "[REDACTED]", ta.Env["secret_1"])
 	assert.Equal(t, "[REDACTED]", ta.Env["SecrET_2"])
+	assert.Equal(t, "some [REDACTED]", ta.Env["something_3"])
 	assert.Equal(t, "[REDACTED]", ta.Env["PASSword"])
 	assert.Equal(t, "hello world", ta.Env["harmless"])
 	assert.Equal(t, "[REDACTED]", ta.Env["AWS_ACCESS_KEY_ID"])
@@ -103,7 +105,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
-	assert.Equal(t, "[REDACTED]", ta.SubJob.Webhooks[0].Headers["secret"])
+	assert.Equal(t, "bearer [REDACTED]", ta.SubJob.Webhooks[0].Headers["token"])
 	assert.Equal(t, "[REDACTED]", ta.Mounts[0].Opts["secret"])
 	assert.NoError(t, ds.Close())
 }

@@ -143,9 +143,7 @@ func (r *Redacter) redactVars(m map[string]string, secrets map[string]string) ma
 			}
 		}
 		for _, secret := range secrets {
-			if secret == v {
-				v = redactedStr
-			}
+			v = strings.ReplaceAll(v, secret, redactedStr)
 		}
 		redacted[k] = v
 	}
