@@ -92,9 +92,16 @@ func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
 	if redacted.Registry != nil {
 		redacted.Registry.Password = redactedStr
 	}
+	// redact subjob secrets
 	if redacted.SubJob != nil {
 		for k := range redacted.SubJob.Secrets {
 			redacted.SubJob.Secrets[k] = redactedStr
+		}
+		// redact webhook headers
+		for _, w := range redacted.SubJob.Webhooks {
+			if w.Headers != nil {
+				w.Headers = r.redactVars(w.Headers, secrets)
+			}
 		}
 	}
 }

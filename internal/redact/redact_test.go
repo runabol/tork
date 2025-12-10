@@ -63,6 +63,13 @@ func TestRedactTask(t *testing.T) {
 			Secrets: map[string]string{
 				"hush": "shhhhh",
 			},
+			Webhooks: []*tork.Webhook{
+				{
+					Headers: map[string]string{
+						"secret": "secret",
+					},
+				},
+			},
 		},
 		Registry: &tork.Registry{
 			Username: "me",
@@ -96,6 +103,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
+	assert.Equal(t, "[REDACTED]", ta.SubJob.Webhooks[0].Headers["secret"])
 	assert.Equal(t, "[REDACTED]", ta.Mounts[0].Opts["secret"])
 	assert.NoError(t, ds.Close())
 }
