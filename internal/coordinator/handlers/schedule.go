@@ -100,12 +100,19 @@ func (h *jobSchedulerHandler) handle(ctx context.Context, s *tork.ScheduledJob) 
 	}
 }
 
-func (h *jobSchedulerHandler) handleActive(ctx context.Context, s *tork.ScheduledJob) error {
-	log.Info().Msgf("Scheduling job %s with cron %s", s.ID, s.Cron)
+func (h *jobSchedulerHandler) handleActive(ctx context.Context, sj *tork.ScheduledJob) error {
+	log.Info().Msgf("Scheduling job %s with cron %s", sj.ID, sj.Cron)
 	cj, err := h.scheduler.NewJob(
-		gocron.CronJob(s.Cron, false),
+		gocron.CronJob(sj.Cron, false),
 		gocron.NewTask(
 			func(sj *tork.ScheduledJob) {
+				// fetch the latest scheduled job to ensure we have the latest version
+				// and to get the full details of the scheduled job (permissions in particular)
+				s, err := h.ds.GetScheduledJobByID(ctx, sj.ID)
+				if err != nil {
+					log.Error().Err(err).Msgf("error fetching scheduled job before creating instance: %s", sj.ID)
+					return
+				}
 				now := time.Now().UTC()
 				job := &tork.Job{
 					ID:          uuid.NewUUID(),
@@ -136,15 +143,15 @@ func (h *jobSchedulerHandler) handleActive(ctx context.Context, s *tork.Schedule
 					log.Error().Err(err).Msgf("error publishing scheduled job instance: %s", s.ID)
 				}
 			},
-			s,
+			sj,
 		),
-		gocron.WithName(s.ID),
+		gocron.WithName(sj.ID),
 	)
 	if err != nil {
-		return errors.Wrapf(err, "error scheduling job %s", s.ID)
+		return errors.Wrapf(err, "error scheduling job %s", sj.ID)
 	}
 	h.mu.Lock()
-	h.m[s.ID] = cj
+	h.m[sj.ID] = cj
 	h.mu.Unlock()
 	return err
 }
