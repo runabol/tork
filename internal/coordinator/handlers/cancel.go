@@ -75,7 +75,7 @@ func cancelActiveTasks(ctx context.Context, ds datastore.Datastore, b broker.Bro
 			return errors.Wrapf(err, "error cancelling task: %s", t.ID)
 		}
 		// if this task is a sub-job, notify the sub-job to cancel
-		if t.SubJob != nil {
+		if t.SubJob != nil && t.SubJob.ID != "" {
 			// cancel the sub-job
 			sj, err := ds.GetJobByID(ctx, t.SubJob.ID)
 			if err != nil {
