@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork"
@@ -248,9 +248,8 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	ctx := context.Background()
 
 	nw := uuid.NewUUID()
-	networkCreateResp, err := rt.client.NetworkCreate(ctx, nw, types.NetworkCreate{
-		CheckDuplicate: true,
-		Driver:         "bridge",
+	networkCreateResp, err := rt.client.NetworkCreate(ctx, nw, network.CreateOptions{
+		Driver: "bridge",
 	})
 	assert.NoError(t, err)
 	log.Debug().Msgf("Created network %s with ID %s", nw, networkCreateResp.ID)

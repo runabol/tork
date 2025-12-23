@@ -13,7 +13,6 @@ import (
 	"time"
 
 	cliopts "github.com/docker/cli/opts"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
@@ -510,7 +509,7 @@ func (tc *tcontainer) initTorkdir(ctx context.Context) error {
 		}
 	}
 
-	if err := tc.client.CopyToContainer(ctx, tc.id, "/tork", ar, types.CopyToContainerOptions{}); err != nil {
+	if err := tc.client.CopyToContainer(ctx, tc.id, "/tork", ar, container.CopyToContainerOptions{}); err != nil {
 		return err
 	}
 
@@ -539,7 +538,7 @@ func (tc *tcontainer) initWorkDir(ctx context.Context) (err error) {
 		}
 	}
 
-	if err := tc.client.CopyToContainer(ctx, tc.id, tc.task.Workdir, ar, types.CopyToContainerOptions{}); err != nil {
+	if err := tc.client.CopyToContainer(ctx, tc.id, tc.task.Workdir, ar, container.CopyToContainerOptions{}); err != nil {
 		return err
 	}
 
