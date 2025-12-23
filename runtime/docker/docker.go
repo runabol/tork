@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	regtypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
@@ -148,9 +148,8 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 
 	// if the tasks has sidecars, we need to create a network
 	if len(t.Sidecars) > 0 {
-		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
-			CheckDuplicate: true,
-			Driver:         "bridge",
+		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), network.CreateOptions{
+			Driver: "bridge",
 		})
 		if err != nil {
 			return errors.Wrapf(err, "error creating network")
