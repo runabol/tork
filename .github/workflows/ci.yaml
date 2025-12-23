@@ -26,7 +26,7 @@ jobs:
   ci:
     strategy:
       matrix:
-        go-version: [1.21.x]
+        go-version: [1.23.x]
         postgres-version: [15, 16]
     runs-on: ubuntu-24.04
     services:
@@ -52,10 +52,10 @@ jobs:
           - 15672:15672
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '${{ matrix.go-version }}'
 
