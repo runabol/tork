@@ -20,7 +20,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/knadh/koanf/parsers/toml v0.1.0
 	github.com/knadh/koanf/providers/env v0.1.0
-	github.com/knadh/koanf/providers/file v1.2.0
+	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/v2 v2.3.0
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/lib/pq v1.10.9
