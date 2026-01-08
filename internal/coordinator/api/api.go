@@ -128,6 +128,7 @@ func NewAPI(cfg Config) (*API, error) {
 	}
 	if v, ok := cfg.Enabled["queues"]; !ok || v {
 		r.GET("/queues", s.listQueues)
+		r.GET("/queues/:name", s.getQueue)
 	}
 	if v, ok := cfg.Enabled["nodes"]; !ok || v {
 		r.GET("/nodes", s.listActiveNodes)
@@ -234,6 +235,20 @@ func (s *API) listQueues(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusOK, qs)
+}
+
+func (s *API) getQueue(c echo.Context) error {
+	qname := c.Param("name")
+	qs, err := s.broker.Queues(c.Request().Context())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	for _, q := range qs {
+		if q.Name == qname {
+			return c.JSON(http.StatusOK, q)
+		}
+	}
+	return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("queue %s not found", qname))
 }
 
 // listActiveNodes
