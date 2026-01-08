@@ -150,6 +150,24 @@ func (b *RabbitMQBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qis, nil
 }
 
+func (b *RabbitMQBroker) QueueInfo(ctx context.Context, qname string) (QueueInfo, error) {
+	rqs, err := b.rabbitQueues(ctx)
+	if err != nil {
+		return QueueInfo{}, err
+	}
+	for _, rq := range rqs {
+		if rq.Name == qname {
+			return QueueInfo{
+				Name:        qname,
+				Size:        rq.Messages,
+				Subscribers: rq.Consumers,
+				Unacked:     rq.Unacked,
+			}, nil
+		}
+	}
+	return QueueInfo{}, errors.Errorf("queue %s not found", qname)
+}
+
 func (b *RabbitMQBroker) rabbitQueues(ctx context.Context) ([]rabbitq, error) {
 	u, err := url.Parse(b.url)
 	if err != nil {
@@ -178,6 +196,22 @@ func (b *RabbitMQBroker) rabbitQueues(ctx context.Context) ([]rabbitq, error) {
 		return nil, errors.Wrapf(err, "error unmarshalling API response")
 	}
 	return rqs, nil
+}
+
+func (b *RabbitMQBroker) DeleteQueue(ctx context.Context, qname string) error {
+	conn, err := b.getConnection()
+	if err != nil {
+		return errors.Wrapf(err, "error getting a connection")
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		return errors.Wrapf(err, "error creating channel")
+	}
+	defer fns.CloseIgnore(ch)
+	if _, err := ch.QueueDelete(qname, false, false, false); err != nil {
+		return errors.Wrapf(err, "error deleting queue")
+	}
+	return nil
 }
 
 func (b *RabbitMQBroker) PublishTask(ctx context.Context, qname string, t *tork.Task) error {

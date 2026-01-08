@@ -129,6 +129,7 @@ func NewAPI(cfg Config) (*API, error) {
 	if v, ok := cfg.Enabled["queues"]; !ok || v {
 		r.GET("/queues", s.listQueues)
 		r.GET("/queues/:name", s.getQueue)
+		r.DELETE("/queues/:name", s.deleteQueue)
 	}
 	if v, ok := cfg.Enabled["nodes"]; !ok || v {
 		r.GET("/nodes", s.listActiveNodes)
@@ -237,18 +238,41 @@ func (s *API) listQueues(c echo.Context) error {
 	return c.JSON(http.StatusOK, qs)
 }
 
+// getQueue
+// @Summary Get a queue by name
+// @Tags queues
+// @Produce application/json
+// @Success 200 {object} broker.QueueInfo
+// @Router /queues/{name} [get]
+// @Param name path string true "Queue name"
 func (s *API) getQueue(c echo.Context) error {
 	qname := c.Param("name")
-	qs, err := s.broker.Queues(c.Request().Context())
+	q, err := s.broker.QueueInfo(c.Request().Context(), qname)
 	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	return c.JSON(http.StatusOK, q)
+}
+
+// deleteQueue
+// @Summary Delete a queue
+// @Tags queues
+// @Produce application/json
+// @Success 200 {object} broker.QueueInfo
+// @Router /queues/{name} [delete]
+// @Param name path string true "Queue name"
+func (s *API) deleteQueue(c echo.Context) error {
+	qname := c.Param("name")
+	if !broker.IsTaskQueue(qname) {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("queue %s is not a task queue", qname))
+	}
+	if _, err := s.broker.QueueInfo(c.Request().Context(), qname); err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	if err := s.broker.DeleteQueue(c.Request().Context(), qname); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	for _, q := range qs {
-		if q.Name == qname {
-			return c.JSON(http.StatusOK, q)
-		}
-	}
-	return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("queue %s not found", qname))
+	return c.NoContent(http.StatusOK)
 }
 
 // listActiveNodes

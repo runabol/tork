@@ -99,6 +99,25 @@ func TestInMemoryGetQueuesUnacked(t *testing.T) {
 	assert.Equal(t, 1, qis[0].Subscribers)
 }
 
+func TestInMemoryDeleteQueue(t *testing.T) {
+	ctx := context.Background()
+	b := broker.NewInMemoryBroker()
+	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
+	err := b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		return nil
+	})
+	assert.NoError(t, err)
+	qis, err := b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(qis))
+	assert.Equal(t, 1, qis[0].Subscribers)
+	err = b.DeleteQueue(ctx, qname)
+	assert.NoError(t, err)
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(qis))
+}
+
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()

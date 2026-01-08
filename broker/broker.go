@@ -38,6 +38,8 @@ type Broker interface {
 	SubscribeForTaskLogPart(handler func(p *tork.TaskLogPart)) error
 
 	Queues(ctx context.Context) ([]QueueInfo, error)
+	QueueInfo(ctx context.Context, qname string) (QueueInfo, error)
+	DeleteQueue(ctx context.Context, qname string) error
 	HealthCheck(ctx context.Context) error
 	Shutdown(ctx context.Context) error
 }

@@ -104,6 +104,20 @@ func (b *brokerProxy) Queues(ctx context.Context) ([]broker.QueueInfo, error) {
 	return b.broker.Queues(ctx)
 }
 
+func (b *brokerProxy) QueueInfo(ctx context.Context, qname string) (broker.QueueInfo, error) {
+	if err := b.checkInit(); err != nil {
+		return broker.QueueInfo{}, err
+	}
+	return b.broker.QueueInfo(ctx, qname)
+}
+
+func (b *brokerProxy) DeleteQueue(ctx context.Context, qname string) error {
+	if err := b.checkInit(); err != nil {
+		return err
+	}
+	return b.broker.DeleteQueue(ctx, qname)
+}
+
 func (b *brokerProxy) HealthCheck(ctx context.Context) error {
 	if err := b.checkInit(); err != nil {
 		return err
