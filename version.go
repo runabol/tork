@@ -1,7 +1,7 @@
 package tork
 
 const (
-	Version = "0.1.149"
+	Version = "0.1.150"
 )
 
 var (
