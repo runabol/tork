@@ -56,6 +56,36 @@ func Test_getQueues(t *testing.T) {
 	assert.NoError(t, ds.Close())
 }
 
+func Test_getQueue(t *testing.T) {
+	b := broker.NewInMemoryBroker()
+	err := b.SubscribeForTasks("some-queue", func(t *tork.Task) error {
+		return nil
+	})
+	assert.NoError(t, err)
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    b,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, api)
+	req, err := http.NewRequest("GET", "/queues/some-queue", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+
+	q := broker.QueueInfo{}
+	err = json.Unmarshal(body, &q)
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, "some-queue", q.Name)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, ds.Close())
+}
+
 func Test_listJobs(t *testing.T) {
 	b := broker.NewInMemoryBroker()
 	ds, err := postgres.NewTestDatastore()
