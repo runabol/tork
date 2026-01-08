@@ -315,3 +315,21 @@ func TestRabbitMQTaskProgress(t *testing.T) {
 	<-processed
 	assert.NoError(t, err)
 }
+
+func TestRabbitMQDeleteQueue(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	qname := fmt.Sprintf("temp-queue-%s", uuid.NewUUID())
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		return nil
+	})
+	assert.NoError(t, err)
+	q, err := b.QueueInfo(ctx, qname)
+	assert.NoError(t, err)
+	assert.Equal(t, qname, q.Name)
+	err = b.DeleteQueue(ctx, qname)
+	assert.NoError(t, err)
+	q, err = b.QueueInfo(ctx, qname)
+	assert.Error(t, err)
+}

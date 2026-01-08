@@ -191,6 +191,24 @@ func (b *InMemoryBroker) Queues(ctx context.Context) ([]QueueInfo, error) {
 	return qi, nil
 }
 
+func (b *InMemoryBroker) QueueInfo(ctx context.Context, qname string) (QueueInfo, error) {
+	q, ok := b.queues.Get(qname)
+	if !ok {
+		return QueueInfo{}, errors.Errorf("queue %s not found", qname)
+	}
+	return QueueInfo{
+		Name:        qname,
+		Size:        q.size(),
+		Subscribers: len(q.subs),
+		Unacked:     int(atomic.LoadInt32(&q.unacked)),
+	}, nil
+}
+
+func (b *InMemoryBroker) DeleteQueue(ctx context.Context, qname string) error {
+	b.queues.Delete(qname)
+	return nil
+}
+
 func (b *InMemoryBroker) PublishHeartbeat(_ context.Context, n *tork.Node) error {
 	return b.publish(QUEUE_HEARTBEAT, n.Clone())
 }
