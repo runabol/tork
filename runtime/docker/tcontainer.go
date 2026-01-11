@@ -153,7 +153,7 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 		hc.PortBindings = nat.PortMap{
 			nat.Port(fmt.Sprintf("%d/tcp", t.Probe.Port)): []nat.PortBinding{
 				{
-					HostIP:   "localhost",
+					HostIP:   "127.0.0.1",
 					HostPort: "0", // Let Docker assign a random port
 				},
 			},
