@@ -144,6 +144,7 @@ func NewAPI(cfg Config) (*API, error) {
 
 		r.POST("/scheduled-jobs", s.createScheduledJob)
 		r.GET("/scheduled-jobs", s.listScheduledJobs)
+		r.GET("/scheduled-jobs/:id", s.getScheduledJob)
 		r.PUT("/scheduled-jobs/:id/pause", s.pauseScheduledJob)
 		r.PUT("/scheduled-jobs/:id/resume", s.resumeScheduledJob)
 		r.DELETE("/scheduled-jobs/:id", s.deleteScheduledJob)
@@ -634,6 +635,23 @@ func (s *API) listScheduledJobs(c echo.Context) error {
 		Items:      res.Items,
 		TotalItems: res.TotalItems,
 	})
+}
+
+// getScheduledJob
+// @Summary Get a scheduled job by id
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {object} tork.ScheduledJob
+// @Failure 404 {object} echo.HTTPError
+// @Router /scheduled-jobs/{id} [get]
+// @Param id path string true "Scheduled Job ID"
+func (s *API) getScheduledJob(c echo.Context) error {
+	id := c.Param("id")
+	sj, err := s.ds.GetScheduledJobByID(c.Request().Context(), id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	return c.JSON(http.StatusOK, sj)
 }
 
 func (s *API) pauseScheduledJob(c echo.Context) error {
