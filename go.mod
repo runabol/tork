@@ -1,6 +1,6 @@
 module github.com/runabol/tork
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.2
 
@@ -35,7 +35,7 @@ require (
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sys v0.32.0
-	golang.org/x/time v0.8.0
+	golang.org/x/time v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.1
 )
