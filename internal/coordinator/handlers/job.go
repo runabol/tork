@@ -225,9 +225,10 @@ func (h *jobHandler) failJob(ctx context.Context, j *tork.Job) error {
 	if err := cancelActiveTasks(ctx, h.ds, h.broker, j.ID); err != nil {
 		return err
 	}
-	j, err := h.ds.GetJobByID(ctx, j.ID)
+	jobID := j.ID
+	j, err := h.ds.GetJobByID(ctx, jobID)
 	if err != nil {
-		return errors.Wrapf(err, "unknown job: %s", j.ID)
+		return errors.Wrapf(err, "unknown job: %s", jobID)
 	}
 	if j.State == tork.JobStateFailed {
 		return h.broker.PublishEvent(ctx, broker.TOPIC_JOB_FAILED, j)
