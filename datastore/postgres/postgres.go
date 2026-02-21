@@ -30,6 +30,10 @@ type PostgresDatastore struct {
 	rand                  *rand.Rand
 	disableCleanup        bool
 	encryptionKey         *string
+	maxOpenConns          int
+	maxIdleConns          int
+	connMaxLifetime       time.Duration
+	connMaxIdleTime       time.Duration
 }
 
 var (
@@ -69,6 +73,30 @@ func WithEncryptionKey(val string) Option {
 	}
 }
 
+func WithMaxOpenConns(n int) Option {
+	return func(ds *PostgresDatastore) {
+		ds.maxOpenConns = n
+	}
+}
+
+func WithMaxIdleConns(n int) Option {
+	return func(ds *PostgresDatastore) {
+		ds.maxIdleConns = n
+	}
+}
+
+func WithConnMaxLifetime(d time.Duration) Option {
+	return func(ds *PostgresDatastore) {
+		ds.connMaxLifetime = d
+	}
+}
+
+func WithConnMaxIdleTime(d time.Duration) Option {
+	return func(ds *PostgresDatastore) {
+		ds.connMaxIdleTime = d
+	}
+}
+
 func NewTestDatastore() (*PostgresDatastore, error) {
 	schemaName := fmt.Sprintf("tork%s", uuid.NewUUID())
 	dsn := `host=localhost user=tork password=tork dbname=tork search_path=%s sslmode=disable`
@@ -96,6 +124,19 @@ func NewPostgresDataStore(dsn string, opts ...Option) (*PostgresDatastore, error
 	}
 	for _, opt := range opts {
 		opt(ds)
+	}
+	// Apply connection pool settings
+	if ds.maxOpenConns > 0 {
+		db.SetMaxOpenConns(ds.maxOpenConns)
+	}
+	if ds.maxIdleConns > 0 {
+		db.SetMaxIdleConns(ds.maxIdleConns)
+	}
+	if ds.connMaxLifetime > 0 {
+		db.SetConnMaxLifetime(ds.connMaxLifetime)
+	}
+	if ds.connMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(ds.connMaxIdleTime)
 	}
 	ds.cleanupInterval = &initialCleanupInterval
 	if ds.logsRetentionDuration == nil {

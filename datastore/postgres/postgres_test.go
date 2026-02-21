@@ -13,6 +13,7 @@ import (
 	"github.com/runabol/tork/datastore"
 	"github.com/runabol/tork/db/postgres"
 
+	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -1725,4 +1726,25 @@ func TestPostgresUpdateScheduledJobWithEncryptedSecrets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, tork.ScheduledJobStatePaused, updatedSJ.State)
 	assert.Equal(t, map[string]string{"password": "secret"}, updatedSJ.Secrets)
+}
+
+func TestPostgresConnectionPoolOptions(t *testing.T) {
+	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
+	ds, err := NewPostgresDataStore(dsn,
+		WithMaxOpenConns(10),
+		WithMaxIdleConns(5),
+		WithConnMaxLifetime(time.Hour),
+		WithConnMaxIdleTime(time.Minute*30),
+	)
+	assert.NoError(t, err)
+	defer fns.CloseIgnore(ds)
+
+	// Verify pool settings were applied
+	stats := ds.db.Stats()
+	assert.Equal(t, 10, stats.MaxOpenConnections)
+
+	// Verify the datastore is functional with pool settings
+	ctx := context.Background()
+	err = ds.HealthCheck(ctx)
+	assert.NoError(t, err)
 }
