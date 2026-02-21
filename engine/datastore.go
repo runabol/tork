@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/runabol/tork"
@@ -277,6 +278,10 @@ func (e *Engine) createDatastore(dstype string) (datastore.Datastore, error) {
 			postgres.WithLogsRetentionDuration(conf.DurationDefault("datastore.retention.logs.duration", postgres.DefaultLogsRetentionDuration)),
 			postgres.WithJobsRetentionDuration(conf.DurationDefault("datastore.retention.jobs.duration", postgres.DefaultJobsRetentionDuration)),
 			postgres.WithEncryptionKey(conf.String("datastore.encryption.key")),
+			postgres.WithMaxOpenConns(conf.IntDefault("datastore.postgres.max_open_conns", 25)),
+			postgres.WithMaxIdleConns(conf.IntDefault("datastore.postgres.max_idle_conns", 25)),
+			postgres.WithConnMaxLifetime(conf.DurationDefault("datastore.postgres.conn_max_lifetime", time.Hour)),
+			postgres.WithConnMaxIdleTime(conf.DurationDefault("datastore.postgres.conn_max_idle_time", time.Minute*5)),
 		)
 	default:
 		return nil, errors.Errorf("unknown datastore type: %s", dstype)
