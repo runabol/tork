@@ -1640,6 +1640,7 @@ func (ds *PostgresDatastore) WithTx(ctx context.Context, f func(tx datastore.Dat
 	}
 	if owner {
 		if err := tx.Commit(); err != nil {
+			_ = tx.Rollback()
 			return errors.Wrapf(err, "error committing transaction")
 		}
 	}
