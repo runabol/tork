@@ -712,6 +712,101 @@ HTTPServer(('0.0.0.0', 9090), Handler).serve_forever()`,
 	assert.Equal(t, "Hello from sidecar", t1.Result)
 }
 
+func TestRunTaskWithSidecarNetworkCleanup(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+
+	// Run a task with sidecars, which should create a network
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "echo hello > $TORK_OUTPUT",
+		Sidecars: []*tork.Task{{
+			Image: "busybox:stable",
+			Run:   "echo hello sidecar",
+		}},
+	}
+
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello\n", t1.Result)
+
+	// Verify that the network was created (it should be in t1.Networks)
+	assert.NotEmpty(t, t1.Networks, "Task should have networks assigned")
+	networkID := t1.Networks[0]
+
+	// Wait a bit for cleanup to complete (retry logic may take up to ~1.5 seconds)
+	// Check multiple times to account for retry delays
+	maxWait := 3 * time.Second
+	checkInterval := 200 * time.Millisecond
+	deadline := time.Now().Add(maxWait)
+
+	var networkExists bool
+	for time.Now().Before(deadline) {
+		_, err := rt.client.NetworkInspect(ctx, networkID, types.NetworkInspectOptions{})
+		if err != nil {
+			// Network doesn't exist - cleanup succeeded
+			networkExists = false
+			break
+		}
+		networkExists = true
+		time.Sleep(checkInterval)
+	}
+
+	// The network should have been cleaned up
+	assert.False(t, networkExists, "Network %s should have been removed after task completion", networkID)
+}
+
+func TestRunTaskWithSidecarNetworkCleanupOnError(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NotNil(t, rt)
+
+	ctx := context.Background()
+
+	// Run a task with sidecars that will fail, which should still clean up the network
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "bad_command_that_fails",
+		Sidecars: []*tork.Task{{
+			Image: "busybox:stable",
+			Run:   "echo hello sidecar",
+		}},
+	}
+
+	err = rt.Run(ctx, t1)
+	assert.Error(t, err, "Task should fail")
+
+	// Verify that the network was created (it should be in t1.Networks)
+	if len(t1.Networks) > 0 {
+		networkID := t1.Networks[0]
+
+		// Wait a bit for cleanup to complete
+		maxWait := 3 * time.Second
+		checkInterval := 200 * time.Millisecond
+		deadline := time.Now().Add(maxWait)
+
+		var networkExists bool
+		for time.Now().Before(deadline) {
+			_, err := rt.client.NetworkInspect(ctx, networkID, types.NetworkInspectOptions{})
+			if err != nil {
+				// Network doesn't exist - cleanup succeeded
+				networkExists = false
+				break
+			}
+			networkExists = true
+			time.Sleep(checkInterval)
+		}
+
+		// The network should have been cleaned up even on error
+		assert.False(t, networkExists, "Network %s should have been removed even after task error", networkID)
+	}
+}
+
 func TestRunTaskWithPreWithError(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
