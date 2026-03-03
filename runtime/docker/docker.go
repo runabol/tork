@@ -147,6 +147,7 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}()
 
 	// if the tasks has sidecars, we need to create a network
+	var networkID string
 	if len(t.Sidecars) > 0 {
 		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
 			CheckDuplicate: true,
@@ -155,15 +156,10 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 		if err != nil {
 			return errors.Wrapf(err, "error creating network")
 		}
-		log.Debug().Msgf("Created network with ID %s", networkCreateResp.ID)
-		defer func() {
-			// remove the network when the task is done
-			log.Debug().Msgf("Removing network with ID %s", networkCreateResp.ID)
-			if err := rt.client.NetworkRemove(context.Background(), networkCreateResp.ID); err != nil {
-				log.Error().Err(err).Msgf("error removing network")
-			}
-		}()
-		t.Networks = append(t.Networks, networkCreateResp.ID)
+		networkID = networkCreateResp.ID
+		log.Debug().Msgf("Created network with ID %s", networkID)
+		t.Networks = append(t.Networks, networkID)
+		defer rt.removeNetwork(context.Background(), networkID)
 	}
 
 	// prepare mounts
@@ -216,6 +212,7 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -273,6 +270,31 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 func (rt *DockerRuntime) HealthCheck(ctx context.Context) error {
 	_, err := rt.client.Ping(ctx)
 	return err
+}
+
+// removeNetwork attempts to remove a network with retry logic.
+// Docker cannot remove a network if containers are still connected to it,
+// so we retry with a small delay to ensure containers are fully removed first.
+func (rt *DockerRuntime) removeNetwork(ctx context.Context, networkID string) {
+	log.Debug().Msgf("Removing network with ID %s", networkID)
+	maxRetries := 5
+	// 200ms, 400ms, 800ms, 1600ms, 3200ms
+	delay := 200 * time.Millisecond
+	for i := range maxRetries {
+		err := rt.client.NetworkRemove(ctx, networkID)
+		if err == nil {
+			log.Debug().Msgf("Successfully removed network %s", networkID)
+			return
+		}
+		// If it's the last retry, return the error
+		if i == maxRetries-1 {
+			log.Error().Err(err).Msgf("failed to remove network %s after %d attempts", networkID, maxRetries)
+			return
+		}
+		log.Debug().Msgf("Failed to remove network %s (attempt %d/%d), retrying in %v: %v", networkID, i+1, maxRetries, delay, err)
+		time.Sleep(delay)
+		delay = delay * 2
+	}
 }
 
 // take from https://github.com/docker/cli/blob/9bd5ec504afd13e82d5e50b60715e7190c1b2aa0/opts/opts.go#L393-L403
