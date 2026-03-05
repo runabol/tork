@@ -147,16 +147,11 @@ func (rt *DockerRuntime) Run(ctx context.Context, t *tork.Task) error {
 	}()
 
 	// if the tasks has sidecars, we need to create a network
-	var networkID string
 	if len(t.Sidecars) > 0 {
-		networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
-			CheckDuplicate: true,
-			Driver:         "bridge",
-		})
+		networkID, err := rt.createNetwork(context.Background())
 		if err != nil {
 			return errors.Wrapf(err, "error creating network")
 		}
-		networkID = networkCreateResp.ID
 		log.Debug().Msgf("Created network with ID %s", networkID)
 		t.Networks = append(t.Networks, networkID)
 		defer rt.removeNetwork(context.Background(), networkID)
@@ -272,10 +267,25 @@ func (rt *DockerRuntime) HealthCheck(ctx context.Context) error {
 	return err
 }
 
+func (rt *DockerRuntime) createNetwork(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
+		CheckDuplicate: true,
+		Driver:         "bridge",
+	})
+	if err != nil {
+		return "", errors.Wrapf(err, "error creating network")
+	}
+	return networkCreateResp.ID, nil
+}
+
 // removeNetwork attempts to remove a network with retry logic.
 // Docker cannot remove a network if containers are still connected to it,
 // so we retry with a small delay to ensure containers are fully removed first.
 func (rt *DockerRuntime) removeNetwork(ctx context.Context, networkID string) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
 	log.Debug().Msgf("Removing network with ID %s", networkID)
 	maxRetries := 5
 	// 200ms, 400ms, 800ms, 1600ms, 3200ms
