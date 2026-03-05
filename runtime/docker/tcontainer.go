@@ -346,6 +346,11 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error inspecting container %s", tc.id)
 	}
+	ports := insp.NetworkSettings.Ports[nat.Port(fmt.Sprintf("%d/tcp", tc.task.Probe.Port))]
+	if len(ports) == 0 {
+		return errors.Errorf("no port found for container %s", tc.id)
+	}
+
 	portStr := insp.NetworkSettings.Ports[nat.Port(fmt.Sprintf("%d/tcp", tc.task.Probe.Port))][0].HostPort
 	portNum, err := strconv.Atoi(portStr)
 	if err != nil {
@@ -367,13 +372,40 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 		return errors.Wrapf(err, "error parsing probe timeout %s", tc.task.Probe.Timeout)
 	}
 
+	// read the container's stdout
+	out, err := tc.client.ContainerLogs(
+		ctx,
+		tc.id,
+		container.LogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+		},
+	)
+	if err != nil {
+		return errors.Wrapf(err, "error getting logs for container %s: %v\n", tc.id, err)
+	}
+	// close the stdout reader
+	defer func() {
+		if err := out.Close(); err != nil {
+			log.Error().Err(err).Msgf("error closing stdout on container %s", tc.id)
+		}
+	}()
+	// copy the container's stdout to the logger
+	go func() {
+		_, err = io.Copy(tc.logger, dockerLogsReader{reader: out})
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msgf("error reading the std out")
+		}
+	}()
+
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	for {
 		select {
 		case <-probeCtx.Done():
-			return errors.New("probe timed out after 1 minute")
+			return errors.Errorf("probe timed out after %s", tc.task.Probe.Timeout)
 		case <-time.After(time.Second):
 			req, err := http.NewRequestWithContext(probeCtx, http.MethodGet, probeURL, nil)
 			if err != nil {
