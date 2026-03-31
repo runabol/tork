@@ -348,6 +348,31 @@ func TestRunTaskWithBind(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRunTaskWithBindAndPropagation(t *testing.T) {
+	mm := runtime.NewMultiMounter()
+	vm, err := NewVolumeMounter()
+	assert.NoError(t, err)
+	mm.RegisterMounter("bind", NewBindMounter(BindConfig{Allowed: true}))
+	mm.RegisterMounter("volume", vm)
+	rt, err := NewDockerRuntime(WithMounter(mm))
+	assert.NoError(t, err)
+	ctx := context.Background()
+	dir := path.Join(os.TempDir(), uuid.NewUUID())
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		Run:   "echo hello world > /xyz/thing",
+		Mounts: []*tork.Mount{{
+			Type:   tork.MountTypeBind,
+			Target: "/xyz",
+			Source: dir,
+			Opts:   map[string]string{"propagation": "rslave"},
+		}},
+	}
+	err = rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
 func TestRunTaskWithTempfs(t *testing.T) {
 	rt, err := NewDockerRuntime(
 		WithMounter(NewTmpfsMounter()),
