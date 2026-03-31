@@ -247,7 +247,9 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 	// add mounts to the container
 	for _, mount := range t.Mounts {
 		switch mount.Type {
-		case tork.MountTypeVolume, tork.MountTypeBind:
+		case tork.MountTypeVolume:
+			createCmd.Args = append(createCmd.Args, "-v", fmt.Sprintf("%s:%s", mount.Source, mount.Target))
+		case tork.MountTypeBind:
 			createCmd.Args = append(createCmd.Args, "-v", formatVolumeSpec(mount))
 		default:
 			return fmt.Errorf("unknown mount type: %s", mount.Type)
