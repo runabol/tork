@@ -407,6 +407,37 @@ func TestRunTaskWithCustomMounter(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFormatVolumeSpec(t *testing.T) {
+	assert.Equal(t, "/src:/dst", formatVolumeSpec(&tork.Mount{Source: "/src", Target: "/dst"}))
+	assert.Equal(t, "/src:/dst:rslave", formatVolumeSpec(&tork.Mount{Source: "/src", Target: "/dst", Opts: map[string]string{"propagation": "rslave"}}))
+	assert.Equal(t, "/src:/dst:ro", formatVolumeSpec(&tork.Mount{Source: "/src", Target: "/dst", Opts: map[string]string{"readonly": "true"}}))
+	assert.Equal(t, "/src:/dst:ro,rslave", formatVolumeSpec(&tork.Mount{Source: "/src", Target: "/dst", Opts: map[string]string{"readonly": "true", "propagation": "rslave"}}))
+}
+
+func TestPodmanRunTaskWithBindAndPropagation(t *testing.T) {
+	mm := runtime.NewMultiMounter()
+	vm := NewVolumeMounter()
+	mm.RegisterMounter("bind", docker.NewBindMounter(docker.BindConfig{Allowed: true}))
+	mm.RegisterMounter("volume", vm)
+	rt := NewPodmanRuntime(WithMounter(mm))
+	ctx := context.Background()
+	dir := path.Join(os.TempDir(), uuid.NewUUID())
+	t1 := &tork.Task{
+		ID:    uuid.NewUUID(),
+		Name:  "Some task",
+		Image: "busybox:stable",
+		Run:   "echo hello world > /xyz/thing",
+		Mounts: []*tork.Mount{{
+			Type:   tork.MountTypeBind,
+			Target: "/xyz",
+			Source: dir,
+			Opts:   map[string]string{"propagation": "rslave"},
+		}},
+	}
+	err := rt.Run(ctx, t1)
+	assert.NoError(t, err)
+}
+
 func Test_imagePull(t *testing.T) {
 	ctx := context.Background()
 
