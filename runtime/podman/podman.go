@@ -250,7 +250,7 @@ func (d *PodmanRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Write
 		case tork.MountTypeVolume:
 			createCmd.Args = append(createCmd.Args, "-v", fmt.Sprintf("%s:%s", mount.Source, mount.Target))
 		case tork.MountTypeBind:
-			createCmd.Args = append(createCmd.Args, "-v", fmt.Sprintf("%s:%s", mount.Source, mount.Target))
+			createCmd.Args = append(createCmd.Args, "-v", formatVolumeSpec(mount))
 		default:
 			return fmt.Errorf("unknown mount type: %s", mount.Type)
 		}
@@ -381,6 +381,21 @@ func (d *PodmanRuntime) stop(ctx context.Context, t *tork.Task) error {
 		return fmt.Errorf("failed to stop container %s: %w", containerID, err)
 	}
 	return nil
+}
+
+func formatVolumeSpec(m *tork.Mount) string {
+	spec := fmt.Sprintf("%s:%s", m.Source, m.Target)
+	var opts []string
+	if m.Opts["readonly"] == "true" {
+		opts = append(opts, "ro")
+	}
+	if prop, ok := m.Opts["propagation"]; ok {
+		opts = append(opts, prop)
+	}
+	if len(opts) > 0 {
+		spec += ":" + strings.Join(opts, ",")
+	}
+	return spec
 }
 
 func (d *PodmanRuntime) HealthCheck(ctx context.Context) error {
