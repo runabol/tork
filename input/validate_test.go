@@ -660,6 +660,110 @@ func TestValidateMounts(t *testing.T) {
 	}
 	err = j.Validate(ds)
 	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some/target",
+						Opts:   map[string]string{"propagation": "rslave"},
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some/target",
+						Opts:   map[string]string{"propagation": "rshared"},
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(ds)
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some/target",
+						Opts:   map[string]string{"propogation": "rslave"},
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(ds)
+	assert.Error(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeBind,
+						Source: "/some/source",
+						Target: "/some/target",
+						Opts:   map[string]string{"readonly": "true"},
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(ds)
+	assert.NoError(t, err)
+
+	j = Job{
+		Name: "test job",
+		Tasks: []Task{
+			{
+				Name:  "test task",
+				Image: "some:image",
+				Run:   "some script",
+				Mounts: []Mount{
+					{
+						Type:   tork.MountTypeVolume,
+						Target: "/some/target",
+						Opts:   map[string]string{"driver_opt_1": "value"},
+					},
+				},
+			},
+		},
+	}
+	err = j.Validate(ds)
+	assert.NoError(t, err)
 	assert.NoError(t, ds.Close())
 }
 

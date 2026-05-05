@@ -77,13 +77,21 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 		default:
 			return nil, errors.Errorf("unknown mount type: %s", m.Type)
 		}
-		mount := mount.Mount{
-			Type:   mt,
-			Source: m.Source,
-			Target: m.Target,
+		mn := mount.Mount{
+			Type:     mt,
+			Source:   m.Source,
+			Target:   m.Target,
+			ReadOnly: m.Opts["readonly"] == "true",
 		}
-		log.Debug().Msgf("Mounting %s -> %s", mount.Source, mount.Target)
-		mounts = append(mounts, mount)
+		if mt == mount.TypeBind {
+			if prop, ok := m.Opts["propagation"]; ok {
+				mn.BindOptions = &mount.BindOptions{
+					Propagation: mount.Propagation(prop),
+				}
+			}
+		}
+		log.Debug().Msgf("Mounting %s -> %s", mn.Source, mn.Target)
+		mounts = append(mounts, mn)
 	}
 
 	torkdir := &tork.Mount{

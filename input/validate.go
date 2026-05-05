@@ -76,6 +76,8 @@ func validateMount(sl validator.StructLevel) {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
 	} else if mnt.Target == "/tork" {
 		sl.ReportError(mnt, "mount", "Mount", "invalidtarget", "")
+	} else if err := tork.ValidateMountOpts(mnt.toMount()); err != nil {
+		sl.ReportError(mnt, "mount", "Mount", "invalidopts", "")
 	}
 }
 
