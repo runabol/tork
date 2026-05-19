@@ -91,7 +91,7 @@ func TestRedactTask(t *testing.T) {
 
 	assert.Equal(t, "[REDACTED]", ta.Env["secret_1"])
 	assert.Equal(t, "[REDACTED]", ta.Env["SecrET_2"])
-	assert.Equal(t, "some [REDACTED]", ta.Env["something_3"])
+	assert.Equal(t, "[REDACTED]", ta.Env["something_3"])
 	assert.Equal(t, "[REDACTED]", ta.Env["PASSword"])
 	assert.Equal(t, "hello world", ta.Env["harmless"])
 	assert.Equal(t, "[REDACTED]", ta.Env["AWS_ACCESS_KEY_ID"])
@@ -105,7 +105,7 @@ func TestRedactTask(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", ta.Registry.Password)
 	assert.Equal(t, "[REDACTED]", ta.Env["thing"])
 	assert.Equal(t, "[REDACTED]", ta.SubJob.Secrets["hush"])
-	assert.Equal(t, "bearer [REDACTED]", ta.SubJob.Webhooks[0].Headers["token"])
+	assert.Equal(t, "[REDACTED]", ta.SubJob.Webhooks[0].Headers["token"])
 	assert.Equal(t, "[REDACTED]", ta.Mounts[0].Opts["secret"])
 	assert.NoError(t, ds.Close())
 }
@@ -242,5 +242,26 @@ func TestRedactJobWildcard(t *testing.T) {
 	assert.Equal(t, "secret", j.Tasks[0].Env["_secret_2"])
 	assert.Equal(t, "password", j.Tasks[0].Env["PASSword"])
 	assert.Equal(t, "hello world", j.Tasks[0].Env["harmless"])
+	assert.NoError(t, ds.Close())
+}
+
+func Test_redactVars(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds)
+	redacted := redacter.redactVars(map[string]string{
+		"secret":    "secret",
+		"something": "else",
+		"lots_of_a": "aaaaaa",
+	}, map[string]string{
+		"secret": "secret",
+		"empty":  "",
+		"a":      "a",
+		"tab":    "\t",
+		"space":  " ",
+	})
+	assert.Equal(t, "[REDACTED]", redacted["secret"])
+	assert.Equal(t, "else", redacted["something"])
+	assert.Equal(t, "[REDACTED]", redacted["lots_of_a"])
 	assert.NoError(t, ds.Close())
 }
