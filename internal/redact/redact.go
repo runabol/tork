@@ -136,16 +136,24 @@ func (r *Redacter) RedactJob(j *tork.Job) {
 func (r *Redacter) redactVars(m map[string]string, secrets map[string]string) map[string]string {
 	redacted := make(map[string]string)
 	for k, v := range m {
-		for _, m := range r.matchers {
-			if m(k) {
-				v = redactedStr
-				break
-			}
-		}
-		for _, secret := range secrets {
-			v = strings.ReplaceAll(v, secret, redactedStr)
-		}
-		redacted[k] = v
+		redacted[k] = r.redactVar(k, v, secrets)
 	}
 	return redacted
+}
+
+func (r *Redacter) redactVar(k, v string, secrets map[string]string) string {
+	for _, m := range r.matchers {
+		if m(k) {
+			return redactedStr
+		}
+	}
+	for _, secret := range secrets {
+		if secret == "" {
+			continue
+		}
+		if strings.Contains(v, secret) {
+			return redactedStr
+		}
+	}
+	return v
 }
