@@ -265,3 +265,21 @@ func Test_redactVars(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", redacted["lots_of_a"])
 	assert.NoError(t, ds.Close())
 }
+
+func TestRedactTaskLogPart(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds)
+	p := &tork.TaskLogPart{
+		Contents: "line 1 -- 1234 -- a -- \t --  ",
+	}
+	redacter.RedactTaskLogPart(p, map[string]string{
+		"secret": "1234",
+		"empty":  "",
+		"a":      "a",
+		"tab":    "\t",
+		"space":  " ",
+	})
+	assert.Equal(t, "line 1 -- [REDACTED] -- [REDACTED] -- \t --  ", p.Contents)
+	assert.NoError(t, ds.Close())
+}

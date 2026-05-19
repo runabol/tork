@@ -61,6 +61,9 @@ func (r *Redacter) RedactTask(t *tork.Task) {
 func (r *Redacter) RedactTaskLogPart(p *tork.TaskLogPart, secrets map[string]string) {
 	contents := p.Contents
 	for _, secret := range secrets {
+		if strings.TrimSpace(secret) == "" {
+			continue
+		}
 		contents = strings.ReplaceAll(contents, secret, redactedStr)
 	}
 	p.Contents = contents
@@ -148,7 +151,7 @@ func (r *Redacter) redactVar(k, v string, secrets map[string]string) string {
 		}
 	}
 	for _, secret := range secrets {
-		if secret == "" {
+		if strings.TrimSpace(secret) == "" {
 			continue
 		}
 		if strings.Contains(v, secret) {
