@@ -64,6 +64,11 @@ func (r *Redacter) RedactTaskLogPart(p *tork.TaskLogPart, secrets map[string]str
 		if strings.TrimSpace(secret) == "" {
 			continue
 		}
+		// if the secret appears more than once, redact the whole line
+		if strings.Count(contents, secret) > 1 {
+			contents = redactedStr
+			break
+		}
 		contents = strings.ReplaceAll(contents, secret, redactedStr)
 	}
 	p.Contents = contents

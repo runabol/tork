@@ -283,3 +283,17 @@ func TestRedactTaskLogPart(t *testing.T) {
 	assert.Equal(t, "line 1 -- [REDACTED] -- [REDACTED] -- \t --  ", p.Contents)
 	assert.NoError(t, ds.Close())
 }
+
+func TestRedactTaskLogPartMultipleOccurrences(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacter(ds)
+	p := &tork.TaskLogPart{
+		Contents: "--- a -- a -- a --- a",
+	}
+	redacter.RedactTaskLogPart(p, map[string]string{
+		"a": "a",
+	})
+	assert.Equal(t, "[REDACTED]", p.Contents)
+	assert.NoError(t, ds.Close())
+}
