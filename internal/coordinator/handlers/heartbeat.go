@@ -25,7 +25,7 @@ func (h *heartbeatHandler) handle(ctx context.Context, n *tork.Node) error {
 	if err == datastore.ErrNodeNotFound {
 		log.Info().
 			Str("node-id", n.ID).
-			Str("hostname", n.Hostname).
+			Str("node-hostname", n.Hostname).
 			Msg("received first heartbeat")
 		return h.ds.CreateNode(ctx, n)
 	}
