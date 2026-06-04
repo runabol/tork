@@ -61,3 +61,35 @@ func TestLogShipperWriteBufferFull(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestLogShipperSplitsLargeBuffer(t *testing.T) {
+	b := NewInMemoryBroker()
+
+	parts := make(chan string, 2)
+	err := b.SubscribeForTaskLogPart(func(p *tork.TaskLogPart) {
+		parts <- p.Contents
+	})
+	assert.NoError(t, err)
+
+	fwd := NewLogShipper(b, "some-task-id")
+	payload := make([]byte, maxLogPartSize+1000)
+	for i := range payload {
+		payload[i] = 'x'
+	}
+	_, err = fwd.Write(payload)
+	assert.NoError(t, err)
+
+	received := make([]string, 0, 2)
+	for i := 0; i < 2; i++ {
+		select {
+		case part := <-parts:
+			received = append(received, part)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for log part %d", i+1)
+		}
+	}
+
+	assert.Len(t, received, 2)
+	assert.Len(t, received[0], maxLogPartSize)
+	assert.Len(t, received[1], 1000)
+}

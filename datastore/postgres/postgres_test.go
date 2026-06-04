@@ -1120,6 +1120,36 @@ func TestPostgresQueryTaskLogs(t *testing.T) {
 	assert.Equal(t, "line 91", logs.Items[0].Contents)
 }
 
+func TestPostgresCreateLargeTaskLogPart(t *testing.T) {
+	ctx := context.Background()
+	ds, err := NewTestDatastore()
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	j1 := tork.Job{ID: uuid.NewUUID()}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	t1 := tork.Task{
+		ID:        uuid.NewUUID(),
+		CreatedAt: &now,
+		JobID:     j1.ID,
+	}
+	err = ds.CreateTask(ctx, &t1)
+	assert.NoError(t, err)
+
+	contents := strings.Repeat("x", 1301604)
+	err = ds.CreateTaskLogPart(ctx, &tork.TaskLogPart{
+		Number:   1,
+		TaskID:   t1.ID,
+		Contents: contents,
+	})
+	assert.NoError(t, err)
+
+	logs, err := ds.GetTaskLogParts(ctx, t1.ID, "", 1, 10)
+	assert.NoError(t, err)
+	assert.Len(t, logs.Items, 1)
+	assert.Equal(t, contents, logs.Items[0].Contents)
+}
+
 func TestPostgresCreateAndExpungeTaskLogs(t *testing.T) {
 	ctx := context.Background()
 	dsn := "host=localhost user=tork password=tork dbname=tork port=5432 sslmode=disable"
