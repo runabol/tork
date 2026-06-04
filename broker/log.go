@@ -8,6 +8,9 @@ import (
 	"github.com/runabol/tork"
 )
 
+// maxLogPartSize keeps each log part under PostgreSQL's tsvector input limit (~1 MiB).
+const maxLogPartSize = 512 * 1024
+
 type LogShipper struct {
 	Broker Broker
 	TaskID string
@@ -39,18 +42,29 @@ func (r *LogShipper) startFlushTimer() {
 		select {
 		case p := <-r.q:
 			buffer = append(buffer, p...)
-		case <-ticker.C:
-			if len(buffer) > 0 {
-				r.part = r.part + 1
-				if err := r.Broker.PublishTaskLogPart(context.Background(), &tork.TaskLogPart{
-					Number:   r.part,
-					TaskID:   r.TaskID,
-					Contents: string(buffer),
-				}); err != nil {
-					log.Error().Err(err).Msgf("error forwarding task log part")
-				}
-				buffer = buffer[:0] // clear buffer
+			if len(buffer) >= maxLogPartSize {
+				r.flush(&buffer)
 			}
+		case <-ticker.C:
+			r.flush(&buffer)
 		}
+	}
+}
+
+func (r *LogShipper) flush(buffer *[]byte) {
+	for len(*buffer) > 0 {
+		n := len(*buffer)
+		if n > maxLogPartSize {
+			n = maxLogPartSize
+		}
+		r.part++
+		if err := r.Broker.PublishTaskLogPart(context.Background(), &tork.TaskLogPart{
+			Number:   r.part,
+			TaskID:   r.TaskID,
+			Contents: string((*buffer)[:n]),
+		}); err != nil {
+			log.Error().Err(err).Msgf("error forwarding task log part")
+		}
+		*buffer = (*buffer)[n:]
 	}
 }
