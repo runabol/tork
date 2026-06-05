@@ -23,6 +23,7 @@ type ScheduledJobState string
 const (
 	ScheduledJobStateActive ScheduledJobState = "ACTIVE"
 	ScheduledJobStatePaused ScheduledJobState = "PAUSED"
+	ScheduledJobStateFailed ScheduledJobState = "FAILED"
 )
 
 type Job struct {

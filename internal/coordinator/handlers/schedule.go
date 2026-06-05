@@ -82,7 +82,7 @@ func NewJobSchedulerHandler(ds datastore.Datastore, b broker.Broker, l locker.Lo
 
 	for _, aj := range activeJobs {
 		if err := h.handle(ctx, aj); err != nil {
-			return nil, err
+			log.Error().Err(err).Str("jobID", aj.ID).Msg("error handling scheduled job on startup")
 		}
 	}
 
@@ -95,6 +95,8 @@ func (h *jobSchedulerHandler) handle(ctx context.Context, s *tork.ScheduledJob) 
 		return h.handleActive(ctx, s)
 	case tork.ScheduledJobStatePaused:
 		return h.handlePaused(ctx, s)
+	case tork.ScheduledJobStateFailed:
+		return h.handleFailed(ctx, s)
 	default:
 		return errors.Errorf("unknown scheduled jobs state: %s", s.State)
 	}
@@ -151,12 +153,28 @@ func (h *jobSchedulerHandler) handleActive(ctx context.Context, sj *tork.Schedul
 		gocron.WithName(sj.ID),
 	)
 	if err != nil {
-		return errors.Wrapf(err, "error scheduling job %s", sj.ID)
+		return h.markFailed(ctx, sj, err)
 	}
 	h.mu.Lock()
 	h.m[sj.ID] = cj
 	h.mu.Unlock()
-	return err
+	return nil
+}
+
+func (h *jobSchedulerHandler) markFailed(ctx context.Context, sj *tork.ScheduledJob, scheduleErr error) error {
+	log.Error().Err(scheduleErr).Str("jobID", sj.ID).Str("cron", sj.Cron).
+		Msg("invalid cron expression, marking scheduled job as failed")
+	if err := h.ds.UpdateScheduledJob(ctx, sj.ID, func(u *tork.ScheduledJob) error {
+		u.State = tork.ScheduledJobStateFailed
+		return nil
+	}); err != nil {
+		return errors.Wrapf(err, "error marking scheduled job %s as failed", sj.ID)
+	}
+	sj.State = tork.ScheduledJobStateFailed
+	if err := h.broker.PublishEvent(ctx, broker.TOPIC_SCHEDULED_JOB, sj); err != nil {
+		return errors.Wrapf(err, "error publishing failed state for scheduled job %s", sj.ID)
+	}
+	return nil
 }
 
 func (h *jobSchedulerHandler) handlePaused(_ context.Context, s *tork.ScheduledJob) error {
@@ -167,6 +185,23 @@ func (h *jobSchedulerHandler) handlePaused(_ context.Context, s *tork.ScheduledJ
 		return errors.Errorf("unknown scheduled job: %s", s.ID)
 	}
 	log.Info().Msgf("Pausing scheduled job %s", gjob.ID())
+	if err := h.scheduler.RemoveJob(gjob.ID()); err != nil {
+		return err
+	}
+	h.mu.Lock()
+	delete(h.m, s.ID)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *jobSchedulerHandler) handleFailed(_ context.Context, s *tork.ScheduledJob) error {
+	h.mu.Lock()
+	gjob, ok := h.m[s.ID]
+	h.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	log.Info().Msgf("Removing failed scheduled job %s from scheduler", s.ID)
 	if err := h.scheduler.RemoveJob(gjob.ID()); err != nil {
 		return err
 	}
