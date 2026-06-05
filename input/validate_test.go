@@ -698,6 +698,19 @@ func TestValidateWebhook(t *testing.T) {
 	assert.NoError(t, ds.Close())
 }
 
+func TestScheduledJobValidateRejectsInvalidCron(t *testing.T) {
+	sj := ScheduledJob{
+		Name: "test",
+		Tasks: []Task{{
+			Name:  "t",
+			Image: "img",
+		}},
+		Schedule: &Schedule{Cron: "0 0 * * 7"},
+	}
+	err := sj.Validate(nil)
+	assert.Error(t, err)
+}
+
 func TestValidateCron(t *testing.T) {
 	validate := validator.New()
 	err := validate.RegisterValidation("cron", validateCron)
@@ -710,6 +723,7 @@ func TestValidateCron(t *testing.T) {
 	}{
 		{"Valid cron expression", "0 0 * * *", false},
 		{"Valid cron expression", "0/10 0 * * *", false},
+		{"Invalid cron expression with Sunday as 7", "0 0 * * 7", true},
 		{"Invalid cron expression", "invalid-cron", true},
 		{"Empty cron expression", "", true},
 		{"Valid cron expression with seconds", "0 0 0 * * *", true},

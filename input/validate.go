@@ -46,6 +46,9 @@ func (ji ScheduledJob) Validate(ds datastore.Datastore) error {
 	if err := validate.RegisterValidation("expr", validateExpr); err != nil {
 		return err
 	}
+	if err := validate.RegisterValidation("cron", validateCron); err != nil {
+		return err
+	}
 	validate.RegisterStructValidation(validateMount, Mount{})
 	validate.RegisterStructValidation(taskInputValidation, Task{})
 	validate.RegisterStructValidation(validatePermission(ds), Permission{})

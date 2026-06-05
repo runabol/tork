@@ -682,8 +682,8 @@ func (s *API) resumeScheduledJob(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	if j.State != tork.ScheduledJobStatePaused {
-		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not paused")
+	if j.State != tork.ScheduledJobStatePaused && j.State != tork.ScheduledJobStateFailed {
+		return echo.NewHTTPError(http.StatusBadRequest, "scheduled job is not paused or failed")
 	}
 	j.State = tork.ScheduledJobStateActive
 	if err := s.ds.UpdateScheduledJob(c.Request().Context(), id, func(u *tork.ScheduledJob) error {
