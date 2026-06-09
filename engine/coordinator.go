@@ -55,10 +55,15 @@ func (e *Engine) initCoordinator() error {
 		for i, pattern := range patterns {
 			matchers[i] = redact.Wildcard(pattern)
 		}
-		redacter := redact.NewRedacter(e.datastoreRef, matchers...)
+		excludePatterns := conf.Strings("middleware.job.redact.exclude.patterns")
+		exclusions := make([]redact.Matcher, len(excludePatterns))
+		for i, pattern := range excludePatterns {
+			exclusions[i] = redact.Wildcard(pattern)
+		}
+		redacter := redact.NewRedacterWithMatchers(e.datastoreRef, exclusions, matchers...)
 		cfg.Middleware.Job = append(cfg.Middleware.Job, job.Redact(redacter))
 		cfg.Middleware.Task = append(cfg.Middleware.Task, task.Redact(redacter))
-		cfg.Middleware.Log = append(cfg.Middleware.Log, logmw.Redact(e.datastoreRef))
+		cfg.Middleware.Log = append(cfg.Middleware.Log, logmw.Redact(redacter))
 	}
 
 	// webhook middleware

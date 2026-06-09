@@ -2,6 +2,7 @@ package redact
 
 import (
 	"context"
+	"maps"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -15,17 +16,23 @@ const (
 )
 
 type Redacter struct {
-	matchers []Matcher
-	ds       datastore.Datastore
+	matchers   []Matcher
+	exclusions []Matcher
+	ds         datastore.Datastore
 }
 
-func NewRedacter(ds datastore.Datastore, matchers ...Matcher) *Redacter {
+func NewRedacter(ds datastore.Datastore) *Redacter {
+	return NewRedacterWithMatchers(ds, nil)
+}
+
+func NewRedacterWithMatchers(ds datastore.Datastore, exclusions []Matcher, matchers ...Matcher) *Redacter {
 	if len(matchers) == 0 {
 		matchers = defaultMatchers
 	}
 	return &Redacter{
-		matchers: matchers,
-		ds:       ds,
+		matchers:   matchers,
+		exclusions: exclusions,
+		ds:         ds,
 	}
 }
 
@@ -60,7 +67,10 @@ func (r *Redacter) RedactTask(t *tork.Task) {
 
 func (r *Redacter) RedactTaskLogPart(p *tork.TaskLogPart, secrets map[string]string) {
 	contents := p.Contents
-	for _, secret := range secrets {
+	for name, secret := range secrets {
+		if r.isExcluded(name) {
+			continue
+		}
 		if strings.TrimSpace(secret) == "" {
 			continue
 		}
@@ -72,6 +82,26 @@ func (r *Redacter) RedactTaskLogPart(p *tork.TaskLogPart, secrets map[string]str
 		contents = strings.ReplaceAll(contents, secret, redactedStr)
 	}
 	p.Contents = contents
+}
+
+func (r *Redacter) RedactTaskLogParts(ctx context.Context, parts []*tork.TaskLogPart) error {
+	if len(parts) == 0 {
+		return nil
+	}
+	task, err := r.ds.GetTaskByID(ctx, parts[0].TaskID)
+	if err != nil {
+		log.Error().Err(err).Msg("error getting task for log")
+		return err
+	}
+	job, err := r.ds.GetJobByID(ctx, task.JobID)
+	if err != nil {
+		log.Error().Err(err).Msg("error getting job for log")
+		return err
+	}
+	for _, p := range parts {
+		r.RedactTaskLogPart(p, job.Secrets)
+	}
+	return nil
 }
 
 func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
@@ -115,29 +145,29 @@ func (r *Redacter) doRedactTask(t *tork.Task, secrets map[string]string) {
 }
 
 func (r *Redacter) RedactJob(j *tork.Job) {
+	secrets := maps.Clone(j.Secrets)
 	redacted := j
 	// redact inputs
-	redacted.Inputs = r.redactVars(redacted.Inputs, j.Secrets)
+	redacted.Inputs = r.redactVars(redacted.Inputs, secrets)
+	// redact secrets
+	redacted.Secrets = r.redactVars(redacted.Secrets, secrets)
 	// redact webhook headers
 	for _, w := range j.Webhooks {
 		if w.Headers != nil {
-			w.Headers = r.redactVars(w.Headers, j.Secrets)
+			w.Headers = r.redactVars(w.Headers, secrets)
 		}
 	}
 	// redact context
-	redacted.Context.Inputs = r.redactVars(redacted.Context.Inputs, j.Secrets)
-	redacted.Context.Secrets = r.redactVars(redacted.Context.Secrets, j.Secrets)
-	redacted.Context.Tasks = r.redactVars(redacted.Context.Tasks, j.Secrets)
+	redacted.Context.Inputs = r.redactVars(redacted.Context.Inputs, secrets)
+	redacted.Context.Secrets = r.redactVars(redacted.Context.Secrets, secrets)
+	redacted.Context.Tasks = r.redactVars(redacted.Context.Tasks, secrets)
 	// redact tasks
 	for _, t := range redacted.Tasks {
-		r.doRedactTask(t, j.Secrets)
+		r.doRedactTask(t, secrets)
 	}
 	// redact execution
 	for _, t := range redacted.Execution {
-		r.doRedactTask(t, j.Secrets)
-	}
-	for k := range j.Secrets {
-		redacted.Secrets[k] = redactedStr
+		r.doRedactTask(t, secrets)
 	}
 }
 
@@ -150,12 +180,17 @@ func (r *Redacter) redactVars(m map[string]string, secrets map[string]string) ma
 }
 
 func (r *Redacter) redactVar(k, v string, secrets map[string]string) string {
-	for _, m := range r.matchers {
-		if m(k) {
-			return redactedStr
+	if !r.isExcluded(k) {
+		for _, m := range r.matchers {
+			if m(k) {
+				return redactedStr
+			}
 		}
 	}
-	for _, secret := range secrets {
+	for name, secret := range secrets {
+		if r.isExcluded(name) {
+			continue
+		}
 		if strings.TrimSpace(secret) == "" {
 			continue
 		}
@@ -164,4 +199,13 @@ func (r *Redacter) redactVar(k, v string, secrets map[string]string) string {
 		}
 	}
 	return v
+}
+
+func (r *Redacter) isExcluded(k string) bool {
+	for _, m := range r.exclusions {
+		if m(k) {
+			return true
+		}
+	}
+	return false
 }

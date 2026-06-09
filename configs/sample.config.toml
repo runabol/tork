@@ -89,6 +89,8 @@ skip = ["GET /health"] # supports wildcards (*)
 
 [middleware.job.redact]
 enabled = false
+# patterns = ["*SECRET*"]       # key patterns to redact (wildcards supported)
+# exclude.patterns = ["*_PUBLIC"] # key patterns to skip redacting
 
 [middleware.task.hostenv]
 vars = [

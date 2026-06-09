@@ -191,6 +191,28 @@ func TestRedactJob(t *testing.T) {
 	assert.Equal(t, "http://example.com/1", j.Webhooks[0].URL)
 	assert.Equal(t, "http://example.com/2", j.Webhooks[1].URL)
 	assert.Equal(t, map[string]string{"my-header": "my-value", "my-secret": "[REDACTED]", "another-header": "[REDACTED]"}, j.Webhooks[1].Headers)
+	assert.Equal(t, "[REDACTED]", j.Secrets["something"])
+}
+
+func TestRedactJobSecrets(t *testing.T) {
+	o := &tork.Job{
+		Secrets: map[string]string{
+			"db_password":   "secret123",
+			"token_public":  "public-token",
+			"config_path":   "/etc/app",
+		},
+	}
+	j := o.Clone()
+
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacterWithMatchers(ds, []Matcher{Wildcard("*_public")})
+	redacter.RedactJob(j)
+
+	assert.Equal(t, "[REDACTED]", j.Secrets["db_password"])
+	assert.Equal(t, "public-token", j.Secrets["token_public"])
+	assert.Equal(t, "[REDACTED]", j.Secrets["config_path"])
+	assert.NoError(t, ds.Close())
 }
 
 func TestRedactJobContains(t *testing.T) {
@@ -218,6 +240,59 @@ func TestRedactJobContains(t *testing.T) {
 	assert.NoError(t, ds.Close())
 }
 
+func TestRedactJobExclusions(t *testing.T) {
+	o := &tork.Job{
+		Tasks: []*tork.Task{
+			{
+				Env: map[string]string{
+					"secret_1":        "secret",
+					"secret_public":   "visible",
+					"PASSWORD":        "password",
+					"PASSWORD_public": "visible",
+				},
+			},
+		},
+	}
+	j := o.Clone()
+
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacterWithMatchers(ds, []Matcher{Wildcard("*_public")})
+	redacter.RedactJob(j)
+
+	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
+	assert.Equal(t, "visible", j.Tasks[0].Env["secret_public"])
+	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["PASSWORD"])
+	assert.Equal(t, "visible", j.Tasks[0].Env["PASSWORD_public"])
+	assert.NoError(t, ds.Close())
+}
+
+func TestRedactJobExclusionsSkipExcludedSecretNames(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacterWithMatchers(ds, []Matcher{Wildcard("*_public")})
+	redacted := redacter.redactVars(map[string]string{
+		"my_var": "shhhhh",
+	}, map[string]string{
+		"hush_public": "shhhhh",
+	})
+	assert.Equal(t, "shhhhh", redacted["my_var"])
+	assert.NoError(t, ds.Close())
+}
+
+func TestRedactJobExclusionsStillRedactNonExcludedSecretNames(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	redacter := NewRedacterWithMatchers(ds, []Matcher{Wildcard("*_public")})
+	redacted := redacter.redactVars(map[string]string{
+		"my_var": "shhhhh",
+	}, map[string]string{
+		"hush": "shhhhh",
+	})
+	assert.Equal(t, "[REDACTED]", redacted["my_var"])
+	assert.NoError(t, ds.Close())
+}
+
 func TestRedactJobWildcard(t *testing.T) {
 	o := &tork.Job{
 		Tasks: []*tork.Task{
@@ -235,7 +310,7 @@ func TestRedactJobWildcard(t *testing.T) {
 
 	ds, err := postgres.NewTestDatastore()
 	assert.NoError(t, err)
-	redacter := NewRedacter(ds, Wildcard("secret*"))
+	redacter := NewRedacterWithMatchers(ds, nil, Wildcard("secret*"))
 	redacter.RedactJob(j)
 
 	assert.Equal(t, "[REDACTED]", j.Tasks[0].Env["secret_1"])
