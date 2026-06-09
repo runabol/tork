@@ -7,6 +7,7 @@ import (
 
 	"github.com/runabol/tork"
 	"github.com/runabol/tork/datastore/postgres"
+	"github.com/runabol/tork/internal/redact"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +37,7 @@ func TestRedactOnRead(t *testing.T) {
 	err = ds.CreateTask(context.Background(), tk)
 	assert.NoError(t, err)
 
-	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(ds)})
+	hm := ApplyMiddleware(NoOpHandlerFunc, []MiddlewareFunc{Redact(redact.NewRedacter(ds))})
 	p := &tork.TaskLogPart{
 		Contents: "line 1 -- 1234",
 		TaskID:   tk.ID,
