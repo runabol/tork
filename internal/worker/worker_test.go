@@ -544,3 +544,50 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
+
+type stubRuntime struct {
+	result string
+	err    error
+}
+
+func (s *stubRuntime) Run(ctx context.Context, t *tork.Task) error {
+	if s.err != nil {
+		return s.err
+	}
+	t.Result = s.result
+	return nil
+}
+
+func (s *stubRuntime) HealthCheck(ctx context.Context) error {
+	return nil
+}
+
+func Test_handleTaskRunResultTooLarge(t *testing.T) {
+	b := broker.NewInMemoryBroker()
+
+	errorsCh := make(chan any)
+	err := b.SubscribeForTasks(broker.QUEUE_ERROR, func(tk *tork.Task) error {
+		assert.Equal(t, tork.TaskStateFailed, tk.State)
+		assert.Contains(t, tk.Error, "task result exceeds maximum size of 5 bytes (got 6)")
+		close(errorsCh)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	w, err := NewWorker(Config{
+		Broker:  b,
+		Runtime: &stubRuntime{result: "123456"},
+		Limits: Limits{
+			MaxResultSize: 5,
+		},
+	})
+	assert.NoError(t, err)
+
+	err = w.handleTask(&tork.Task{
+		ID:    uuid.NewUUID(),
+		State: tork.TaskStateRunning,
+	})
+
+	assert.NoError(t, err)
+	<-errorsCh
+}
