@@ -50,6 +50,7 @@ type Limits struct {
 	DefaultCPUsLimit   string
 	DefaultMemoryLimit string
 	DefaultTimeout     string
+	MaxResultSize      int
 }
 
 type runningTask struct {
@@ -66,6 +67,9 @@ func NewWorker(cfg Config) (*Worker, error) {
 	}
 	if cfg.Runtime == nil {
 		return nil, errors.New("must provide runtime")
+	}
+	if cfg.Limits.MaxResultSize <= 0 {
+		cfg.Limits.MaxResultSize = DefaultMaxTaskResultSize
 	}
 	tasks := new(syncx.Map[string, runningTask])
 	w := &Worker{
@@ -197,6 +201,13 @@ func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 		t.FailedAt = &finished
 		t.State = tork.TaskStateFailed
 		t.Error = err.Error()
+		return nil
+	}
+	if len(t.Result) > w.limits.MaxResultSize {
+		finished := time.Now().UTC()
+		t.FailedAt = &finished
+		t.State = tork.TaskStateFailed
+		t.Error = fmt.Errorf("task result exceeds maximum size of %d bytes (got %d)", w.limits.MaxResultSize, len(t.Result)).Error()
 		return nil
 	}
 	finished := time.Now().UTC()

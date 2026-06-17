@@ -30,3 +30,4 @@ config.local.toml
 # Binaries
 tmp/
 config.toml
+tork
