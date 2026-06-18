@@ -281,6 +281,26 @@ func (r taskRecord) toTask() (*tork.Task, error) {
 	}, nil
 }
 
+func (r taskRecord) toTaskSummary() *tork.TaskSummary {
+	return &tork.TaskSummary{
+		ID:          r.ID,
+		JobID:       r.JobID,
+		Position:    r.Position,
+		Progress:    r.Progress,
+		Name:        r.Name,
+		Description: r.Description,
+		State:       tork.TaskState(r.State),
+		CreatedAt:   &r.CreatedAt,
+		ScheduledAt: r.ScheduledAt,
+		StartedAt:   r.StartedAt,
+		CompletedAt: r.CompletedAt,
+		Error:       r.Error,
+		Result:      r.Result,
+		Var:         r.Var,
+		Tags:        r.Tags,
+	}
+}
+
 func (r nodeRecord) toNode() *tork.Node {
 	n := tork.Node{
 		ID:              r.ID,

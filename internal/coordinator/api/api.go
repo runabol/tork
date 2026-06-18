@@ -34,9 +34,10 @@ import (
 )
 
 const (
-	MIN_PORT          = 8000
-	MAX_PORT          = 8100
-	MAX_LOG_PAGE_SIZE = 100
+	MIN_PORT                = 8000
+	MAX_PORT                = 8100
+	MAX_LOG_PAGE_SIZE       = 100
+	MAX_EXECUTION_PAGE_SIZE = 100
 )
 
 type HealthResponse struct {
@@ -137,6 +138,7 @@ func NewAPI(cfg Config) (*API, error) {
 	if v, ok := cfg.Enabled["jobs"]; !ok || v {
 		r.POST("/jobs", s.createJob)
 		r.GET("/jobs/:id", s.getJob)
+		r.GET("/jobs/:id/execution", s.getJobExecution)
 		r.GET("/jobs/:id/log", s.getJobLog)
 		r.GET("/jobs", s.listJobs)
 		r.PUT("/jobs/:id/cancel", s.cancelJob)
@@ -420,9 +422,28 @@ func bindInputYAML(target any, r io.ReadCloser) error {
 // @Failure 404 {object} echo.HTTPError
 // @Router /jobs/{id} [get]
 // @Param id path string true "Job ID"
+// @Param full query bool false "return full job (default: true)"
 func (s *API) getJob(c echo.Context) error {
 	ctx := c.Request().Context()
 	id := c.Param("id")
+	full := true
+	if fullParam := c.QueryParam("full"); fullParam != "" {
+		parsed, err := strconv.ParseBool(fullParam)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid full: %s", fullParam))
+		}
+		full = parsed
+	}
+	if !full {
+		j, err := s.ds.GetJobSummaryByID(ctx, id)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, err)
+		}
+		if err := s.onReadJob(ctx, job.Read, j); err != nil {
+			return err
+		}
+		return c.JSON(http.StatusOK, tork.NewJobSummary(j))
+	}
 	j, err := s.ds.GetJobByID(ctx, id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err)
@@ -431,6 +452,57 @@ func (s *API) getJob(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, j)
+}
+
+// getJobExecution
+// @Summary Get a job's execution tasks
+// @Tags jobs
+// @Produce application/json
+// @Success 200 {object} datastore.Page[tork.TaskSummary]
+// @Failure 404 {object} echo.HTTPError
+// @Router /jobs/{id}/execution [get]
+// @Param id path string true "Job ID"
+// @Param page query int false "page number"
+// @Param size query int false "page size"
+// @Param sort query string false "sort order (desc or asc, default: desc)"
+func (s *API) getJobExecution(c echo.Context) error {
+	id := c.Param("id")
+	sort := c.QueryParam("sort")
+	if sort == "" {
+		sort = "desc"
+	}
+	if sort != "desc" && sort != "asc" {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid sort: %s", sort))
+	}
+	ps := c.QueryParam("page")
+	if ps == "" {
+		ps = "1"
+	}
+	page, err := strconv.Atoi(ps)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid page number: %s", ps))
+	}
+	if page < 1 {
+		page = 1
+	}
+	si := c.QueryParam("size")
+	if si == "" {
+		si = "25"
+	}
+	size, err := strconv.Atoi(si)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid size: %s", si))
+	}
+	if size < 1 {
+		size = 1
+	} else if size > MAX_EXECUTION_PAGE_SIZE {
+		size = MAX_EXECUTION_PAGE_SIZE
+	}
+	exec, err := s.ds.GetJobExecution(c.Request().Context(), id, page, size, sort)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+	return c.JSON(http.StatusOK, exec)
 }
 
 // getJobLog

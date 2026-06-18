@@ -614,6 +614,89 @@ func TestPostgresUpdateJobConcurrently(t *testing.T) {
 	assert.Equal(t, 5, j2.Position)
 }
 
+func TestPostgresGetJobSummaryByID(t *testing.T) {
+	ctx := context.Background()
+	ds, err := NewTestDatastore()
+	assert.NoError(t, err)
+	defer fns.CloseIgnore(ds)
+	now := time.Now().UTC()
+	j1 := tork.Job{
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateRunning,
+		Name:      "summary-job",
+		TaskCount: 3,
+		Tasks: []*tork.Task{{
+			Name: "task-def",
+		}},
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	err = ds.CreateTask(ctx, &tork.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     j1.ID,
+		Position:  1,
+		Name:      "exec-task",
+		State:     tork.TaskStateCompleted,
+		CreatedAt: &now,
+	})
+	assert.NoError(t, err)
+
+	js, err := ds.GetJobSummaryByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, j1.ID, js.ID)
+	assert.Equal(t, "summary-job", js.Name)
+	assert.Equal(t, 3, js.TaskCount)
+	assert.Empty(t, js.Tasks)
+	assert.Empty(t, js.Execution)
+
+	_, err = ds.GetJobSummaryByID(ctx, "not-a-job")
+	assert.ErrorIs(t, err, datastore.ErrJobNotFound)
+}
+
+func TestPostgresGetJobExecution(t *testing.T) {
+	ctx := context.Background()
+	ds, err := NewTestDatastore()
+	assert.NoError(t, err)
+	defer fns.CloseIgnore(ds)
+	j1 := tork.Job{
+		ID:    uuid.NewUUID(),
+		State: tork.JobStateRunning,
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	for i := 0; i < 5; i++ {
+		started := now.Add(time.Duration(i) * time.Minute)
+		err = ds.CreateTask(ctx, &tork.Task{
+			ID:        uuid.NewUUID(),
+			JobID:     j1.ID,
+			Position:  i + 1,
+			Name:      fmt.Sprintf("task-%d", i+1),
+			State:     tork.TaskStateCompleted,
+			CreatedAt: &now,
+			StartedAt: &started,
+		})
+		assert.NoError(t, err)
+	}
+
+	page, err := ds.GetJobExecution(ctx, j1.ID, 1, 2, "desc")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page.Number)
+	assert.Equal(t, 2, len(page.Items))
+	assert.Equal(t, 5, page.TotalItems)
+	assert.Equal(t, 3, page.TotalPages)
+	assert.Equal(t, "task-5", page.Items[0].Name)
+	assert.Equal(t, "task-4", page.Items[1].Name)
+
+	page, err = ds.GetJobExecution(ctx, j1.ID, 1, 2, "asc")
+	assert.NoError(t, err)
+	assert.Equal(t, "task-1", page.Items[0].Name)
+	assert.Equal(t, "task-2", page.Items[1].Name)
+
+	_, err = ds.GetJobExecution(ctx, "not-a-job", 1, 10, "desc")
+	assert.ErrorIs(t, err, datastore.ErrJobNotFound)
+}
+
 func TestPostgresGetJobs(t *testing.T) {
 	ctx := context.Background()
 	schemaName := fmt.Sprintf("tork%d", rand.Int())
