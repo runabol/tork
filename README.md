@@ -40,7 +40,7 @@ Tork is a highly-scalable, general-purpose workflow engine. It lets you define j
 - **Task isolation** – Tasks run in containers for isolation, idempotency, and [resource limits](#limits)
 - **Automatic recovery** – Tasks are recovered if a worker crashes
 - **Stand-alone and distributed** – Run all-in-one or [distributed](#running-in-distributed-mode) with Coordinator + Workers
-- **Retry failed tasks** – Configurable [retry](#retry) with backoff
+- **Retry failed tasks** – Configurable [retry](#retry) (up to 10 attempts)
 - **Middleware** – [HTTP, Job, Task, Node middleware](#middleware) for auth, logging, metrics
 - **No single point of failure** – Stateless, leaderless coordinators
 - **Task timeout** – [Timeout](#timeout) per task
@@ -691,6 +691,8 @@ tasks:
 
 ### Retry
 
+Set `limit` (1–10) to retry a failed task that many times:
+
 ```yaml
 name: retry job
 tasks:
@@ -699,8 +701,6 @@ tasks:
     run: echo hello world
     retry:
       limit: 5
-      initialDelay: 5s
-      scalingFactor: 2
 ```
 
 ### Priority
