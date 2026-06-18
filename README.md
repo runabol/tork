@@ -283,10 +283,12 @@ Route a task to a specific queue:
 
 ```yaml
 name: transcode a video
-queue: video
-image: jrottenberg/ffmpeg:3.4-alpine
-run: |
-  ffmpeg -i https://example.com/some/video.mov output.mp4
+tasks:
+  - name: transcode video
+    queue: video
+    image: jrottenberg/ffmpeg:3.4-alpine
+    run: |
+      ffmpeg -i https://example.com/some/video.mov output.mp4
 ```
 
 ---
@@ -577,11 +579,14 @@ Create files in the task working directory:
 - name: a parallel task
   parallel:
     tasks:
-      - image: ubuntu:mantic
+      - name: sleep two seconds
+        image: ubuntu:mantic
         run: sleep 2
-      - image: ubuntu:mantic
+      - name: sleep one second
+        image: ubuntu:mantic
         run: sleep 1
-      - image: ubuntu:mantic
+      - name: sleep three seconds
+        image: ubuntu:mantic
         run: sleep 3
 ```
 
@@ -595,6 +600,7 @@ Run a task for each item in a list (with optional `concurrency`):
     list: '{{ sequence(1,5) }}'
     concurrency: 3
     task:
+      name: output item
       image: ubuntu:mantic
       env:
         ITEM: '{{ item.value }}'
@@ -649,10 +655,13 @@ Example with a volume shared between `pre` and the main task:
 ### Retry
 
 ```yaml
-retry:
-  limit: 5
-  initialDelay: 5s
-  scalingFactor: 2
+- name: my task
+  image: alpine:latest
+  run: echo hello world
+  retry:
+    limit: 5
+    initialDelay: 5s
+    scalingFactor: 2
 ```
 
 ### Priority
@@ -662,16 +671,21 @@ Values 0–9 (9 highest). Set per task or in job `defaults.priority`.
 ### Limits
 
 ```yaml
-limits:
-  cpus: .5
-  memory: 10m
+- name: my task
+  image: alpine:latest
+  run: echo hello world
+  limits:
+    cpus: .5
+    memory: 10m
 ```
 
 ### Timeout
 
 ```yaml
-timeout: 5s
-run: sleep 30   # will fail after 5s
+- name: my task
+  image: ubuntu:mantic
+  timeout: 5s
+  run: sleep 30   # will fail after 5s
 ```
 
 ### GPUs
@@ -681,9 +695,12 @@ With the Docker runtime, use Docker’s `--gpus` via the `gpus` property (e.g. `
 ### Tags and workdir
 
 ```yaml
-tags:
-  - some-tag
-workdir: /workspace
+- name: my task
+  image: alpine:latest
+  run: echo hello world
+  tags:
+    - some-tag
+  workdir: /workspace
 ```
 
 ---
