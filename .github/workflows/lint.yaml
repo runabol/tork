@@ -35,10 +35,11 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.23.x'
+          go-version: '1.25.x'
           cache: false
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.1.0
+          version: v2.12.2
+          install-mode: goinstall

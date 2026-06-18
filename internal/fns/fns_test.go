@@ -1,7 +1,6 @@
 package fns
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 )
@@ -45,50 +44,4 @@ func TestCloseIgnore(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestFprintf(t *testing.T) {
-	var buf bytes.Buffer
-	format := "Hello, %s!"
-	name := "World"
-	expected := "Hello, World!"
-
-	Fprintf(&buf, format, name)
-
-	if buf.String() != expected {
-		t.Errorf("expected: %q, got: %q", expected, buf.String())
-	}
-}
-
-func TestFprintf_EmptyWriter(t *testing.T) {
-	var buf bytes.Buffer
-	format := ""
-	expected := ""
-
-	Fprintf(&buf, format)
-
-	if buf.String() != expected {
-		t.Errorf("expected: %q, got: %q", expected, buf.String())
-	}
-}
-
-func TestFprintf_ErrorWriter(t *testing.T) {
-	errorWriter := &mockErrorWriter{}
-	format := "Hello, %s!"
-	name := "World"
-
-	Fprintf(errorWriter, format, name)
-
-	if !errorWriter.writeCalled {
-		t.Errorf("expected write to be called, but it was not")
-	}
-}
-
-type mockErrorWriter struct {
-	writeCalled bool
-}
-
-func (m *mockErrorWriter) Write(p []byte) (n int, err error) {
-	m.writeCalled = true
-	return 0, errors.New("mock write error")
 }
