@@ -490,10 +490,10 @@ func Test_getJobExecution(t *testing.T) {
 	assert.Equal(t, 2, len(page.Items))
 	assert.Equal(t, 5, page.TotalItems)
 	assert.Equal(t, 3, page.TotalPages)
-	assert.Equal(t, "task-5", page.Items[0].Name)
-	assert.Equal(t, "task-4", page.Items[1].Name)
+	assert.Equal(t, "task-1", page.Items[0].Name)
+	assert.Equal(t, "task-2", page.Items[1].Name)
 
-	req, err = http.NewRequest("GET", fmt.Sprintf("/jobs/%s/execution?page=1&size=2&sort=asc", j1.ID), nil)
+	req, err = http.NewRequest("GET", fmt.Sprintf("/jobs/%s/execution?page=1&size=2&sort=desc", j1.ID), nil)
 	assert.NoError(t, err)
 	w = httptest.NewRecorder()
 	api.server.Handler.ServeHTTP(w, req)
@@ -502,8 +502,8 @@ func Test_getJobExecution(t *testing.T) {
 	assert.NoError(t, err)
 	err = json.Unmarshal(body, &page)
 	assert.NoError(t, err)
-	assert.Equal(t, "task-1", page.Items[0].Name)
-	assert.Equal(t, "task-2", page.Items[1].Name)
+	assert.Equal(t, "task-5", page.Items[0].Name)
+	assert.Equal(t, "task-4", page.Items[1].Name)
 	assert.NoError(t, ds.Close())
 }
 

@@ -464,12 +464,12 @@ func (s *API) getJob(c echo.Context) error {
 // @Param id path string true "Job ID"
 // @Param page query int false "page number"
 // @Param size query int false "page size"
-// @Param sort query string false "sort order (desc or asc, default: desc)"
+// @Param sort query string false "sort order (asc or desc, default: asc)"
 func (s *API) getJobExecution(c echo.Context) error {
 	id := c.Param("id")
 	sort := c.QueryParam("sort")
 	if sort == "" {
-		sort = "desc"
+		sort = "asc"
 	}
 	if sort != "desc" && sort != "asc" {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid sort: %s", sort))

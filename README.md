@@ -890,14 +890,14 @@ By default, returns the full job (definition, execution tasks, context, etc.). P
 ### Get job execution
 
 ```shell
-GET /jobs/<JOB_ID>/execution?page=1&size=25&sort=desc
+GET /jobs/<JOB_ID>/execution?page=1&size=25
 ```
 
 Returns a paginated list of execution tasks as `TaskSummary` objects. Query params:
 
 - `page` – page number (default: `1`)
 - `size` – page size (default: `25`, max: `100`)
-- `sort` – `desc` (default, most recently started first) or `asc` (matches full job execution order)
+- `sort` – `asc` (default, matches full job execution order) or `desc` (most recently started first)
 
 ### Submit a job
 

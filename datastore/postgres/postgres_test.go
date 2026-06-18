@@ -679,21 +679,21 @@ func TestPostgresGetJobExecution(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	page, err := ds.GetJobExecution(ctx, j1.ID, 1, 2, "desc")
+	page, err := ds.GetJobExecution(ctx, j1.ID, 1, 2, "asc")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, page.Number)
 	assert.Equal(t, 2, len(page.Items))
 	assert.Equal(t, 5, page.TotalItems)
 	assert.Equal(t, 3, page.TotalPages)
-	assert.Equal(t, "task-5", page.Items[0].Name)
-	assert.Equal(t, "task-4", page.Items[1].Name)
-
-	page, err = ds.GetJobExecution(ctx, j1.ID, 1, 2, "asc")
-	assert.NoError(t, err)
 	assert.Equal(t, "task-1", page.Items[0].Name)
 	assert.Equal(t, "task-2", page.Items[1].Name)
 
-	_, err = ds.GetJobExecution(ctx, "not-a-job", 1, 10, "desc")
+	page, err = ds.GetJobExecution(ctx, j1.ID, 1, 2, "desc")
+	assert.NoError(t, err)
+	assert.Equal(t, "task-5", page.Items[0].Name)
+	assert.Equal(t, "task-4", page.Items[1].Name)
+
+	_, err = ds.GetJobExecution(ctx, "not-a-job", 1, 10, "asc")
 	assert.ErrorIs(t, err, datastore.ErrJobNotFound)
 }
 
