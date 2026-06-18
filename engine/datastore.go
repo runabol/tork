@@ -113,6 +113,20 @@ func (ds *datastoreProxy) GetJobByID(ctx context.Context, id string) (*tork.Job,
 	return ds.ds.GetJobByID(ctx, id)
 }
 
+func (ds *datastoreProxy) GetJobSummaryByID(ctx context.Context, id string) (*tork.Job, error) {
+	if err := ds.checkInit(); err != nil {
+		return nil, err
+	}
+	return ds.ds.GetJobSummaryByID(ctx, id)
+}
+
+func (ds *datastoreProxy) GetJobExecution(ctx context.Context, jobID string, page, size int, sort string) (*datastore.Page[*tork.TaskSummary], error) {
+	if err := ds.checkInit(); err != nil {
+		return nil, err
+	}
+	return ds.ds.GetJobExecution(ctx, jobID, page, size, sort)
+}
+
 func (ds *datastoreProxy) GetJobLogParts(ctx context.Context, jobID, q string, page, size int) (*datastore.Page[*tork.TaskLogPart], error) {
 	if err := ds.checkInit(); err != nil {
 		return nil, err

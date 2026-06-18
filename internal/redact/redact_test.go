@@ -197,9 +197,9 @@ func TestRedactJob(t *testing.T) {
 func TestRedactJobSecrets(t *testing.T) {
 	o := &tork.Job{
 		Secrets: map[string]string{
-			"db_password":   "secret123",
-			"token_public":  "public-token",
-			"config_path":   "/etc/app",
+			"db_password":  "secret123",
+			"token_public": "public-token",
+			"config_path":  "/etc/app",
 		},
 	}
 	j := o.Clone()

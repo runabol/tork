@@ -865,7 +865,22 @@ Query params: `page`, `size` (1–20), `q` (full-text search).
 
 ```shell
 GET /jobs/<JOB_ID>
+GET /jobs/<JOB_ID>?full=false
 ```
+
+By default, returns the full job (definition, execution tasks, context, etc.). Pass `full=false` to return a lightweight `JobSummary` — useful for status polling on large jobs.
+
+### Get job execution
+
+```shell
+GET /jobs/<JOB_ID>/execution?page=1&size=25&sort=desc
+```
+
+Returns a paginated list of execution tasks as `TaskSummary` objects. Query params:
+
+- `page` – page number (default: `1`)
+- `size` – page size (default: `25`, max: `100`)
+- `sort` – `desc` (default, most recently started first) or `asc` (matches full job execution order)
 
 ### Submit a job
 

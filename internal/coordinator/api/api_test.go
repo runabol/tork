@@ -396,6 +396,117 @@ func Test_getJob(t *testing.T) {
 	assert.NoError(t, ds.Close())
 }
 
+func Test_getJob_full_false(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = ds.CreateJob(context.Background(), &tork.Job{
+		ID:    "1234",
+		State: tork.JobStatePending,
+		Name:  "test-job",
+	})
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    broker.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	req, err := http.NewRequest("GET", "/jobs/1234?full=false", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+	js := tork.JobSummary{}
+	err = json.Unmarshal(body, &js)
+	assert.NoError(t, err)
+	assert.Equal(t, "1234", js.ID)
+	assert.Equal(t, "test-job", js.Name)
+	assert.Equal(t, tork.JobStatePending, js.State)
+	assert.NoError(t, ds.Close())
+}
+
+func Test_getJob_invalid_full(t *testing.T) {
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	err = ds.CreateJob(context.Background(), &tork.Job{
+		ID:    "1234",
+		State: tork.JobStatePending,
+	})
+	assert.NoError(t, err)
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    broker.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	req, err := http.NewRequest("GET", "/jobs/1234?full=maybe", nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, ds.Close())
+}
+
+func Test_getJobExecution(t *testing.T) {
+	ctx := context.Background()
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	j1 := tork.Job{
+		ID:    uuid.NewUUID(),
+		State: tork.JobStateRunning,
+	}
+	err = ds.CreateJob(ctx, &j1)
+	assert.NoError(t, err)
+	now := time.Now().UTC()
+	for i := 0; i < 5; i++ {
+		started := now.Add(time.Duration(i) * time.Minute)
+		err = ds.CreateTask(ctx, &tork.Task{
+			ID:        uuid.NewUUID(),
+			JobID:     j1.ID,
+			Position:  i + 1,
+			Name:      fmt.Sprintf("task-%d", i+1),
+			State:     tork.TaskStateCompleted,
+			CreatedAt: &now,
+			StartedAt: &started,
+		})
+		assert.NoError(t, err)
+	}
+	api, err := NewAPI(Config{
+		DataStore: ds,
+		Broker:    broker.NewInMemoryBroker(),
+	})
+	assert.NoError(t, err)
+	req, err := http.NewRequest("GET", fmt.Sprintf("/jobs/%s/execution?page=1&size=2", j1.ID), nil)
+	assert.NoError(t, err)
+	w := httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	body, err := io.ReadAll(w.Body)
+	assert.NoError(t, err)
+	page := datastore.Page[*tork.TaskSummary]{}
+	err = json.Unmarshal(body, &page)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page.Number)
+	assert.Equal(t, 2, len(page.Items))
+	assert.Equal(t, 5, page.TotalItems)
+	assert.Equal(t, 3, page.TotalPages)
+	assert.Equal(t, "task-5", page.Items[0].Name)
+	assert.Equal(t, "task-4", page.Items[1].Name)
+
+	req, err = http.NewRequest("GET", fmt.Sprintf("/jobs/%s/execution?page=1&size=2&sort=asc", j1.ID), nil)
+	assert.NoError(t, err)
+	w = httptest.NewRecorder()
+	api.server.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	body, err = io.ReadAll(w.Body)
+	assert.NoError(t, err)
+	err = json.Unmarshal(body, &page)
+	assert.NoError(t, err)
+	assert.Equal(t, "task-1", page.Items[0].Name)
+	assert.Equal(t, "task-2", page.Items[1].Name)
+	assert.NoError(t, ds.Close())
+}
+
 func Test_cancelRunningJob(t *testing.T) {
 	ctx := context.Background()
 	ds, err := postgres.NewTestDatastore()

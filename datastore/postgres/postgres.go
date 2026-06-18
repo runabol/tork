@@ -841,6 +841,67 @@ func (ds *PostgresDatastore) GetJobByID(ctx context.Context, id string) (*tork.J
 	return r.toJob(tasks, exec, u, perms, ds.encryptionKey)
 }
 
+func (ds *PostgresDatastore) GetJobSummaryByID(ctx context.Context, id string) (*tork.Job, error) {
+	r := jobRecord{}
+	if err := ds.get(&r, `SELECT * FROM jobs where id = $1`, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, datastore.ErrJobNotFound
+		}
+		return nil, errors.Wrapf(err, "error fetching job from db")
+	}
+	u, err := ds.GetUser(ctx, r.CreatedBy)
+	if err != nil {
+		return nil, err
+	}
+	return r.toJob([]*tork.Task{}, []*tork.Task{}, u, []*tork.Permission{}, ds.encryptionKey)
+}
+
+func jobExecutionOrder(sort string) string {
+	if sort == "asc" {
+		return "position asc, started_at asc nulls last, created_at asc"
+	}
+	return "started_at desc nulls last, position desc, created_at desc"
+}
+
+func (ds *PostgresDatastore) GetJobExecution(ctx context.Context, jobID string, page, size int, sort string) (*datastore.Page[*tork.TaskSummary], error) {
+	var exists bool
+	if err := ds.get(&exists, `SELECT EXISTS(SELECT 1 FROM jobs WHERE id = $1)`, jobID); err != nil {
+		return nil, errors.Wrapf(err, "error checking if job exists")
+	}
+	if !exists {
+		return nil, datastore.ErrJobNotFound
+	}
+	offset := (page - 1) * size
+	rs := make([]taskRecord, 0)
+	q := fmt.Sprintf(`SELECT * 
+	      FROM tasks 
+		  WHERE job_id = $1 
+		  ORDER BY %s
+		  OFFSET %d LIMIT %d`, jobExecutionOrder(sort), offset, size)
+	if err := ds.select_(&rs, q, jobID); err != nil {
+		return nil, errors.Wrapf(err, "error getting job execution from db")
+	}
+	items := make([]*tork.TaskSummary, len(rs))
+	for i, r := range rs {
+		items[i] = r.toTaskSummary()
+	}
+	var count *int
+	if err := ds.get(&count, `SELECT count(*) FROM tasks WHERE job_id = $1`, jobID); err != nil {
+		return nil, errors.Wrapf(err, "error getting job execution count")
+	}
+	totalPages := *count / size
+	if *count%size != 0 {
+		totalPages = totalPages + 1
+	}
+	return &datastore.Page[*tork.TaskSummary]{
+		Items:      items,
+		Number:     page,
+		Size:       len(items),
+		TotalPages: totalPages,
+		TotalItems: *count,
+	}, nil
+}
+
 func (ds *PostgresDatastore) GetActiveTasks(ctx context.Context, jobID string) ([]*tork.Task, error) {
 	rs := make([]taskRecord, 0)
 	q := `SELECT * 
