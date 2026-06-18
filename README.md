@@ -471,22 +471,26 @@ A **task** is the unit of execution. With the Docker runtime, each task runs in 
 ### Basic task
 
 ```yaml
-- name: say hello
-  var: task1
-  image: ubuntu:mantic
-  run: |
-    echo -n hello world > $TORK_OUTPUT
+name: hello job
+tasks:
+  - name: say hello
+    var: task1
+    image: ubuntu:mantic
+    run: |
+      echo -n hello world > $TORK_OUTPUT
 ```
 
 ### Private registries
 
 ```yaml
-- name: populate a variable
-  image: myregistry.com/my_image:latest
-  registry:
-    username: user
-    password: mypassword
-  run: echo "do work"
+name: private registry job
+tasks:
+  - name: populate a variable
+    image: myregistry.com/my_image:latest
+    registry:
+      username: user
+      password: mypassword
+    run: echo "do work"
 ```
 
 Or use a Docker config file on the host and set `TORK_RUNTIME_DOCKER_CONFIG`.
@@ -500,6 +504,7 @@ Use the `queue` property to send a task to a specific [queue](#queues) (e.g. `hi
 Write to `$TORK_OUTPUT` and set `var` to store the result in the job context for later tasks:
 
 ```yaml
+name: output and variables job
 tasks:
   - name: populate a variable
     var: task1
@@ -519,37 +524,59 @@ Tork uses the [expr](https://github.com/antonmedv/expr) language for expressions
 Conditional execution with `if`:
 
 ```yaml
-- name: say something
-  if: "{{ inputs.run == 'true' }}"
-  image: ubuntu:mantic
-  run: echo "this runs only when inputs.run is 'true'"
+name: conditional job
+inputs:
+  run: 'true'
+tasks:
+  - name: say something
+    if: "{{ inputs.run == 'true' }}"
+    image: ubuntu:mantic
+    run: echo "this runs only when inputs.run is 'true'"
 ```
 
 Using inputs in env:
 
 ```yaml
-env:
-  MESSAGE: '{{ inputs.message }}'
+name: message job
+inputs:
+  message: hello world
+tasks:
+  - name: print message
+    image: ubuntu:mantic
+    env:
+      MESSAGE: '{{ inputs.message }}'
+    run: echo -n $MESSAGE
 ```
 
 Using previous task output:
 
 ```yaml
-env:
-  OUTPUT: '{{tasks.someOutput}}'
+name: task output job
+tasks:
+  - name: produce output
+    var: someOutput
+    image: ubuntu:mantic
+    run: echo -n result > $TORK_OUTPUT
+  - name: consume output
+    image: ubuntu:mantic
+    env:
+      OUTPUT: '{{ tasks.someOutput }}'
+    run: echo -n $OUTPUT
 ```
 
 ### Environment variables
 
 ```yaml
-- name: print a message
-  image: ubuntu:mantic
-  env:
-    INTRO: hello world
-    OUTRO: bye world
-  run: |
-    echo $INTRO
-    echo $OUTRO
+name: env job
+tasks:
+  - name: print a message
+    image: ubuntu:mantic
+    env:
+      INTRO: hello world
+      OUTRO: bye world
+    run: |
+      echo $INTRO
+      echo $OUTRO
 ```
 
 ### Secrets
@@ -561,33 +588,37 @@ Use the job’s `secrets` and reference with `{{secrets.name}}` in `env`. Tork r
 Create files in the task working directory:
 
 ```yaml
-- name: Get the post
-  image: python:3
-  files:
-    script.py: |
-      import requests
-      response = requests.get("https://jsonplaceholder.typicode.com/posts/1")
-      print(response.json()['title'])
-  run: |
-    pip install requests
-    python script.py > $TORK_OUTPUT
+name: files job
+tasks:
+  - name: Get the post
+    image: python:3
+    files:
+      script.py: |
+        import requests
+        response = requests.get("https://jsonplaceholder.typicode.com/posts/1")
+        print(response.json()['title'])
+    run: |
+      pip install requests
+      python script.py > $TORK_OUTPUT
 ```
 
 ### Parallel Task
 
 ```yaml
-- name: a parallel task
-  parallel:
-    tasks:
-      - name: sleep two seconds
-        image: ubuntu:mantic
-        run: sleep 2
-      - name: sleep one second
-        image: ubuntu:mantic
-        run: sleep 1
-      - name: sleep three seconds
-        image: ubuntu:mantic
-        run: sleep 3
+name: parallel job
+tasks:
+  - name: a parallel task
+    parallel:
+      tasks:
+        - name: sleep two seconds
+          image: ubuntu:mantic
+          run: sleep 2
+        - name: sleep one second
+          image: ubuntu:mantic
+          run: sleep 1
+        - name: sleep three seconds
+          image: ubuntu:mantic
+          run: sleep 3
 ```
 
 ### Each Task
@@ -595,17 +626,19 @@ Create files in the task working directory:
 Run a task for each item in a list (with optional `concurrency`):
 
 ```yaml
-- name: sample each task
-  each:
-    list: '{{ sequence(1,5) }}'
-    concurrency: 3
-    task:
-      name: output item
-      image: ubuntu:mantic
-      env:
-        ITEM: '{{ item.value }}'
-        INDEX: '{{ item.index }}'
-      run: echo -n HELLO $ITEM at $INDEX
+name: each job
+tasks:
+  - name: sample each task
+    each:
+      list: '{{ sequence(1,5) }}'
+      concurrency: 3
+      task:
+        name: output item
+        image: ubuntu:mantic
+        env:
+          ITEM: '{{ item.value }}'
+          INDEX: '{{ item.index }}'
+        run: echo -n HELLO $ITEM at $INDEX
 ```
 
 ### Sub-Job Task
@@ -613,16 +646,18 @@ Run a task for each item in a list (with optional `concurrency`):
 A task can start another job; the parent task completes or fails with the sub-job:
 
 ```yaml
-- name: a task that starts a sub-job
-  subjob:
-    name: my sub job
-    tasks:
-      - name: hello sub task
-        image: ubuntu:mantic
-        run: echo start of sub-job
-      - name: bye task
-        image: ubuntu:mantic
-        run: echo end of sub-job
+name: subjob job
+tasks:
+  - name: a task that starts a sub-job
+    subjob:
+      name: my sub job
+      tasks:
+        - name: hello sub task
+          image: ubuntu:mantic
+          run: echo start of sub-job
+        - name: bye task
+          image: ubuntu:mantic
+          run: echo end of sub-job
 ```
 
 Use `detached: true` to fire-and-forget.
@@ -636,16 +671,18 @@ Use `detached: true` to fire-and-forget.
 Example with a volume shared between `pre` and the main task:
 
 ```yaml
-- name: convert the first 5 seconds of a video
-  image: jrottenberg/ffmpeg:3.4-alpine
-  run: ffmpeg -i /tmp/my_video.mov -t 5 /tmp/output.mp4
-  mounts:
-    - type: volume
-      target: /tmp
-  pre:
-    - name: download the remote file
-      image: alpine:3.18.3
-      run: wget http://example.com/my_video.mov -O /tmp/my_video.mov
+name: mounts job
+tasks:
+  - name: convert the first 5 seconds of a video
+    image: jrottenberg/ffmpeg:3.4-alpine
+    run: ffmpeg -i /tmp/my_video.mov -t 5 /tmp/output.mp4
+    mounts:
+      - type: volume
+        target: /tmp
+    pre:
+      - name: download the remote file
+        image: alpine:3.18.3
+        run: wget http://example.com/my_video.mov -O /tmp/my_video.mov
 ```
 
 ### Pre/Post Tasks
@@ -655,13 +692,15 @@ Example with a volume shared between `pre` and the main task:
 ### Retry
 
 ```yaml
-- name: my task
-  image: alpine:latest
-  run: echo hello world
-  retry:
-    limit: 5
-    initialDelay: 5s
-    scalingFactor: 2
+name: retry job
+tasks:
+  - name: my task
+    image: alpine:latest
+    run: echo hello world
+    retry:
+      limit: 5
+      initialDelay: 5s
+      scalingFactor: 2
 ```
 
 ### Priority
@@ -671,21 +710,25 @@ Values 0–9 (9 highest). Set per task or in job `defaults.priority`.
 ### Limits
 
 ```yaml
-- name: my task
-  image: alpine:latest
-  run: echo hello world
-  limits:
-    cpus: .5
-    memory: 10m
+name: limits job
+tasks:
+  - name: my task
+    image: alpine:latest
+    run: echo hello world
+    limits:
+      cpus: .5
+      memory: 10m
 ```
 
 ### Timeout
 
 ```yaml
-- name: my task
-  image: ubuntu:mantic
-  timeout: 5s
-  run: sleep 30   # will fail after 5s
+name: timeout job
+tasks:
+  - name: my task
+    image: ubuntu:mantic
+    timeout: 5s
+    run: sleep 30   # will fail after 5s
 ```
 
 ### GPUs
@@ -695,12 +738,14 @@ With the Docker runtime, use Docker’s `--gpus` via the `gpus` property (e.g. `
 ### Tags and workdir
 
 ```yaml
-- name: my task
-  image: alpine:latest
-  run: echo hello world
-  tags:
-    - some-tag
-  workdir: /workspace
+name: tags and workdir job
+tasks:
+  - name: my task
+    image: alpine:latest
+    run: echo hello world
+    tags:
+      - some-tag
+    workdir: /workspace
 ```
 
 ---
