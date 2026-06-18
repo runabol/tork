@@ -31,8 +31,8 @@ ENV SHELL=/bin/zsh
 # --------------------------------------
 # Golang
 # --------------------------------------
-RUN wget https://go.dev/dl/go1.24.4.linux-amd64.tar.gz
-RUN tar -xvzf go1.24.4.linux-amd64.tar.gz && rm go1.24.4.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+RUN tar -xvzf go1.25.0.linux-amd64.tar.gz && rm go1.25.0.linux-amd64.tar.gz
 RUN mv go /usr/local/
 ENV GOROOT="/usr/local/go"
 ENV GOPATH="$HOME/go"

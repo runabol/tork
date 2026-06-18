@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -48,7 +47,7 @@ func LoadConfig() error {
 		break
 	}
 	if !loaded && userConfig != "" {
-		return errors.Errorf(fmt.Sprintf("could not find config file in: %s", userConfig))
+		return errors.Errorf("could not find config file in: %s", userConfig)
 	}
 	// load configs from env vars
 	if err := konf.Load(env.Provider("TORK_", ".", func(s string) string {

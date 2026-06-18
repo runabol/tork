@@ -152,7 +152,7 @@ func EvaluateTemplate(ex string, c map[string]any) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		buf.WriteString(fmt.Sprintf("%v", ev))
+		fmt.Fprintf(&buf, "%v", ev)
 		loc = endTag
 	}
 	buf.WriteString(ex[loc:])

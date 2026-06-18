@@ -45,7 +45,7 @@ services:
       - tork_network
 
   migration:
-    image: golang:1.24
+    image: golang:1.25
     working_dir: /code
     environment:
       - TORK_CONFIG=configs/config.compose.toml
