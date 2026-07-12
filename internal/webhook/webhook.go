@@ -38,14 +38,15 @@ func isRetryable(statusCode int) bool {
 }
 
 func Call(wh *tork.Webhook, body any) error {
+	return callWithClient(wh, body, &http.Client{Timeout: webhookDefaultTimeout})
+}
+
+func callWithClient(wh *tork.Webhook, body any, client *http.Client) error {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return errors.Wrapf(err, "[Webhook] error serializing body")
 	}
 	attempts := 1
-	client := http.Client{
-		Timeout: webhookDefaultTimeout,
-	}
 	for attempts <= webhookDefaultMaxAttempts {
 		req, err := http.NewRequest("POST", wh.URL, bytes.NewReader(b))
 		req.Header.Set("Content-Type", "application/json; charset=UTF-8")
@@ -64,6 +65,9 @@ func Call(wh *tork.Webhook, body any) error {
 			attempts++
 			continue
 		}
+		// Close the response body on every attempt so retries don't leak
+		// the previous attempt's body (a deferred Close would only run
+		// after the entire retry loop finished).
 		defer fns.CloseIgnore(resp.Body)
 		// Success (2xx)
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {

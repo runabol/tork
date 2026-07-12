@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -73,4 +74,51 @@ func TestCall(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCallClosesResponseBodyOnRetry(t *testing.T) {
+	// The webhook retries on 5xx responses. Previously the response body
+	// was only closed via a deferred call that ran after the entire retry
+	// loop finished, so every failed attempt leaked its body. This test
+	// asserts that each attempt's body is closed as soon as it is consumed.
+	closed := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("boom"))
+	}))
+	defer testServer.Close()
+
+	client := &http.Client{
+		Timeout: webhookDefaultTimeout,
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			resp, err := http.DefaultTransport.RoundTrip(r)
+			if err != nil {
+				return resp, err
+			}
+			orig := resp.Body
+			resp.Body = &trackingReadCloser{ReadCloser: orig, onClose: func() { closed++ }}
+			return resp, nil
+		}),
+	}
+
+	wh := &tork.Webhook{URL: testServer.URL}
+	err := callWithClient(wh, map[string]string{"key": "value"}, client)
+	assert.Error(t, err)
+
+	// Five attempts means five responses; all of them must be closed.
+	assert.Equal(t, webhookDefaultMaxAttempts, closed, "expected every attempt's response body to be closed")
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type trackingReadCloser struct {
+	io.ReadCloser
+	onClose func()
+}
+
+func (t *trackingReadCloser) Close() error {
+	t.onClose()
+	return t.ReadCloser.Close()
 }
