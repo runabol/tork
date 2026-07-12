@@ -84,7 +84,7 @@ func TestCallClosesResponseBodyOnRetry(t *testing.T) {
 	closed := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("boom"))
+		_, _ = w.Write([]byte("boom"))
 	}))
 	defer testServer.Close()
 
