@@ -220,6 +220,13 @@ func (s *Scheduler) scheduleEachTask(ctx context.Context, t *tork.Task) error {
 	}); err != nil {
 		return errors.Wrapf(err, "error updating task in datastore")
 	}
+	// An empty list has no child tasks to complete the each, so it would hang
+	// RUNNING forever. Complete it now so the job can advance.
+	if len(list) == 0 {
+		t.State = tork.TaskStateCompleted
+		t.CompletedAt = &now
+		return s.broker.PublishTask(ctx, broker.QUEUE_COMPLETED, t)
+	}
 	for ix, item := range list {
 		cx := j.Context.Clone().AsMap()
 		eachVar := t.Each.Var

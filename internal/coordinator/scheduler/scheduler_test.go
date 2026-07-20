@@ -289,6 +289,64 @@ func Test_scheduleEachTask(t *testing.T) {
 	assert.NoError(t, ds.Close())
 }
 
+func Test_scheduleEachTaskEmptyList(t *testing.T) {
+	ctx := context.Background()
+	b := broker.NewInMemoryBroker()
+
+	// No child tasks should ever be published for an empty list.
+	var pendingCount atomic.Int32
+	err := b.SubscribeForTasks(broker.QUEUE_PENDING, func(tk *tork.Task) error {
+		pendingCount.Add(1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// The each parent should instead be published to the completed queue so the
+	// job can advance rather than hang RUNNING forever.
+	completed := make(chan *tork.Task, 1)
+	err = b.SubscribeForTasks(broker.QUEUE_COMPLETED, func(tk *tork.Task) error {
+		completed <- tk
+		return nil
+	})
+	assert.NoError(t, err)
+
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+	s := NewScheduler(ds, b)
+	assert.NotNil(t, s)
+
+	j := &tork.Job{ID: uuid.NewUUID(), Name: "test job"}
+	assert.NoError(t, ds.CreateJob(ctx, j))
+
+	now := time.Now().UTC()
+	tk := &tork.Task{
+		ID:        uuid.NewUUID(),
+		JobID:     j.ID,
+		CreatedAt: &now,
+		Each: &tork.EachTask{
+			List: "{{ sequence (2,2) }}", // empty list
+			Task: &tork.Task{Queue: "test-queue"},
+		},
+	}
+	assert.NoError(t, ds.CreateTask(ctx, tk))
+
+	err = s.scheduleEachTask(ctx, tk)
+	assert.NoError(t, err)
+
+	// the parent each task should be completed
+	select {
+	case ct := <-completed:
+		assert.Equal(t, tk.ID, ct.ID)
+		assert.Equal(t, tork.TaskStateCompleted, ct.State)
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected the empty each task to be published as completed")
+	}
+
+	// and no child tasks should have been scheduled
+	assert.Equal(t, int32(0), pendingCount.Load())
+	assert.NoError(t, ds.Close())
+}
+
 func Test_scheduleEachTaskNotaList(t *testing.T) {
 	ctx := context.Background()
 	b := broker.NewInMemoryBroker()
