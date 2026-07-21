@@ -32,7 +32,7 @@ func (e *Engine) initWorker() error {
 		Limits: worker.Limits{
 			DefaultCPUsLimit:   conf.String("worker.limits.cpus"),
 			DefaultMemoryLimit: conf.String("worker.limits.memory"),
-			DefaultTimeout:     conf.String("worker.limits.timeout"),
+			Timeout:            conf.String("worker.limits.timeout"),
 			MaxResultSize:      conf.IntDefault("worker.limits.result", worker.DefaultMaxTaskResultSize),
 		},
 		Address:    conf.String("worker.address"),

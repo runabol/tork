@@ -49,7 +49,7 @@ type Config struct {
 type Limits struct {
 	DefaultCPUsLimit   string
 	DefaultMemoryLimit string
-	DefaultTimeout     string
+	Timeout            string
 	MaxResultSize      int
 }
 
@@ -119,8 +119,22 @@ func (w *Worker) doHandleTask(ctx context.Context, t *tork.Task) error {
 	if t.Limits != nil && t.Limits.Memory == "" {
 		t.Limits.Memory = w.limits.DefaultMemoryLimit
 	}
-	if t.Timeout == "" {
-		t.Timeout = w.limits.DefaultTimeout
+	if w.limits.Timeout != "" {
+		limitDur, err := time.ParseDuration(w.limits.Timeout)
+		if err != nil {
+			return errors.Wrapf(err, "invalid worker timeout duration: %s", w.limits.Timeout)
+		}
+		if t.Timeout == "" {
+			t.Timeout = w.limits.Timeout
+		} else {
+			taskDur, err := time.ParseDuration(t.Timeout)
+			if err != nil {
+				return errors.Wrapf(err, "invalid timeout duration: %s", t.Timeout)
+			}
+			if taskDur > limitDur {
+				t.Timeout = w.limits.Timeout
+			}
+		}
 	}
 	adapter := func(ctx context.Context, et task.EventType, t *tork.Task) error {
 		return w.runTask(t)
