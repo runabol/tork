@@ -432,7 +432,7 @@ func Test_sendHeartbeat(t *testing.T) {
 	assert.NoError(t, w.Stop())
 }
 
-func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
+func Test_handleTaskRunTimeoutExceeded(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
@@ -442,7 +442,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 		Broker:  b,
 		Runtime: rt,
 		Limits: Limits{
-			DefaultTimeout: "1s",
+			Timeout: "1s",
 		},
 	})
 	assert.NoError(t, err)
@@ -489,7 +489,7 @@ func Test_handleTaskRunDefaultLimitExceeded(t *testing.T) {
 	assert.Equal(t, "/somevolume", t1.Mounts[0].Target)
 }
 
-func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
+func Test_handleTaskRunTimeoutOK(t *testing.T) {
 	rt, err := docker.NewDockerRuntime()
 	assert.NoError(t, err)
 
@@ -499,7 +499,7 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 		Broker:  b,
 		Runtime: rt,
 		Limits: Limits{
-			DefaultTimeout: "5s",
+			Timeout: "5s",
 		},
 	})
 	assert.NoError(t, err)
@@ -524,10 +524,11 @@ func Test_handleTaskRunDefaultLimitOK(t *testing.T) {
 	assert.NoError(t, err)
 
 	t1 := &tork.Task{
-		ID:    uuid.NewUUID(),
-		State: tork.TaskStateRunning,
-		Image: "ubuntu:mantic",
-		CMD:   []string{"sleep", "1"},
+		ID:      uuid.NewUUID(),
+		State:   tork.TaskStateRunning,
+		Image:   "ubuntu:mantic",
+		CMD:     []string{"sleep", "1"},
+		Timeout: "10s",
 		Mounts: []*tork.Mount{
 			{
 				Type:   tork.MountTypeVolume,
