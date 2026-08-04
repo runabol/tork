@@ -27,6 +27,13 @@ func (b *brokerProxy) SubscribeForTasks(qname string, handler func(t *tork.Task)
 	return b.broker.SubscribeForTasks(qname, handler)
 }
 
+func (b *brokerProxy) Unsubscribe(qname string) error {
+	if err := b.checkInit(); err != nil {
+		return err
+	}
+	return b.broker.Unsubscribe(qname)
+}
+
 func (b *brokerProxy) PublishTaskProgress(ctx context.Context, t *tork.Task) error {
 	if err := b.checkInit(); err != nil {
 		return err
