@@ -18,7 +18,7 @@ func Test_health(t *testing.T) {
 	api := newAPI(Config{
 		Broker:  broker.NewInMemoryBroker(),
 		Runtime: rt,
-	}, &syncx.Map[string, runningTask]{})
+	}, &syncx.Map[string, runningTask]{}, &Worker{})
 	assert.NotNil(t, api)
 	req, err := http.NewRequest("GET", "/health", nil)
 	assert.NoError(t, err)

@@ -1032,12 +1032,14 @@
             "enum": [
                 "UP",
                 "DOWN",
-                "OFFLINE"
+                "OFFLINE",
+                "CORDONED"
             ],
             "x-enum-varnames": [
                 "NodeStatusUP",
                 "NodeStatusDown",
-                "NodeStatusOffline"
+                "NodeStatusOffline",
+                "NodeStatusCordoned"
             ]
         },
         "tork.ParallelTask": {

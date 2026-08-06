@@ -130,6 +130,76 @@ func TestRabbitMQPublishConcurrent(t *testing.T) {
 	close(processed)
 }
 
+func TestRabbitMQUnsubscribe(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+	var mu sync.Mutex
+	count := 0
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		mu.Lock()
+		count++
+		mu.Unlock()
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// deliver one task and confirm it's processed
+	assert.NoError(t, b.PublishTask(ctx, qname, &tork.Task{ID: "before"}))
+	time.Sleep(time.Millisecond * 300)
+	mu.Lock()
+	assert.Equal(t, 1, count)
+	mu.Unlock()
+
+	// unsubscribe -- consumer is cancelled
+	assert.NoError(t, b.Unsubscribe(qname))
+
+	// a task published after unsubscribe must not be processed
+	assert.NoError(t, b.PublishTask(ctx, qname, &tork.Task{ID: "after"}))
+	time.Sleep(time.Millisecond * 300)
+	mu.Lock()
+	assert.Equal(t, 1, count)
+	mu.Unlock()
+
+	// unsubscribing an unknown queue is a no-op
+	assert.NoError(t, b.Unsubscribe(fmt.Sprintf("%snope-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())))
+}
+
+func TestRabbitMQUnsubscribeNonBlockingWhileBusy(t *testing.T) {
+	ctx := context.Background()
+	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")
+	assert.NoError(t, err)
+	qname := fmt.Sprintf("%stest-%s", QUEUE_EXCLUSIVE_PREFIX, uuid.NewUUID())
+
+	release := make(chan struct{})
+	started := make(chan struct{})
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		close(started)
+		<-release // simulate a long-running task
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// kick off a task and wait until the handler is actually running
+	assert.NoError(t, b.PublishTask(ctx, qname, &tork.Task{ID: "busy"}))
+	<-started
+
+	// Unsubscribe must return promptly even though the consumer is mid-task
+	// (cordon semantics: don't block on in-flight work).
+	done := make(chan error, 1)
+	go func() { done <- b.Unsubscribe(qname) }()
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Unsubscribe blocked while a task was in flight")
+	}
+
+	// let the in-flight task complete
+	close(release)
+}
+
 func TestRabbitMQShutdown(t *testing.T) {
 	ctx := context.Background()
 	b, err := NewRabbitMQBroker("amqp://guest:guest@localhost:5672/")

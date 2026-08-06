@@ -271,11 +271,12 @@ func (b *RabbitMQBroker) subscribe(ctx context.Context, exchange, key, qname str
 	log.Debug().Msgf("created channel %s for queue: %s", cname, qname)
 	id := uuid.NewUUID()
 	sub := &subscription{
-		ch:     ch,
-		qname:  qname,
-		name:   cname,
-		done:   make(chan struct{}),
-		cancel: make(chan struct{}),
+		ch:    ch,
+		qname: qname,
+		// both buffered so neither cancelling nor the goroutine's terminal
+		// done-send blocks when Unsubscribe fires and doesn't wait (cordon)
+		done:   make(chan struct{}, 1),
+		cancel: make(chan struct{}, 1),
 	}
 	b.mu.Lock()
 	b.subscriptions[id] = sub
@@ -627,6 +628,30 @@ func (b *RabbitMQBroker) Shutdown(ctx context.Context) error {
 	b.mu.Lock()
 	b.connPool = []*amqp.Connection{}
 	b.mu.Unlock()
+	return nil
+}
+
+// Unsubscribe cancels all consumers on a queue. It is non-blocking: it signals
+// cancellation and returns without waiting for in-flight handlers, so a busy
+// consumer stops claiming new work at once and exits once its task acks.
+func (b *RabbitMQBroker) Unsubscribe(qname string) error {
+	// collect under lock, signal outside it -- each goroutine takes the lock
+	// itself to remove its subscription when it terminates.
+	b.mu.RLock()
+	subs := make([]*subscription, 0)
+	for _, sub := range b.subscriptions {
+		if sub.qname == qname {
+			subs = append(subs, sub)
+		}
+	}
+	b.mu.RUnlock()
+	if len(subs) == 0 {
+		log.Warn().Msgf("no active subscriptions found for queue: %s", qname)
+		return nil
+	}
+	for _, sub := range subs {
+		sub.cancel <- struct{}{}
+	}
 	return nil
 }
 
