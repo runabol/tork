@@ -947,11 +947,16 @@ func (ds *PostgresDatastore) CreateTaskLogPart(ctx context.Context, p *tork.Task
 	if p.Number < 1 {
 		return errors.Errorf("part number must be > 0")
 	}
+	contents := p.Contents
+	// PostgreSQL text rejects NUL; task stdout/stderr may contain 0x00.
+	if strings.Contains(contents, "\x00") {
+		contents = strings.ReplaceAll(contents, "\x00", "")
+	}
 	q := `insert into tasks_log_parts 
 	       (id,number_,task_id,created_at,contents) 
 	      values
 	       ($1,$2,$3,$4,$5)`
-	_, err := ds.exec(q, uuid.NewUUID(), p.Number, p.TaskID, time.Now().UTC(), p.Contents)
+	_, err := ds.exec(q, uuid.NewUUID(), p.Number, p.TaskID, time.Now().UTC(), contents)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting task log part to the db")
 	}
