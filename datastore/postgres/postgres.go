@@ -1106,44 +1106,67 @@ func (ds *PostgresDatastore) GetJobLogParts(ctx context.Context, jobID, q string
 
 func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string, page, size int) (*datastore.Page[*tork.JobSummary], error) {
 	searchTerm, tags := parseQuery(q)
-
 	offset := (page - 1) * size
 	rs := make([]jobRecord, 0)
-	qry := fmt.Sprintf(`
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
+	filtered := searchTerm != "" || len(tags) > 0
+	var qry string
+	if filtered {
+		// Filter on id + created_at first, then fetch full rows for the page only.
+		// Avoids ORDER BY created_at + LIMIT over the whole jobs table when FTS/tags are selective.
+		qry = fmt.Sprintf(`
+      WITH candidates AS MATERIALIZED (
+        SELECT j.id, j.created_at
+        FROM jobs j
+        WHERE ($1 = '' OR j.ts @@ plainto_tsquery('english', $1))
+          AND (coalesce(array_length($2::text[], 1), 0) = 0 OR j.tags && $2)
       ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
-      role_info AS (
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
-        SELECT job_id
-        FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
+      page AS (
+        SELECT c.id, c.created_at
+        FROM candidates c
+        WHERE ($3 = '' OR EXISTS (
+          SELECT 1
+          FROM jobs_perms jp
+          WHERE jp.job_id = c.id
+            AND (
+              jp.user_id = (SELECT id FROM users WHERE username_ = $3)
+              OR jp.role_id IN (
+                SELECT ur.role_id
+                FROM users_roles ur
+                JOIN users u ON u.id = ur.user_id
+                WHERE u.username_ = $3
+              )
+              OR jp.role_id = (SELECT id FROM roles WHERE slug = 'public')
+            )
+        ))
+        ORDER BY c.created_at DESC
+        OFFSET %d LIMIT %d
       )
       SELECT j.*
+      FROM page p
+      JOIN jobs j ON j.id = p.id
+      ORDER BY p.created_at DESC`, offset, size)
+	} else {
+		qry = fmt.Sprintf(`
+      SELECT j.*
       FROM jobs j
-      WHERE 
-        ($1 = '' OR ts @@ plainto_tsquery('english', $1))
-      AND 
-        (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
-      AND
-        ($3 = '' OR EXISTS (
-           SELECT 1
-           FROM job_perms_info jpi
-           WHERE jpi.job_id = j.id
+      WHERE ($3 = '' OR EXISTS (
+          SELECT 1
+          FROM jobs_perms jp
+          WHERE jp.job_id = j.id
+            AND (
+              jp.user_id = (SELECT id FROM users WHERE username_ = $3)
+              OR jp.role_id IN (
+                SELECT ur.role_id
+                FROM users_roles ur
+                JOIN users u ON u.id = ur.user_id
+                WHERE u.username_ = $3
+              )
+              OR jp.role_id = (SELECT id FROM roles WHERE slug = 'public')
+            )
         ))
-	  ORDER BY created_at DESC 
-	  OFFSET %d LIMIT %d`, offset, size)
+      ORDER BY j.created_at DESC
+      OFFSET %d LIMIT %d`, offset, size)
+	}
 	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
@@ -1168,39 +1191,25 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 
 	var count *int
 	if err := ds.get(&count, `
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
-      ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
-      role_info AS (
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
-        SELECT job_id
-        FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
-      )
       SELECT count(*)
       FROM jobs j
-      WHERE 
-        ($1 = '' OR ts @@ plainto_tsquery('english', $1))
-      AND 
-        (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
-      AND
-        ($3 = '' OR EXISTS (
-           SELECT 1
-           FROM job_perms_info jpi
-           WHERE jpi.job_id = j.id
-        ));
-	  `, searchTerm, pq.StringArray(tags), currentUser); err != nil {
+      WHERE ($1 = '' OR j.ts @@ plainto_tsquery('english', $1))
+        AND (coalesce(array_length($2::text[], 1), 0) = 0 OR j.tags && $2)
+        AND ($3 = '' OR EXISTS (
+          SELECT 1
+          FROM jobs_perms jp
+          WHERE jp.job_id = j.id
+            AND (
+              jp.user_id = (SELECT id FROM users WHERE username_ = $3)
+              OR jp.role_id IN (
+                SELECT ur.role_id
+                FROM users_roles ur
+                JOIN users u ON u.id = ur.user_id
+                WHERE u.username_ = $3
+              )
+              OR jp.role_id = (SELECT id FROM roles WHERE slug = 'public')
+            )
+        ))`, searchTerm, pq.StringArray(tags), currentUser); err != nil {
 		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 
