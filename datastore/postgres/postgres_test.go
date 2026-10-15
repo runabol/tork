@@ -16,6 +16,7 @@ import (
 	"github.com/runabol/tork/internal/fns"
 	"github.com/runabol/tork/internal/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPostgresCreateAndGetTask(t *testing.T) {
@@ -843,6 +844,10 @@ func TestPostgresSearchJobs(t *testing.T) {
 		}
 		err := ds.CreateJob(ctx, &j1)
 		assert.NoError(t, err)
+		jPublic, err := ds.GetJobByID(ctx, j1.ID)
+		assert.NoError(t, err)
+		require.Len(t, jPublic.Permissions, 1)
+		assert.Equal(t, tork.ROLE_PUBLIC, jPublic.Permissions[0].Role.Slug)
 
 		now := time.Now().UTC()
 		err = ds.CreateTask(ctx, &tork.Task{

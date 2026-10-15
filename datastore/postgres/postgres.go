@@ -670,7 +670,11 @@ func (ds *PostgresDatastore) CreateJob(ctx context.Context, j *tork.Job) error {
 			pq.StringArray(j.Tags), autoDelete, secrets, scheduledJobID); err != nil {
 			return errors.Wrapf(err, "error inserting job to the db")
 		}
-		for _, perm := range j.Permissions {
+		perms := j.Permissions
+		if len(perms) == 0 {
+			perms = []*tork.Permission{{Role: &tork.Role{Slug: tork.ROLE_PUBLIC}}}
+		}
+		for _, perm := range perms {
 			var username *string
 			var roleSlug *string
 			if perm.Role != nil {
@@ -1106,6 +1110,9 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM users
         WHERE username_ = $3
       ),
+      public_role AS (
+        SELECT id AS role_id FROM roles WHERE slug = 'public'
+      ),
       role_info AS (
         SELECT role_id
         FROM users_roles ur
@@ -1116,13 +1123,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-      ),
-      no_job_perms AS (
-        SELECT j.id as job_id
-        FROM jobs j
-        where not exists (
-		  select 1 from jobs_perms jp where j.id = jp.job_id
-		)
+        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT j.*
       FROM jobs j
@@ -1131,7 +1132,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
       AND 
         (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
       AND
-        ($3 = '' OR EXISTS (select 1 from no_job_perms njp where njp.job_id=j.id) OR EXISTS (
+        ($3 = '' OR EXISTS (
            SELECT 1
            FROM job_perms_info jpi
            WHERE jpi.job_id = j.id
@@ -1167,6 +1168,9 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM users
         WHERE username_ = $3
       ),
+      public_role AS (
+        SELECT id AS role_id FROM roles WHERE slug = 'public'
+      ),
       role_info AS (
         SELECT role_id
         FROM users_roles ur
@@ -1177,13 +1181,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-      ),
-      no_job_perms AS (
-        SELECT j.id as job_id
-        FROM jobs j
-        where not exists (
-		  select 1 from jobs_perms jp where j.id = jp.job_id
-		)
+        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT count(*)
       FROM jobs j
@@ -1192,7 +1190,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
       AND 
         (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
       AND
-        ($3 = '' OR EXISTS (select 1 from no_job_perms njp where njp.job_id=j.id) OR EXISTS (
+        ($3 = '' OR EXISTS (
            SELECT 1
            FROM job_perms_info jpi
            WHERE jpi.job_id = j.id
@@ -1401,7 +1399,11 @@ func (ds *PostgresDatastore) CreateScheduledJob(ctx context.Context, sj *tork.Sc
 			pq.StringArray(sj.Tags), autoDelete, secrets, sj.Cron, sj.State); err != nil {
 			return errors.Wrapf(err, "error inserting scheduled job to the db")
 		}
-		for _, perm := range sj.Permissions {
+		perms := sj.Permissions
+		if len(perms) == 0 {
+			perms = []*tork.Permission{{Role: &tork.Role{Slug: tork.ROLE_PUBLIC}}}
+		}
+		for _, perm := range perms {
 			var username *string
 			var roleSlug *string
 			if perm.Role != nil {
@@ -1458,6 +1460,9 @@ func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser s
         FROM users
         WHERE username_ = $1
       ),
+      public_role AS (
+        SELECT id AS role_id FROM roles WHERE slug = 'public'
+      ),
       role_info AS (
         SELECT role_id
         FROM users_roles ur
@@ -1468,17 +1473,11 @@ func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser s
         FROM scheduled_jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-      ),
-      no_job_perms AS (
-        SELECT j.id as scheduled_job_id
-        FROM scheduled_jobs j
-        where not exists (
-		  select 1 from scheduled_jobs_perms jp where j.id = jp.scheduled_job_id
-		)
+        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT j.*
       FROM scheduled_jobs j
-      WHERE ($1 = '' OR EXISTS (select 1 from no_job_perms njp where njp.scheduled_job_id=j.id) OR EXISTS (
+      WHERE ($1 = '' OR EXISTS (
            SELECT 1
            FROM job_perms_info jpi
            WHERE jpi.scheduled_job_id = j.id
@@ -1508,6 +1507,9 @@ func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser s
         FROM users
         WHERE username_ = $1
       ),
+      public_role AS (
+        SELECT id AS role_id FROM roles WHERE slug = 'public'
+      ),
       role_info AS (
         SELECT role_id
         FROM users_roles ur
@@ -1518,17 +1520,11 @@ func (ds *PostgresDatastore) GetScheduledJobs(ctx context.Context, currentUser s
         FROM scheduled_jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-      ),
-      no_job_perms AS (
-        SELECT j.id as scheduled_job_id
-        FROM scheduled_jobs j
-        where not exists (
-		  select 1 from scheduled_jobs_perms jp where j.id = jp.scheduled_job_id
-		)
+        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT count(*)
       FROM scheduled_jobs j
-      WHERE ($1 = '' OR EXISTS (select 1 from no_job_perms njp where njp.scheduled_job_id=j.id) OR EXISTS (
+      WHERE ($1 = '' OR EXISTS (
            SELECT 1
            FROM job_perms_info jpi
            WHERE jpi.scheduled_job_id = j.id
