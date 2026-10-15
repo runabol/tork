@@ -1130,7 +1130,24 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         OR jp.role_id IN (SELECT role_id FROM role_info)
         OR jp.role_id IN (SELECT role_id FROM public_role)
       )
-      SELECT j.*
+      SELECT j.id,
+             j.name,
+             j.description,
+             j.tags,
+             j.state,
+             j.created_at,
+             j.created_by,
+             j.started_at,
+             j.completed_at,
+             j.failed_at,
+             j.position,
+             j.inputs,
+             j.parent_id,
+             j.task_count,
+             j.result,
+             j.error_,
+             j.progress,
+             j.scheduled_job_id
       FROM jobs j
       WHERE 
         ($1 = '' OR ts @@ plainto_tsquery('english', $1))
@@ -1142,16 +1159,24 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
            FROM job_perms_info jpi
            WHERE jpi.job_id = j.id
         ))
-	  ORDER BY created_at DESC 
+	  ORDER BY j.created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
 	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
+	createdByIDs := make([]string, len(rs))
+	for i, r := range rs {
+		createdByIDs[i] = r.CreatedBy
+	}
+	usersByID, err := ds.getUsersByIDs(createdByIDs)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]*tork.JobSummary, len(rs))
 	for i, r := range rs {
-		createdBy, err := ds.GetUser(ctx, r.CreatedBy)
-		if err != nil {
-			return nil, err
+		createdBy, ok := usersByID[r.CreatedBy]
+		if !ok {
+			return nil, datastore.ErrUserNotFound
 		}
 		j, err := r.toJob(
 			[]*tork.Task{},
@@ -1227,6 +1252,33 @@ func (ds *PostgresDatastore) GetUser(ctx context.Context, uid string) (*tork.Use
 		return nil, errors.Wrapf(err, "error fetching user from db")
 	}
 	return r.toUser(), nil
+}
+
+func (ds *PostgresDatastore) getUsersByIDs(ids []string) (map[string]*tork.User, error) {
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return map[string]*tork.User{}, nil
+	}
+	rs := make([]userRecord, 0)
+	if err := ds.select_(&rs, `SELECT * FROM users WHERE id = ANY($1)`, pq.StringArray(unique)); err != nil {
+		return nil, errors.Wrapf(err, "error fetching users from db")
+	}
+	users := make(map[string]*tork.User, len(rs))
+	for _, r := range rs {
+		users[r.ID] = r.toUser()
+	}
+	return users, nil
 }
 
 func (ds *PostgresDatastore) CreateUser(ctx context.Context, u *tork.User) error {

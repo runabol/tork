@@ -341,12 +341,16 @@ func (r jobRecord) toJob(
 	encryptionKey *string,
 ) (*tork.Job, error) {
 	var c tork.JobContext
-	if err := json.Unmarshal(r.Context, &c); err != nil {
-		return nil, errors.Wrapf(err, "error deserializing job.context")
+	if len(r.Context) > 0 {
+		if err := json.Unmarshal(r.Context, &c); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.context")
+		}
 	}
 	var inputs map[string]string
-	if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
-		return nil, errors.Wrapf(err, "error deserializing job.inputs")
+	if len(r.Inputs) > 0 {
+		if err := json.Unmarshal(r.Inputs, &inputs); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.inputs")
+		}
 	}
 	var defaults *tork.JobDefaults
 	if r.Defaults != nil {
@@ -363,8 +367,10 @@ func (r jobRecord) toJob(
 		}
 	}
 	var webhooks []*tork.Webhook
-	if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
-		return nil, errors.Wrapf(err, "error deserializing job.webhook")
+	if len(r.Webhooks) > 0 {
+		if err := json.Unmarshal(r.Webhooks, &webhooks); err != nil {
+			return nil, errors.Wrapf(err, "error deserializing job.webhook")
+		}
 	}
 	var secrets map[string]string
 	if r.Secrets != nil {
