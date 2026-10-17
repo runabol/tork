@@ -10,9 +10,10 @@ var HEARTBEAT_RATE = time.Second * 30
 type NodeStatus string
 
 const (
-	NodeStatusUP      NodeStatus = "UP"
-	NodeStatusDown    NodeStatus = "DOWN"
-	NodeStatusOffline NodeStatus = "OFFLINE"
+	NodeStatusUP       NodeStatus = "UP"
+	NodeStatusDown     NodeStatus = "DOWN"
+	NodeStatusOffline  NodeStatus = "OFFLINE"
+	NodeStatusCordoned NodeStatus = "CORDONED"
 )
 
 type Node struct {

@@ -547,8 +547,9 @@ func Test_handleTaskRunTimeoutOK(t *testing.T) {
 }
 
 type stubRuntime struct {
-	result string
-	err    error
+	result    string
+	err       error
+	healthErr error
 }
 
 func (s *stubRuntime) Run(ctx context.Context, t *tork.Task) error {
@@ -560,7 +561,7 @@ func (s *stubRuntime) Run(ctx context.Context, t *tork.Task) error {
 }
 
 func (s *stubRuntime) HealthCheck(ctx context.Context) error {
-	return nil
+	return s.healthErr
 }
 
 func Test_handleTaskRunResultTooLarge(t *testing.T) {
