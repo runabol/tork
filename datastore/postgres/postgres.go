@@ -1108,29 +1108,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 	searchTerm, tags := parseQuery(q)
 
 	offset := (page - 1) * size
-	rs := make([]jobRecord, 0)
-	qry := fmt.Sprintf(`
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
-      ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
-      role_info AS (
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
-        SELECT job_id
-        FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
-      )
-      SELECT j.id,
+	jobColumns := `j.id,
              j.name,
              j.description,
              j.tags,
@@ -1147,22 +1125,77 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
              j.result,
              j.error_,
              j.progress,
-             j.scheduled_job_id
+             j.scheduled_job_id`
+	filters := `($1 = '' OR j.ts @@ plainto_tsquery('english', $1))
+        AND (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)`
+	rs := make([]jobRecord, 0)
+	var count *int
+	if currentUser == "" {
+		qry := fmt.Sprintf(`
+      SELECT %s
       FROM jobs j
-      WHERE 
-        ($1 = '' OR ts @@ plainto_tsquery('english', $1))
-      AND 
-        (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
-      AND
-        ($3 = '' OR EXISTS (
-           SELECT 1
-           FROM job_perms_info jpi
-           WHERE jpi.job_id = j.id
-        ))
-	  ORDER BY j.created_at DESC 
-	  OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
-		return nil, errors.Wrapf(err, "error getting a page of jobs")
+      WHERE %s
+      ORDER BY j.created_at DESC
+      OFFSET %d LIMIT %d`, jobColumns, filters, offset, size)
+		if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags)); err != nil {
+			return nil, errors.Wrapf(err, "error getting a page of jobs")
+		}
+		if err := ds.get(&count, fmt.Sprintf(`SELECT count(*) FROM jobs j WHERE %s`, filters), searchTerm, pq.StringArray(tags)); err != nil {
+			return nil, errors.Wrapf(err, "error getting the jobs count")
+		}
+	} else {
+		// Look up the caller's user ID and role IDs (including the public role)
+		// first, so Postgres plans the page and count queries against real IDs
+		// and only reads the jobs the caller is allowed to see.
+		var access struct {
+			UserID  *string        `db:"user_id"`
+			RoleIDs pq.StringArray `db:"role_ids"`
+		}
+		if err := ds.get(&access, `
+      SELECT (SELECT id FROM users WHERE username_ = $1) AS user_id,
+             ARRAY(
+               SELECT ur.role_id
+               FROM users_roles ur
+               JOIN users u ON u.id = ur.user_id
+               WHERE u.username_ = $1
+               UNION
+               SELECT id FROM roles WHERE slug = 'public'
+             ) AS role_ids`, currentUser); err != nil {
+			return nil, errors.Wrapf(err, "error getting the user's access")
+		}
+		// Jobs granted to the user and jobs granted to one of the user's roles
+		// are fetched separately so each branch can use its own best plan.
+		qry := fmt.Sprintf(`
+      SELECT %s
+      FROM jobs j
+      JOIN (
+        (SELECT j.id, j.created_at
+         FROM jobs j
+         WHERE EXISTS (SELECT 1 FROM jobs_perms jp WHERE jp.job_id = j.id AND jp.user_id = $3)
+         AND %s
+         ORDER BY j.created_at DESC
+         LIMIT %d)
+        UNION
+        (SELECT j.id, j.created_at
+         FROM jobs j
+         WHERE EXISTS (SELECT 1 FROM jobs_perms jp WHERE jp.job_id = j.id AND jp.role_id = ANY($4))
+         AND %s
+         ORDER BY j.created_at DESC
+         LIMIT %d)
+        ORDER BY created_at DESC
+        OFFSET %d LIMIT %d
+      ) v ON v.id = j.id
+      ORDER BY j.created_at DESC`, jobColumns, filters, offset+size, filters, offset+size, offset, size)
+		if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), access.UserID, access.RoleIDs); err != nil {
+			return nil, errors.Wrapf(err, "error getting a page of jobs")
+		}
+		if err := ds.get(&count, fmt.Sprintf(`
+      SELECT count(*)
+      FROM jobs j
+      WHERE j.id IN (SELECT job_id FROM jobs_perms WHERE user_id = $3 OR role_id = ANY($4))
+      AND %s`, filters), searchTerm, pq.StringArray(tags), access.UserID, access.RoleIDs); err != nil {
+			return nil, errors.Wrapf(err, "error getting the jobs count")
+		}
 	}
 	createdByIDs := make([]string, len(rs))
 	for i, r := range rs {
@@ -1189,44 +1222,6 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 			return nil, err
 		}
 		result[i] = tork.NewJobSummary(j)
-	}
-
-	var count *int
-	if err := ds.get(&count, `
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
-      ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
-      role_info AS (
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
-        SELECT job_id
-        FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
-      )
-      SELECT count(*)
-      FROM jobs j
-      WHERE 
-        ($1 = '' OR ts @@ plainto_tsquery('english', $1))
-      AND 
-        (coalesce(array_length($2::text[], 1),0) = 0 OR j.tags && $2)
-      AND
-        ($3 = '' OR EXISTS (
-           SELECT 1
-           FROM job_perms_info jpi
-           WHERE jpi.job_id = j.id
-        ));
-	  `, searchTerm, pq.StringArray(tags), currentUser); err != nil {
-		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 
 	totalPages := *count / size
