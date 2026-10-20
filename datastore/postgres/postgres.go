@@ -1123,7 +1123,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         JOIN user_info ui ON ur.user_id = ui.user_id
       ),
       job_perms_info AS (
-        SELECT job_id
+        SELECT distinct job_id
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
@@ -1204,7 +1204,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         JOIN user_info ui ON ur.user_id = ui.user_id
       ),
       job_perms_info AS (
-        SELECT job_id
+        SELECT distinct job_id
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
