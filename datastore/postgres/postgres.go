@@ -1115,10 +1115,9 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM users
         WHERE username_ = $3
       ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
       role_info AS (
+	    SELECT id AS role_id FROM roles WHERE slug = 'public'
+		UNION
         SELECT role_id
         FROM users_roles ur
         JOIN user_info ui ON ur.user_id = ui.user_id
@@ -1128,7 +1127,6 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT j.id,
              j.name,
@@ -1198,10 +1196,9 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM users
         WHERE username_ = $3
       ),
-      public_role AS (
-        SELECT id AS role_id FROM roles WHERE slug = 'public'
-      ),
       role_info AS (
+	    SELECT id AS role_id FROM roles WHERE slug = 'public'
+		UNION
         SELECT role_id
         FROM users_roles ur
         JOIN user_info ui ON ur.user_id = ui.user_id
@@ -1211,7 +1208,6 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         FROM jobs_perms jp
         WHERE jp.user_id = (SELECT user_id FROM user_info)
         OR jp.role_id IN (SELECT role_id FROM role_info)
-        OR jp.role_id IN (SELECT role_id FROM public_role)
       )
       SELECT count(*)
       FROM jobs j
