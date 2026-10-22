@@ -115,6 +115,20 @@ func (q *queue) close() {
 	}
 }
 
+// unsubscribeAll cancels all consumers but keeps the queue, so it can be
+// re-subscribed later (e.g. on uncordon).
+func (q *queue) unsubscribeAll() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, sub := range q.subs {
+		close(sub.terminate)
+		if IsCoordinatorQueue(q.name) {
+			<-sub.terminated
+		}
+	}
+	q.subs = make([]*qsub, 0)
+}
+
 func (q *queue) subscribe(sub func(m any) error) {
 	terminate := make(chan any)
 	terminated := make(chan any)
@@ -126,6 +140,17 @@ func (q *queue) subscribe(sub func(m any) error) {
 	q.mu.Unlock()
 	go func() {
 		for {
+			// prioritize terminate: a closed terminate and a queued message
+			// are both ready in the select below and Go picks at random, so
+			// without this a cancelled consumer keeps draining the queue.
+			// Checking it first each iteration bounds that to at most one
+			// message after cancellation.
+			select {
+			case <-terminate:
+				close(terminated)
+				return
+			default:
+			}
 			select {
 			case <-terminate:
 				close(terminated)
@@ -175,6 +200,16 @@ func (b *InMemoryBroker) subscribe(qname string, handler func(m any) error) erro
 		b.queues.Set(qname, q)
 	}
 	q.subscribe(handler)
+	return nil
+}
+
+func (b *InMemoryBroker) Unsubscribe(qname string) error {
+	q, ok := b.queues.Get(qname)
+	if !ok {
+		log.Warn().Msgf("no active subscriptions found for queue: %s", qname)
+		return nil
+	}
+	q.unsubscribeAll()
 	return nil
 }
 
