@@ -9,6 +9,7 @@ import (
 	"github.com/runabol/tork/broker"
 	"github.com/runabol/tork/datastore/postgres"
 	"github.com/runabol/tork/internal/uuid"
+	"github.com/runabol/tork/middleware/job"
 	"github.com/runabol/tork/middleware/task"
 	"github.com/stretchr/testify/assert"
 )
@@ -179,5 +180,60 @@ func Test_handleFailedTaskRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, j1.ID, j2.ID)
 	assert.Equal(t, tork.JobStateRunning, j2.State)
+	assert.NoError(t, ds.Close())
+}
+
+func Test_handleFailedTaskCancelledJob(t *testing.T) {
+	ctx := context.Background()
+	b := broker.NewInMemoryBroker()
+
+	ds, err := postgres.NewTestDatastore()
+	assert.NoError(t, err)
+
+	called := false
+	handler := NewErrorHandler(ds, b, func(next job.HandlerFunc) job.HandlerFunc {
+		return func(ctx context.Context, et job.EventType, j *tork.Job) error {
+			called = true
+			return next(ctx, et, j)
+		}
+	})
+	assert.NotNil(t, handler)
+
+	now := time.Now().UTC()
+
+	j1 := &tork.Job{
+		ID:        uuid.NewUUID(),
+		State:     tork.JobStateCancelled,
+		CreatedAt: now,
+		Position:  1,
+		TaskCount: 1,
+		Tasks: []*tork.Task{
+			{
+				Name: "task-1",
+			},
+		},
+	}
+	err = ds.CreateJob(ctx, j1)
+	assert.NoError(t, err)
+
+	t1 := &tork.Task{
+		ID:        uuid.NewUUID(),
+		State:     tork.TaskStateRunning,
+		StartedAt: &now,
+		JobID:     j1.ID,
+		Position:  1,
+		CreatedAt: &now,
+	}
+	err = ds.CreateTask(ctx, t1)
+	assert.NoError(t, err)
+
+	err = handler(ctx, task.StateChange, t1)
+	assert.NoError(t, err)
+	assert.False(t, called)
+
+	j2, err := ds.GetJobByID(ctx, j1.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, tork.JobStateCancelled, j2.State)
+	assert.Nil(t, j2.FailedAt)
 	assert.NoError(t, ds.Close())
 }

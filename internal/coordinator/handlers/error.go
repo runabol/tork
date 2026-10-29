@@ -77,7 +77,7 @@ func (h *errorHandler) handle(ctx context.Context, et task.EventType, t *tork.Ta
 		if err := h.broker.PublishTask(ctx, broker.QUEUE_PENDING, rt); err != nil {
 			log.Error().Err(err).Msg("error publishing retry task")
 		}
-	} else {
+	} else if j.State == tork.JobStateRunning || j.State == tork.JobStateScheduled {
 		j.State = tork.JobStateFailed
 		j.FailedAt = t.FailedAt
 		j.Error = t.Error
