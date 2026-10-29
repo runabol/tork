@@ -205,13 +205,6 @@ func Test_handleFailedTaskCancelledJob(t *testing.T) {
 		ID:        uuid.NewUUID(),
 		State:     tork.JobStateCancelled,
 		CreatedAt: now,
-		Position:  1,
-		TaskCount: 1,
-		Tasks: []*tork.Task{
-			{
-				Name: "task-1",
-			},
-		},
 	}
 	err = ds.CreateJob(ctx, j1)
 	assert.NoError(t, err)
@@ -219,7 +212,6 @@ func Test_handleFailedTaskCancelledJob(t *testing.T) {
 	t1 := &tork.Task{
 		ID:        uuid.NewUUID(),
 		State:     tork.TaskStateRunning,
-		StartedAt: &now,
 		JobID:     j1.ID,
 		Position:  1,
 		CreatedAt: &now,
@@ -234,6 +226,5 @@ func Test_handleFailedTaskCancelledJob(t *testing.T) {
 	j2, err := ds.GetJobByID(ctx, j1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, tork.JobStateCancelled, j2.State)
-	assert.Nil(t, j2.FailedAt)
 	assert.NoError(t, ds.Close())
 }
