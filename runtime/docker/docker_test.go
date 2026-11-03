@@ -149,6 +149,29 @@ func TestRunTaskCMDLogger(t *testing.T) {
 	<-processed
 }
 
+type slowWriter struct {
+	buf bytes.Buffer
+}
+
+func (w *slowWriter) Write(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	return w.buf.Write(p)
+}
+
+func TestRunTaskLogsNotTruncated(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	w := &slowWriter{}
+	err = rt.doRun(context.Background(), &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		CMD:   []string{"sh", "-c", "for i in $(seq 1 300); do echo $i; done"},
+	}, w)
+	assert.NoError(t, err)
+	assert.Contains(t, w.buf.String(), "\n300\n")
+}
+
 func TestRunTaskConcurrently(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)

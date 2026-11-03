@@ -283,15 +283,22 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting logs for container %s: %v\n", tc.id, err)
 	}
-	// close the stdout reader
+	copied := make(chan struct{})
+	// close the stdout reader only once the copy below drained it, or the logs get truncated
 	defer func() {
+		select {
+		case <-copied:
+		case <-time.After(time.Second * 10):
+			log.Warn().Msgf("timed out draining logs for container %s, output may be incomplete", tc.id)
+		}
 		if err := out.Close(); err != nil {
 			log.Error().Err(err).Msgf("error closing stdout on container %s", tc.id)
 		}
 	}()
 	// copy the container's stdout to the logger
 	go func() {
-		_, err = io.Copy(tc.logger, dockerLogsReader{reader: out})
+		defer close(copied)
+		_, err := io.Copy(tc.logger, dockerLogsReader{reader: out})
 		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msgf("error reading the std out")
 		}
