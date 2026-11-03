@@ -42,4 +42,18 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Run Govulncheck
-        run: govulncheck ./...
+        run: |
+          findings=$(mktemp)
+          govulncheck -format json ./... > "$findings"; rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then exit "$rc"; fi
+          # unreviewed advisories carry no symbol data, so they match every
+          # importer regardless of reachability; gate on the reviewed ones
+          affected=$(jq -rs '
+            (map(select(.osv.database_specific.review_status == "REVIEWED") | .osv.id) | unique) as $reviewed
+            | [ .[] | select(.finding.trace[0].function) | .finding.osv ]
+            | unique | map(select(IN($reviewed[]))) | .[]
+          ' "$findings")
+          if [ -n "$affected" ]; then
+            printf 'reachable reviewed vulnerabilities:\n%s\n' "$affected"
+            govulncheck ./...
+          fi
