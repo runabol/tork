@@ -15,10 +15,6 @@ import (
 	"github.com/runabol/tork/locker"
 )
 
-// minScheduledJobLockTTL is the minimum time a scheduled
-// job lock should be held
-const minScheduledJobLockTTL = 10 * time.Second
-
 type jobSchedulerHandler struct {
 	ds        datastore.Datastore
 	broker    broker.Broker
@@ -32,19 +28,11 @@ type glocker struct {
 }
 
 type glock struct {
-	key       string
-	lock      locker.Lock
-	createdAt time.Time
+	key  string
+	lock locker.Lock
 }
 
 func (l glock) Unlock(ctx context.Context) error {
-	// ensure that the lock is held for at least minLockTTL
-	// to mitigate drifting coordinators from re-acquiring
-	// the lock
-	elapsed := time.Since(l.createdAt)
-	if elapsed < minScheduledJobLockTTL {
-		time.Sleep(minScheduledJobLockTTL - elapsed)
-	}
 	log.Debug().Msgf("Releasing lock for %s", l.key)
 	return l.lock.ReleaseLock(ctx)
 }
@@ -55,7 +43,7 @@ func (d glocker) Lock(ctx context.Context, key string) (gocron.Lock, error) {
 		return nil, err
 	}
 	log.Debug().Msgf("Acquired lock for %s", key)
-	return &glock{lock: lock, key: key, createdAt: time.Now()}, nil
+	return &glock{lock: lock, key: key}, nil
 }
 
 func NewJobSchedulerHandler(ds datastore.Datastore, b broker.Broker, l locker.Locker) (func(ctx context.Context, s *tork.ScheduledJob) error, error) {
