@@ -15,7 +15,7 @@ type VolumeMounter struct {
 }
 
 func NewVolumeMounter() (*VolumeMounter, error) {
-	dc, err := client.NewClientWithOpts(client.FromEnv)
+	dc, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}

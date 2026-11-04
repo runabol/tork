@@ -105,7 +105,7 @@ func WithImageVerify(verify bool) Option {
 }
 
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
-	dc, err := client.NewClientWithOpts(client.FromEnv)
+	dc, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
