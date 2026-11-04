@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
@@ -298,8 +299,8 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 	// copy the container's stdout to the logger
 	go func() {
 		defer close(copied)
-		_, err := io.Copy(tc.logger, dockerLogsReader{reader: out})
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
+		_, err := stdcopy.StdCopy(tc.logger, tc.logger, out)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msgf("error reading the std out")
 		}
 	}()
@@ -323,11 +324,11 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 				log.Error().Err(err).Msg("error tailing the log")
 				return "", errors.Errorf("exit code %d", status.StatusCode)
 			}
-			buf, err := io.ReadAll(dockerLogsReader{reader: out})
-			if err != nil {
+			var buf bytes.Buffer
+			if _, err := stdcopy.StdCopy(&buf, &buf, out); err != nil {
 				log.Error().Err(err).Msg("error copying the output")
 			}
-			return "", errors.Errorf("exit code %d: %s", status.StatusCode, string(buf))
+			return "", errors.Errorf("exit code %d: %s", status.StatusCode, buf.String())
 		} else {
 			stdout, err := tc.readOutput(ctx)
 			if err != nil {
@@ -408,8 +409,8 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 	}()
 	// copy the container's stdout to the logger
 	go func() {
-		_, err = io.Copy(tc.logger, dockerLogsReader{reader: out})
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
+		_, err = stdcopy.StdCopy(tc.logger, tc.logger, out)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msgf("error reading the std out")
 		}
 	}()
