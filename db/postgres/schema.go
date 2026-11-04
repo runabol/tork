@@ -192,4 +192,13 @@ ALTER TABLE tasks_log_parts ADD COLUMN ts tsvector NOT NULL
 CREATE INDEX tasks_log_parts_ts_idx ON tasks_log_parts USING GIN (ts);
 CREATE INDEX idx_tasks_log_parts_task_id ON tasks_log_parts (task_id);
 CREATE INDEX idx_tasks_log_parts_created_at ON tasks_log_parts (created_at);
+
+CREATE TABLE lock_leases (
+    key         varchar(256) not null primary key,
+    holder      varchar(128) not null,
+    token       bigint       not null,
+    expires_at  timestamp    not null
+);
+
+CREATE INDEX idx_lock_leases_expires_at ON lock_leases (expires_at);
 `
