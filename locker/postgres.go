@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,32 +14,27 @@ import (
 )
 
 const (
-	defaultLeaseTTL = 30 * time.Second
-	maxLockKeyLen   = 256
+	maxLockKeyLen            = 256
+	defaultHeartbeatInterval = 10 * time.Second
 )
 
 var holderInstance atomic.Uint64
 
 type PostgresLocker struct {
-	db                *sqlx.DB
-	holder            string
-	leaseTTL          time.Duration
-	heartbeatInterval time.Duration
-	maxOpenConns      int
-	maxIdleConns      int
-	connMaxLifetime   time.Duration
-	connMaxIdleTime   time.Duration
+	db              *sqlx.DB
+	holder          string
+	maxOpenConns    int
+	maxIdleConns    int
+	connMaxLifetime time.Duration
+	connMaxIdleTime time.Duration
 }
 
 type postgresLock struct {
-	db                *sqlx.DB
-	key               string
-	holder            string
-	token             int64
-	leaseSec          float64
-	heartbeatInterval time.Duration
-	stopHeartbeat     context.CancelFunc
-	heartbeatDone     sync.WaitGroup
+	db            *sqlx.DB
+	key           string
+	holder        string
+	token         int64
+	stopHeartbeat context.CancelFunc
 }
 
 type LockerOption func(*PostgresLocker)
@@ -69,18 +63,6 @@ func WithConnMaxIdleTime(d time.Duration) LockerOption {
 	}
 }
 
-func WithLeaseTTL(d time.Duration) LockerOption {
-	return func(l *PostgresLocker) {
-		l.leaseTTL = d
-	}
-}
-
-func WithHeartbeatInterval(d time.Duration) LockerOption {
-	return func(l *PostgresLocker) {
-		l.heartbeatInterval = d
-	}
-}
-
 func NewPostgresLocker(dsn string, opts ...LockerOption) (*PostgresLocker, error) {
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
@@ -101,15 +83,6 @@ func NewPostgresLocker(dsn string, opts ...LockerOption) (*PostgresLocker, error
 		return nil, errors.Wrap(err, "failed to resolve hostname for lock holder id")
 	}
 	locker.holder = fmt.Sprintf("%s:%d:%d", hostname, os.Getpid(), holderInstance.Add(1))
-	if locker.leaseTTL <= 0 {
-		locker.leaseTTL = defaultLeaseTTL
-	}
-	if locker.heartbeatInterval <= 0 {
-		locker.heartbeatInterval = max(locker.leaseTTL/3, time.Second)
-	}
-	if locker.heartbeatInterval >= locker.leaseTTL {
-		return nil, errors.New("heartbeat interval must be less than lease TTL")
-	}
 	if locker.maxOpenConns > 0 {
 		db.SetMaxOpenConns(locker.maxOpenConns)
 	}
@@ -129,11 +102,10 @@ func (p *PostgresLocker) AcquireLock(ctx context.Context, key string) (Lock, err
 	if len(key) == 0 || len(key) > maxLockKeyLen {
 		return nil, errors.Errorf("invalid lock key length for key '%s'", key)
 	}
-	leaseSec := p.leaseTTL.Seconds()
 	var token int64
 	q := `
 	INSERT INTO lock_leases (key, holder, token, expires_at)
-	VALUES ($1, $2, 1, now() + ($3 * interval '1 second'))
+	VALUES ($1, $2, 1, (date_trunc('minute', now() AT TIME ZONE 'UTC') + interval '1 minute') AT TIME ZONE 'UTC')
 	ON CONFLICT (key) DO UPDATE
 	SET holder = EXCLUDED.holder,
 		expires_at = EXCLUDED.expires_at,
@@ -141,7 +113,7 @@ func (p *PostgresLocker) AcquireLock(ctx context.Context, key string) (Lock, err
 	WHERE lock_leases.expires_at <= now()
 	RETURNING token;
 	`
-	err := p.db.QueryRowContext(ctx, q, key, p.holder, leaseSec).Scan(&token)
+	err := p.db.QueryRowContext(ctx, q, key, p.holder).Scan(&token)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errors.Errorf("failed to acquire lock for key '%s'", key)
 	}
@@ -150,42 +122,23 @@ func (p *PostgresLocker) AcquireLock(ctx context.Context, key string) (Lock, err
 	}
 	hbCtx, cancel := context.WithCancel(context.Background())
 	lock := &postgresLock{
-		db:                p.db,
-		key:               key,
-		holder:            p.holder,
-		token:             token,
-		leaseSec:          leaseSec,
-		heartbeatInterval: p.heartbeatInterval,
-		stopHeartbeat:     cancel,
+		db:            p.db,
+		key:           key,
+		holder:        p.holder,
+		token:         token,
+		stopHeartbeat: cancel,
 	}
-	lock.heartbeatDone.Add(1)
 	go lock.runHeartbeat(hbCtx)
 	return lock, nil
 }
 
-func (l *postgresLock) ReleaseLock(ctx context.Context) error {
-	if l.stopHeartbeat != nil {
-		l.stopHeartbeat()
-	}
-	l.heartbeatDone.Wait()
-	q := `DELETE FROM lock_leases WHERE key = $1 AND holder = $2 AND token = $3;`
-	res, err := l.db.ExecContext(ctx, q, l.key, l.holder, l.token)
-	if err != nil {
-		return errors.Wrapf(err, "failed to release lock for key '%s'", l.key)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "failed to release lock for key '%s'", l.key)
-	}
-	if n == 0 {
-		return errors.Errorf("failed to release lock for key '%s'", l.key)
-	}
+func (l *postgresLock) ReleaseLock(_ context.Context) error {
+	l.stopHeartbeat()
 	return nil
 }
 
 func (l *postgresLock) runHeartbeat(ctx context.Context) {
-	defer l.heartbeatDone.Done()
-	ticker := time.NewTicker(l.heartbeatInterval)
+	ticker := time.NewTicker(defaultHeartbeatInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -194,10 +147,10 @@ func (l *postgresLock) runHeartbeat(ctx context.Context) {
 		case <-ticker.C:
 			q := `
 			UPDATE lock_leases
-			SET expires_at = now() + ($4 * interval '1 second')
+			SET expires_at = (date_trunc('minute', now() AT TIME ZONE 'UTC') + interval '1 minute') AT TIME ZONE 'UTC'
 			WHERE key = $1 AND holder = $2 AND token = $3;
 			`
-			res, err := l.db.ExecContext(ctx, q, l.key, l.holder, l.token, l.leaseSec)
+			res, err := l.db.ExecContext(ctx, q, l.key, l.holder, l.token)
 			if err != nil {
 				return
 			}

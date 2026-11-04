@@ -39,15 +39,15 @@ func TestPostgresLocker_AcquireLock(t *testing.T) {
 	assert.NoError(t, lock.ReleaseLock(ctx))
 
 	lock3, err := locker.AcquireLock(ctx, key)
-	assert.NoError(t, err, "lock acquisition should succeed")
-	assert.NoError(t, lock3.ReleaseLock(ctx))
+	assert.Error(t, err, "lease row remains until the next UTC minute")
+	assert.Nil(t, lock3)
 }
 
 func TestPostgresLocker_AcquireLock_DifferentHolders(t *testing.T) {
-	locker1, err := NewPostgresLocker(testPostgresDSN, WithLeaseTTL(30*time.Second), WithHeartbeatInterval(5*time.Second))
+	locker1, err := NewPostgresLocker(testPostgresDSN)
 	assert.NoError(t, err)
 
-	locker2, err := NewPostgresLocker(testPostgresDSN, WithLeaseTTL(30*time.Second), WithHeartbeatInterval(5*time.Second))
+	locker2, err := NewPostgresLocker(testPostgresDSN)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -61,6 +61,29 @@ func TestPostgresLocker_AcquireLock_DifferentHolders(t *testing.T) {
 	assert.Nil(t, lock2)
 
 	assert.NoError(t, lock.ReleaseLock(ctx))
+
+	lock2, err = locker2.AcquireLock(ctx, key)
+	assert.Error(t, err, "lease remains for the UTC minute after release")
+	assert.Nil(t, lock2)
+}
+
+func TestPostgresLocker_LateAcquireFailsAfterReleaseSameUTCMinute(t *testing.T) {
+	locker1, err := NewPostgresLocker(testPostgresDSN)
+	require.NoError(t, err)
+	locker2, err := NewPostgresLocker(testPostgresDSN)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	key := fmt.Sprintf("late_acquire_%s", t.Name())
+
+	lock, err := locker1.AcquireLock(ctx, key)
+	require.NoError(t, err)
+	time.Sleep(50 * time.Millisecond)
+	require.NoError(t, lock.ReleaseLock(ctx))
+
+	lock2, err := locker2.AcquireLock(ctx, key)
+	assert.Error(t, err, "second coordinator must not acquire after winner released within same minute")
+	assert.Nil(t, lock2)
 }
 
 // concurrentAcquireSameKey has two locker instances (two coordinators) race to
@@ -72,8 +95,6 @@ func concurrentAcquireSameKey(t *testing.T, maxOpenConns int, hold time.Duration
 		testPostgresDSN,
 		WithMaxOpenConns(maxOpenConns),
 		WithMaxIdleConns(maxOpenConns),
-		WithLeaseTTL(30*time.Second),
-		WithHeartbeatInterval(5*time.Second),
 	)
 	require.NoError(t, err)
 
@@ -81,8 +102,6 @@ func concurrentAcquireSameKey(t *testing.T, maxOpenConns int, hold time.Duration
 		testPostgresDSN,
 		WithMaxOpenConns(maxOpenConns),
 		WithMaxIdleConns(maxOpenConns),
-		WithLeaseTTL(30*time.Second),
-		WithHeartbeatInterval(5*time.Second),
 	)
 	require.NoError(t, err)
 
