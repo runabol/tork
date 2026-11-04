@@ -82,10 +82,12 @@ jobs:
             exit 1
           fi
 
-          # submit a simple job 
+          # submit a simple job to warm up the image cache. the worker runs one
+          # task at a time, so this has to finish before the job we assert on
+          # is submitted, or that job spends its budget waiting in the queue.
           JOB_ID=$(curl -s -X POST --data-binary @examples/hello.yaml \
           -H "Content-type: text/yaml" http://localhost:8000/jobs | jq -r .id)
-          for i in {1..5}
+          for i in {1..120}
           do
             JOB_STATE=$(curl -s  http://localhost:8000/jobs/$JOB_ID | jq -r .state)
             echo "$JOB_ID $JOB_STATE"
@@ -98,7 +100,7 @@ jobs:
           # submit a simple job 
           JOB_ID=$(curl -s -X POST --data-binary @examples/hello.yaml \
           -H "Content-type: text/yaml" http://localhost:8000/jobs | jq -r .id)
-          for i in {1..10}
+          for i in {1..60}
           do
             JOB_STATE=$(curl -s  http://localhost:8000/jobs/$JOB_ID | jq -r .state)
             echo "$JOB_ID $JOB_STATE"
