@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,8 @@ type Worker struct {
 	api        *api
 	taskCount  int32
 	middleware []task.MiddlewareFunc
+	mu         sync.Mutex
+	cordoned   bool
 }
 
 type Config struct {
@@ -44,6 +47,8 @@ type Config struct {
 	Queues     map[string]int
 	Limits     Limits
 	Middleware []task.MiddlewareFunc
+	// CordonToken gates the /cordon endpoints; if empty they are disabled.
+	CordonToken string
 }
 
 type Limits struct {
@@ -81,10 +86,10 @@ func NewWorker(cfg Config) (*Worker, error) {
 		queues:     cfg.Queues,
 		tasks:      tasks,
 		limits:     cfg.Limits,
-		api:        newAPI(cfg, tasks),
 		stop:       make(chan any),
 		middleware: cfg.Middleware,
 	}
+	w.api = newAPI(cfg, tasks, w)
 	return w, nil
 }
 
@@ -230,15 +235,24 @@ func (w *Worker) doRunTask(ctx context.Context, t *tork.Task) error {
 	return nil
 }
 
+// nodeStatus reports the status published in heartbeats. DOWN (failed health
+// check) takes precedence over CORDONED so a real fault isn't masked.
+func (w *Worker) nodeStatus(ctx context.Context) tork.NodeStatus {
+	if err := w.runtime.HealthCheck(ctx); err != nil {
+		log.Error().Err(err).Msgf("node %s failed health check", w.id)
+		return tork.NodeStatusDown
+	}
+	if w.isCordoned() {
+		return tork.NodeStatusCordoned
+	}
+	return tork.NodeStatusUP
+}
+
 func (w *Worker) sendHeartbeats() {
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		status := tork.NodeStatusUP
-		if err := w.runtime.HealthCheck(ctx); err != nil {
-			log.Error().Err(err).Msgf("node %s failed health check", w.id)
-			status = tork.NodeStatusDown
-		}
+		status := w.nodeStatus(ctx)
 		hostname, err := os.Hostname()
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to get hostname for worker %s", w.id)
@@ -256,7 +270,7 @@ func (w *Worker) sendHeartbeats() {
 				LastHeartbeatAt: time.Now().UTC(),
 				Hostname:        hostname,
 				Port:            w.api.port,
-				TaskCount:       int(atomic.LoadInt32(&w.taskCount)),
+				TaskCount:       w.TaskCount(),
 				Version:         tork.Version,
 			},
 		)
@@ -283,19 +297,72 @@ func (w *Worker) Start() error {
 		return errors.Wrapf(err, "error subscribing for queue: %s", w.id)
 	}
 	// subscribe to shared work queues
+	if err := w.subscribeForWork(); err != nil {
+		return err
+	}
+	go w.sendHeartbeats()
+	return nil
+}
+
+// subscribeForWork subscribes to the shared work queues (startup and uncordon).
+func (w *Worker) subscribeForWork() error {
 	for qname, concurrency := range w.queues {
 		if !broker.IsWorkerQueue(qname) {
 			continue
 		}
 		for i := 0; i < concurrency; i++ {
-			err := w.broker.SubscribeForTasks(qname, w.handleTask)
-			if err != nil {
+			if err := w.broker.SubscribeForTasks(qname, w.handleTask); err != nil {
 				return errors.Wrapf(err, "error subscribing for queue: %s", qname)
 			}
 		}
 	}
-	go w.sendHeartbeats()
 	return nil
+}
+
+// Cordon takes the worker out of rotation: it stops claiming new tasks while
+// running tasks finish normally. Idempotent.
+func (w *Worker) Cordon() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.cordoned {
+		return nil
+	}
+	log.Info().Msgf("cordoning worker %s", w.id)
+	for qname := range w.queues {
+		if !broker.IsWorkerQueue(qname) {
+			continue
+		}
+		if err := w.broker.Unsubscribe(qname); err != nil {
+			return errors.Wrapf(err, "error unsubscribing from queue: %s", qname)
+		}
+	}
+	w.cordoned = true
+	return nil
+}
+
+// Uncordon puts the worker back into rotation. Idempotent.
+func (w *Worker) Uncordon() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.cordoned {
+		return nil
+	}
+	log.Info().Msgf("uncordoning worker %s", w.id)
+	if err := w.subscribeForWork(); err != nil {
+		return err
+	}
+	w.cordoned = false
+	return nil
+}
+
+func (w *Worker) isCordoned() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.cordoned
+}
+
+func (w *Worker) TaskCount() int {
+	return int(atomic.LoadInt32(&w.taskCount))
 }
 
 func (w *Worker) Stop() error {

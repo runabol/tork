@@ -35,8 +35,9 @@ func (e *Engine) initWorker() error {
 			Timeout:            conf.String("worker.limits.timeout"),
 			MaxResultSize:      conf.IntDefault("worker.limits.result", worker.DefaultMaxTaskResultSize),
 		},
-		Address:    conf.String("worker.address"),
-		Middleware: e.cfg.Middleware.Task,
+		Address:     conf.String("worker.address"),
+		Middleware:  e.cfg.Middleware.Task,
+		CordonToken: conf.String("worker.cordon.token"),
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error creating worker")
