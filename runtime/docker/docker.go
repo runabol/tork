@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,10 +48,6 @@ type DockerRuntime struct {
 	imageTTL    time.Duration
 	imageVerify bool
 	mu          sync.Mutex
-}
-
-type dockerLogsReader struct {
-	reader io.Reader
 }
 
 type pullRequest struct {
@@ -328,26 +323,6 @@ func parseMemory(limits *tork.TaskLimits) (int64, error) {
 		return 0, nil
 	}
 	return units.RAMInBytes(limits.Memory)
-}
-
-func (r dockerLogsReader) Read(p []byte) (int, error) {
-	hdr := make([]byte, 8)
-	_, err := r.reader.Read(hdr)
-	if err != nil {
-		if err != io.EOF {
-			return 0, err
-		}
-	}
-	count := binary.BigEndian.Uint32(hdr[4:8])
-	data := make([]byte, count)
-	_, err = r.reader.Read(data)
-	if err != nil {
-		if err != io.EOF {
-			return 0, err
-		}
-	}
-	n := copy(p, data)
-	return n, err
 }
 
 func (rt *DockerRuntime) imagePull(ctx context.Context, t *tork.Task, logger io.Writer) error {

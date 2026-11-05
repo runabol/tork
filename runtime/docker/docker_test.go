@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -37,59 +38,6 @@ func TestParseCPUs(t *testing.T) {
 	parsed, err = parseCPUs(&tork.TaskLimits{CPUs: "0.5"})
 	assert.NoError(t, err)
 	assert.Equal(t, int64(500000000), parsed)
-}
-
-func TestDockerLogsReader(t *testing.T) {
-	bs := []byte{}
-	for i := 0; i < 100; i++ {
-		bs = append(bs, []byte{1, 0, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111}...)
-	}
-	s := ""
-	for i := 0; i < 100; i++ {
-		s = s + "hello"
-	}
-	pr := dockerLogsReader{reader: bytes.NewReader(bs)}
-	b, err := io.ReadAll(pr)
-	assert.NoError(t, err)
-	assert.Equal(t, s, string(b))
-}
-
-func TestDockerLogsReaderNewLine(t *testing.T) {
-	s := []byte{}
-	for i := 0; i < 1000; i++ {
-		s = append(s, 0)
-	}
-	s = append(s, []byte{1, 0, 0, 0, 0, 0, 0, 12, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100, 10}...)
-	pr := dockerLogsReader{reader: bytes.NewReader(s)}
-	b, err := io.ReadAll(pr)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello world\n", string(b))
-}
-
-type eofReader struct {
-	hdr     []byte
-	data    []byte
-	hdrRead bool
-}
-
-func (r *eofReader) Read(p []byte) (int, error) {
-	if !r.hdrRead {
-		r.hdrRead = true
-		copy(p, r.hdr)
-		return len(r.hdr), nil
-	}
-	copy(p, r.data)
-	return len(r.data), io.EOF
-}
-
-func TestDockerLogsReaderEOF(t *testing.T) {
-	pr := dockerLogsReader{reader: &eofReader{
-		hdr:  []byte{1, 0, 0, 0, 0, 0, 0, 11},
-		data: []byte{104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100},
-	}}
-	b, err := io.ReadAll(pr)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello world", string(b))
 }
 
 func TestParseMemory(t *testing.T) {
@@ -149,6 +97,47 @@ func TestRunTaskCMDLogger(t *testing.T) {
 	<-processed
 }
 
+type slowWriter struct {
+	buf bytes.Buffer
+}
+
+func (w *slowWriter) Write(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	return w.buf.Write(p)
+}
+
+func TestRunTaskLogsNotTruncated(t *testing.T) {
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	w := &slowWriter{}
+	err = rt.doRun(context.Background(), &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		CMD:   []string{"sh", "-c", "for i in $(seq 1 300); do echo $i; done"},
+	}, w)
+	assert.NoError(t, err)
+	assert.Contains(t, w.buf.String(), "\n300\n")
+}
+
+func TestRunTaskLongLogLine(t *testing.T) {
+	const lineLen = 100 * 1024
+
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+
+	var buf bytes.Buffer
+	err = rt.doRun(context.Background(), &tork.Task{
+		ID:    uuid.NewUUID(),
+		Image: "busybox:stable",
+		CMD: []string{"sh", "-c",
+			fmt.Sprintf("awk 'BEGIN{for(i=0;i<%d;i++)printf \"x\"}'", lineLen)},
+	}, &buf)
+	assert.NoError(t, err)
+	assert.Equal(t, lineLen, strings.Count(buf.String(), "x"))
+	assert.NotContains(t, buf.String(), "\x00")
+}
+
 func TestRunTaskConcurrently(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
@@ -198,6 +187,7 @@ func TestRunTaskWithError(t *testing.T) {
 		Run:   "not_a_thing",
 	})
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not_a_thing")
 }
 
 func TestRunAndCancelTask(t *testing.T) {
