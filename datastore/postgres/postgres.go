@@ -1108,25 +1108,35 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 	searchTerm, tags := parseQuery(q)
 
 	offset := (page - 1) * size
+
+	// Look up the caller's user ID and role IDs (including the public role)
+	// up front, so the planner sees the actual values in the queries below.
+	var access struct {
+		UserID  *string        `db:"user_id"`
+		RoleIDs pq.StringArray `db:"role_ids"`
+	}
+	if currentUser != "" {
+		if err := ds.get(&access, `
+      SELECT (SELECT id FROM users WHERE username_ = $1) AS user_id,
+             ARRAY(
+               SELECT id FROM roles WHERE slug = 'public'
+               UNION
+               SELECT ur.role_id
+               FROM users_roles ur
+               JOIN users u ON u.id = ur.user_id
+               WHERE u.username_ = $1
+             ) AS role_ids`, currentUser); err != nil {
+			return nil, errors.Wrapf(err, "error getting the user's roles")
+		}
+	}
+
 	rs := make([]jobRecord, 0)
 	qry := fmt.Sprintf(`
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
-      ),
-      role_info AS (
-	    SELECT id AS role_id FROM roles WHERE slug = 'public'
-		UNION
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
+      WITH job_perms_info AS (
         SELECT distinct job_id
         FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
+        WHERE jp.user_id = $4
+        OR jp.role_id = ANY($5)
       )
       SELECT j.id,
              j.name,
@@ -1159,7 +1169,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
         ))
 	  ORDER BY j.created_at DESC 
 	  OFFSET %d LIMIT %d`, offset, size)
-	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser); err != nil {
+	if err := ds.select_(&rs, qry, searchTerm, pq.StringArray(tags), currentUser, access.UserID, access.RoleIDs); err != nil {
 		return nil, errors.Wrapf(err, "error getting a page of jobs")
 	}
 	createdByIDs := make([]string, len(rs))
@@ -1191,23 +1201,11 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
 
 	var count *int
 	if err := ds.get(&count, `
-      WITH user_info AS (
-        SELECT id AS user_id
-        FROM users
-        WHERE username_ = $3
-      ),
-      role_info AS (
-	    SELECT id AS role_id FROM roles WHERE slug = 'public'
-		UNION
-        SELECT role_id
-        FROM users_roles ur
-        JOIN user_info ui ON ur.user_id = ui.user_id
-      ),
-      job_perms_info AS (
+      WITH job_perms_info AS (
         SELECT distinct job_id
         FROM jobs_perms jp
-        WHERE jp.user_id = (SELECT user_id FROM user_info)
-        OR jp.role_id IN (SELECT role_id FROM role_info)
+        WHERE jp.user_id = $4
+        OR jp.role_id = ANY($5)
       )
       SELECT count(*)
       FROM jobs j
@@ -1221,7 +1219,7 @@ func (ds *PostgresDatastore) GetJobs(ctx context.Context, currentUser, q string,
            FROM job_perms_info jpi
            WHERE jpi.job_id = j.id
         ));
-	  `, searchTerm, pq.StringArray(tags), currentUser); err != nil {
+	  `, searchTerm, pq.StringArray(tags), currentUser, access.UserID, access.RoleIDs); err != nil {
 		return nil, errors.Wrapf(err, "error getting the jobs count")
 	}
 
