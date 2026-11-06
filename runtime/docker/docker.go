@@ -11,12 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	regtypes "github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
+	"github.com/moby/moby/api/types/container"
+	regtypes "github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -107,7 +105,7 @@ func WithImageVerify(verify bool) Option {
 }
 
 func NewDockerRuntime(opts ...Option) (*DockerRuntime, error) {
-	dc, err := client.NewClientWithOpts(client.FromEnv)
+	dc, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -263,16 +261,15 @@ func (rt *DockerRuntime) doRun(ctx context.Context, t *tork.Task, logger io.Writ
 }
 
 func (rt *DockerRuntime) HealthCheck(ctx context.Context) error {
-	_, err := rt.client.Ping(ctx)
+	_, err := rt.client.Ping(ctx, client.PingOptions{})
 	return err
 }
 
 func (rt *DockerRuntime) createNetwork(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), types.NetworkCreate{
-		CheckDuplicate: true,
-		Driver:         "bridge",
+	networkCreateResp, err := rt.client.NetworkCreate(ctx, uuid.NewUUID(), client.NetworkCreateOptions{
+		Driver: "bridge",
 	})
 	if err != nil {
 		return "", errors.Wrapf(err, "error creating network")
@@ -291,7 +288,7 @@ func (rt *DockerRuntime) removeNetwork(ctx context.Context, networkID string) {
 	// 200ms, 400ms, 800ms, 1600ms, 3200ms
 	delay := 200 * time.Millisecond
 	for i := range maxRetries {
-		err := rt.client.NetworkRemove(ctx, networkID)
+		_, err := rt.client.NetworkRemove(ctx, networkID, client.NetworkRemoveOptions{})
 		if err == nil {
 			log.Debug().Msgf("Successfully removed network %s", networkID)
 			return
@@ -424,7 +421,7 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 		}
 		authStr := base64.URLEncoding.EncodeToString(encodedJSON)
 		reader, err := d.client.ImagePull(
-			pr.ctx, pr.image, image.PullOptions{RegistryAuth: authStr})
+			pr.ctx, pr.image, client.ImagePullOptions{RegistryAuth: authStr})
 		if err != nil {
 			return err
 		}
@@ -439,7 +436,7 @@ func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
 	if d.imageVerify {
 		if err := d.verifyImage(pr.ctx, pr.image, pr.logger); err != nil {
 			log.Error().Err(err).Msgf("image %s is invalid or corrupted", pr.image)
-			if _, err := d.client.ImageRemove(context.Background(), pr.image, image.RemoveOptions{Force: true}); err != nil {
+			if _, err := d.client.ImageRemove(context.Background(), pr.image, client.ImageRemoveOptions{Force: true}); err != nil {
 				log.Error().Err(err).Msgf("error removing image %s after failed verification", pr.image)
 			}
 			return errors.Wrapf(err, "image %s is invalid or corrupted", pr.image)
@@ -460,10 +457,12 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger i
 	_, _ = fmt.Fprintf(logger, "verifying image %s\n", image)
 
 	// Create a test container without starting it
-	resp, err := rt.client.ContainerCreate(ctx, &container.Config{
-		Image: image,
-		Cmd:   []string{"true"}, // minimal command
-	}, nil, nil, nil, "")
+	resp, err := rt.client.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image: image,
+			Cmd:   []string{"true"}, // minimal command
+		},
+	})
 	if err != nil {
 		_, _ = fmt.Fprintf(logger, "image %s failed verification test: %v\n", image, err)
 		return errors.Wrapf(err, "image %s failed verification test", image)
@@ -471,7 +470,7 @@ func (rt *DockerRuntime) verifyImage(ctx context.Context, image string, logger i
 
 	// Clean up the test container
 	defer func() {
-		if err := rt.client.ContainerRemove(context.Background(), resp.ID, container.RemoveOptions{Force: true}); err != nil {
+		if _, err := rt.client.ContainerRemove(context.Background(), resp.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
 			log.Error().Err(err).Msgf("error removing test container %s", resp.ID)
 		}
 	}()
@@ -502,7 +501,7 @@ func (rt *DockerRuntime) prune(ctx context.Context) error {
 		if time.Since(t) > rt.imageTTL {
 			// remove the image if its last use was more than
 			// the imageTTL duration ago and is not currently in use
-			if _, err := rt.client.ImageRemove(ctx, img, image.RemoveOptions{Force: false}); err != nil {
+			if _, err := rt.client.ImageRemove(ctx, img, client.ImageRemoveOptions{Force: false}); err != nil {
 				return err
 			}
 			log.Debug().Msgf("pruned image %s", img)
@@ -515,12 +514,12 @@ func (rt *DockerRuntime) prune(ctx context.Context) error {
 func (rt *DockerRuntime) imageExistsLocally(ctx context.Context, name string) (bool, error) {
 	images, err := rt.client.ImageList(
 		ctx,
-		image.ListOptions{All: true},
+		client.ImageListOptions{All: true},
 	)
 	if err != nil {
 		return false, err
 	}
-	for _, img := range images {
+	for _, img := range images.Items {
 		for _, tag := range img.RepoTags {
 			if tag == name {
 				return true, nil

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/rs/zerolog/log"
 
 	"github.com/runabol/tork"
@@ -240,6 +240,29 @@ func TestHealthCheckFailed(t *testing.T) {
 	assert.Error(t, rt.HealthCheck(ctx))
 }
 
+// reportProgress relies on a missing progress file being a not-found error
+func TestCopyFromContainerNotFound(t *testing.T) {
+	ctx := context.Background()
+	rt, err := NewDockerRuntime()
+	assert.NoError(t, err)
+	assert.NoError(t, rt.imagePull(ctx, &tork.Task{Image: "busybox:stable"}, io.Discard))
+
+	resp, err := rt.client.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{Image: "busybox:stable", Cmd: []string{"true"}},
+	})
+	assert.NoError(t, err)
+	defer func() {
+		_, err := rt.client.ContainerRemove(ctx, resp.ID, client.ContainerRemoveOptions{Force: true})
+		assert.NoError(t, err)
+	}()
+
+	_, err = rt.client.CopyFromContainer(ctx, resp.ID, client.CopyFromContainerOptions{
+		SourcePath: "/tork/progress",
+	})
+	assert.Error(t, err)
+	assert.True(t, cerrdefs.IsNotFound(err))
+}
+
 func TestRunTaskWithNetwork(t *testing.T) {
 	rt, err := NewDockerRuntime()
 	assert.NoError(t, err)
@@ -248,14 +271,13 @@ func TestRunTaskWithNetwork(t *testing.T) {
 	ctx := context.Background()
 
 	nw := uuid.NewUUID()
-	networkCreateResp, err := rt.client.NetworkCreate(ctx, nw, types.NetworkCreate{
-		CheckDuplicate: true,
-		Driver:         "bridge",
+	networkCreateResp, err := rt.client.NetworkCreate(ctx, nw, client.NetworkCreateOptions{
+		Driver: "bridge",
 	})
 	assert.NoError(t, err)
 	log.Debug().Msgf("Created network %s with ID %s", nw, networkCreateResp.ID)
 	defer func() {
-		if err := rt.client.NetworkRemove(context.Background(), nw); err != nil {
+		if _, err := rt.client.NetworkRemove(context.Background(), nw, client.NetworkRemoveOptions{}); err != nil {
 			log.Error().Err(err).Msgf("error removing network %s", nw)
 		}
 	}()
@@ -508,13 +530,13 @@ func Test_imagePull(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 
-	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "busybox:*")),
+	images, err := rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "busybox:*"),
 	})
 	assert.NoError(t, err)
 
-	for _, img := range images {
-		_, err = rt.client.ImageRemove(ctx, img.ID, image.RemoveOptions{Force: true})
+	for _, img := range images.Items {
+		_, err = rt.client.ImageRemove(ctx, img.ID, client.ImageRemoveOptions{Force: true})
 		assert.NoError(t, err)
 	}
 
@@ -541,20 +563,23 @@ func Test_imagePullPrivateRegistry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
 
-	r1, err := rt.client.ImagePull(ctx, "busybox:stable", image.PullOptions{})
+	r1, err := rt.client.ImagePull(ctx, "busybox:stable", client.ImagePullOptions{})
 	assert.NoError(t, err)
 	assert.NoError(t, r1.Close())
 
-	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "busybox:stable")),
+	images, err := rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "busybox:stable"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 1)
+	assert.Len(t, images.Items, 1)
 
-	err = rt.client.ImageTag(ctx, "busybox:stable", "localhost:5001/tork/busybox:stable")
+	_, err = rt.client.ImageTag(ctx, client.ImageTagOptions{
+		Source: "busybox:stable",
+		Target: "localhost:5001/tork/busybox:stable",
+	})
 	assert.NoError(t, err)
 
-	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/busybox:stable", image.PushOptions{RegistryAuth: "noauth"})
+	r2, err := rt.client.ImagePush(ctx, "localhost:5001/tork/busybox:stable", client.ImagePushOptions{RegistryAuth: "noauth"})
 	assert.NoError(t, err)
 	assert.NoError(t, r2.Close())
 
@@ -597,11 +622,11 @@ func Test_doPullRequest(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	// check that the image is cached
-	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	images, err := rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "alpine:3.18.3"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 1)
+	assert.Len(t, images.Items, 1)
 
 	// get the image again (should be cached)
 	err = rt.doPullRequest(&pullRequest{
@@ -612,11 +637,11 @@ func Test_doPullRequest(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check that the image is still cached
-	images, err = rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	images, err = rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "alpine:3.18.3"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 1)
+	assert.Len(t, images.Items, 1)
 
 	err = rt.Run(context.Background(), &tork.Task{
 		ID:    uuid.NewUUID(),
@@ -771,7 +796,7 @@ func TestRunTaskWithSidecarNetworkCleanup(t *testing.T) {
 
 	var networkExists bool
 	for time.Now().Before(deadline) {
-		_, err := rt.client.NetworkInspect(ctx, networkID, types.NetworkInspectOptions{})
+		_, err := rt.client.NetworkInspect(ctx, networkID, client.NetworkInspectOptions{})
 		if err != nil {
 			// Network doesn't exist - cleanup succeeded
 			networkExists = false
@@ -817,7 +842,7 @@ func TestRunTaskWithSidecarNetworkCleanupOnError(t *testing.T) {
 
 		var networkExists bool
 		for time.Now().Before(deadline) {
-			_, err := rt.client.NetworkInspect(ctx, networkID, types.NetworkInspectOptions{})
+			_, err := rt.client.NetworkInspect(ctx, networkID, client.NetworkInspectOptions{})
 			if err != nil {
 				// Network doesn't exist - cleanup succeeded
 				networkExists = false
@@ -869,11 +894,11 @@ func Test_imagePullWithVerify(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify the image exists
-	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "busybox:stable")),
+	images, err := rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "busybox:stable"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 1)
+	assert.Len(t, images.Items, 1)
 
 	// Run a task using the pulled image
 	t1 := &tork.Task{
@@ -914,11 +939,11 @@ func Test_prune(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check that the image is cached
-	images, err := rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	images, err := rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "alpine:3.18.3"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 1)
+	assert.Len(t, images.Items, 1)
 
 	// Wait for the image to expire
 	time.Sleep(2 * time.Second)
@@ -928,11 +953,11 @@ func Test_prune(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check that the image has been removed
-	images, err = rt.client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", "alpine:3.18.3")),
+	images, err = rt.client.ImageList(ctx, client.ImageListOptions{
+		Filters: client.Filters{}.Add("reference", "alpine:3.18.3"),
 	})
 	assert.NoError(t, err)
-	assert.Len(t, images, 0)
+	assert.Len(t, images.Items, 0)
 }
 
 func TestVerifyImage_Success(t *testing.T) {
@@ -981,7 +1006,7 @@ func TestVerifyImage_PartialReadError(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Remove the image forcibly to simulate a read error
-	_, err = rt.client.ImageRemove(ctx, "busybox:stable", image.RemoveOptions{Force: true})
+	_, err = rt.client.ImageRemove(ctx, "busybox:stable", client.ImageRemoveOptions{Force: true})
 	assert.NoError(t, err)
 
 	// Now verifyImage should fail

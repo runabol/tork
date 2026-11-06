@@ -8,19 +8,18 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	cliopts "github.com/docker/cli/opts"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
-	"github.com/docker/go-connections/nat"
 	"github.com/gosimple/slug"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/runabol/tork"
@@ -31,13 +30,14 @@ import (
 )
 
 type tcontainer struct {
-	id      string
-	client  *client.Client
-	mounter runtime.Mounter
-	broker  broker.Broker
-	task    *tork.Task
-	logger  io.Writer
-	torkdir *tork.Mount
+	id        string
+	client    *client.Client
+	mounter   runtime.Mounter
+	broker    broker.Broker
+	task      *tork.Task
+	logger    io.Writer
+	torkdir   *tork.Mount
+	probePort network.Port
 }
 
 func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, logger io.Writer) (*tcontainer, error) {
@@ -153,15 +153,21 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 		Privileged:      rt.privileged,
 	}
 
+	var probePort network.Port
 	if t.Probe != nil {
-		containerConf.ExposedPorts = nat.PortSet{
-			nat.Port(fmt.Sprintf("%d/tcp", t.Probe.Port)): struct{}{}, // Expose the probe port
+		var ok bool
+		probePort, ok = network.PortFrom(uint16(t.Probe.Port), network.TCP)
+		if !ok {
+			return nil, errors.Errorf("invalid probe port: %d", t.Probe.Port)
+		}
+		containerConf.ExposedPorts = network.PortSet{
+			probePort: struct{}{}, // Expose the probe port
 		}
 
-		hc.PortBindings = nat.PortMap{
-			nat.Port(fmt.Sprintf("%d/tcp", t.Probe.Port)): []nat.PortBinding{
+		hc.PortBindings = network.PortMap{
+			probePort: []network.PortBinding{
 				{
-					HostIP:   "127.0.0.1",
+					HostIP:   netip.MustParseAddr("127.0.0.1"),
 					HostPort: "0", // Let Docker assign a random port
 				},
 			},
@@ -198,8 +204,11 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 	// where the attached volumes can't be removed and cleaned up.
 	createCtx, createCancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer createCancel()
-	resp, err := rt.client.ContainerCreate(
-		createCtx, &containerConf, &hc, &nc, nil, "")
+	resp, err := rt.client.ContainerCreate(createCtx, client.ContainerCreateOptions{
+		Config:           &containerConf,
+		HostConfig:       &hc,
+		NetworkingConfig: &nc,
+	})
 	if err != nil {
 		log.Error().Msgf(
 			"Error creating container using image %s: %v\n",
@@ -209,13 +218,14 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 	}
 
 	tc := &tcontainer{
-		id:      resp.ID,
-		client:  rt.client,
-		mounter: rt.mounter,
-		broker:  rt.broker,
-		task:    t,
-		torkdir: torkdir,
-		logger:  logger,
+		id:        resp.ID,
+		client:    rt.client,
+		mounter:   rt.mounter,
+		broker:    rt.broker,
+		task:      t,
+		torkdir:   torkdir,
+		logger:    logger,
+		probePort: probePort,
 	}
 
 	// initialize the tork and, optionally, the work directory
@@ -235,8 +245,8 @@ func createTaskContainer(ctx context.Context, rt *DockerRuntime, t *tork.Task, l
 func (tc *tcontainer) Start(ctx context.Context) error {
 	// start the container
 	log.Debug().Msgf("Starting container %s", tc.id)
-	err := tc.client.ContainerStart(
-		ctx, tc.id, container.StartOptions{})
+	_, err := tc.client.ContainerStart(
+		ctx, tc.id, client.ContainerStartOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "error starting container %s: %v\n", tc.id, err)
 	}
@@ -251,7 +261,7 @@ func (tc *tcontainer) Start(ctx context.Context) error {
 
 func (tc *tcontainer) Remove(ctx context.Context) error {
 	log.Debug().Msgf("Attempting to stop and remove container %v", tc.id)
-	if err := tc.client.ContainerRemove(ctx, tc.id, container.RemoveOptions{
+	if _, err := tc.client.ContainerRemove(ctx, tc.id, client.ContainerRemoveOptions{
 		RemoveVolumes: true,
 		RemoveLinks:   false,
 		Force:         true,
@@ -274,7 +284,7 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 	out, err := tc.client.ContainerLogs(
 		ctx,
 		tc.id,
-		container.LogsOptions{
+		client.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
@@ -297,16 +307,18 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 		}
 	}()
 	// wait for the task to finish execution
-	statusCh, errCh := tc.client.ContainerWait(ctx, tc.id, container.WaitConditionNotRunning)
+	wait := tc.client.ContainerWait(ctx, tc.id, client.ContainerWaitOptions{
+		Condition: container.WaitConditionNotRunning,
+	})
 	select {
-	case err := <-errCh: // error waiting for the container to finish
+	case err := <-wait.Error: // error waiting for the container to finish
 		return "", err
-	case status := <-statusCh:
+	case status := <-wait.Result:
 		if status.StatusCode != 0 { // error
 			out, err := tc.client.ContainerLogs(
 				ctx,
 				tc.id,
-				container.LogsOptions{
+				client.ContainerLogsOptions{
 					ShowStdout: true,
 					ShowStderr: true,
 					Tail:       "10",
@@ -350,23 +362,23 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 	}
 
 	// If there's a probe, get the assigned host port
-	insp, err := tc.client.ContainerInspect(ctx, tc.id)
+	insp, err := tc.client.ContainerInspect(ctx, tc.id, client.ContainerInspectOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "error inspecting container %s", tc.id)
 	}
-	ports := insp.NetworkSettings.Ports[nat.Port(fmt.Sprintf("%d/tcp", tc.task.Probe.Port))]
+	ports := insp.Container.NetworkSettings.Ports[tc.probePort]
 	if len(ports) == 0 {
 		return errors.Errorf("no port found for container %s", tc.id)
 	}
 
-	portStr := insp.NetworkSettings.Ports[nat.Port(fmt.Sprintf("%d/tcp", tc.task.Probe.Port))][0].HostPort
+	portStr := ports[0].HostPort
 	portNum, err := strconv.Atoi(portStr)
 	if err != nil {
 		return errors.Wrapf(err, "error parsing assigned port %s", portStr)
 	}
 
 	probeURL := fmt.Sprintf("http://localhost:%d%s", portNum, tc.task.Probe.Path)
-	client := &http.Client{
+	httpClient := &http.Client{
 		Timeout: time.Second * 3,
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -384,7 +396,7 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 	out, err := tc.client.ContainerLogs(
 		ctx,
 		tc.id,
-		container.LogsOptions{
+		client.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
@@ -420,7 +432,7 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 				fns.Fprintf(tc.logger, "Failed to create probe request for container %s. Retrying...\n", tc.id)
 				continue
 			}
-			res, err := client.Do(req)
+			res, err := httpClient.Do(req)
 			if err != nil {
 				fns.Fprintf(tc.logger, "Probe failed for container %s: %v. Retrying...\n", tc.id, err)
 				continue
@@ -439,8 +451,7 @@ func (tc *tcontainer) reportProgress(ctx context.Context) {
 	for {
 		progress, err := tc.readProgress(ctx)
 		if err != nil {
-			var notFoundError errdefs.ErrNotFound
-			if errors.As(err, &notFoundError) {
+			if cerrdefs.IsNotFound(err) {
 				return // progress file not found
 			}
 			if errors.Is(err, context.Canceled) {
@@ -464,17 +475,19 @@ func (tc *tcontainer) reportProgress(ctx context.Context) {
 }
 
 func (tc *tcontainer) readOutput(ctx context.Context) (string, error) {
-	r, _, err := tc.client.CopyFromContainer(ctx, tc.id, "/tork/stdout")
+	r, err := tc.client.CopyFromContainer(ctx, tc.id, client.CopyFromContainerOptions{
+		SourcePath: "/tork/stdout",
+	})
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		err := r.Close()
+		err := r.Content.Close()
 		if err != nil {
 			log.Error().Err(err).Msgf("error closing /tork/stdout reader")
 		}
 	}()
-	tr := tar.NewReader(r)
+	tr := tar.NewReader(r.Content)
 	var buf bytes.Buffer
 	for {
 		_, err := tr.Next()
@@ -493,17 +506,19 @@ func (tc *tcontainer) readOutput(ctx context.Context) (string, error) {
 }
 
 func (tc *tcontainer) readProgress(ctx context.Context) (float64, error) {
-	r, _, err := tc.client.CopyFromContainer(ctx, tc.id, "/tork/progress")
+	r, err := tc.client.CopyFromContainer(ctx, tc.id, client.CopyFromContainerOptions{
+		SourcePath: "/tork/progress",
+	})
 	if err != nil {
 		return 0, err
 	}
 	defer func() {
-		err := r.Close()
+		err := r.Content.Close()
 		if err != nil {
 			log.Error().Err(err).Msgf("error closing /tork/progress reader")
 		}
 	}()
-	tr := tar.NewReader(r)
+	tr := tar.NewReader(r.Content)
 	var buf bytes.Buffer
 	for {
 		_, err := tr.Next()
@@ -550,7 +565,10 @@ func (tc *tcontainer) initTorkdir(ctx context.Context) error {
 		}
 	}
 
-	if err := tc.client.CopyToContainer(ctx, tc.id, "/tork", ar, types.CopyToContainerOptions{}); err != nil {
+	if _, err := tc.client.CopyToContainer(ctx, tc.id, client.CopyToContainerOptions{
+		DestinationPath: "/tork",
+		Content:         ar,
+	}); err != nil {
 		return err
 	}
 
@@ -579,7 +597,10 @@ func (tc *tcontainer) initWorkDir(ctx context.Context) (err error) {
 		}
 	}
 
-	if err := tc.client.CopyToContainer(ctx, tc.id, tc.task.Workdir, ar, types.CopyToContainerOptions{}); err != nil {
+	if _, err := tc.client.CopyToContainer(ctx, tc.id, client.CopyToContainerOptions{
+		DestinationPath: tc.task.Workdir,
+		Content:         ar,
+	}); err != nil {
 		return err
 	}
 
