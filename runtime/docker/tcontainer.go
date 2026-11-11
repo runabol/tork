@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -283,19 +284,7 @@ func (tc *tcontainer) Wait(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting logs for container %s: %v\n", tc.id, err)
 	}
-	// close the stdout reader
-	defer func() {
-		if err := out.Close(); err != nil {
-			log.Error().Err(err).Msgf("error closing stdout on container %s", tc.id)
-		}
-	}()
-	// copy the container's stdout to the logger
-	go func() {
-		_, err = io.Copy(tc.logger, dockerLogsReader{reader: out})
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msgf("error reading the std out")
-		}
-	}()
+	defer streamLogs(out, tc.logger)()
 	// wait for the task to finish execution
 	statusCh, errCh := tc.client.ContainerWait(ctx, tc.id, container.WaitConditionNotRunning)
 	select {
@@ -393,19 +382,7 @@ func (tc *tcontainer) probeContainer(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "error getting logs for container %s: %v\n", tc.id, err)
 	}
-	// close the stdout reader
-	defer func() {
-		if err := out.Close(); err != nil {
-			log.Error().Err(err).Msgf("error closing stdout on container %s", tc.id)
-		}
-	}()
-	// copy the container's stdout to the logger
-	go func() {
-		_, err = io.Copy(tc.logger, dockerLogsReader{reader: out})
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msgf("error reading the std out")
-		}
-	}()
+	defer streamLogs(out, tc.logger)()
 
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -460,6 +437,35 @@ func (tc *tcontainer) reportProgress(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// streamLogs streams multiplexed container logs to w in the background.
+// The returned function closes the reader, waits for the copy to finish, and
+// logs unexpected read errors.
+func streamLogs(out io.ReadCloser, w io.Writer) func() {
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(w, dockerLogsReader{reader: out})
+		done <- err
+	}()
+	return func() {
+		fns.CloseIgnore(out)
+		err := <-done
+		if err == nil ||
+			errors.Is(err, io.EOF) ||
+			errors.Is(err, context.Canceled) ||
+			errors.Is(err, io.ErrClosedPipe) ||
+			errors.Is(err, io.ErrUnexpectedEOF) ||
+			errors.Is(err, os.ErrClosed) ||
+			errors.Is(err, net.ErrClosed) ||
+			errors.Is(err, http.ErrBodyReadAfterClose) {
+			return
+		}
+		if err.Error() == "http: read on closed response body" {
+			return
+		}
+		log.Error().Err(err).Msgf("error reading the std out")
 	}
 }
 
