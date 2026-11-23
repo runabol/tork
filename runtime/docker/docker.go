@@ -379,16 +379,6 @@ func (rt *DockerRuntime) puller() {
 // doPullRequest handles the pull queue requests.
 // Relies on the fact that pull requests are handled serially
 func (d *DockerRuntime) doPullRequest(pr *pullRequest) error {
-	// check if we have the image already
-	d.mu.Lock()
-	_, ok := d.images[pr.image]
-	d.mu.Unlock()
-	if ok {
-		d.mu.Lock()
-		d.images[pr.image] = time.Now()
-		d.mu.Unlock()
-		return nil
-	}
 	// let's check if we have the image locally already
 	imageExists, err := d.imageExistsLocally(pr.ctx, pr.image)
 	if err != nil {
