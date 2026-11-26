@@ -82,7 +82,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		tasks:      tasks,
 		limits:     cfg.Limits,
 		api:        newAPI(cfg, tasks),
-		stop:       make(chan any),
+		stop:       make(chan any, 1),
 		middleware: cfg.Middleware,
 	}
 	return w, nil
