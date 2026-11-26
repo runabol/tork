@@ -23,25 +23,35 @@ const (
 )
 
 type api struct {
-	server  *http.Server
-	broker  broker.Broker
-	runtime runtime.Runtime
-	tasks   *syncx.Map[string, runningTask]
-	port    int
+	server      *http.Server
+	broker      broker.Broker
+	runtime     runtime.Runtime
+	tasks       *syncx.Map[string, runningTask]
+	worker      *Worker
+	cordonToken string
+	port        int
 }
 
-func newAPI(cfg Config, tasks *syncx.Map[string, runningTask]) *api {
+func newAPI(cfg Config, tasks *syncx.Map[string, runningTask], w *Worker) *api {
 	r := echo.New()
 	s := &api{
-		runtime: cfg.Runtime,
-		broker:  cfg.Broker,
-		tasks:   tasks,
+		runtime:     cfg.Runtime,
+		broker:      cfg.Broker,
+		tasks:       tasks,
+		worker:      w,
+		cordonToken: cfg.CordonToken,
 		server: &http.Server{
 			Addr:    cfg.Address,
 			Handler: r,
 		},
 	}
 	r.GET("/health", s.health)
+	r.GET("/status", s.status)
+	// cordon endpoints require a configured token; disabled without one
+	if s.cordonToken != "" {
+		r.POST("/cordon", s.cordon, s.requireCordonToken)
+		r.POST("/uncordon", s.uncordon, s.requireCordonToken)
+	}
 	return s
 }
 

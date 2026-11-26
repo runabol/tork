@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -116,6 +117,89 @@ func TestInMemoryDeleteQueue(t *testing.T) {
 	qis, err = b.Queues(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(qis))
+}
+
+func TestInMemoryUnsubscribe(t *testing.T) {
+	ctx := context.Background()
+	b := broker.NewInMemoryBroker()
+	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
+	var count int32
+	err := b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		atomic.AddInt32(&count, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+	qis, err := b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, qis[0].Subscribers)
+
+	// unsubscribe -- consumers should be gone
+	err = b.Unsubscribe(qname)
+	assert.NoError(t, err)
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, qis[0].Subscribers)
+	// let the cancelled consumer goroutine fully exit before re-subscribing so
+	// it can't race the new consumer for the next published task.
+	time.Sleep(time.Millisecond * 100)
+
+	// re-subscribe -- delivery resumes for newly published tasks
+	var count2 int32
+	err = b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		atomic.AddInt32(&count2, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+	qis, err = b.Queues(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, qis[0].Subscribers)
+
+	err = b.PublishTask(ctx, qname, &tork.Task{ID: "t2"})
+	assert.NoError(t, err)
+	time.Sleep(time.Millisecond * 100)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&count2))
+}
+
+func TestInMemoryUnsubscribeUnknownQueue(t *testing.T) {
+	b := broker.NewInMemoryBroker()
+	// unsubscribing from a queue that was never subscribed is a no-op
+	err := b.Unsubscribe(fmt.Sprintf("nope-%s", uuid.NewUUID()))
+	assert.NoError(t, err)
+}
+
+// TestInMemoryUnsubscribeStopsBacklog verifies a cancelled consumer does not
+// keep draining a queued backlog: with the terminate case prioritized it may
+// process at most one more task, not the whole queue.
+func TestInMemoryUnsubscribeStopsBacklog(t *testing.T) {
+	ctx := context.Background()
+	b := broker.NewInMemoryBroker()
+	qname := fmt.Sprintf("test-queue-%s", uuid.NewUUID())
+	release := make(chan struct{})
+	started := make(chan struct{}, 1)
+	var count int32
+	err := b.SubscribeForTasks(qname, func(t *tork.Task) error {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release // hold the consumer inside the handler
+		atomic.AddInt32(&count, 1)
+		return nil
+	})
+	assert.NoError(t, err)
+
+	// enqueue a backlog and wait until the consumer is busy on the first task
+	for i := 0; i < 20; i++ {
+		assert.NoError(t, b.PublishTask(ctx, qname, &tork.Task{}))
+	}
+	<-started
+
+	assert.NoError(t, b.Unsubscribe(qname))
+	close(release) // let the in-flight (and any single extra) task finish
+	time.Sleep(time.Millisecond * 100)
+
+	// far fewer than the 20 enqueued should have been processed
+	assert.LessOrEqual(t, atomic.LoadInt32(&count), int32(2))
 }
 
 func TestInMemoryPublishAndSubsribeForHeartbeat(t *testing.T) {

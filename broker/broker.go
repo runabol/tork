@@ -21,6 +21,9 @@ const (
 type Broker interface {
 	PublishTask(ctx context.Context, qname string, t *tork.Task) error
 	SubscribeForTasks(qname string, handler func(t *tork.Task) error) error
+	// Unsubscribe cancels all consumers for a queue without waiting for
+	// in-flight handlers, which are left to complete and ack.
+	Unsubscribe(qname string) error
 
 	PublishTaskProgress(ctx context.Context, t *tork.Task) error
 	SubscribeForTaskProgress(handler func(t *tork.Task) error) error
